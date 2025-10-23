@@ -1,6 +1,15 @@
 import * as THREE from 'three';
 import * as UTILS from '/utils.js';
 import * as G from '/globals.js';
+import simVert from './sim.vert?raw';
+import simFrag from './sim.frag?raw';
+import noWrapSimFrag from './nowrapsim.frag?raw';
+import pointVert from './point.vert?raw';
+import pointFrag from './point.frag?raw';
+import trailFrag from './trail.frag?raw';
+import trailLineVert from './trailLine.vert?raw';
+import trailDecayVert from './trailDecay.vert?raw';
+import trailDecayFrag from './trailDecay.frag?raw';
 
 async function loadShader(url) {
     const res = await fetch(url);
@@ -45,16 +54,16 @@ document.onmouseup = event => {
     mouseDown = false;
 }
 
-const simVert = await loadShader('sim.vert');
-const simFrag = await loadShader('sim.frag');
-const noWrapSimFrag = await loadShader('nowrapsim.frag');
-const pointVert = await loadShader('point.vert');
-const pointFrag = await loadShader('point.frag');
-// trail will use the same sim.vert shader
-const trailFrag = await loadShader('trail.frag');
-const trailLineVert = await loadShader('trailLine.vert');
-const trailDecayVert = await loadShader('trailDecay.vert');
-const trailDecayFrag = await loadShader('trailDecay.frag');
+// const simVert = await loadShader('sim.vert');
+// const simFrag = await loadShader('sim.frag');
+// const noWrapSimFrag = await loadShader('nowrapsim.frag');
+// const pointVert = await loadShader('point.vert');
+// const pointFrag = await loadShader('point.frag');
+// // trail will use the same sim.vert shader
+// const trailFrag = await loadShader('trail.frag');
+// const trailLineVert = await loadShader('trailLine.vert');
+// const trailDecayVert = await loadShader('trailDecay.vert');
+// const trailDecayFrag = await loadShader('trailDecay.frag');
 // we hold both of those to achieve sim.
 // sim will hold the Data, draw will show it.
 const sceneSim = new THREE.Scene();
@@ -155,7 +164,7 @@ const matSim = new THREE.RawShaderMaterial({
         uCanvas: { value: new THREE.Vector2(W, H) },
         uTime: { value: 0 },
         uDt: { value: 0.1 },
-        uDrag: { value: G.DRAG },
+        // uDrag: { value: G.DRAG },
         uStepLen: { value: G.STEP_LEN },
         uJitter: { value: G.JITTER },
         uMouseDown: { value: mouseDown},
