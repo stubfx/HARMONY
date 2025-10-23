@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>My first three.js app</title>
+    <style>
+      body { 
+        margin: 0;
+        background-color: #000000;
+        }
+        .info {
+            position: absolute;
+            display: flex;
+            bottom: 0;
+            right: 0;
+            background: black;
+            z-index: 9999;
+            color: green;
+        }
+    </style>
+  </head>
+  <body>
+    <script type="module" src="/utils.js"></script>
+    <script type="module" src="/main.js"></script>
+        <div class="info">
+            <span id="fps">N/A</span>
+        </div>
+  </body>
+</html>
