@@ -20,7 +20,7 @@ void main(){
     gl_PointSize = uPointSize;
     vImportance = 1.0;
     if (index % 10000 == 0) {
-        vImportance = 1000.0;
+        vImportance = 100.0;
         gl_PointSize *= 5.0;
     }
 }

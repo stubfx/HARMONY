@@ -10,6 +10,8 @@ import trailFrag from './trail.frag?raw';
 import trailLineVert from './trailLine.vert?raw';
 import trailDecayVert from './trailDecay.vert?raw';
 import trailDecayFrag from './trailDecay.frag?raw';
+import imgUrl from './assets/screenshot.png';
+import { texture } from 'three/tsl';
 
 async function loadShader(url) {
     const res = await fetch(url);
@@ -22,6 +24,10 @@ let mouseDown = false;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
+const texLoader = new THREE.TextureLoader();
+const customImage = texLoader.load(imgUrl, () => {
+    customImage.colorSpace = THREE.SRGBColorSpace;
+});
 
 const renderer = new THREE.WebGLRenderer();
 const trailRenderer = new THREE.WebGLRenderer();
@@ -176,6 +182,7 @@ const matSim = new THREE.RawShaderMaterial({
 matSim.uniforms.uTrail     = { value: trailRead.texture };
 matSim.uniforms.uSenseDist = { value: 20 };  // try 20–40
 matSim.uniforms.uSenseAngle= { value: 0.3 };   // ~34°
+// matSim.uniforms.uTurnRate  = { value: 40 };   // rad/sec
 matSim.uniforms.uTurnRate  = { value: 50 };   // rad/sec
 const quadSim = new THREE.Mesh(fsq, matSim); 
 sceneSim.add(quadSim);
@@ -252,6 +259,8 @@ const matTrailDecay = new THREE.RawShaderMaterial({
         uCanvas:    { value: new THREE.Vector2(W, H) },
         uMouseCoords: { value: prevmousecoords},
         uMouseDown: { value: mouseDown},
+        uCustomImage: { value: customImage},
+        uHasCustomImage: { value: true}
     },
     vertexShader: trailDecayVert,
     fragmentShader: trailDecayFrag,

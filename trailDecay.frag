@@ -3,6 +3,8 @@ precision highp sampler2D;
 
 uniform sampler2D uPrevDecay; // W×H
 uniform sampler2D uDeposit;   // W×H
+uniform bool uHasCustomImage;
+uniform sampler2D uCustomImage;
 uniform float     uDecay;     // e.g. 0.985..0.999
 out vec4 fc;
 uniform vec2 uMouseCoords;
@@ -22,5 +24,10 @@ void main() {
         // if we are close to mouse coords clean up.
         if (distance(gl_FragCoord.xy, uMouseCoords) < 100.0) d = 0.0;
     }
-    fc = vec4(d, 0.0, 0.0, 1.0);
+    vec4 color = vec4(d, 0.0,0.0,0.0);
+    if (uHasCustomImage) {
+        vec4 customImage = texelFetch(uCustomImage,   uv, 0);
+        color += customImage * 1000.0;
+    }
+    fc = color;
 }
