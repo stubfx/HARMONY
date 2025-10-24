@@ -5,6 +5,7 @@ uniform sampler2D uPrevDecay; // W×H
 uniform sampler2D uDeposit;   // W×H
 uniform bool uHasCustomImage;
 uniform sampler2D uCustomImage;
+uniform vec2 uCustomImageSize;
 uniform float     uDecay;     // e.g. 0.985..0.999
 uniform float uImageArea;
 uniform vec2 uMouseCoords;
@@ -25,10 +26,15 @@ void main() {
     vec4 color = d;
     if (uHasCustomImage) {
         if (uMouseDown) {
-    // current coords from custom texture placements for test.
             // if (distance(gl_FragCoord.xy, uMouseCoords) < 100.0) d = 0.0;
             float dist = distance(gl_FragCoord.xy, uMouseCoords);
-            vec4 customImage = texelFetch(uCustomImage,   uv, 0);
+            // ivec2 imagePlacement  = ivec2(uCanvas/2.0 - gl_FragCoord.xy);
+            vec2 topLeft = 0.5 * (uCanvas - uCustomImageSize);
+            ivec2 imagePlacement  = ivec2(floor(gl_FragCoord.xy - topLeft));
+            // image dimensions should be fixed.
+            // we subtract half the dimensions of them.
+            // imagePlacement += ivec2(uCustomImageSize)/2;
+            vec4 customImage = texelFetch(uCustomImage,   imagePlacement, 0);
             if (dist < uImageArea) {
                 // consider only the image at this coords.
                 // d = vec4(100.0/dist);
@@ -38,7 +44,7 @@ void main() {
             fc = customImage * dist;
             return;
             }
-            fc = customImage += d;
+            fc = customImage + d;
             // color += customImage * 1000.0;
         }
     }

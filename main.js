@@ -8,7 +8,7 @@ import pointFrag from './point.frag?raw';
 import trailFrag from './trail.frag?raw';
 import trailDecayVert from './trailDecay.vert?raw';
 import trailDecayFrag from './trailDecay.frag?raw';
-import imgUrl from './assets/poli1.png';
+import imgUrl from './assets/aim.png';
 
 async function loadShader(url) {
     const res = await fetch(url);
@@ -19,11 +19,16 @@ let prevmousecoords = [0.0, 0.0];
 let mouseDown = false;
 
 
+//dealing with this tomorrow. it's late.
+let customImageTopLeft = 0;
+
+
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
 const texLoader = new THREE.TextureLoader();
 const customImage = texLoader.load(imgUrl, () => {
     customImage.colorSpace = THREE.SRGBColorSpace;
+    console.log(customImage.width, customImage.height);
 });
 
 const renderer = new THREE.WebGLRenderer();
@@ -207,10 +212,12 @@ const matPoints = new THREE.RawShaderMaterial({
         uTexSize: { value: new THREE.Vector2(G.TEX_SIDE, G.TEX_SIDE) },
         uCanvas: { value: new THREE.Vector2(W, H) },
         uPointSize:{ value: G.POINT_SIZE },
-        uCustomImage: { value: customImage},
         uMouseDown: {value: false},
         uMouseCoords: {value: prevmousecoords},
-        uHasCustomImage: { value: true},
+        uImageArea: { value: G.IMAGE_AREA},
+        uCustomImageSize: {value: new THREE.Vector2(customImage.width, customImage.height)},
+        uCustomImage: { value: customImage},
+        uHasCustomImage: { value: false},
         uImageArea: { value: G.IMAGE_AREA},
     },
     vertexShader: pointVert,
@@ -253,12 +260,13 @@ const matTrailDecay = new THREE.RawShaderMaterial({
         // check this color that is making everything blue
         uDecay:      { value: 0.8 },               // keep ~98.5% per frame (tune)
         uDt:         { value: 0.2 },
-        uCanvas:    { value: new THREE.Vector2(W, H) },
         uMouseCoords: { value: prevmousecoords},
         uMouseDown: { value: mouseDown}, 
+        uCustomImageSize: {value: new THREE.Vector2(customImage.width, customImage.height)},
         uCustomImage: { value: customImage},
-        uHasCustomImage: { value: true},
+        uHasCustomImage: { value: false},
         uImageArea: { value: G.IMAGE_AREA},
+        uCanvas:    { value: new THREE.Vector2(W, H) },
     },
     vertexShader: trailDecayVert,
     fragmentShader: trailDecayFrag,
@@ -310,6 +318,12 @@ function frame() {
 
     matTrailDecay.uniforms.uMouseCoords.value = prevmousecoords;
     matTrailDecay.uniforms.uMouseDown.value = mouseDown;
+    matTrailDecay.uniforms.uCustomImageSize.value = new THREE.Vector2(customImage.width, customImage.height);
+    matTrailDecay.uniforms.uCustomImage.value = customImage;
+    matTrailDecay.uniforms.uHasCustomImage.value = true;
+    matPoints.uniforms.uCustomImageSize.value = new THREE.Vector2(customImage.width, customImage.height);
+    matPoints.uniforms.uCustomImage.value = customImage;
+    matPoints.uniforms.uHasCustomImage.value = true;
     matPoints.uniforms.uMouseDown.value = mouseDown;
     matPoints.uniforms.uMouseCoords.value = prevmousecoords;
     matSim.uniforms.uMouseDown.value = mouseDown;

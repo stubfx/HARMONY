@@ -1,6 +1,8 @@
 precision highp float; out vec4 fragColor;
 in float vImportance;
 uniform sampler2D uCustomImage;
+uniform vec2 uCustomImageSize;
+uniform vec2 uCanvas;
 uniform vec2 uMouseCoords;
 uniform bool uMouseDown;
 uniform bool uHasCustomImage;
@@ -16,7 +18,9 @@ void main(){
     if (uMouseDown) {
         if (uHasCustomImage) {
             // color = vec4(0.3,0.3,0.3,.6);
-            vec4 customImage = texelFetch(uCustomImage,   ivec2(gl_FragCoord.xy), 0);
+            vec2 topLeft = 0.5 * (uCanvas - uCustomImageSize);
+            ivec2 imagePlacement  = ivec2(floor(gl_FragCoord.xy - topLeft));
+            vec4 customImage = texelFetch(uCustomImage,   imagePlacement, 0);
             float dist = distance(gl_FragCoord.xy, uMouseCoords);
             // if (dist < 500.0) color.xyz = customImage.xyz;
             if (dist < uImageArea) {
