@@ -8,7 +8,7 @@ import pointFrag from './point.frag?raw';
 import trailFrag from './trail.frag?raw';
 import trailDecayVert from './trailDecay.vert?raw';
 import trailDecayFrag from './trailDecay.frag?raw';
-import imgUrl from './assets/screenshot.png';
+import imgUrl from './assets/poli1.png';
 
 async function loadShader(url) {
     const res = await fetch(url);
@@ -27,16 +27,11 @@ const customImage = texLoader.load(imgUrl, () => {
 });
 
 const renderer = new THREE.WebGLRenderer();
-const trailRenderer = new THREE.WebGLRenderer();
 renderer.autoClear = false;
-trailRenderer.autoClear = false;
 // renderer.setSize(1000, 1000);
 renderer.setSize( window.innerWidth, window.innerHeight );
-trailRenderer.setSize( window.innerWidth, window.innerHeight );
 document.body.appendChild( renderer.domElement );
-console.log('devicePixelRatio', window.devicePixelRatio);
-renderer.setPixelRatio( window.devicePixelRatio );
-trailRenderer.setPixelRatio( window.devicePixelRatio/3 );
+renderer.setPixelRatio( window.devicePixelRatio*G.RENDER_QUALITY);
 const W = renderer.domElement.width, H = renderer.domElement.height;
 const fpsEl = document.querySelector("#fps");
 
@@ -260,7 +255,7 @@ const matTrailDecay = new THREE.RawShaderMaterial({
         uDt:         { value: 0.2 },
         uCanvas:    { value: new THREE.Vector2(W, H) },
         uMouseCoords: { value: prevmousecoords},
-        uMouseDown: { value: mouseDown},
+        uMouseDown: { value: mouseDown}, 
         uCustomImage: { value: customImage},
         uHasCustomImage: { value: true},
         uImageArea: { value: G.IMAGE_AREA},

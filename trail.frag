@@ -12,5 +12,5 @@ void main() {
     float d = length(gl_PointCoord - 0.5);
     float m = smoothstep(0.5, 0.0, d);  // soft edge
     m *= uStrength * vImportance;
-    fragColor = vec4(m, 0.0, 0.0, 1.0);        // write density into .r
+    fragColor = vec4(0.0, 0.0, 0.0, m);        // write density into .r
 }

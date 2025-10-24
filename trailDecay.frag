@@ -7,9 +7,10 @@ uniform bool uHasCustomImage;
 uniform sampler2D uCustomImage;
 uniform float     uDecay;     // e.g. 0.985..0.999
 uniform float uImageArea;
-out vec4 fc;
 uniform vec2 uMouseCoords;
 uniform bool uMouseDown;
+uniform vec2 uCanvas;
+out vec4 fc;
 
 
 void main() {
