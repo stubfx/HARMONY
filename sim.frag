@@ -22,7 +22,9 @@ float sampleTrailPX(vec2 pPx) {
     // pPx is in pixel coords, origin = bottom-left
     vec2 p = clamp(pPx, vec2(0.0), uCanvas - vec2(1.0));
     ivec2 uv = ivec2(p);
-    return texelFetch(uTrail, uv, 0).r;  // use .r channel for density
+    // return texelFetch(uTrail, uv, 0).r;  // use .r channel for density
+    vec4 tx = texelFetch(uTrail, uv, 0);
+    return tx.r + tx.g + tx.b;
 }
 
 float sampleTrailPX_flipped(vec2 pPx) {

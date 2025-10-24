@@ -3,15 +3,12 @@ import * as UTILS from '/utils.js';
 import * as G from '/globals.js';
 import simVert from './sim.vert?raw';
 import simFrag from './sim.frag?raw';
-import noWrapSimFrag from './nowrapsim.frag?raw';
 import pointVert from './point.vert?raw';
 import pointFrag from './point.frag?raw';
 import trailFrag from './trail.frag?raw';
-import trailLineVert from './trailLine.vert?raw';
 import trailDecayVert from './trailDecay.vert?raw';
 import trailDecayFrag from './trailDecay.frag?raw';
 import imgUrl from './assets/screenshot.png';
-import { texture } from 'three/tsl';
 
 async function loadShader(url) {
     const res = await fetch(url);
@@ -215,6 +212,9 @@ const matPoints = new THREE.RawShaderMaterial({
         uTexSize: { value: new THREE.Vector2(G.TEX_SIDE, G.TEX_SIDE) },
         uCanvas: { value: new THREE.Vector2(W, H) },
         uPointSize:{ value: G.POINT_SIZE },
+        uCustomImage: { value: customImage},
+        uMouseDown: {value: false},
+        uHasCustomImage: { value: true}
     },
     vertexShader: pointVert,
     fragmentShader: pointFrag,
@@ -312,6 +312,7 @@ function frame() {
 
     matTrailDecay.uniforms.uMouseCoords.value = prevmousecoords;
     matTrailDecay.uniforms.uMouseDown.value = mouseDown;
+    matPoints.uniforms.uMouseDown.value = mouseDown;
     matSim.uniforms.uMouseDown.value = mouseDown;
     matTrailDeposit.uniforms.uState.value = writeRT.texture;   // deposit uses agent positions
     // matTrailDeposit.uniforms.uDt.value = dt;

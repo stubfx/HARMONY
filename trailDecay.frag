@@ -20,14 +20,16 @@ void main() {
     float decay = dec.r - 0.1 * uDecay;
     // float d = max(dec.r * uDecay, dep.r);
     float d = max(decay + dep.r, 0.0);
-    if (uMouseDown) {
-        // if we are close to mouse coords clean up.
-        if (distance(gl_FragCoord.xy, uMouseCoords) < 100.0) d = 0.0;
-    }
     vec4 color = vec4(d, 0.0,0.0,0.0);
     if (uHasCustomImage) {
-        vec4 customImage = texelFetch(uCustomImage,   uv, 0);
-        color += customImage * 1000.0;
+        if (uMouseDown) {
+            // if we are close to mouse coords clean up.
+            // if (distance(gl_FragCoord.xy, uMouseCoords) < 100.0) d = 0.0;
+            vec4 customImage = texelFetch(uCustomImage,   uv, 0);
+            fc = customImage;
+            return;
+            // color += customImage * 1000.0;
+        }
     }
     fc = color;
 }
