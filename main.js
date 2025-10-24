@@ -214,7 +214,9 @@ const matPoints = new THREE.RawShaderMaterial({
         uPointSize:{ value: G.POINT_SIZE },
         uCustomImage: { value: customImage},
         uMouseDown: {value: false},
-        uHasCustomImage: { value: true}
+        uMouseCoords: {value: prevmousecoords},
+        uHasCustomImage: { value: true},
+        uImageArea: { value: G.IMAGE_AREA},
     },
     vertexShader: pointVert,
     fragmentShader: pointFrag,
@@ -260,7 +262,8 @@ const matTrailDecay = new THREE.RawShaderMaterial({
         uMouseCoords: { value: prevmousecoords},
         uMouseDown: { value: mouseDown},
         uCustomImage: { value: customImage},
-        uHasCustomImage: { value: true}
+        uHasCustomImage: { value: true},
+        uImageArea: { value: G.IMAGE_AREA},
     },
     vertexShader: trailDecayVert,
     fragmentShader: trailDecayFrag,
@@ -313,6 +316,7 @@ function frame() {
     matTrailDecay.uniforms.uMouseCoords.value = prevmousecoords;
     matTrailDecay.uniforms.uMouseDown.value = mouseDown;
     matPoints.uniforms.uMouseDown.value = mouseDown;
+    matPoints.uniforms.uMouseCoords.value = prevmousecoords;
     matSim.uniforms.uMouseDown.value = mouseDown;
     matTrailDeposit.uniforms.uState.value = writeRT.texture;   // deposit uses agent positions
     // matTrailDeposit.uniforms.uDt.value = dt;
