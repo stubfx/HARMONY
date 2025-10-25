@@ -51,14 +51,11 @@ document.onkeydown = (event) => {
 document.onkeyup = (event) => {
     if (event.key == "n") nuke = false;
 }
-document.onmousemove = (event)=> {
-    // fix coords to the center of the screen
-    const x = event.clientX;
-    const y = H - event.clientY;
-    // console.log(event.clientX, event.clientY);
-    // fix mousecoords to match 0 at center of screen.
-    prevmousecoords = [x * RES, y * RES];
-}
+document.onmousemove = (e) => {
+  const xDev = e.clientX * RES;
+  const yDev = (window.innerHeight - e.clientY) * RES; // flip in CSS, then scale
+  prevmousecoords = [xDev, yDev];
+};
 
 document.onmousedown = event => {
     mouseDown = true;
