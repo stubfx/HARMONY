@@ -36,14 +36,30 @@ const customImage = texLoader.load(imgUrl, () => {
     console.log(customImage.width, customImage.height);
 });
 
+// renderer section
 const renderer = new THREE.WebGLRenderer();
 renderer.autoClear = false;
 // renderer.setSize(1000, 1000);
 renderer.setSize( window.innerWidth, window.innerHeight );
-document.body.appendChild( renderer.domElement );
 renderer.setPixelRatio(RES);
+const bufferSize = new THREE.Vector2();
+renderer.getDrawingBufferSize(bufferSize);
+
+
+document.body.appendChild( renderer.domElement );
+
 const W = renderer.domElement.width, H = renderer.domElement.height;
 const fpsEl = document.querySelector("#fps");
+
+function refreshSizes() {
+  renderer.getDrawingBufferSize(bufferSize);     // device px
+}
+refreshSizes();
+window.addEventListener('resize', () => {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  refreshSizes();
+});
+
 document.onkeydown = (event) => {
     nuke = event.key == "n";
 }
@@ -55,7 +71,7 @@ document.onmousemove = (e) => {
   const xDev = e.clientX * RES;
   const yDev = (window.innerHeight - e.clientY) * RES; // flip in CSS, then scale
   prevmousecoords = [xDev, yDev];
-};
+}
 
 document.onmousedown = event => {
     mouseDown = true;
@@ -76,11 +92,11 @@ const camera = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
 
 let rtA = UTILS.makeRT();
 let rtB = UTILS.makeRT();
-const trailA = UTILS.makeTrailRT(W, H);
-const trailB = UTILS.makeTrailRT(W, H);
+const trailA = UTILS.makeTrailRT(bufferSize.x, bufferSize.y);
+const trailB = UTILS.makeTrailRT(bufferSize.x, bufferSize.y);
 let trailRead = trailA, trailWrite = trailB;
-let trailDecayTxA = UTILS.makeTrailRT(W, H);
-let trailDecayTxB = UTILS.makeTrailRT(W, H);
+let trailDecayTxA = UTILS.makeTrailRT(bufferSize.x, bufferSize.y);
+let trailDecayTxB = UTILS.makeTrailRT(bufferSize.x, bufferSize.y);
 let trailDecayRead = trailDecayTxA, trailDecayWrite = trailDecayTxB;
 
 // clear once
@@ -305,6 +321,11 @@ function frame() {
     let dt = Math.min(Math.max(now - prev, timeMult), 0.05);
 
     prev = now;
+    matSim.uniforms.uCanvas.value = bufferSize.clone();
+    matTrailDeposit.uniforms.uCanvas.value = bufferSize.clone();
+    matTrailDecay.uniforms.uCanvas.value = bufferSize.clone();
+    matPoints.uniforms.uCanvas.value = bufferSize.clone();
+
     matSim.uniforms.uTrail.value = trailDecayRead.texture;
     matSim.uniforms.uState.value = readRT.texture;
     matSim.uniforms.uTime.value  = now;
