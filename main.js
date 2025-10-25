@@ -58,16 +58,6 @@ document.onmouseup = event => {
     mouseDown = false;
 }
 
-// const simVert = await loadShader('sim.vert');
-// const simFrag = await loadShader('sim.frag');
-// const noWrapSimFrag = await loadShader('nowrapsim.frag');
-// const pointVert = await loadShader('point.vert');
-// const pointFrag = await loadShader('point.frag');
-// // trail will use the same sim.vert shader
-// const trailFrag = await loadShader('trail.frag');
-// const trailLineVert = await loadShader('trailLine.vert');
-// const trailDecayVert = await loadShader('trailDecay.vert');
-// const trailDecayFrag = await loadShader('trailDecay.frag');
 // we hold both of those to achieve sim.
 // sim will hold the Data, draw will show it.
 const sceneSim = new THREE.Scene();
@@ -223,7 +213,8 @@ const matPoints = new THREE.RawShaderMaterial({
     },
     vertexShader: pointVert,
     fragmentShader: pointFrag,
-    transparent:true, depthTest:false, depthWrite:false
+    transparent:true, depthTest:false, depthWrite:false,
+    blending: THREE.AdditiveBlending
 });
 
 const points = new THREE.Points(ptsGeo, matPoints);
