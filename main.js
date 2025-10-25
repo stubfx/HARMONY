@@ -5,7 +5,8 @@ import simVert from './sim.vert?raw';
 import simFrag from './sim.frag?raw';
 import pointVert from './point.vert?raw';
 import pointFrag from './point.frag?raw';
-import trailFrag from './trail.frag?raw';
+import trailFrag from './trailDeposit.frag?raw';
+import trailVert from './trailDeposit.vert?raw';
 import trailDecayVert from './trailDecay.vert?raw';
 import trailDecayFrag from './trailDecay.frag?raw';
 import imgUrl from './assets/aant.png';
@@ -239,10 +240,11 @@ const matTrailDeposit = new THREE.RawShaderMaterial({
         uPointSize: { value: 10.0 },
         uStrength:  { value: 1 },
         uEdgeSoft:  { value: 0.5 },
+        uChampSampleInterval:  { value: 1000 },
+
         // uDt:        { value: 0.1 },   // <-- new
     },
-    vertexShader: pointVert,
-    // vertexShader: trailLineVert,
+    vertexShader: trailVert,
     fragmentShader: trailFrag,
     depthTest:false, depthWrite:false,
     transparent:false, blending: THREE.NoBlending
