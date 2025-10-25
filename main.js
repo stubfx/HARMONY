@@ -9,7 +9,8 @@ import trailFrag from './trailDeposit.frag?raw';
 import trailVert from './trailDeposit.vert?raw';
 import trailDecayVert from './trailDecay.vert?raw';
 import trailDecayFrag from './trailDecay.frag?raw';
-import imgUrl from './assets/aant.png';
+import logoImgUrl from './assets/aant.png';
+import colorImgUrl from './assets/a03.png';
 
 async function loadShader(url) {
     const res = await fetch(url);
@@ -31,7 +32,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
 const texLoader = new THREE.TextureLoader();
 const RES = window.devicePixelRatio * G.RENDER_QUALITY;
-const customImage = texLoader.load(imgUrl, () => {
+const customImage = texLoader.load(colorImgUrl, () => {
     customImage.colorSpace = THREE.SRGBColorSpace;
     console.log(customImage.width, customImage.height);
 });
@@ -52,12 +53,13 @@ const W = renderer.domElement.width, H = renderer.domElement.height;
 const fpsEl = document.querySelector("#fps");
 
 function refreshSizes() {
-  renderer.getDrawingBufferSize(bufferSize);     // device px
+    renderer.getDrawingBufferSize(bufferSize);     // device px
 }
 refreshSizes();
 window.addEventListener('resize', () => {
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  refreshSizes();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    refreshSizes();
+    initTextures();
 });
 
 document.onkeydown = (event) => {
@@ -68,9 +70,9 @@ document.onkeyup = (event) => {
     if (event.key == "n") nuke = false;
 }
 document.onmousemove = (e) => {
-  const xDev = e.clientX * RES;
-  const yDev = (window.innerHeight - e.clientY) * RES; // flip in CSS, then scale
-  prevmousecoords = [xDev, yDev];
+    const xDev = e.clientX * RES;
+    const yDev = (window.innerHeight - e.clientY) * RES; // flip in CSS, then scale
+    prevmousecoords = [xDev, yDev];
 }
 
 document.onmousedown = event => {
@@ -89,26 +91,36 @@ const sceneTrailDecay = new THREE.Scene();
 const sceneDraw = new THREE.Scene();
 const camera = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
 
-
 let rtA = UTILS.makeRT();
 let rtB = UTILS.makeRT();
-const trailA = UTILS.makeTrailRT(bufferSize.x, bufferSize.y);
-const trailB = UTILS.makeTrailRT(bufferSize.x, bufferSize.y);
+let trailA = UTILS.makeTrailRT(bufferSize.x, bufferSize.y);
+let trailB = UTILS.makeTrailRT(bufferSize.x, bufferSize.y);
 let trailRead = trailA, trailWrite = trailB;
 let trailDecayTxA = UTILS.makeTrailRT(bufferSize.x, bufferSize.y);
 let trailDecayTxB = UTILS.makeTrailRT(bufferSize.x, bufferSize.y);
 let trailDecayRead = trailDecayTxA, trailDecayWrite = trailDecayTxB;
 
-// clear once
-renderer.setRenderTarget(trailA); 
-renderer.clear(true,false,false);
-renderer.setRenderTarget(trailB); 
-renderer.clear(true,false,false);
-renderer.setRenderTarget(trailDecayTxA); 
-renderer.clear(true,false,false);
-renderer.setRenderTarget(trailDecayTxB); 
-renderer.clear(true,false,false);
+function initTextures() {
+    rtA = UTILS.makeRT();
+    rtB = UTILS.makeRT();
+    trailA = UTILS.makeTrailRT(bufferSize.x, bufferSize.y);
+    trailB = UTILS.makeTrailRT(bufferSize.x, bufferSize.y);
+    trailRead = trailA, trailWrite = trailB;
+    trailDecayTxA = UTILS.makeTrailRT(bufferSize.x, bufferSize.y);
+    trailDecayTxB = UTILS.makeTrailRT(bufferSize.x, bufferSize.y);
+    trailDecayRead = trailDecayTxA, trailDecayWrite = trailDecayTxB;
 
+    // clear once
+    renderer.setRenderTarget(trailA); 
+    renderer.clear(true,false,false);
+    renderer.setRenderTarget(trailB); 
+    renderer.clear(true,false,false);
+    renderer.setRenderTarget(trailDecayTxA); 
+    renderer.clear(true,false,false);
+    renderer.setRenderTarget(trailDecayTxB); 
+    renderer.clear(true,false,false);
+}
+initTextures();
 
 const fsq = new THREE.BufferGeometry();
 const positions = new Float32Array([
