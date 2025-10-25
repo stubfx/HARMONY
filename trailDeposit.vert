@@ -8,7 +8,7 @@ uniform float uPointSize;
 uniform vec2 uMouse;
 uniform bool uMouseDown;
 uniform int uChampSampleInterval;
-out float vImportance;
+out float vIsChamp;
 
 void main(){
     int index = gl_VertexID;
@@ -19,9 +19,10 @@ void main(){
     vec2 ndc = (pos / uCanvas) * 2.0 - 1.0; ndc.y = -ndc.y;
     gl_Position = vec4(ndc, 0.0, 1.0);
     gl_PointSize = uPointSize;
-    vImportance = 1.0;
     if (index % uChampSampleInterval == 0) {
-        vImportance = 1.0;
-        gl_PointSize *= 5.0;
+        vIsChamp = 1.0;
+        gl_PointSize *= 2.0;
+    } else {
+        vIsChamp = 0.0;
     }
 }

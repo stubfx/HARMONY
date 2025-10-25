@@ -2,7 +2,9 @@ precision highp float; precision highp sampler2D;
 
 uniform sampler2D uState;
 uniform vec2      uCanvas;
-uniform float     uTime, uDt, uDrag, uStepLen, uJitter;
+uniform float     uTime, uDt, uDrag, uStepLen;
+uniform float uTurnJitter;
+// uniform float uSpeedJitter;
 
 uniform sampler2D uTrail;
 uniform float     uSenseDist;
@@ -53,18 +55,22 @@ void main(){
 
     float turnUnit = 0.0;
     if (weightForward < weightLeft && weightForward < weightRight) {
-        turnUnit = (rnd - 0.5) * 2.0;
+        turnUnit = (rnd - 0.5);
     } else if (weightRight > weightLeft) {
         turnUnit = -rnd;
     } else if (weightLeft > weightRight) {
         turnUnit = +rnd;
     }
 
+    turnUnit *= uTurnJitter;
+
     float maxTurn = uTurnRate * uDt;
     float dTheta  = clamp(turnUnit * maxTurn, -maxTurn, +maxTurn);
     dir = normalize(rot(dir, dTheta));
 
-    pos += dir * uStepLen;
+    // float speed = uStepLen * rnd * 1.5;
+    float speed = uStepLen;
+    pos += dir * speed * uDt;
     
     // WATCH OUT YOU MIGHT WANT THIS ON!!!
     pos = mod(pos + uCanvas, uCanvas);

@@ -13,7 +13,7 @@ void main(){
     // float r = length(p);
     // if (r > 0.5) discard;
     // float a = smoothstep(0.5, 0.45, r);
-    vec4 color = vec4(0.5);
+    vec4 color = vec4(0.4);
     // vec4 color = vec4(0.0, 0.5, 0.0, 0.5);
     // vec3 color = vec3(1.0, 1.0/vImportance, 1.0/vImportance);
     if (uMouseDown) {

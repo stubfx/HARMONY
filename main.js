@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import * as UTILS from '/utils.js';
-import * as G from '/globals.js';
+import params from '/tunables.js';
+
+
 import simVert from './sim.vert?raw';
 import simFrag from './sim.frag?raw';
 import pointVert from './point.vert?raw';
@@ -17,6 +19,9 @@ async function loadShader(url) {
     return await res.text();
 }
 
+// console.log(params.TEX_SIDE);
+
+
 let prevmousecoords = [0.0, 0.0]; 
 let mouseDown = false;
 let nuke = false;
@@ -31,10 +36,10 @@ let customImageTopLeft = 0;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
 const texLoader = new THREE.TextureLoader();
-const RES = window.devicePixelRatio * G.RENDER_QUALITY;
+const RES = window.devicePixelRatio * params.RENDER_QUALITY;
 const customImage = texLoader.load(colorImgUrl, () => {
     customImage.colorSpace = THREE.SRGBColorSpace;
-    console.log(customImage.width, customImage.height);
+    // console.log(customImage.width, customImage.height);
 });
 
 // renderer section
@@ -51,12 +56,14 @@ document.body.appendChild( renderer.domElement );
 
 const W = renderer.domElement.width, H = renderer.domElement.height;
 const fpsEl = document.querySelector("#fps");
-const dtEl = document.querySelector("#deltaTime");
+// const dtEl = document.querySelector("#deltaTime");
 
 function refreshSizes() {
     renderer.getDrawingBufferSize(bufferSize);     // device px
 }
+
 refreshSizes();
+
 window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
     refreshSizes();
@@ -74,10 +81,11 @@ document.onmousemove = (e) => {
     const xDev = e.clientX * RES;
     const yDev = (window.innerHeight - e.clientY) * RES; // flip in CSS, then scale
     prevmousecoords = [xDev, yDev];
+    // console.log(prevmousecoords);
 }
 
-document.onmousedown = event => {
-    mouseDown = true;
+document.onmousedown = () => {
+    mouseDown = true && params.ENABLE_MOUSE;
 }
 
 document.onmouseup = event => {
@@ -132,59 +140,62 @@ const positions = new Float32Array([
 fsq.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
 // init state texture (rnd positions, zero velocities)
-// const N = G.TEX_SIDE * G.TEX_SIDE;
-// const init = new Float32Array(N*4);
-// for (let i=0;i<N;i++) {
-//     const k=i*4;
-//     init[k] = W/2; //x
-//     init[k+1] = H/2; //y
-//     // init[k] = Math.random() * W; //x
-//     // init[k+1] = Math.random() * H; //y
-//     //dx and dy
+const N = params.TEX_SIDE * params.TEX_SIDE;
+const init = new Float32Array(N*4);
+for (let i=0;i<N;i++) {
+    const k=i*4;
+    init[k] = W/2; //x
+    init[k+1] = H/2; //y
+    // init[k] = Math.random() * W; //x
+    // init[k+1] = Math.random() * H; //y
+    //dx and dy
+    init[k+2] = (Math.random() - 0.5) ; //x
+    init[k+3] = (Math.random() - 0.5); //y
+}
+
+// const N = params.TEX_SIDE * params.TEX_SIDE;
+// const init = new Float32Array(N * 4);
+// const cx = W / 2;
+// const cy = H / 2;
+// const R = 500;
+//
+// for (let i = 0; i < N; i++) {
+//     const k = i * 4;
+//
+//     // Random polar position
+//     const theta = Math.random() * Math.PI * 2;
+//     const r = Math.sqrt(Math.random()) * R;
+//
+//     // Cartesian position
+//     const x = cx + r * Math.cos(theta);
+//     const y = cy + r * Math.sin(theta);
+//     init[k] = x;
+//     init[k + 1] = y;
+//
+//     // Direction vector toward center
+//     let dx = cx - x;
+//     let dy = cy - y;
+//
+//     // Normalize
+//     const len = Math.hypot(dx, dy) || 1;
+//     dx /= len;
+//     dy /= len;
+//
+//     // Scale by random speed factor if you like
+//     const rnd = Math.random() - 0.5; // tweak
+//     // init[k + 2] = dx * speed;
+//     // init[k + 3] = dy * speed;
 //     init[k+2] = (Math.random() - 0.5) ; //x
 //     init[k+3] = (Math.random() - 0.5); //y
+//
 // }
-
-const N = G.TEX_SIDE * G.TEX_SIDE;
-const init = new Float32Array(N * 4);
-const cx = W / 2;
-const cy = H / 2;
-const R = 500;
-
-for (let i = 0; i < N; i++) {
-  const k = i * 4;
-
-  // Random polar position
-  const theta = Math.random() * Math.PI * 2;
-  const r = Math.sqrt(Math.random()) * R;
-
-  // Cartesian position
-  const x = cx + r * Math.cos(theta);
-  const y = cy + r * Math.sin(theta);
-  init[k] = x;
-  init[k + 1] = y;
-
-  // Direction vector toward center
-  let dx = cx - x;
-  let dy = cy - y;
-
-  // Normalize
-  const len = Math.hypot(dx, dy) || 1;
-  dx /= len;
-  dy /= len;
-
-  // Scale by random speed factor if you like
-  const speed = Math.random() * 2.0; // tweak
-  init[k + 2] = dx * speed;
-  init[k + 3] = dy * speed;
-}
 
 
 
 
 
 // this texture will hold a matrix with the position of the pixels.
-const initTex = new THREE.DataTexture(init, G.TEX_SIDE, G.TEX_SIDE, THREE.RGBAFormat, THREE.FloatType);
+const initTex = new THREE.DataTexture(init, params.TEX_SIDE, params.TEX_SIDE, THREE.RGBAFormat, THREE.FloatType);
 initTex.minFilter = THREE.NearestFilter;
 initTex.magFilter = THREE.NearestFilter; 
 initTex.needsUpdate = true;
@@ -233,9 +244,10 @@ const matSim = new THREE.RawShaderMaterial({
         uCanvas: { value: new THREE.Vector2(W, H) },
         uTime: { value: 0 },
         uDt: { value: 0.1 },
-        // uDrag: { value: G.DRAG },
-        uStepLen: { value: G.STEP_LEN },
-        uJitter: { value: G.JITTER },
+        // uDrag: { value: params.DRAG },
+        uStepLen: { value: params.STEP_LEN },
+        uTurnJitter: { value: params.TURN_JITTER },
+        // uSpeedJitter: { value: params.SPEED_JITTER },
         uMouseDown: { value: mouseDown},
     },
     vertexShader: simVert,
@@ -260,12 +272,12 @@ const matPoints = new THREE.RawShaderMaterial({
     glslVersion: THREE.GLSL3,
     uniforms: {
         uState: { value: rtA.texture },
-        uTexSize: { value: new THREE.Vector2(G.TEX_SIDE, G.TEX_SIDE) },
+        uTexSize: { value: new THREE.Vector2(params.TEX_SIDE, params.TEX_SIDE) },
         uCanvas: { value: new THREE.Vector2(W, H) },
-        uPointSize:{ value: G.POINT_SIZE },
+        uPointSize:{ value: params.POINT_SIZE },
         uMouseDown: {value: false},
         uMouseCoords: {value: prevmousecoords},
-        uImageArea: { value: G.IMAGE_AREA},
+        uImageArea: { value: params.IMAGE_AREA},
         uCustomImageSize: {value: new THREE.Vector2(customImage.width, customImage.height)},
         uCustomImage: { value: customImage},
         uHasCustomImage: { value: false},
@@ -285,12 +297,13 @@ const matTrailDeposit = new THREE.RawShaderMaterial({
     glslVersion: THREE.GLSL3,
     uniforms: {
         uState:     { value: rtA.texture },
-        uTexSize: { value: new THREE.Vector2(G.TEX_SIDE, G.TEX_SIDE) },
+        uTexSize: { value: new THREE.Vector2(params.TEX_SIDE, params.TEX_SIDE) },
         uCanvas:    { value: new THREE.Vector2(W, H) },
         uPointSize: { value: 10.0 },
         uStrength:  { value: 1 },
         uEdgeSoft:  { value: 0.5 },
         uDt: {value: 1.0},
+        uChampImportanceMultiplier: {value: 10000},
         uChampSampleInterval:  { value: 1000 },
     },
     vertexShader: trailVert,
@@ -316,14 +329,14 @@ const matTrailDecay = new THREE.RawShaderMaterial({
         uCustomImageSize: {value: new THREE.Vector2(customImage.width, customImage.height)},
         uCustomImage: { value: customImage},
         uHasCustomImage: { value: false},
-        uImageArea: { value: G.IMAGE_AREA},
+        uImageArea: { value: params.IMAGE_AREA},
         uCanvas:    { value: new THREE.Vector2(W, H) },
         uNuke: { value: nuke}
     },
     vertexShader: trailDecayVert,
     fragmentShader: trailDecayFrag,
     depthTest:false, depthWrite:false,
-    transparent:false, blending: THREE.NoBlending
+    transparent:false, blending: THREE.AdditiveBlending
 });
 const trailDecay = new THREE.Mesh(fsq, matTrailDecay);
 trailDecay.frustumCulled = false;
@@ -362,13 +375,11 @@ function frame() {
     matTrailDeposit.uniforms.uDt.value = dt;
     matTrailDecay.uniforms.uDt.value    = dt;
 
-    dtEl.textContent = `${dt.toFixed(3)}`;
+    // dtEl.textContent = `${dt.toFixed(3)}`;
 
     prev = now;
 
-    // matSim.uniforms.uDt.value    = 1.0;
-    // matTrailDeposit.uniforms.uDt.value = 1.0;
-    // matTrailDecay.uniforms.uDt.value    = 1.0;
+    updateUniforms();
 
     matSim.uniforms.uCanvas.value = bufferSize.clone();
     matTrailDeposit.uniforms.uCanvas.value = bufferSize.clone();
@@ -385,7 +396,6 @@ function frame() {
     renderer.render(sceneSim, camera);
 
     matTrailDecay.uniforms.uMouseCoords.value = prevmousecoords;
-    matTrailDecay.uniforms.uMouseDown.value = mouseDown;
     matTrailDecay.uniforms.uCustomImageSize.value = new THREE.Vector2(customImage.width, customImage.height);
     matTrailDecay.uniforms.uCustomImage.value = customImage;
     matTrailDecay.uniforms.uHasCustomImage.value = true;
@@ -393,9 +403,7 @@ function frame() {
     matPoints.uniforms.uCustomImageSize.value = new THREE.Vector2(customImage.width, customImage.height);
     matPoints.uniforms.uCustomImage.value = customImage;
     matPoints.uniforms.uHasCustomImage.value = true;
-    matPoints.uniforms.uMouseDown.value = mouseDown;
     matPoints.uniforms.uMouseCoords.value = prevmousecoords;
-    matSim.uniforms.uMouseDown.value = mouseDown;
     matTrailDeposit.uniforms.uState.value = writeRT.texture;   // deposit uses agent positions
     // matTrailDeposit.uniforms.uDt.value = dt;
     // ensure deposit maps world→trail correctly
@@ -418,10 +426,11 @@ function frame() {
     renderer.setRenderTarget(null); 
     renderer.clear(true, false, false);
     //renderer.render(sceneTrail, camera);
-    // renderer.render(sceneTrailDecay, camera);
-
-    renderer.render(sceneDraw, camera);
-
+    if (params.SHOW_TRAIL) {
+        renderer.render(sceneTrailDecay, camera);
+    } else {
+        renderer.render(sceneDraw, camera);
+    }
 
     frames++;
     const nowMs = performance.now();
@@ -436,3 +445,25 @@ function frame() {
     requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
+
+
+
+function updateUniforms () {
+    matSim.uniforms.uStepLen.value = params.STEP_LEN;
+    matSim.uniforms.uTurnJitter.value = params.TURN_JITTER;
+    // matSim.uniforms.uSpeedJitter.value = params.SPEED_JITTER;
+    matSim.uniforms.uSenseDist.value = params.SENSE_DIST;
+    matSim.uniforms.uSenseAngle.value = params.SENSE_ANGLE;
+    matSim.uniforms.uTurnRate.value = params.TURN_RATE;
+    matPoints.uniforms.uPointSize.value = params.POINT_SIZE;
+    matTrailDeposit.uniforms.uPointSize.value = params.DEPOSIT_SIZE;
+    matTrailDeposit.uniforms.uStrength.value = params.DEPOSIT_STRENGTH;
+    matTrailDeposit.uniforms.uEdgeSoft.value = params.DEPOSIT_EDGE_SOFT;
+    matTrailDeposit.uniforms.uChampSampleInterval.value = params.CHAMP_SAMPLE_INTERVAL;
+    matTrailDecay.uniforms.uDecay.value = params.TRAIL_DECAY;
+
+
+    matTrailDecay.uniforms.uMouseDown.value = mouseDown;
+    matPoints.uniforms.uMouseDown.value = mouseDown;
+}

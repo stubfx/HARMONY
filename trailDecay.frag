@@ -22,7 +22,7 @@ void main() {
     vec4 dep  = texelFetch(uDeposit,   uv, 0);
 
 
-    vec4 decay = dec - 0.1 * uDecay * uDt;
+    vec4 decay = dec - uDecay * uDt;
     // vec4 d = max(dec * uDecay, dep);
     vec4 d = max(decay + dep, 0.0);
     vec4 color = d;
@@ -42,13 +42,12 @@ void main() {
             vec4 customImage = vec4(0.0);
             if (inImg) customImage = texelFetch(uCustomImage, imagePlacement, 0);
             if (dist < uImageArea) {
-                dist = smoothstep(1.0, 0.2, dist/uImageArea);
-                fc = customImage * dist;
-                return;
+                dist = smoothstep(1.0, 0.3, dist/uImageArea);
+                // color = customImage*dist;
+                color = customImage*dist + d * 0.3;
+                // fc = customImage * dist;
+                // return;
             }
-            fc = customImage*uDt + d;
-            return;
-            // color += customImage * 1000.0;
         }
     }
     // color.w = clamp(color.w, 0.0, 1.0);

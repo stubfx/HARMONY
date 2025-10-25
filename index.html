@@ -8,6 +8,16 @@
         margin: 0;
         background-color: #000000;
         }
+        #tweaks {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            /*align-items: start;*/
+            background: black;
+            z-index: 9999;
+            color: green;
+            padding: 20;
+        }
         .info {
             position: absolute;
             display: flex;
@@ -26,9 +36,11 @@
   <body>
     <script type="module" src="/utils.js"></script>
     <script type="module" src="/main.js"></script>
+        <div id="tweaks">
+        </div>
         <div class="info">
             <span id="fps">N/A</span>
-            <span id="deltaTime">N/A</span>
+            <!-- <span id="deltaTime">N/A</span> -->
         </div>
   </body>
 </html>
