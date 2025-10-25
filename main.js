@@ -132,18 +132,57 @@ const positions = new Float32Array([
 fsq.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
 // init state texture (rnd positions, zero velocities)
+// const N = G.TEX_SIDE * G.TEX_SIDE;
+// const init = new Float32Array(N*4);
+// for (let i=0;i<N;i++) {
+//     const k=i*4;
+//     init[k] = W/2; //x
+//     init[k+1] = H/2; //y
+//     // init[k] = Math.random() * W; //x
+//     // init[k+1] = Math.random() * H; //y
+//     //dx and dy
+//     init[k+2] = (Math.random() - 0.5) ; //x
+//     init[k+3] = (Math.random() - 0.5); //y
+// }
+
 const N = G.TEX_SIDE * G.TEX_SIDE;
-const init = new Float32Array(N*4);
-for (let i=0;i<N;i++) {
-    const k=i*4;
-    init[k] = W/2; //x
-    init[k+1] = H/2; //y
-    // init[k] = Math.random() * W; //x
-    // init[k+1] = Math.random() * H; //y
-    //dx and dy
-    init[k+2] = (Math.random() - 0.5) ; //x
-    init[k+3] = (Math.random() - 0.5); //y
+const init = new Float32Array(N * 4);
+const cx = W / 2;
+const cy = H / 2;
+const R = 500;
+
+for (let i = 0; i < N; i++) {
+  const k = i * 4;
+
+  // Random polar position
+  const theta = Math.random() * Math.PI * 2;
+  const r = Math.sqrt(Math.random()) * R;
+
+  // Cartesian position
+  const x = cx + r * Math.cos(theta);
+  const y = cy + r * Math.sin(theta);
+  init[k] = x;
+  init[k + 1] = y;
+
+  // Direction vector toward center
+  let dx = cx - x;
+  let dy = cy - y;
+
+  // Normalize
+  const len = Math.hypot(dx, dy) || 1;
+  dx /= len;
+  dy /= len;
+
+  // Scale by random speed factor if you like
+  const speed = Math.random() * 2.0; // tweak
+  init[k + 2] = dx * speed;
+  init[k + 3] = dy * speed;
 }
+
+
+
+
+
 // this texture will hold a matrix with the position of the pixels.
 const initTex = new THREE.DataTexture(init, G.TEX_SIDE, G.TEX_SIDE, THREE.RGBAFormat, THREE.FloatType);
 initTex.minFilter = THREE.NearestFilter;
@@ -204,30 +243,15 @@ const matSim = new THREE.RawShaderMaterial({
     depthTest:false, depthWrite:false
 });
 matSim.uniforms.uTrail     = { value: trailRead.texture };
-matSim.uniforms.uSenseDist = { value: 20 };  // try 20–40
+matSim.uniforms.uSenseDist = { value: 30 };  // try 20–40
 matSim.uniforms.uSenseAngle= { value: 0.3 };   // ~34°
 // matSim.uniforms.uTurnRate  = { value: 40 };   // rad/sec
-matSim.uniforms.uTurnRate  = { value: 15 };   // rad/sec
+matSim.uniforms.uTurnRate  = { value: 20 };   // rad/sec
 const quadSim = new THREE.Mesh(fsq, matSim); 
 sceneSim.add(quadSim);
 
-// Points geometry: provide dummy positions so Three is happy
-// keep in mind that this array could actually be filled with the center 
-// coords over and over. the only reason this is made this way is to fill up 
-// the grid and see if this is actually rendering properly.
-// there's no other reason why we're filling up the whole square like that.
 const ptsGeo = new THREE.BufferGeometry();
 const dummy = new Float32Array(N*3);
-for (let i=0;i<N;i++){
-    const ix = i % G.TEX_SIDE;           // column index
-    const iy = (i / G.TEX_SIDE) | 0;     // row index (fast floor)
-    const x  = (ix/(G.TEX_SIDE-1))*2 - 1;  // map [0..G.TEX_SIDE-1] → [-1..+1]
-    const y  = (iy/(G.TEX_SIDE-1))*2 - 1;
-    const k  = i*3;
-    dummy[k]   = x;
-    dummy[k+1] = y;
-    dummy[k+2] = 0;
-}
 
 ptsGeo.setAttribute('position', new THREE.BufferAttribute(dummy, 3));
 ptsGeo.computeBoundingSphere();
@@ -264,7 +288,7 @@ const matTrailDeposit = new THREE.RawShaderMaterial({
         uTexSize: { value: new THREE.Vector2(G.TEX_SIDE, G.TEX_SIDE) },
         uCanvas:    { value: new THREE.Vector2(W, H) },
         uPointSize: { value: 10.0 },
-        uStrength:  { value: 3 },
+        uStrength:  { value: 1 },
         uEdgeSoft:  { value: 0.5 },
         uDt: {value: 1.0},
         uChampSampleInterval:  { value: 1000 },
@@ -285,7 +309,7 @@ const matTrailDecay = new THREE.RawShaderMaterial({
         uPrevDecay:  { value: trailDecayRead.texture }, // previous decay buffer
         uDeposit:    { value: trailRead.texture },      // previous frame’s deposits
         // check this color that is making everything blue
-        uDecay:      { value: 0.8 },               // keep ~98.5% per frame (tune)
+        uDecay:      { value: 0.1 },               // keep ~98.5% per frame (tune)
         uDt:         { value: 0.2 },
         uMouseCoords: { value: prevmousecoords},
         uMouseDown: { value: mouseDown}, 

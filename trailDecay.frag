@@ -47,8 +47,10 @@ void main() {
                 return;
             }
             fc = customImage*uDt + d;
+            return;
             // color += customImage * 1000.0;
         }
     }
+    // color.w = clamp(color.w, 0.0, 1.0);
     fc = color;
 }

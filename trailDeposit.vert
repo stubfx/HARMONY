@@ -21,7 +21,7 @@ void main(){
     gl_PointSize = uPointSize;
     vImportance = 1.0;
     if (index % uChampSampleInterval == 0) {
-        vImportance = 10.0;
+        vImportance = 1.0;
         gl_PointSize *= 5.0;
     }
 }
