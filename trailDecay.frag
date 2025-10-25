@@ -11,6 +11,7 @@ uniform float uImageArea;
 uniform vec2 uMouseCoords;
 uniform bool uMouseDown;
 uniform vec2 uCanvas;
+uniform bool uNuke;
 out vec4 fc;
 
 
@@ -24,7 +25,10 @@ void main() {
     // vec4 d = max(dec * uDecay, dep);
     vec4 d = max(decay + dep, 0.0);
     vec4 color = d;
-    if (uHasCustomImage) {
+    if (uNuke) {
+        color = vec4(0.0);
+    }
+    else if (uHasCustomImage) {
         if (uMouseDown) {
             // if (distance(gl_FragCoord.xy, uMouseCoords) < 100.0) d = 0.0;
             float dist = distance(gl_FragCoord.xy, uMouseCoords);

@@ -18,15 +18,19 @@ async function loadShader(url) {
 
 let prevmousecoords = [0.0, 0.0]; 
 let mouseDown = false;
+let nuke = false;
 
 
-//dealing with this tomorrow. it's late.
+// dealing with this tomorrow. it's late.
+// the purpose of this is to calculate the image once
+// outside the shader for optimization purposes
 let customImageTopLeft = 0;
 
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
 const texLoader = new THREE.TextureLoader();
+const RES = window.devicePixelRatio * G.RENDER_QUALITY;
 const customImage = texLoader.load(imgUrl, () => {
     customImage.colorSpace = THREE.SRGBColorSpace;
     console.log(customImage.width, customImage.height);
@@ -37,17 +41,23 @@ renderer.autoClear = false;
 // renderer.setSize(1000, 1000);
 renderer.setSize( window.innerWidth, window.innerHeight );
 document.body.appendChild( renderer.domElement );
-renderer.setPixelRatio( window.devicePixelRatio*G.RENDER_QUALITY);
+renderer.setPixelRatio(RES);
 const W = renderer.domElement.width, H = renderer.domElement.height;
 const fpsEl = document.querySelector("#fps");
+document.onkeydown = (event) => {
+    nuke = event.key == "n";
+}
 
+document.onkeyup = (event) => {
+    if (event.key == "n") nuke = false;
+}
 document.onmousemove = (event)=> {
     // fix coords to the center of the screen
-    const x = event.clientX - W/2;
-    const y = event.clientY - H/2;
+    const x = event.clientX;
+    const y = H - event.clientY;
     // console.log(event.clientX, event.clientY);
     // fix mousecoords to match 0 at center of screen.
-    prevmousecoords = [x+W/2, -y+H/2];
+    prevmousecoords = [x * RES, y * RES];
 }
 
 document.onmousedown = event => {
@@ -209,7 +219,6 @@ const matPoints = new THREE.RawShaderMaterial({
         uCustomImageSize: {value: new THREE.Vector2(customImage.width, customImage.height)},
         uCustomImage: { value: customImage},
         uHasCustomImage: { value: false},
-        uImageArea: { value: G.IMAGE_AREA},
     },
     vertexShader: pointVert,
     fragmentShader: pointFrag,
@@ -232,8 +241,6 @@ const matTrailDeposit = new THREE.RawShaderMaterial({
         uStrength:  { value: 1 },
         uEdgeSoft:  { value: 0.5 },
         uChampSampleInterval:  { value: 1000 },
-
-        // uDt:        { value: 0.1 },   // <-- new
     },
     vertexShader: trailVert,
     fragmentShader: trailFrag,
@@ -260,6 +267,7 @@ const matTrailDecay = new THREE.RawShaderMaterial({
         uHasCustomImage: { value: false},
         uImageArea: { value: G.IMAGE_AREA},
         uCanvas:    { value: new THREE.Vector2(W, H) },
+        uNuke: { value: nuke}
     },
     vertexShader: trailDecayVert,
     fragmentShader: trailDecayFrag,
@@ -299,7 +307,7 @@ function frame() {
 
     let dt = Math.min(Math.max(now - prev, timeMult), 0.05);
 
-    prev = now;    
+    prev = now;
     matSim.uniforms.uTrail.value = trailDecayRead.texture;
     matSim.uniforms.uState.value = readRT.texture;
     matSim.uniforms.uTime.value  = now;
@@ -314,6 +322,7 @@ function frame() {
     matTrailDecay.uniforms.uCustomImageSize.value = new THREE.Vector2(customImage.width, customImage.height);
     matTrailDecay.uniforms.uCustomImage.value = customImage;
     matTrailDecay.uniforms.uHasCustomImage.value = true;
+    matTrailDecay.uniforms.uNuke.value = nuke;
     matPoints.uniforms.uCustomImageSize.value = new THREE.Vector2(customImage.width, customImage.height);
     matPoints.uniforms.uCustomImage.value = customImage;
     matPoints.uniforms.uHasCustomImage.value = true;
