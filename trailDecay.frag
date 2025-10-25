@@ -28,19 +28,16 @@ void main() {
         if (uMouseDown) {
             // if (distance(gl_FragCoord.xy, uMouseCoords) < 100.0) d = 0.0;
             float dist = distance(gl_FragCoord.xy, uMouseCoords);
-            // ivec2 imagePlacement  = ivec2(uCanvas/2.0 - gl_FragCoord.xy);
             vec2 topLeft = 0.5 * (uCanvas - uCustomImageSize);
             ivec2 imagePlacement  = ivec2(floor(gl_FragCoord.xy - topLeft));
-            // image dimensions should be fixed.
-            // we subtract half the dimensions of them.
-            // imagePlacement += ivec2(uCustomImageSize)/2;
-            vec4 customImage = texelFetch(uCustomImage,   imagePlacement, 0);
+            bvec2 ge0 = greaterThanEqual(imagePlacement, ivec2(0));
+            bvec2 ltS = lessThan(imagePlacement, ivec2(uCustomImageSize));
+            bool inImg = all(ge0) && all(ltS);
+
+            vec4 customImage = vec4(0.0);
+            if (inImg) customImage = texelFetch(uCustomImage, imagePlacement, 0);
             if (dist < uImageArea) {
-                // consider only the image at this coords.
-                // d = vec4(100.0/dist);
-            // if we are close to mouse coords clean up.
             dist = smoothstep(1.0, 0.2, dist/uImageArea);
-            // fc = customImage * dist + d;
             fc = customImage * dist;
             return;
             }

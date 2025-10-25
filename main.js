@@ -8,7 +8,7 @@ import pointFrag from './point.frag?raw';
 import trailFrag from './trail.frag?raw';
 import trailDecayVert from './trailDecay.vert?raw';
 import trailDecayFrag from './trailDecay.frag?raw';
-import imgUrl from './assets/aim.png';
+import imgUrl from './assets/aant.png';
 
 async function loadShader(url) {
     const res = await fetch(url);
