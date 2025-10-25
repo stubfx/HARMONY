@@ -48,7 +48,7 @@ void main(){
     float weightLeft    = sampleTrailPX_flipped(pos +  uSenseDist * rot(dir,  uSenseAngle));
     float weightRight   = sampleTrailPX_flipped(pos +  uSenseDist * rot(dir, -uSenseAngle));
 
-    float rnd = fract(sin(dot(vec3(gl_FragCoord.xy, floor(uTime*60.0)),
+    float rnd = fract(sin(dot(vec3(gl_FragCoord.xy, floor(uTime*uDt)),
                               vec3(127.1,311.7,74.7))) * 43758.5453123);
 
     float turnUnit = 0.0;

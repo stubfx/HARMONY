@@ -8,6 +8,7 @@ uniform sampler2D uCustomImage;
 uniform vec2 uCustomImageSize;
 uniform float     uDecay;     // e.g. 0.985..0.999
 uniform float uImageArea;
+uniform float uDt;
 uniform vec2 uMouseCoords;
 uniform bool uMouseDown;
 uniform vec2 uCanvas;
@@ -21,7 +22,7 @@ void main() {
     vec4 dep  = texelFetch(uDeposit,   uv, 0);
 
 
-    vec4 decay = dec - 0.1 * uDecay;
+    vec4 decay = dec - 0.1 * uDecay * uDt;
     // vec4 d = max(dec * uDecay, dep);
     vec4 d = max(decay + dep, 0.0);
     vec4 color = d;
@@ -41,11 +42,11 @@ void main() {
             vec4 customImage = vec4(0.0);
             if (inImg) customImage = texelFetch(uCustomImage, imagePlacement, 0);
             if (dist < uImageArea) {
-            dist = smoothstep(1.0, 0.2, dist/uImageArea);
-            fc = customImage * dist;
-            return;
+                dist = smoothstep(1.0, 0.2, dist/uImageArea);
+                fc = customImage * dist;
+                return;
             }
-            fc = customImage + d;
+            fc = customImage*uDt + d;
             // color += customImage * 1000.0;
         }
     }

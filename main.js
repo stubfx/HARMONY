@@ -51,6 +51,7 @@ document.body.appendChild( renderer.domElement );
 
 const W = renderer.domElement.width, H = renderer.domElement.height;
 const fpsEl = document.querySelector("#fps");
+const dtEl = document.querySelector("#deltaTime");
 
 function refreshSizes() {
     renderer.getDrawingBufferSize(bufferSize);     // device px
@@ -206,7 +207,7 @@ matSim.uniforms.uTrail     = { value: trailRead.texture };
 matSim.uniforms.uSenseDist = { value: 20 };  // try 20–40
 matSim.uniforms.uSenseAngle= { value: 0.3 };   // ~34°
 // matSim.uniforms.uTurnRate  = { value: 40 };   // rad/sec
-matSim.uniforms.uTurnRate  = { value: 50 };   // rad/sec
+matSim.uniforms.uTurnRate  = { value: 15 };   // rad/sec
 const quadSim = new THREE.Mesh(fsq, matSim); 
 sceneSim.add(quadSim);
 
@@ -263,8 +264,9 @@ const matTrailDeposit = new THREE.RawShaderMaterial({
         uTexSize: { value: new THREE.Vector2(G.TEX_SIDE, G.TEX_SIDE) },
         uCanvas:    { value: new THREE.Vector2(W, H) },
         uPointSize: { value: 10.0 },
-        uStrength:  { value: 1 },
+        uStrength:  { value: 3 },
         uEdgeSoft:  { value: 0.5 },
+        uDt: {value: 1.0},
         uChampSampleInterval:  { value: 1000 },
     },
     vertexShader: trailVert,
@@ -332,7 +334,18 @@ function frame() {
 
     let dt = Math.min(Math.max(now - prev, timeMult), 0.05);
 
+    matSim.uniforms.uDt.value    = dt;
+    matTrailDeposit.uniforms.uDt.value = dt;
+    matTrailDecay.uniforms.uDt.value    = dt;
+
+    dtEl.textContent = `${dt.toFixed(3)}`;
+
     prev = now;
+
+    // matSim.uniforms.uDt.value    = 1.0;
+    // matTrailDeposit.uniforms.uDt.value = 1.0;
+    // matTrailDecay.uniforms.uDt.value    = 1.0;
+
     matSim.uniforms.uCanvas.value = bufferSize.clone();
     matTrailDeposit.uniforms.uCanvas.value = bufferSize.clone();
     matTrailDecay.uniforms.uCanvas.value = bufferSize.clone();
@@ -341,7 +354,7 @@ function frame() {
     matSim.uniforms.uTrail.value = trailDecayRead.texture;
     matSim.uniforms.uState.value = readRT.texture;
     matSim.uniforms.uTime.value  = now;
-    matSim.uniforms.uDt.value    = dt;
+
 
     renderer.setRenderTarget(writeRT);
     renderer.clear(true,false,false);
