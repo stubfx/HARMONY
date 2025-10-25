@@ -11,5 +11,4 @@ export let STEP_LEN = .8; // pos += vel * STEP_LEN
 export let JITTER = 2.0; // random acceleration strength
 export let IMAGE_AREA = 400.0;
 // still testing this with coords, they clearly need to be adjusted.
-// export let RENDER_QUALITY = renderQuality || 1;
-export let RENDER_QUALITY = 1;
+export let RENDER_QUALITY = renderQuality || 1;
