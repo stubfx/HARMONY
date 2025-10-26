@@ -2,6 +2,7 @@ precision highp float; precision highp sampler2D;
 
 uniform sampler2D uState;
 uniform vec2      uCanvas;
+uniform vec2      uTrailTexSize;
 uniform float     uTime, uDt, uDrag, uStepLen;
 uniform float uTurnJitter;
 // uniform float uSpeedJitter;
@@ -19,19 +20,26 @@ vec2 rot(vec2 v, float a){
     return mat2(c,-s,s,c) * v;
 }
 
-// helper: clamp and sample exact pixel
-float sampleTrailPX(vec2 pPx) {
-    // pPx is in pixel coords, origin = bottom-left
-    vec2 p = clamp(pPx, vec2(0.0), uCanvas - vec2(1.0));
-    ivec2 uv = ivec2(p);
-    return texelFetch(uTrail, uv, 0).r;  // use .r channel for density
-    // vec4 tx = texelFetch(uTrail, uv, 0);
-    // return tx.r + tx.g + tx.b;
+// // helper: clamp and sample exact pixel
+// float sampleTrailPX(vec2 pPx) {
+//     // pPx is in pixel coords, origin = bottom-left
+//     vec2 p = clamp(pPx, vec2(0.0), uCanvas - vec2(1.0));
+//     ivec2 uv = ivec2(p);
+//     return texelFetch(uTrail, uv, 0).r;  // use .r channel for density
+// }
+
+// pPx is agent position in FULL-RES pixels (same space as uCanvas)
+float sampleTrail_atPos(vec2 pPx) {
+    vec2 uv = pPx / uCanvas;     // 0..1 in full-res space
+    // uv.y = 1.0 - uv.y;           // flip if your pos origin is top-left
+    uv = clamp(uv, 0.0, 1.0);
+    return texture(uTrail, uv).r;   // linear/nearest depends on RT filtering
 }
 
 float sampleTrailPX_flipped(vec2 pPx) {
     vec2 p = vec2(pPx.x, uCanvas.y - 1.0 - pPx.y);
-    return sampleTrailPX(p);
+    // return sampleTrailPX(p);
+    return sampleTrail_atPos(p);
 }
 
 void main(){

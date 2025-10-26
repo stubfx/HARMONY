@@ -10,8 +10,8 @@ export let IMAGE_AREA = 400.0;
 // still testing this with coords, they clearly need to be adjusted.
 export let RENDER_QUALITY = renderQuality || 1;
 
-
 const gui = new dat.GUI();
+gui.width = 500;
 
 const params = {
     STEP_LEN: 70.0,
@@ -23,17 +23,17 @@ const params = {
     SENSE_ANGLE: 0.3,
     TURN_RATE: 5.0,
     POINT_SIZE: 1.0,
-    DEPOSIT_SIZE: 10.0,
+    DEPOSIT_SIZE: 1.0,
     DEPOSIT_STRENGTH: 1,
     DEPOSIT_EDGE_SOFT: 0.5,
     CHAMP_SAMPLE_INTERVAL: 5000.0,
     CHAMP_IMP_MULTIPLIER: 5000.0,
-    TRAIL_DECAY: 80,
+    TRAIL_DECAY: 140,
     SPAWN_RADIUS: 500.0,
     ENABLE_MOUSE: false,
     SHOW_TRAIL: false,
     RENDER_QUALITY: 1.0,
-    TEX_SIDE: 1200
+    TEX_SIDE: number || 1200
 };
 
 // folders for grouping
@@ -76,14 +76,9 @@ fDecay.add(params, 'TRAIL_DECAY', 0, 500, 1)
 // fHeavy.add(params, 'RENDER_QUALITY', 0.25, 2, 0.05)
 // fHeavy.add(params, 'TEX_SIDE', 32, 4096, 32)
 
-// open folders if desired
-fSim.open();
-fDraw.open();
-// gui.hide()
 fSim.open();
 fDraw.open();
 fDep.open();
 fDecay.open();
-
 
 export default params;

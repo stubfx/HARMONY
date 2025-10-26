@@ -50,8 +50,7 @@ renderer.setSize( window.innerWidth, window.innerHeight );
 renderer.setPixelRatio(RES);
 const bufferSize = new THREE.Vector2();
 renderer.getDrawingBufferSize(bufferSize);
-// const trailBufferSize = bufferSize.clone().multiplyScalar(0.5);
-const trailBufferSize = bufferSize.clone();
+const trailBufferSize = bufferSize.clone().multiplyScalar(.4);
 console.log(trailBufferSize);
 
 
@@ -147,10 +146,10 @@ const N = params.TEX_SIDE * params.TEX_SIDE;
 const init = new Float32Array(N*4);
 for (let i=0;i<N;i++) {
     const k=i*4;
-    init[k] = W/2; //x
-    init[k+1] = H/2; //y
-    // init[k] = Math.random() * W; //x
-    // init[k+1] = Math.random() * H; //y
+    // init[k] = W/2; //x
+    // init[k+1] = H/2; //y
+    init[k] = Math.random() * W; //x
+    init[k+1] = Math.random() * H; //y
     //dx and dy
     init[k+2] = (Math.random() - 0.5) ; //x
     init[k+3] = (Math.random() - 0.5); //y
@@ -252,6 +251,7 @@ const matSim = new THREE.RawShaderMaterial({
         uTurnJitter: { value: params.TURN_JITTER },
         // uSpeedJitter: { value: params.SPEED_JITTER },
         uMouseDown: { value: mouseDown},
+        uTrailTexSize: {value: new THREE.Vector2(trailBufferSize.x, trailBufferSize.y)}
     },
     vertexShader: simVert,
     fragmentShader: simFrag,
@@ -302,13 +302,13 @@ const matTrailDeposit = new THREE.RawShaderMaterial({
         uState:     { value: rtA.texture },
         uTexSize: { value: new THREE.Vector2(params.TEX_SIDE, params.TEX_SIDE) },
         uCanvas:    { value: new THREE.Vector2(W, H) },
-        uBufferSize:    { value: new THREE.Vector2(W, H) },
         uPointSize: { value: 10.0 },
         uStrength:  { value: 1 },
         uEdgeSoft:  { value: 0.5 },
         uDt: {value: 1.0},
         uChampImportanceMultiplier: {value: params.CHAMP_IMP_MULTIPLIER},
         uChampSampleInterval:  { value: 1000 },
+        uTrailTexSize: {value: new THREE.Vector2(trailBufferSize.x, trailBufferSize.y)}
     },
     vertexShader: trailVert,
     fragmentShader: trailFrag,
@@ -335,7 +335,6 @@ const matTrailDecay = new THREE.RawShaderMaterial({
         uHasCustomImage: { value: false},
         uImageArea: { value: params.IMAGE_AREA},
         uCanvas:    { value: new THREE.Vector2(W, H) },
-        uBufferSize:    { value: new THREE.Vector2(W, H) },
         uNuke: { value: nuke}
     },
     vertexShader: trailDecayVert,
@@ -387,10 +386,10 @@ function frame() {
     updateUniforms();
 
     matSim.uniforms.uCanvas.value = bufferSize.clone();
+    matSim.uniforms.uTrailTexSize.value = trailBufferSize.clone();
     matTrailDeposit.uniforms.uCanvas.value = bufferSize.clone();
-    matTrailDeposit.uniforms.uBufferSize.value = trailBufferSize.clone();
-    matTrailDecay.uniforms.uCanvas.value = bufferSize.clone();
-    // matTrailDecay.uniforms.uBufferSize.value = trailBufferSize.clone();
+    matTrailDeposit.uniforms.uTrailTexSize.value = trailBufferSize.clone();
+    matTrailDecay.uniforms.uCanvas.value = trailBufferSize.clone();
     matPoints.uniforms.uCanvas.value = bufferSize.clone();
 
     matSim.uniforms.uTrail.value = trailDecayRead.texture;
@@ -436,9 +435,8 @@ function frame() {
     // renderer.render(sceneTrail, camera);
     if (params.SHOW_TRAIL) {
         renderer.render(sceneTrailDecay, camera);
-    } else {
-        renderer.render(sceneDraw, camera);
     }
+        renderer.render(sceneDraw, camera);
 
     frames++;
     const nowMs = performance.now();
