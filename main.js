@@ -50,14 +50,14 @@ renderer.setSize( window.innerWidth, window.innerHeight );
 renderer.setPixelRatio(RES);
 const bufferSize = new THREE.Vector2();
 renderer.getDrawingBufferSize(bufferSize);
-const trailBufferSize = bufferSize.clone().multiplyScalar(.4);
-console.log(trailBufferSize);
-
+const trailBufferSize = bufferSize.clone().multiplyScalar(params.TRAIL_TEX_RES);
 
 document.body.appendChild( renderer.domElement );
 
 const W = renderer.domElement.width, H = renderer.domElement.height;
 const fpsEl = document.querySelector("#fps");
+const agentsEl = document.querySelector("#agentsCount");
+agentsEl.textContent = `${(params.TEX_SIDE * params.TEX_SIDE).toLocaleString()} agents`
 // const dtEl = document.querySelector("#deltaTime");
 
 function refreshSizes() {
@@ -148,6 +148,8 @@ for (let i=0;i<N;i++) {
     const k=i*4;
     // init[k] = W/2; //x
     // init[k+1] = H/2; //y
+    // init[k] = 0.0; //x
+    // init[k+1] = 0.0; //y
     init[k] = Math.random() * W; //x
     init[k+1] = Math.random() * H; //y
     //dx and dy
@@ -335,6 +337,8 @@ const matTrailDecay = new THREE.RawShaderMaterial({
         uHasCustomImage: { value: false},
         uImageArea: { value: params.IMAGE_AREA},
         uCanvas:    { value: new THREE.Vector2(W, H) },
+        uTrailTexSize: {value: new THREE.Vector2(trailBufferSize.x, trailBufferSize.y)},
+        uTrailTexRes: {value: params.TRAIL_TEX_RES},
         uNuke: { value: nuke}
     },
     vertexShader: trailDecayVert,
@@ -389,7 +393,8 @@ function frame() {
     matSim.uniforms.uTrailTexSize.value = trailBufferSize.clone();
     matTrailDeposit.uniforms.uCanvas.value = bufferSize.clone();
     matTrailDeposit.uniforms.uTrailTexSize.value = trailBufferSize.clone();
-    matTrailDecay.uniforms.uCanvas.value = trailBufferSize.clone();
+    matTrailDecay.uniforms.uCanvas.value = bufferSize.clone();
+    matTrailDecay.uniforms.uTrailTexSize.value = trailBufferSize.clone();
     matPoints.uniforms.uCanvas.value = bufferSize.clone();
 
     matSim.uniforms.uTrail.value = trailDecayRead.texture;

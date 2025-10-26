@@ -29,7 +29,7 @@ void main(){
     gl_PointSize = uPointSize;
     if (index % uChampSampleInterval == 0) {
         vIsChamp = 1.0;
-        gl_PointSize *= 5.0;
+        gl_PointSize *= 20.0;
     } else {
         vIsChamp = 0.0;
     }

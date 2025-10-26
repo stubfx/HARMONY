@@ -16,5 +16,6 @@ void main() {
     m *= uStrength * uDt;
     if (vIsChamp > 0.5) m *= uChampImportanceMultiplier;
     // fragColor = vec4(m, 0.0, 0.0, 1.0);   // write density into .r
+    // m = clamp(m, 0.0, 1.0);
     fragColor = vec4(m, 0.0, 0.0, 1.0);   // write density into .r
 }

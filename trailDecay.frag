@@ -12,13 +12,12 @@ uniform float uDt;
 uniform vec2 uMouseCoords;
 uniform bool uMouseDown;
 uniform vec2 uCanvas;
-uniform vec2 uBufferSize;
+uniform float uTrailTexRes;
 uniform bool uNuke;
 out vec4 fc;
 
 
 void main() {
-    // ivec2 uv  = ivec2(gl_FragCoord.xy * (uCanvas / uBufferSize));
     ivec2 uv  = ivec2(gl_FragCoord.xy);
 
     vec4 dec  = texelFetch(uPrevDecay, uv, 0);
@@ -34,18 +33,51 @@ void main() {
     }
     else if (uHasCustomImage) {
         if (uMouseDown) {
+            vec2 trailMouseCoords = uMouseCoords * uTrailTexRes;
+            // fc = vec4(nMouseCoords.xy, 0.0, 1.0);
             // if (distance(gl_FragCoord.xy, uMouseCoords) < 100.0) d = 0.0;
-            float dist = distance(gl_FragCoord.xy, uMouseCoords);
-            vec2 topLeft = 0.5 * (uCanvas - uCustomImageSize);
-            ivec2 imagePlacement  = ivec2(floor(gl_FragCoord.xy - topLeft));
-            bvec2 ge0 = greaterThanEqual(imagePlacement, ivec2(0));
-            bvec2 ltS = lessThan(imagePlacement, ivec2(uCustomImageSize));
-            bool inImg = all(ge0) && all(ltS);
+            float dist = distance(gl_FragCoord.xy, trailMouseCoords);
+            // vec2 topLeft = 0.5 * (uCanvas * uTrailTexRes - uCustomImageSize);
+            // ivec2 imagePlacement  = ivec2(floor(gl_FragCoord.xy - topLeft));
+            // bvec2 ge0 = greaterThanEqual(imagePlacement, ivec2(0));
+            // bvec2 ltS = lessThan(imagePlacement, ivec2(uCustomImageSize));
+            // bool inImg = all(ge0) && all(ltS);
+            //
+            // vec4 customImage = vec4(0.0);
+            // if (inImg) customImage = texelFetch(uCustomImage, imagePlacement, 0);
+
+
+
+
+
+            // Desired on-RT size = original size scaled by trailRes
+            vec2 scaledSize = uCustomImageSize * uTrailTexRes;
+
+            // Center on the trail RT (whose pixel size = uCanvas * uTrailTexRes)
+            vec2 trailSize = uCanvas * uTrailTexRes;
+            vec2 topLeft   = 0.5 * (trailSize - scaledSize);
+
+            // Position of this fragment relative to the image rectangle (in trail pixels)
+            vec2 rel       = gl_FragCoord.xy - topLeft;
+
+            // Normalized UV into the source image (0..1)
+            vec2 uv        = rel / scaledSize;
+
+            // Inside the image?
+            bvec2 in0 = greaterThanEqual(uv, vec2(0.0));
+            bvec2 in1 = lessThan(uv, vec2(1.0));
+            bool inImg = all(in0) && all(in1);
 
             vec4 customImage = vec4(0.0);
-            if (inImg) customImage = texelFetch(uCustomImage, imagePlacement, 0);
-            if (dist < uImageArea) {
-                dist = smoothstep(1.0, 0.3, dist/uImageArea);
+            if (inImg) {
+                // Filtering chosen by sampler state:
+                //   NearestFilter  -> crisp pixels
+                //   LinearFilter   -> smooth scale
+                customImage = texture(uCustomImage, uv);
+            }
+            float scaledImageArea = uImageArea * uTrailTexRes;
+            if (dist < scaledImageArea) {
+                dist = smoothstep(1.0, 0.1, dist/scaledImageArea);
                 // WATCH OUT
                 // AS WE ARE USING THE RED CHANNEL FOR SENSING THE TRAIL
                 // WE MUST DUMP THE TRAIL INTO THAT FOR THE SIM TO WORK.
