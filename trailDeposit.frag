@@ -10,10 +10,10 @@ in float vIsChamp;
 
 void main() {
     // round splat: gl_PointCoord is [0..1] within the point
-    // float d = length(gl_PointCoord - 0.5);
-    // float m = smoothstep(0.5, 0.0, d);  // soft edge
-    float m = 1.0;
+    float d = length(gl_PointCoord - 0.5);
+    float m = smoothstep(0.5, 0.0, d);  // soft edge
+    // float m = 0.05;
     m *= uStrength * uDt;
     if (vIsChamp > 0.5) m *= uChampImportanceMultiplier;
-    fragColor = vec4(m, 0.0, 0.0, m);        // write density into .r
+    fragColor = vec4(m, 0.0, 0.0, 1.0);   // write density into .r
 }

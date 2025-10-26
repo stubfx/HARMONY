@@ -50,6 +50,9 @@ renderer.setSize( window.innerWidth, window.innerHeight );
 renderer.setPixelRatio(RES);
 const bufferSize = new THREE.Vector2();
 renderer.getDrawingBufferSize(bufferSize);
+// const trailBufferSize = bufferSize.clone().multiplyScalar(0.5);
+const trailBufferSize = bufferSize.clone();
+console.log(trailBufferSize);
 
 
 document.body.appendChild( renderer.domElement );
@@ -100,23 +103,23 @@ const sceneTrailDecay = new THREE.Scene();
 const sceneDraw = new THREE.Scene();
 const camera = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
 
-let rtA = UTILS.makeRT();
-let rtB = UTILS.makeRT();
-let trailA = UTILS.makeTrailRT(bufferSize.x, bufferSize.y);
-let trailB = UTILS.makeTrailRT(bufferSize.x, bufferSize.y);
-let trailRead = trailA, trailWrite = trailB;
-let trailDecayTxA = UTILS.makeTrailRT(bufferSize.x, bufferSize.y);
-let trailDecayTxB = UTILS.makeTrailRT(bufferSize.x, bufferSize.y);
-let trailDecayRead = trailDecayTxA, trailDecayWrite = trailDecayTxB;
+let rtA;
+let rtB;
+let trailA;
+let trailB;
+let trailRead, trailWrite;
+let trailDecayTxA;
+let trailDecayTxB;
+let trailDecayRead, trailDecayWrite;
 
 function initTextures() {
     rtA = UTILS.makeRT();
     rtB = UTILS.makeRT();
-    trailA = UTILS.makeTrailRT(bufferSize.x, bufferSize.y);
-    trailB = UTILS.makeTrailRT(bufferSize.x, bufferSize.y);
+    trailA = UTILS.makeTrailRT(trailBufferSize.x, trailBufferSize.y);
+    trailB = UTILS.makeTrailRT(trailBufferSize.x, trailBufferSize.y);
     trailRead = trailA, trailWrite = trailB;
-    trailDecayTxA = UTILS.makeTrailRT(bufferSize.x, bufferSize.y);
-    trailDecayTxB = UTILS.makeTrailRT(bufferSize.x, bufferSize.y);
+    trailDecayTxA = UTILS.makeTrailRT(trailBufferSize.x, trailBufferSize.y);
+    trailDecayTxB = UTILS.makeTrailRT(trailBufferSize.x, trailBufferSize.y);
     trailDecayRead = trailDecayTxA, trailDecayWrite = trailDecayTxB;
 
     // clear once
@@ -299,17 +302,18 @@ const matTrailDeposit = new THREE.RawShaderMaterial({
         uState:     { value: rtA.texture },
         uTexSize: { value: new THREE.Vector2(params.TEX_SIDE, params.TEX_SIDE) },
         uCanvas:    { value: new THREE.Vector2(W, H) },
+        uBufferSize:    { value: new THREE.Vector2(W, H) },
         uPointSize: { value: 10.0 },
         uStrength:  { value: 1 },
         uEdgeSoft:  { value: 0.5 },
         uDt: {value: 1.0},
-        uChampImportanceMultiplier: {value: 10000},
+        uChampImportanceMultiplier: {value: params.CHAMP_IMP_MULTIPLIER},
         uChampSampleInterval:  { value: 1000 },
     },
     vertexShader: trailVert,
     fragmentShader: trailFrag,
     depthTest:false, depthWrite:false,
-    transparent:false, blending: THREE.NoBlending
+    transparent:false
 });
 const pointsDeposit = new THREE.Points(ptsGeo, matTrailDeposit);
 pointsDeposit.frustumCulled = false;
@@ -331,6 +335,7 @@ const matTrailDecay = new THREE.RawShaderMaterial({
         uHasCustomImage: { value: false},
         uImageArea: { value: params.IMAGE_AREA},
         uCanvas:    { value: new THREE.Vector2(W, H) },
+        uBufferSize:    { value: new THREE.Vector2(W, H) },
         uNuke: { value: nuke}
     },
     vertexShader: trailDecayVert,
@@ -383,7 +388,9 @@ function frame() {
 
     matSim.uniforms.uCanvas.value = bufferSize.clone();
     matTrailDeposit.uniforms.uCanvas.value = bufferSize.clone();
+    matTrailDeposit.uniforms.uBufferSize.value = trailBufferSize.clone();
     matTrailDecay.uniforms.uCanvas.value = bufferSize.clone();
+    // matTrailDecay.uniforms.uBufferSize.value = trailBufferSize.clone();
     matPoints.uniforms.uCanvas.value = bufferSize.clone();
 
     matSim.uniforms.uTrail.value = trailDecayRead.texture;
@@ -404,6 +411,7 @@ function frame() {
     matPoints.uniforms.uCustomImage.value = customImage;
     matPoints.uniforms.uHasCustomImage.value = true;
     matPoints.uniforms.uMouseCoords.value = prevmousecoords;
+
     matTrailDeposit.uniforms.uState.value = writeRT.texture;   // deposit uses agent positions
     // matTrailDeposit.uniforms.uDt.value = dt;
     // ensure deposit maps world→trail correctly
@@ -425,7 +433,7 @@ function frame() {
     // DRAW pass
     renderer.setRenderTarget(null); 
     renderer.clear(true, false, false);
-    //renderer.render(sceneTrail, camera);
+    // renderer.render(sceneTrail, camera);
     if (params.SHOW_TRAIL) {
         renderer.render(sceneTrailDecay, camera);
     } else {
@@ -461,6 +469,7 @@ function updateUniforms () {
     matTrailDeposit.uniforms.uStrength.value = params.DEPOSIT_STRENGTH;
     matTrailDeposit.uniforms.uEdgeSoft.value = params.DEPOSIT_EDGE_SOFT;
     matTrailDeposit.uniforms.uChampSampleInterval.value = params.CHAMP_SAMPLE_INTERVAL;
+    matTrailDeposit.uniforms.uChampImportanceMultiplier.value = params.CHAMP_IMP_MULTIPLIER;
     matTrailDecay.uniforms.uDecay.value = params.TRAIL_DECAY;
 
 

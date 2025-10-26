@@ -12,12 +12,15 @@ uniform float uDt;
 uniform vec2 uMouseCoords;
 uniform bool uMouseDown;
 uniform vec2 uCanvas;
+uniform vec2 uBufferSize;
 uniform bool uNuke;
 out vec4 fc;
 
 
 void main() {
+    // ivec2 uv  = ivec2(gl_FragCoord.xy * (uCanvas / uBufferSize));
     ivec2 uv  = ivec2(gl_FragCoord.xy);
+
     vec4 dec  = texelFetch(uPrevDecay, uv, 0);
     vec4 dep  = texelFetch(uDeposit,   uv, 0);
 
@@ -43,13 +46,17 @@ void main() {
             if (inImg) customImage = texelFetch(uCustomImage, imagePlacement, 0);
             if (dist < uImageArea) {
                 dist = smoothstep(1.0, 0.3, dist/uImageArea);
-                // color = customImage*dist;
-                color = customImage*dist + d * 0.3;
+                // WATCH OUT
+                // AS WE ARE USING THE RED CHANNEL FOR SENSING THE TRAIL
+                // WE MUST DUMP THE TRAIL INTO THAT FOR THE SIM TO WORK.
+                customImage.r = customImage.w;
+                color = customImage*dist;
+                // color = customImage*dist + d * 0.3;
                 // fc = customImage * dist;
                 // return;
             }
         }
     }
-    // color.w = clamp(color.w, 0.0, 1.0);
+    // color.w = clamp(color.w, 0.0, 20.0);
     fc = color;
 }

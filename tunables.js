@@ -24,10 +24,11 @@ const params = {
     TURN_RATE: 5.0,
     POINT_SIZE: 1.0,
     DEPOSIT_SIZE: 10.0,
-    DEPOSIT_STRENGTH: .1,
+    DEPOSIT_STRENGTH: 1,
     DEPOSIT_EDGE_SOFT: 0.5,
     CHAMP_SAMPLE_INTERVAL: 5000.0,
-    TRAIL_DECAY: 150,
+    CHAMP_IMP_MULTIPLIER: 5000.0,
+    TRAIL_DECAY: 80,
     SPAWN_RADIUS: 500.0,
     ENABLE_MOUSE: false,
     SHOW_TRAIL: false,
@@ -63,6 +64,7 @@ fDep.add(params, 'DEPOSIT_SIZE', 0.5, 40, 0.5)
 fDep.add(params, 'DEPOSIT_STRENGTH', 0, 5, 0.05)
 fDep.add(params, 'DEPOSIT_EDGE_SOFT', 0, 1, 0.01)
 fDep.add(params, 'CHAMP_SAMPLE_INTERVAL', 1, 20000, 1)
+fDep.add(params, 'CHAMP_IMP_MULTIPLIER', 1, 20000, 1)
 
 // trail decay
 fDecay.add(params, 'TRAIL_DECAY', 0, 500, 1)

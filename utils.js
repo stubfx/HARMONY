@@ -18,7 +18,7 @@ export function makeTrailRT(w, h){
   return new THREE.WebGLRenderTarget(w, h, {
     minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter,
     wrapS: THREE.ClampToEdgeWrapping, wrapT: THREE.ClampToEdgeWrapping,
-    type: THREE.FloatType, format: THREE.RGBAFormat,
+    type: THREE.FloatType, format: THREE.RedFormat,
     depthBuffer:false, stencilBuffer:false
   });
 }
