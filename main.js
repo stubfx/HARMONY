@@ -13,6 +13,7 @@ import trailDecayVert from './trailDecay.vert?raw';
 import trailDecayFrag from './trailDecay.frag?raw';
 import logoImgUrl from './assets/aant.png';
 import colorImgUrl from './assets/a03.png';
+import Stats from 'three/examples/jsm/libs/stats.module.js';
 
 async function loadShader(url) {
     const res = await fetch(url);
@@ -346,7 +347,7 @@ const matTrailDecay = new THREE.RawShaderMaterial({
     vertexShader: trailDecayVert,
     fragmentShader: trailDecayFrag,
     depthTest:false, depthWrite:false,
-    transparent:false, blending: THREE.AdditiveBlending
+    transparent:false
 });
 const trailDecay = new THREE.Mesh(fsq, matTrailDecay);
 trailDecay.frustumCulled = false;
@@ -375,8 +376,12 @@ let fps = 0;
 const timeMult = 0.001;
 // main sim loop
 let prev = performance.now()*timeMult;
+var stats = new Stats();
+stats.showPanel( 1 ); // 0: fps, 1: ms, 2: mb, 3+: custom
+document.body.appendChild( stats.dom );
 
 function frame() {
+    stats.begin();
     const now = performance.now()*timeMult;
 
     let dt = Math.min(Math.max(now - prev, timeMult), 0.05);
@@ -454,6 +459,8 @@ function frame() {
         lastTime = nowMs;
         frames = 0;
     }
+
+    stats.end();
 
     requestAnimationFrame(frame);
 }

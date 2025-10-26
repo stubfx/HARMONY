@@ -24,9 +24,11 @@ void main() {
     vec4 dep  = texelFetch(uDeposit,   uv, 0);
 
 
-    vec4 decay = dec - uDecay * uDt;
+    // vec4 decay = dec - uDecay * uDt;
     // vec4 d = max(dec * uDecay, dep);
-    vec4 d = max(decay + dep, 0.0);
+    // vec4 d = max(decay + dep, 0.0);
+    float keep = pow(uDecay, uDt);
+    vec4 d = dec * keep + dep;
     vec4 color = d;
     if (uNuke) {
         color = vec4(0.0);
