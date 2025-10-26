@@ -286,6 +286,8 @@ const matPoints = new THREE.RawShaderMaterial({
         uCustomImageSize: {value: new THREE.Vector2(customImage.width, customImage.height)},
         uCustomImage: { value: customImage},
         uHasCustomImage: { value: false},
+        uPointColor: { value: params.POINT_COLOR},
+
     },
     vertexShader: pointVert,
     fragmentShader: pointFrag,
@@ -468,6 +470,7 @@ function updateUniforms () {
     matSim.uniforms.uSenseAngle.value = params.SENSE_ANGLE;
     matSim.uniforms.uTurnRate.value = params.TURN_RATE;
     matPoints.uniforms.uPointSize.value = params.POINT_SIZE;
+    matPoints.uniforms.uPointColor.value = params.POINT_COLOR;
     matTrailDeposit.uniforms.uPointSize.value = params.DEPOSIT_SIZE;
     matTrailDeposit.uniforms.uStrength.value = params.DEPOSIT_STRENGTH;
     matTrailDeposit.uniforms.uEdgeSoft.value = params.DEPOSIT_EDGE_SOFT;
