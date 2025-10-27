@@ -25,7 +25,6 @@ export async function captureVolume() {
     const volume = rms; // 0.0–1.0 approx
 
     // console.log(volume);
-    params.DEPOSIT_SIZE = 1 + volume;
 
     requestAnimationFrame(update);
   }

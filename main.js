@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as UTILS from '/utils.js';
 import {params, debug} from '/tunables.js';
+import {chat} from '/client-openai-api.js';
 
 
 import simVert from './sim.vert?raw';
@@ -70,19 +71,34 @@ function refreshSizes() {
 
 refreshSizes();
 
+
+document.querySelector("#chat-container").onsubmit = async (e) => {
+    e.preventDefault();
+    const inputEl = document.querySelector("#chat-input");
+    const text = inputEl.value;
+    inputEl.innerText = "";
+    const res = await chat(text);
+    const p = JSON.parse(res);
+    console.log(p);
+    const c = new THREE.Color(p.color);
+    params.POINT_COLOR = [c.r, c.g, c.b]; 
+    console.log(params.POINT_COLOR);
+};
+
 window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
     refreshSizes();
     initTextures();
 });
 
-document.onkeydown = (event) => {
-    nuke = event.key == "n";
-}
+// document.onkeydown = (event) => {
+//     nuke = event.key == "n";
+// }
+//
+// document.onkeyup = (event) => {
+//     if (event.key == "n") nuke = false;
+// }
 
-document.onkeyup = (event) => {
-    if (event.key == "n") nuke = false;
-}
 document.onmousemove = (e) => {
     const xDev = e.clientX * RES;
     const yDev = (window.innerHeight - e.clientY) * RES; // flip in CSS, then scale
@@ -90,8 +106,9 @@ document.onmousemove = (e) => {
     // console.log(prevmousecoords);
 }
 
-document.onmousedown = () => {
-    mouseDown = true && params.ENABLE_MOUSE;
+document.onmousedown = (event) => {
+    // console.log(event.target == renderer.domElement)
+    mouseDown = event.target == renderer.domElement && params.ENABLE_MOUSE;
 }
 
 document.onmouseup = event => {
