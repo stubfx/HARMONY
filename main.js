@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as UTILS from '/utils.js';
-import params from '/tunables.js';
+import {params, debug} from '/tunables.js';
 
 
 import simVert from './sim.vert?raw';
@@ -377,7 +377,6 @@ const timeMult = 0.001;
 // main sim loop
 let prev = performance.now()*timeMult;
 var stats = new Stats();
-stats.showPanel( 1 ); // 0: fps, 1: ms, 2: mb, 3+: custom
 document.body.appendChild( stats.dom );
 
 function frame() {

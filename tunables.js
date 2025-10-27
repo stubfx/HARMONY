@@ -14,7 +14,7 @@ export let RENDER_QUALITY = renderQuality || 1;
 const gui = new dat.GUI();
 gui.width = 500;
 
-const params = {
+export const params = {
     STEP_LEN: 70.0,
     IMAGE_AREA: 500,
     RENDER_QUALITY: 1,
@@ -41,6 +41,10 @@ const params = {
     TRAIL_TEX_RES: .4
 };
 
+export const debug = {
+    SHOW_INFO: false, 
+}
+
 // folders for grouping
 const fSim   = gui.addFolder('Simulation');
 const fDraw  = gui.addFolder('Draw Points');
@@ -52,6 +56,7 @@ const fDebug = gui.addFolder('Debug');
 // toggle
 fDebug.add(params, 'ENABLE_MOUSE')
 fDebug.add(params, 'SHOW_TRAIL')
+// fDebug.add(debug, 'SHOW_INFO');
 
 // simulat
 fSim.add(params, 'STEP_LEN', 0, 200, 1)
@@ -91,6 +96,4 @@ fDraw.open();
 fDep.open();
 fDecay.open();
 fDebug.open();
-gui.close();
-
-export default params;
+// gui.close();
