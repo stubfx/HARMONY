@@ -25,7 +25,7 @@ export const params = {
     SENSE_ANGLE: 0.2,
     TURN_RATE: 20.0,
     POINT_SIZE: 1.0,
-    DEPOSIT_SIZE: 1.0,
+    DEPOSIT_SIZE: 0.1,
     DEPOSIT_STRENGTH: 10,
     DEPOSIT_EDGE_SOFT: 0.5,
     CHAMP_SAMPLE_INTERVAL: 50000.0,

@@ -14,11 +14,14 @@ import trailDecayFrag from './trailDecay.frag?raw';
 import logoImgUrl from './assets/aant.png';
 import colorImgUrl from './assets/a03.png';
 import Stats from 'three/examples/jsm/libs/stats.module.js';
+import { captureVolume } from './audio';
 
 async function loadShader(url) {
     const res = await fetch(url);
     return await res.text();
 }
+
+// captureVolume();
 
 // console.log(params.TEX_SIDE);
 
