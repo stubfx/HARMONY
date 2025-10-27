@@ -147,12 +147,12 @@ const N = params.TEX_SIDE * params.TEX_SIDE;
 const init = new Float32Array(N*4);
 for (let i=0;i<N;i++) {
     const k=i*4;
-    // init[k] = W/2; //x
-    // init[k+1] = H/2; //y
+    init[k] = W/2; //x
+    init[k+1] = H/2; //y
     // init[k] = 0.0; //x
     // init[k+1] = 0.0; //y
-    init[k] = Math.random() * W; //x
-    init[k+1] = Math.random() * H; //y
+    // init[k] = Math.random() * W; //x
+    // init[k+1] = Math.random() * H; //y
     //dx and dy
     init[k+2] = (Math.random() - 0.5) ; //x
     init[k+3] = (Math.random() - 0.5); //y
@@ -249,7 +249,7 @@ const matSim = new THREE.RawShaderMaterial({
         uCanvas: { value: new THREE.Vector2(W, H) },
         uTime: { value: 0 },
         uDt: { value: 0.1 },
-        // uDrag: { value: params.DRAG },
+        uDrag: { value: params.DRAG },
         uStepLen: { value: params.STEP_LEN },
         uTurnJitter: { value: params.TURN_JITTER },
         // uSpeedJitter: { value: params.SPEED_JITTER },
@@ -472,6 +472,7 @@ requestAnimationFrame(frame);
 function updateUniforms () {
     matSim.uniforms.uStepLen.value = params.STEP_LEN;
     matSim.uniforms.uTurnJitter.value = params.TURN_JITTER;
+    matSim.uniforms.uDrag.value = params.DRAG;
     // matSim.uniforms.uSpeedJitter.value = params.SPEED_JITTER;
     matSim.uniforms.uSenseDist.value = params.SENSE_DIST;
     matSim.uniforms.uSenseAngle.value = params.SENSE_ANGLE;

@@ -46,40 +46,55 @@ void main(){
     ivec2 uv = ivec2(gl_FragCoord.xy);
     vec4 s   = texelFetch(uState, uv, 0);
     vec2 pos = s.xy;
-    vec2 dir = normalize(s.zw);
-    // if (uMouseDown) {
-    //     dir = vec2(0.0);
-    //     fragColor = vec4(pos, dir);
-    //     return;
-    // }
-    if (!all(greaterThan(abs(dir), vec2(0.0001)))) dir = vec2(1.0, 0.0);
+    vec2 v   = s.zw;                 // velocity, not unit dir
+    float speed = length(v);
+    vec2 dir = (speed > 1e-6) ? v / speed : vec2(1.0, 0.0);
 
     float weightForward = sampleTrailPX_flipped(pos +  uSenseDist * dir);
     float weightLeft    = sampleTrailPX_flipped(pos +  uSenseDist * rot(dir,  uSenseAngle));
     float weightRight   = sampleTrailPX_flipped(pos +  uSenseDist * rot(dir, -uSenseAngle));
 
-    float rnd = fract(sin(dot(vec3(gl_FragCoord.xy, floor(uTime*uDt)),
+    // 0..1 hash
+    float rnd = fract(sin(dot(vec3(gl_FragCoord.xy, floor(uTime*123.0)),
                               vec3(127.1,311.7,74.7))) * 43758.5453123);
 
-    float turnUnit = 0.0;
+    // centered, signed noise in [-uTurnJitter, +uTurnJitter]
+    float noise = (rnd * 2.0 - 1.0) * uTurnJitter;
+
+    float turnUnit;
     if (weightForward < weightLeft && weightForward < weightRight) {
-        turnUnit = (rnd - 0.5);
+        // wander: just noise around 0
+        turnUnit = noise;
     } else if (weightRight > weightLeft) {
-        turnUnit = -rnd;
+        // steer right (negative) + symmetric noise
+        turnUnit = -1.0 + noise;
     } else if (weightLeft > weightRight) {
-        turnUnit = +rnd;
+        // steer left (positive) + symmetric noise
+        turnUnit = +1.0 + noise;
+    } else {
+        // equal L/R: only noise
+        turnUnit = noise;
     }
 
-    turnUnit *= uTurnJitter;
+    // keep within [-1,1]
+    turnUnit = clamp(turnUnit, -1.0, 1.0);
 
+    // then scale to radians
     float maxTurn = uTurnRate * uDt;
-    float dTheta  = clamp(turnUnit * maxTurn, -maxTurn, +maxTurn);
-    dir = normalize(rot(dir, dTheta));
+    float dTheta  = turnUnit * maxTurn;
+    v = rot(v, dTheta);
 
-    // float speed = uStepLen * rnd * 1.5;
-    float speed = uStepLen;
-    pos += dir * speed * uDt;
-    
+
+    // (optional) drag & target step length
+    float target = uStepLen;                     // desired cruising speed
+    float drag   = exp(-uDrag * uDt);            // 0..1
+    // keep magnitude near target with exponential smoothing
+    float newSpeed = mix(target, length(v), drag);
+    v = (length(v) > 1e-6) ? normalize(v) * newSpeed : dir * newSpeed;
+
+    // integrate
+    pos += v * uDt;
+
     // WATCH OUT YOU MIGHT WANT THIS ON!!!
     pos = mod(pos + uCanvas, uCanvas);
     //-------------------------------------
@@ -93,6 +108,6 @@ void main(){
 
     // Removed zeroing block that killed particles.
 
-    fragColor = vec4(pos, dir);
+    fragColor = vec4(pos, v);
 }
 
