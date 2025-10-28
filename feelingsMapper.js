@@ -15,7 +15,7 @@ export function mapFeelings(feelings) {
     // --- Simulation -----------------------------------------------------------
     // Faster for anger (arousal+tension). Harder to fetch (ok for “angry”).
     const STEP_LEN = clamp(
-        base.STEP_LEN * lerp(0.75, 1.75, 0.65*f.arousal + 0.35*f.tension),
+        base.STEP_LEN * lerp(0.75, 1.75, 0.65*f.arousal + 0.35*f.tension + 0.6*f.valence),
         0, 200
     );
 
