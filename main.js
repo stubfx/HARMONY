@@ -14,7 +14,6 @@ import trailDecayVert from './trailDecay.vert?raw';
 import trailDecayFrag from './trailDecay.frag?raw';
 import logoImgUrl from './assets/aant.png';
 import colorImgUrl from './assets/a03.png';
-import Stats from 'three/examples/jsm/libs/stats.module.js';
 import { captureVolume } from './audio';
 
 async function loadShader(url) {
@@ -420,11 +419,8 @@ let fps = 0;
 const timeMult = 0.001;
 // main sim loop
 let prev = performance.now()*timeMult;
-var stats = new Stats();
-document.body.appendChild( stats.dom );
 
 function frame() {
-    stats.begin();
     const now = performance.now()*timeMult;
 
     let dt = Math.min(Math.max(now - prev, timeMult), 0.05);
@@ -503,7 +499,6 @@ function frame() {
         frames = 0;
     }
 
-    stats.end();
 
     requestAnimationFrame(frame);
 }
