@@ -1,5 +1,5 @@
 export async function chat(text) {
-    const url = "https://stubfx.io:3000/chat";
+    const url = "https://api.stubfx.io/chat";
     try {
         const response = await fetch(url, {
             method: "POST",
