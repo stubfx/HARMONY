@@ -11,7 +11,7 @@ export async function chat(text) {
     return await openai.responses.create({
         prompt: {
             "id": "pmpt_69008cb402f08193af25c0255cf58bd00b05f606f3d9299e",
-            "version": "4"
+            "version": "5"
         },
         input: [
             {
