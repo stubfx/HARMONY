@@ -1,4 +1,4 @@
-import {params, debug} from '/tunables.js';
+import {baseParams, params, debug} from '/tunables.js';
 
 
 export async function captureVolume() {
@@ -25,6 +25,8 @@ export async function captureVolume() {
     const volume = rms; // 0.0–1.0 approx
 
     // console.log(volume);
+    // params.TURN_JITTER = baseParams.TURN_JITTER + volume * 50;
+    // params.STEP_LEN = baseParams.STEP_LEN + volume * 50;
 
     requestAnimationFrame(update);
   }

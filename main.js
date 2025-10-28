@@ -22,7 +22,7 @@ async function loadShader(url) {
     return await res.text();
 }
 
-// captureVolume();
+captureVolume();
 
 // console.log(params.TEX_SIDE);
 
