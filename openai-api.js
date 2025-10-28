@@ -11,7 +11,7 @@ export async function chat(text) {
     return await openai.responses.create({
         prompt: {
             "id": "pmpt_69008cb402f08193af25c0255cf58bd00b05f606f3d9299e",
-            "version": "17"
+            "version": "19"
         },
         input: [
             {
@@ -107,17 +107,17 @@ export async function chat(text) {
         tools: [
             {
                 "type": "image_generation",
-                "model": "gpt-image-1-mini",
-                "size": "1024x1024",
-                "quality": "low",
-                "output_format": "png",
                 "background": "transparent",
-                "moderation": "low"
+                "model": "gpt-image-1-mini",
+                "moderation": "auto",
+                "output_compression": 100,
+                "output_format": "png",
+                "quality": "low",
+                "size": "1024x1024"
             }
         ],
-        temperature: 1,
         max_output_tokens: 2048,
-        top_p: 1,
         store: true,
-        include: ["web_search_call.action.sources"]    });
+        include: ["web_search_call.action.sources"]  
+    });
 }
