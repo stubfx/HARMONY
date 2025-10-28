@@ -29,7 +29,9 @@ void main(){
             if (dist < uImageArea) {
                 dist = smoothstep(1.0, 0.0, dist/uImageArea);
                 // color.xyz = customImage.xyz * dist + color.xyz * (.8 - dist);
-                color.xyz = customImage.xyz * dist + color.xyz * (1.0 - dist);
+                // no color if alpha is dirty, im looking at you chatGPT.
+                vec3 imgColor = (customImage.w > 0.8) ? customImage.xyz * dist : vec3(0.0);
+                color.xyz = imgColor + color.xyz * (1.0 - dist);
                 // color += 0.6;
             }
         }

@@ -20,7 +20,7 @@ app.use(cors({
 
 app.post("/chat", async (req, res) => {
     const text = await chat(req.body.text);
-    res.json(text.output_text);
+    res.json(text.output);
 });
 
 app.listen(port, () => {

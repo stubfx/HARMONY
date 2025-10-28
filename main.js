@@ -13,6 +13,7 @@ import trailVert from './trailDeposit.vert?raw';
 import trailDecayVert from './trailDecay.vert?raw';
 import trailDecayFrag from './trailDecay.frag?raw';
 import logoImgUrl from './assets/aant.png';
+import houseAlpha from './assets/house_alpha.png';
 import colorImgUrl from './assets/a03.png';
 import { captureVolume } from './audio';
 import { mapFeelings } from './feelingsMapper.js'
@@ -39,7 +40,8 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
 const texLoader = new THREE.TextureLoader();
 const RES = window.devicePixelRatio * params.RENDER_QUALITY;
-const customImage = texLoader.load(colorImgUrl, () => {
+// let customImage = texLoader.load(colorImgUrl, () => {
+let customImage = texLoader.load(houseAlpha, () => {
     customImage.colorSpace = THREE.SRGBColorSpace;
     // console.log(customImage.width, customImage.height);
 });
@@ -75,8 +77,21 @@ document.querySelector("#chat-form").onsubmit = async (e) => {
     const formEl = document.querySelector("#chat-form");
     const text = inputEl.value;
     formEl.reset();
+    nuke = true;
+    // customImage = texLoader.load(logoImgUrl);
     const res = await chat(text);
-    const p = JSON.parse(res);
+    nuke = false;
+    // const p = JSON.parse(res);
+    // image here:
+    const msg_obj = res.find((el) => el.type == "message");
+    const img_obj = res.find((el) => el.type == "image_generation_call");
+    if (img_obj) {
+        const dataUrl = "data:image/png;base64," + img_obj.result;
+        console.log(img_obj)
+        customImage = texLoader.load(dataUrl)
+        console.log(customImage)
+    }
+    const p = JSON.parse(msg_obj.content[0].text);
     const c = new THREE.Color(p.color);
     console.log(p)
     params.POINT_COLOR_HEX = c.getHexString();
