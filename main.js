@@ -22,7 +22,7 @@ async function loadShader(url) {
     return await res.text();
 }
 
-captureVolume();
+// captureVolume();
 
 let prevmousecoords = [0.0, 0.0]; 
 let mouseDown = false;
