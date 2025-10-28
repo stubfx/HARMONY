@@ -80,11 +80,33 @@ document.querySelector("#chat-form").onsubmit = async (e) => {
     formEl.reset();
     const res = await chat(text);
     const p = JSON.parse(res);
-    console.log(p);
-    const c = new THREE.Color(p.color);
+    const c = new THREE.Color(p.POINT_COLOR_HEX);
+    console.log(p)
     params.POINT_COLOR_HEX = c.getHexString();
     params.POINT_COLOR = [c.r, c.g, c.b]; 
-    console.log(params.POINT_COLOR);
+    params.STEP_LEN = p.STEP_LEN;
+    params.TURN_JITTER = p.TURN_JITTER;
+    params.DRAG = p.DRAG;
+    params.SENSE_DIST = p.SENSE_DIST;
+    params.SENSE_ANGLE = p.SENSE_ANGLE;
+    params.TURN_RATE = p.TURN_RATE;
+    params.DEPOSIT_SIZE = p.DEPOSIT_SIZE;
+    params.DEPOSIT_STRENGTH = p.DEPOSIT_STRENGTH;
+    params.DEPOSIT_EDGE_SOFT = p.DEPOSIT_EDGE_SOFT;
+    params.CHAMP_SAMPLE_INTERVAL = p.CHAMP_SAMPLE_INTERVAL;
+    params.CHAMP_IMP_MULTIPLIER = p.CHAMP_IMP_MULTIPLIER;
+    params.TRAIL_DECAY = p.TRAIL_DECAY;
+    // IMAGE_AREA
+    // RENDER_QUALITY
+    // POINT_SIZE
+    // SPAWN_RADIUS
+    // ENABLE_MOUSE
+    // SHOW_TRAIL
+    // RENDER_QUALITY
+    // TEX_SIDE
+    // POINT_COLOR
+    // POINT_COLOR_HEX
+    // TRAIL_TEX_RES
 };
 
 window.addEventListener('resize', () => {

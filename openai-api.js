@@ -34,7 +34,7 @@ export async function chat(text) {
                     "properties": {
                         "STEP_LEN": {
                             "type": "number",
-                            "description": "Step length",
+                            "description": "Step length of the simulation. Higher number = faster.",
                             "minimum": 0,
                             "maximum": 200
                         },
