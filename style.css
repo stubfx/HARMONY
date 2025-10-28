@@ -36,8 +36,14 @@ textarea:focus, input:focus{
     display: flex;
     justify-content: center;
     width: 100vw;
-    bottom: 1rem;
+    bottom: 0;
+    padding-bottom: 1rem;
     left: 0;
+    padding-top: 6rem;
+    background: transparent;
+    background: linear-gradient(180deg, 
+    rgba(255, 255, 255, 0) 0%, 
+    rgba(0, 0, 0, 0.95) 55%);
 }
 
 #chat-form {
@@ -46,7 +52,7 @@ textarea:focus, input:focus{
     border-radius: 5rem;
     border: 1px solid rgb(255 255 255 / 30%);
     /* background: black; */
-    padding-left: 3rem;
+    padding-left: 1.6rem;
     /* padding-right: 3rem; */
     font-weight: bold;
     backdrop-filter: blur(15px);
@@ -56,10 +62,11 @@ textarea:focus, input:focus{
     flex-grow: 1;
     background: transparent;
     border: 0;
+    font-size: 16px;
     color: white;
 }
 
-#chat-send {
+#chat-send, button {
     height: 3rem;
     padding: 5px 15px;
     font-weight: bold;
@@ -71,4 +78,11 @@ textarea:focus, input:focus{
     /* background: rgb(144 144 144 / 25%); */
     background: rgb(255 255 255 / 10%);
     /* backdrop-filter: blur(5px); */
+}
+
+button {
+    border: 1px solid rgb(255 255 255 / 20%);
+    background: rgb(255 255 255 / 30%);
+    backdrop-filter: blur(5px);
+    cursor: pointer;
 }
