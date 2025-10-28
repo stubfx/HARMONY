@@ -11,7 +11,7 @@ export async function chat(text) {
     return await openai.responses.create({
         prompt: {
             "id": "pmpt_69008cb402f08193af25c0255cf58bd00b05f606f3d9299e",
-            "version": "2"
+            "version": "3"
         },
         input: [
             {
@@ -119,7 +119,7 @@ export async function chat(text) {
                             "description": "Display the agent trail"
                         },
                         "POINT_COLOR_HEX": {
-                            "type": "integer",
+                            "type": "string",
                             "description": "Color in hexadecimal integer format (es. #a308e3)"
                         }
                     },
