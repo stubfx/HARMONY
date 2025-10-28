@@ -14,7 +14,7 @@ export let RENDER_QUALITY = renderQuality || 1;
 const gui = new dat.GUI();
 gui.width = 500;
 
-export const params = {
+export const baseParams = {
     STEP_LEN: 70.0,
     IMAGE_AREA: 500,
     RENDER_QUALITY: 1,
@@ -25,7 +25,7 @@ export const params = {
     SENSE_ANGLE: 0.2,
     TURN_RATE: 20.0,
     POINT_SIZE: 1.0,
-    DEPOSIT_SIZE: 0.1,
+    DEPOSIT_SIZE: 0.05,
     DEPOSIT_STRENGTH: 10,
     DEPOSIT_EDGE_SOFT: 0.5,
     CHAMP_SAMPLE_INTERVAL: 50000.0,
@@ -40,6 +40,9 @@ export const params = {
     POINT_COLOR_HEX: 0x1e1e1e1e,
     TRAIL_TEX_RES: .4
 };
+
+// this will be changed dinamically.
+export const params = structuredClone(baseParams);
 
 export const debug = {
     SHOW_INFO: false, 
@@ -75,7 +78,7 @@ fSim.addColor(params, 'POINT_COLOR_HEX').onChange(v => {
 fDraw.add(params, 'POINT_SIZE', 1, 3, .1)
 
 // trail deposit
-fDep.add(params, 'DEPOSIT_SIZE', 0.5, 40, 0.5)
+fDep.add(params, 'DEPOSIT_SIZE', 0.05, 40, 0.05)
 fDep.add(params, 'DEPOSIT_STRENGTH', 0, 20, 0.05)
 fDep.add(params, 'DEPOSIT_EDGE_SOFT', 0, 1, 0.01)
 fDep.add(params, 'CHAMP_SAMPLE_INTERVAL', 1, 1000000, 1)
