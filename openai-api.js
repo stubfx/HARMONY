@@ -11,7 +11,7 @@ export async function chat(text) {
     return await openai.responses.create({
         prompt: {
             "id": "pmpt_69008cb402f08193af25c0255cf58bd00b05f606f3d9299e",
-            "version": "1"
+            "version": "2"
         },
         input: [
             {
@@ -27,7 +27,7 @@ export async function chat(text) {
         text: {
             "format": {
                 "type": "json_schema",
-                "name": "dat_gui_params",
+                "name": "simulation_schema",
                 "strict": true,
                 "schema": {
                     "type": "object",
@@ -94,7 +94,7 @@ export async function chat(text) {
                         },
                         "CHAMP_SAMPLE_INTERVAL": {
                             "type": "number",
-                            "description": "Sample interval for champion detection",
+                            "description": "Sample interval for champion detection. Defined as 1 every X amount",
                             "minimum": 1,
                             "maximum": 1000000
                         },
@@ -120,9 +120,7 @@ export async function chat(text) {
                         },
                         "POINT_COLOR_HEX": {
                             "type": "integer",
-                            "description": "Point color in hexadecimal integer format",
-                            "minimum": 0,
-                            "maximum": 4294967295
+                            "description": "Color in hexadecimal integer format (es. #a308e3)"
                         }
                     },
                     "required": [
