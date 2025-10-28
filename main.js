@@ -24,9 +24,6 @@ async function loadShader(url) {
 
 captureVolume();
 
-// console.log(params.TEX_SIDE);
-
-
 let prevmousecoords = [0.0, 0.0]; 
 let mouseDown = false;
 let nuke = false;
