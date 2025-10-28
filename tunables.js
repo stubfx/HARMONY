@@ -96,4 +96,4 @@ fDraw.open();
 fDep.open();
 fDecay.open();
 fDebug.open();
-// gui.close();
+gui.close();

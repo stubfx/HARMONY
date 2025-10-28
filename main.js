@@ -72,15 +72,17 @@ function refreshSizes() {
 refreshSizes();
 
 
-document.querySelector("#chat-container").onsubmit = async (e) => {
+document.querySelector("#chat-form").onsubmit = async (e) => {
     e.preventDefault();
     const inputEl = document.querySelector("#chat-input");
+    const formEl = document.querySelector("#chat-form");
     const text = inputEl.value;
-    inputEl.innerText = "";
+    formEl.reset();
     const res = await chat(text);
     const p = JSON.parse(res);
     console.log(p);
     const c = new THREE.Color(p.color);
+    params.POINT_COLOR_HEX = c.getHexString();
     params.POINT_COLOR = [c.r, c.g, c.b]; 
     console.log(params.POINT_COLOR);
 };

@@ -43,7 +43,6 @@ textarea:focus, input:focus{
 #chat-form {
     width: 50vw;
     display: flex;
-    height: 3rem;
     border-radius: 5rem;
     background: rgb(43 43 43 / 62%);
     /* background: black; */
@@ -62,8 +61,13 @@ textarea:focus, input:focus{
 }
 
 #chat-send {
-    width: 50px;
-    height: 50px;
+    height: 3rem;
+    padding: 5px 15px;
+    font-weight: bold;
     border-radius: 5rem;
-    border: 0;
+    border: 5px solid transparent;
+    margin: 5px;
+    color: white;
+    background: rgb(144 144 144 / 62%);
+    backdrop-filter: blur(15px);
 }
