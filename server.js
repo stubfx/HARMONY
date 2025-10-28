@@ -9,10 +9,11 @@ const app = express();
 const port = process.env.PORT;
 
 app.use(express.json())
+app.set('trust proxy', true);
 
 // allow only localhost:5173 (vite dev default)
 app.use(cors({
-  origin: "*",   // or "*" for all origins
+    origin: ["https://stubfx.io", "http://localhost:5173"],   // or "*" for all origins
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
