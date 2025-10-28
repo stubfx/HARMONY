@@ -11,7 +11,7 @@ export async function chat(text) {
     return await openai.responses.create({
         prompt: {
             "id": "pmpt_69008cb402f08193af25c0255cf58bd00b05f606f3d9299e",
-            "version": "3"
+            "version": "4"
         },
         input: [
             {
@@ -34,7 +34,7 @@ export async function chat(text) {
                     "properties": {
                         "STEP_LEN": {
                             "type": "number",
-                            "description": "Step length of the simulation. Higher number = faster.",
+                            "description": "Step length of the simulation. Higher number = faster simulation.",
                             "minimum": 0,
                             "maximum": 200
                         },
