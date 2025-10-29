@@ -79,11 +79,11 @@ document.querySelector("#chat-form").onsubmit = async (e) => {
     const formEl = document.querySelector("#chat-form");
     const text = inputEl.value;
     formEl.reset();
-    // nuke = true;
+    nuke = true;
     params.uHasCustomImage = false;
     const res = await chat(text);
     console.log(res)
-    // nuke = false;
+    nuke = false;
     const p = res;
     const c = new THREE.Color(p.color);
     params.POINT_COLOR_HEX = c.getHexString();

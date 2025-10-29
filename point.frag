@@ -45,8 +45,11 @@ void main() {
         if (dist < uImageArea) {
             float t = smoothstep(1.0, 0.0, dist / uImageArea);
 
-            // Only use the image color if the source alpha is solid enough
-            vec3 imgColor = (customImage.a > 0.8) ? (customImage.rgb * t) : vec3(0.0);
+            // // Only use the image color if the source alpha is solid enough
+            // vec3 imgColor = (customImage.a > 0.8) ? (customImage.rgb * t) : vec3(0.0);
+            // we are not working with the alpha anymore, if black, discard.
+            float colorAmount = customImage.r + customImage.g + customImage.b;
+            vec3 imgColor = (colorAmount > 0.4) ? customImage.rgb*t : vec3(0.0);
 
             // Simple crossfade: image dominates toward the cursor center
             color.rgb = imgColor + color.rgb * (1.0 - t);

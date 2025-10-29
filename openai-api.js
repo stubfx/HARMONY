@@ -120,7 +120,7 @@ export async function imagine(prompt) {
     return await openai.responses.create({
         prompt: {
             "id": "pmpt_6901d8c6a23881979af6e5434008301408ca3d4bfa2b5c0d",
-            "version": "2"
+            "version": "3"
         },
         input: [
             {
@@ -146,7 +146,7 @@ export async function imagine(prompt) {
                 "size": "1024x1024",
                 "quality": "low",
                 "output_format": "webp",
-                "background": "transparent",
+                "background": "opaque",
                 "moderation": "low"
             }
         ],

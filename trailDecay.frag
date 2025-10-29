@@ -30,55 +30,69 @@ void main() {
     float keep = pow(uDecay, uDt);
     vec4 d = dec * keep + dep;
     vec4 color = d;
+    vec2 trailMouseCoords;
+    float dist;
     if (uNuke) {
         color = vec4(0.0);
     }
     else if (uHasCustomImage) {
-        // if (uMouseDown) {
-            // dist is now from the image center.
-            // vec2 trailMouseCoords = uMouseCoords * uTrailTexRes;
-            // float dist = distance(gl_FragCoord.xy, trailMouseCoords);
+        // Desired on-RT size = original size scaled by trailRes
+        vec2 scaledSize = uCustomImageSize * uTrailTexRes;
+
+        // Center on the trail RT (whose pixel size = uCanvas * uTrailTexRes)
+        vec2 trailSize = uCanvas * uTrailTexRes;
+        vec2 topLeft   = 0.5 * (trailSize - scaledSize);
+        dist = distance(gl_FragCoord.xy, uCanvas*uTrailTexRes*0.5);
+
+        // Position of this fragment relative to the image rectangle (in trail pixels)
+        vec2 rel       = gl_FragCoord.xy - topLeft;
+
+        // Normalized UV into the source image (0..1)
+        vec2 uv        = rel / scaledSize;
+
+        // Inside the image?
+        bvec2 in0 = greaterThanEqual(uv, vec2(0.0));
+        bvec2 in1 = lessThan(uv, vec2(1.0));
+        bool inImg = all(in0) && all(in1);
+
+        vec4 customImage = vec4(0.0);
+        if (inImg) {
+            // Filtering chosen by sampler state:
+            //   NearestFilter  -> crisp pixels
+            //   LinearFilter   -> smooth scale
+            customImage = texture(uCustomImage, uv);
+        }
+        float scaledImageArea = uImageArea * uTrailTexRes;
+        if (dist < scaledImageArea) {
+            dist = smoothstep(1.0, 0.1, dist/scaledImageArea);
+            // WATCH OUT
+            // AS WE ARE USING THE RED CHANNEL FOR SENSING THE TRAIL
+            // WE MUST DUMP THE TRAIL INTO THAT FOR THE SIM TO WORK.
+            // customImage.r = customImage.w;
+            // we are not working with the alpha anymore, if black, discard.
+            float colorAmount = customImage.r + customImage.g + customImage.b;
+            customImage.r = (colorAmount > 0.4) ? colorAmount : 0.0;
 
 
-            // Desired on-RT size = original size scaled by trailRes
-            vec2 scaledSize = uCustomImageSize * uTrailTexRes;
 
-            // Center on the trail RT (whose pixel size = uCanvas * uTrailTexRes)
-            vec2 trailSize = uCanvas * uTrailTexRes;
-            vec2 topLeft   = 0.5 * (trailSize - scaledSize);
-            float dist = distance(gl_FragCoord.xy, uCanvas*uTrailTexRes*0.5);
-
-            // Position of this fragment relative to the image rectangle (in trail pixels)
-            vec2 rel       = gl_FragCoord.xy - topLeft;
-
-            // Normalized UV into the source image (0..1)
-            vec2 uv        = rel / scaledSize;
-
-            // Inside the image?
-            bvec2 in0 = greaterThanEqual(uv, vec2(0.0));
-            bvec2 in1 = lessThan(uv, vec2(1.0));
-            bool inImg = all(in0) && all(in1);
-
-            vec4 customImage = vec4(0.0);
-            if (inImg) {
-                // Filtering chosen by sampler state:
-                //   NearestFilter  -> crisp pixels
-                //   LinearFilter   -> smooth scale
-                customImage = texture(uCustomImage, uv);
-            }
-            float scaledImageArea = uImageArea * uTrailTexRes;
-            if (dist < scaledImageArea) {
-                dist = smoothstep(1.0, 0.1, dist/scaledImageArea);
-                // WATCH OUT
-                // AS WE ARE USING THE RED CHANNEL FOR SENSING THE TRAIL
-                // WE MUST DUMP THE TRAIL INTO THAT FOR THE SIM TO WORK.
-                customImage.r = customImage.w;
-                color = customImage*dist;
-                // color = customImage*dist + d * 0.3;
-                // fc = customImage * dist;
-                // return;
-            }
+            // color = customImage*dist;
+            // do not consider the dist, otherwise everything will try to go in the middle.
+            // later this could be actually animated tho.
+            // the higher the d must
+            // color = customImage;
+            color = customImage + d * 0.7;
+            // fc = customImage * dist;
+            // return;
+        }
         // }
+    }
+    if (uMouseDown) {
+        trailMouseCoords = uMouseCoords * uTrailTexRes;
+        dist = distance(gl_FragCoord.xy, trailMouseCoords);
+        float mouseArea = uImageArea*0.2;
+        if (dist < mouseArea) {
+            color = vec4(0.0);
+        }
     }
     // color.w = clamp(color.w, 0.0, 20.0);
     fc = color;
