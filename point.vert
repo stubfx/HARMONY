@@ -1,4 +1,5 @@
 precision highp float; precision highp sampler2D;
+precision highp int;
 
 
 uniform sampler2D uState; // current state texture
@@ -7,6 +8,14 @@ uniform vec2 uCanvas;
 uniform float uPointSize;
 uniform vec2 uMouse;
 uniform bool uMouseDown;
+
+uniform int uSecondaryColorAmount;
+out float vIsSecondary;
+uniform int uTertiaryColorAmount;
+out float vIsTertiary;
+
+
+flat out int vVID;
 out float vImportance;
 
 void main(){
@@ -19,8 +28,13 @@ void main(){
     gl_Position = vec4(ndc, 0.0, 1.0);
     gl_PointSize = uPointSize;
     vImportance = 1.0;
-    // if (index % 10000 == 0) {
-    //     vImportance = 100.0;
-    //     gl_PointSize *= 5.0;
-    // }
+    vVID = gl_VertexID;
+    int maxIndex = uTexSize.x * uTexSize.y;
+    // isSecondary
+    if (index % 100/uSecondaryColorAmount == 0) {
+        vIsSecondary = 1.0;
+    } else if (index % 100/uTertiaryColorAmount == 0) {
+        vIsTertiary = 1.0;
+    }
+
 }

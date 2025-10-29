@@ -37,8 +37,16 @@ export const baseParams = {
     SHOW_TRAIL: false,
     RENDER_QUALITY: 1.0,
     TEX_SIDE: number || 1200,
-    POINT_COLOR: [0.3, 0.3, 0.3],
-    POINT_COLOR_HEX: 0x1e1e1e1e,
+    COLOR: {
+        POINT_COLOR_HEX: 0x1e1e1e1e,
+        POINT_COLOR: [0.3, 0.3, 0.3],
+        SECONDARY_AMOUNT: 3,
+        POINT_SECONDARY_COLOR_HEX: 0x1e1e1e1e,
+        POINT_SECONDARY_COLOR: [0.3, 0.3, 0.3],
+        TERTIARY_AMOUNT: 1,
+        POINT_TERTIARY_COLOR_HEX: 0x1e1e1e1e,
+        POINT_TERTIARY_COLOR: [0.3, 0.3, 0.3],
+    },
     TRAIL_TEX_RES: .4
 };
 
@@ -51,6 +59,7 @@ export const debug = {
 
 // folders for grouping
 const fSim   = gui.addFolder('Simulation');
+const fColors = fSim.addFolder('colors');
 const fDraw  = gui.addFolder('Draw Points');
 const fDep   = gui.addFolder('Trail Deposit');
 const fDecay = gui.addFolder('Trail Decay');
@@ -70,10 +79,25 @@ fSim.add(params, 'TURN_JITTER', 0.05, 2, 0.05)
 fSim.add(params, 'SENSE_DIST', 1, 200, 1)
 fSim.add(params, 'SENSE_ANGLE', 0, 1, 0.01)
 fSim.add(params, 'TURN_RATE', 0, 100, 1)
-fSim.addColor(params, 'POINT_COLOR_HEX').onChange(v => {
-  const c = new THREE.Color(v); // or your own parser
-  params.POINT_COLOR = [c.r,c.g,c.b]; // values 0–1
+
+fColors.addColor(params.COLOR, 'POINT_COLOR_HEX').onChange(v => {
+    const c = new THREE.Color(v); // or your own parser
+    params.COLOR.POINT_COLOR = [c.r,c.g,c.b]; // values 0–1
 });
+
+fColors.addColor(params.COLOR, 'POINT_SECONDARY_COLOR_HEX').onChange(v => {
+    const c = new THREE.Color(v); // or your own parser
+    params.COLOR.POINT_SECONDARY_COLOR = [c.r,c.g,c.b]; // values 0–1
+});
+
+fColors.add(params.COLOR, 'SECONDARY_AMOUNT', 0, 100, 1);
+
+fColors.addColor(params.COLOR, 'POINT_TERTIARY_COLOR_HEX').onChange(v => {
+    const c = new THREE.Color(v); // or your own parser
+    params.COLOR.POINT_TERTIARY_COLOR = [c.r,c.g,c.b]; // values 0–1
+});
+
+fColors.add(params.COLOR, 'TERTIARY_AMOUNT', 0, 100, 1);
 
 // draw points
 fDraw.add(params, 'POINT_SIZE', 1, 3, .1)
@@ -96,8 +120,9 @@ fDecay.add(params, 'TRAIL_DECAY', 0, 1, .005)
 // fHeavy.add(params, 'TEX_SIDE', 32, 4096, 32)
 
 fSim.open();
-fDraw.open();
-fDep.open();
-fDecay.open();
-fDebug.open();
-gui.close();
+fColors.open();
+// fDraw.open();
+// fDep.open();
+// fDecay.open();
+// fDebug.open();
+// gui.close();

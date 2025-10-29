@@ -11,7 +11,7 @@ export async function chat(text) {
     return await openai.responses.create({
         prompt: {
             "id": "pmpt_6901d285bcac819383687e9bbc72515a0067f4fc25dbf8d1",
-            "version": "2"
+            "version": "3"
         },
         input: [
             {
@@ -90,9 +90,30 @@ export async function chat(text) {
                             "additionalProperties": false
                         },
                         "color": {
-                            "type": "string",
-                            "description": "A hex color representing the combined emotion (e.g. #1A2B3C)",
-                            "pattern": "^#[0-9A-Fa-f]{6}$"
+                            "type": "object",
+                            "properties": {
+                                "primary": {
+                                    "type": "string",
+                                    "description": "The main hex color representing the combined emotion (e.g. #1A2B3C)",
+                                    "pattern": "^#[0-9A-Fa-f]{6}$"
+                                },
+                                "secondary": {
+                                    "type": "string",
+                                    "description": "A hex color that goes well with the primary color",
+                                    "pattern": "^#[0-9A-Fa-f]{6}$"
+                                },
+                                "terciary": {
+                                    "type": "string",
+                                    "description": "A hex color that goes well with both the primary and secondary colors",
+                                    "pattern": "^#[0-9A-Fa-f]{6}$"
+                                }
+                            },
+                            "required": [
+                                "primary",
+                                "secondary",
+                                "terciary"
+                            ],
+                            "additionalProperties": false
                         },
                         "image_prompt": {
                             "type": "string",

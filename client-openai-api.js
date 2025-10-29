@@ -1,5 +1,4 @@
-// const url = "https://api.stubfx.io/";
-const url = "http://localhost:3000/";
+const url = import.meta.env.VITE_HOSTNAME;
 
 export async function chat(text) {
     try {

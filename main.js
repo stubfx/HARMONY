@@ -14,6 +14,7 @@ import trailDecayVert from './trailDecay.vert?raw';
 import trailDecayFrag from './trailDecay.frag?raw';
 import logoImgUrl from './assets/aant.png';
 import car from './assets/car.png';
+import cake from './assets/cake.png';
 import stadium from './assets/stadium.png';
 import colorImgUrl from './assets/a03.png';
 import { captureVolume } from './audio';
@@ -42,7 +43,7 @@ scene.background = new THREE.Color(0x000000);
 const texLoader = new THREE.TextureLoader();
 const RES = window.devicePixelRatio * params.RENDER_QUALITY;
 // let customImage = texLoader.load(colorImgUrl, () => {
-// let customImage = texLoader.load(stadium, () => {
+// let customImage = texLoader.load(cake, () => {
 //     customImage.colorSpace = THREE.SRGBColorSpace;
 //     // console.log(customImage.width, customImage.height);
 // });
@@ -78,6 +79,7 @@ refreshSizes();
 
 
 document.querySelector("#chat-form").onsubmit = async (e) => {
+    // prevent page reoload
     e.preventDefault();
     const inputEl = document.querySelector("#chat-input");
     const formEl = document.querySelector("#chat-form");
@@ -88,11 +90,14 @@ document.querySelector("#chat-form").onsubmit = async (e) => {
     const res = await chat(text);
     console.log(res)
     nuke = false;
-    const p = res;
-    const c = new THREE.Color(p.color);
-    params.POINT_COLOR_HEX = c.getHexString();
-    params.POINT_COLOR = [c.r, c.g, c.b]; 
-    Object.assign(params, mapFeelings(p.feelings));
+    const c = new THREE.Color(res.color.primary);
+    params.COLOR.POINT_COLOR_HEX = c.getHexString();
+    params.COLOR.POINT_COLOR = [c.r, c.g, c.b]; 
+    params.COLOR.POINT_SECONDARY_COLOR_HEX = c.getHexString();
+    params.COLOR.POINT_SECONDARY_COLOR = [c.r, c.g, c.b]; 
+    params.COLOR.POINT_TERTIARY_COLOR_HEX = c.getHexString();
+    params.COLOR.POINT_TERTIARY_COLOR = [c.r, c.g, c.b]; 
+    Object.assign(params, mapFeelings(res.feelings));
     console.log(params)
 
     // updateImagePrompt
@@ -330,7 +335,11 @@ const matPoints = new THREE.RawShaderMaterial({
         uCustomImageSize: {value: new THREE.Vector2(params.IMAGE_AREA, params.IMAGE_AREA)},
         uCustomImage: { value: customImage},
         uHasCustomImage: { value: false},
-        uPointColor: { value: params.POINT_COLOR},
+        uPointColor: { value: params.COLOR.POINT_COLOR},
+        uSecondaryColor: {value: params.COLOR.POINT_SECONDARY_COLOR},
+        uSecondaryColorAmount: {value: params.COLOR.SECONDARY_AMOUNT},
+        uTertiaryColor: {value: params.COLOR.POINT_TERTIARY_COLOR},
+        uTertiaryColorAmount: {value: params.COLOR.TERTIARY_AMOUNT},
         uTrailTexRes: {value: params.TRAIL_TEX_RES}
     },
     vertexShader: pointVert,
@@ -514,9 +523,17 @@ function updateUniforms () {
     matSim.uniforms.uSenseDist.value = params.SENSE_DIST;
     matSim.uniforms.uSenseAngle.value = params.SENSE_ANGLE;
     matSim.uniforms.uTurnRate.value = params.TURN_RATE;
+
+
     matPoints.uniforms.uPointSize.value = params.POINT_SIZE;
-    matPoints.uniforms.uPointColor.value = params.POINT_COLOR;
+    matPoints.uniforms.uPointColor.value = params.COLOR.POINT_COLOR;
     matPoints.uniforms.uImageRevealArea.value = params.IMAGE_REVEAL_AREA;
+    matPoints.uniforms.uSecondaryColor.value = params.COLOR.POINT_SECONDARY_COLOR;
+    matPoints.uniforms.uSecondaryColorAmount.value = params.COLOR.SECONDARY_AMOUNT;
+    matPoints.uniforms.uTertiaryColor.value = params.COLOR.POINT_TERTIARY_COLOR;
+    matPoints.uniforms.uTertiaryColorAmount.value = params.COLOR.TERTIARY_AMOUNT;
+
+
 
     matTrailDeposit.uniforms.uPointSize.value = params.DEPOSIT_SIZE;
     matTrailDeposit.uniforms.uStrength.value = params.DEPOSIT_STRENGTH;
