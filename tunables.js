@@ -38,13 +38,13 @@ export const baseParams = {
     RENDER_QUALITY: 1.0,
     TEX_SIDE: number || 1200,
     COLOR: {
-        POINT_COLOR_HEX: 0xcacaca,
+        POINT_COLOR_HEX: 0x2dff,
         POINT_COLOR: [],
-        SECONDARY_AMOUNT: 3,
-        POINT_SECONDARY_COLOR_HEX: 0x00FF00,
+        SECONDARY_AMOUNT: 10,
+        POINT_SECONDARY_COLOR_HEX: 0xff00ff,
         POINT_SECONDARY_COLOR: [],
-        TERTIARY_AMOUNT: 1,
-        POINT_TERTIARY_COLOR_HEX: 0xFF0000,
+        TERTIARY_AMOUNT: 11,
+        POINT_TERTIARY_COLOR_HEX: 0xff00,
         POINT_TERTIARY_COLOR: [],
     },
     TRAIL_TEX_RES: .4
