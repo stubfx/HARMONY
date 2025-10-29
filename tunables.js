@@ -38,14 +38,14 @@ export const baseParams = {
     RENDER_QUALITY: 1.0,
     TEX_SIDE: number || 1200,
     COLOR: {
-        POINT_COLOR_HEX: 0x1e1e1e1e,
-        POINT_COLOR: [0.3, 0.3, 0.3],
+        POINT_COLOR_HEX: 0xcacaca,
+        POINT_COLOR: [],
         SECONDARY_AMOUNT: 3,
-        POINT_SECONDARY_COLOR_HEX: 0x1e1e1e1e,
-        POINT_SECONDARY_COLOR: [0.3, 0.3, 0.3],
+        POINT_SECONDARY_COLOR_HEX: 0x00FF00,
+        POINT_SECONDARY_COLOR: [],
         TERTIARY_AMOUNT: 1,
-        POINT_TERTIARY_COLOR_HEX: 0x1e1e1e1e,
-        POINT_TERTIARY_COLOR: [0.3, 0.3, 0.3],
+        POINT_TERTIARY_COLOR_HEX: 0xFF0000,
+        POINT_TERTIARY_COLOR: [],
     },
     TRAIL_TEX_RES: .4
 };
@@ -83,19 +83,19 @@ fSim.add(params, 'TURN_RATE', 0, 100, 1)
 fColors.addColor(params.COLOR, 'POINT_COLOR_HEX').onChange(v => {
     const c = new THREE.Color(v); // or your own parser
     params.COLOR.POINT_COLOR = [c.r,c.g,c.b]; // values 0–1
-});
+}).setValue(params.COLOR.POINT_COLOR_HEX);
 
 fColors.addColor(params.COLOR, 'POINT_SECONDARY_COLOR_HEX').onChange(v => {
     const c = new THREE.Color(v); // or your own parser
     params.COLOR.POINT_SECONDARY_COLOR = [c.r,c.g,c.b]; // values 0–1
-});
+}).setValue(params.COLOR.POINT_SECONDARY_COLOR_HEX);
 
 fColors.add(params.COLOR, 'SECONDARY_AMOUNT', 0, 100, 1);
 
 fColors.addColor(params.COLOR, 'POINT_TERTIARY_COLOR_HEX').onChange(v => {
     const c = new THREE.Color(v); // or your own parser
     params.COLOR.POINT_TERTIARY_COLOR = [c.r,c.g,c.b]; // values 0–1
-});
+}).setValue(params.COLOR.POINT_TERTIARY_COLOR_HEX);
 
 fColors.add(params.COLOR, 'TERTIARY_AMOUNT', 0, 100, 1);
 
@@ -125,4 +125,4 @@ fColors.open();
 // fDep.open();
 // fDecay.open();
 // fDebug.open();
-// gui.close();
+gui.close();
