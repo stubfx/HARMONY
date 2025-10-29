@@ -41,12 +41,12 @@ scene.background = new THREE.Color(0x000000);
 const texLoader = new THREE.TextureLoader();
 const RES = window.devicePixelRatio * params.RENDER_QUALITY;
 // let customImage = texLoader.load(colorImgUrl, () => {
-let customImage = texLoader.load(car, () => {
-    customImage.colorSpace = THREE.SRGBColorSpace;
-    // console.log(customImage.width, customImage.height);
-});
-// let customImage;
-params.uHasCustomImage = true;
+// let customImage = texLoader.load(car, () => {
+//     customImage.colorSpace = THREE.SRGBColorSpace;
+//     // console.log(customImage.width, customImage.height);
+// });
+let customImage;
+params.uHasCustomImage = false;
 
 // renderer section
 const renderer = new THREE.WebGLRenderer();
