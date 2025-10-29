@@ -17,6 +17,7 @@ gui.width = 500;
 export const baseParams = {
     STEP_LEN: 70.0,
     IMAGE_AREA: 500,
+    IMAGE_REVEAL_AREA: 250,
     RENDER_QUALITY: 1,
     TURN_JITTER: 0.1,
     DRAG: 0.5,

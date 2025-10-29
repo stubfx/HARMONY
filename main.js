@@ -14,6 +14,7 @@ import trailDecayVert from './trailDecay.vert?raw';
 import trailDecayFrag from './trailDecay.frag?raw';
 import logoImgUrl from './assets/aant.png';
 import car from './assets/car.png';
+import stadium from './assets/stadium.png';
 import colorImgUrl from './assets/a03.png';
 import { captureVolume } from './audio';
 import { mapFeelings } from './feelingsMapper.js'
@@ -41,7 +42,7 @@ scene.background = new THREE.Color(0x000000);
 const texLoader = new THREE.TextureLoader();
 const RES = window.devicePixelRatio * params.RENDER_QUALITY;
 // let customImage = texLoader.load(colorImgUrl, () => {
-// let customImage = texLoader.load(car, () => {
+// let customImage = texLoader.load(stadium, () => {
 //     customImage.colorSpace = THREE.SRGBColorSpace;
 //     // console.log(customImage.width, customImage.height);
 // });
@@ -61,6 +62,9 @@ const trailBufferSize = bufferSize.clone().multiplyScalar(params.TRAIL_TEX_RES);
 document.body.appendChild( renderer.domElement );
 
 const W = renderer.domElement.width, H = renderer.domElement.height;
+const imageArea = Math.min(W, H) * .8;
+params.IMAGE_AREA = imageArea;
+params.IMAGE_REVEAL_AREA = imageArea * .5; 
 const fpsEl = document.querySelector("#fps");
 const agentsEl = document.querySelector("#agentsCount");
 agentsEl.textContent = `${(params.TEX_SIDE * params.TEX_SIDE).toLocaleString()} agents`
@@ -322,6 +326,7 @@ const matPoints = new THREE.RawShaderMaterial({
         uMouseDown: {value: false},
         uMouseCoords: {value: prevmousecoords},
         uImageArea: { value: params.IMAGE_AREA},
+        uImageRevealArea: { value: params.IMAGE_REVEAL_AREA },
         uCustomImageSize: {value: new THREE.Vector2(params.IMAGE_AREA, params.IMAGE_AREA)},
         uCustomImage: { value: customImage},
         uHasCustomImage: { value: false},
@@ -377,6 +382,7 @@ const matTrailDecay = new THREE.RawShaderMaterial({
         uCustomImage: { value: customImage},
         uHasCustomImage: { value: false},
         uImageArea: { value: params.IMAGE_AREA},
+        uImageRevealArea: { value: params.IMAGE_REVEAL_AREA },
         uCanvas:    { value: new THREE.Vector2(W, H) },
         uTrailTexSize: {value: new THREE.Vector2(trailBufferSize.x, trailBufferSize.y)},
         uTrailTexRes: {value: params.TRAIL_TEX_RES},
@@ -510,12 +516,15 @@ function updateUniforms () {
     matSim.uniforms.uTurnRate.value = params.TURN_RATE;
     matPoints.uniforms.uPointSize.value = params.POINT_SIZE;
     matPoints.uniforms.uPointColor.value = params.POINT_COLOR;
+    matPoints.uniforms.uImageRevealArea.value = params.IMAGE_REVEAL_AREA;
+
     matTrailDeposit.uniforms.uPointSize.value = params.DEPOSIT_SIZE;
     matTrailDeposit.uniforms.uStrength.value = params.DEPOSIT_STRENGTH;
     matTrailDeposit.uniforms.uEdgeSoft.value = params.DEPOSIT_EDGE_SOFT;
     matTrailDeposit.uniforms.uChampSampleInterval.value = params.CHAMP_SAMPLE_INTERVAL;
     matTrailDeposit.uniforms.uChampImportanceMultiplier.value = params.CHAMP_IMP_MULTIPLIER;
     matTrailDecay.uniforms.uDecay.value = params.TRAIL_DECAY;
+    matTrailDecay.uniforms.uImageRevealArea.value = params.IMAGE_REVEAL_AREA;
 
 
     matTrailDecay.uniforms.uMouseDown.value = mouseDown;

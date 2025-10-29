@@ -10,6 +10,7 @@ uniform vec2  uMouseCoords;
 uniform bool  uMouseDown;
 uniform bool  uHasCustomImage;
 uniform float uImageArea;
+uniform float uImageRevealArea;
 uniform vec3  uPointColor;
 
 void main() {
@@ -42,7 +43,7 @@ void main() {
         // Distance gating around the mouse
         // float dist = distance(gl_FragCoord.xy, uMouseCoords);
         float dist = distance(gl_FragCoord.xy, uCanvas*0.5);
-        if (dist < uImageArea) {
+        if (dist < uImageArea && dist < uImageRevealArea) {
             float t = smoothstep(1.0, 0.0, dist / uImageArea);
 
             // // Only use the image color if the source alpha is solid enough

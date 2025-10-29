@@ -8,6 +8,7 @@ uniform sampler2D uCustomImage;
 uniform vec2 uCustomImageSize;
 uniform float     uDecay;     // e.g. 0.985..0.999
 uniform float uImageArea;
+uniform float uImageRevealArea;
 uniform float uDt;
 uniform vec2 uMouseCoords;
 uniform bool uMouseDown;
@@ -63,7 +64,7 @@ void main() {
             customImage = texture(uCustomImage, uv);
         }
         float scaledImageArea = uImageArea * uTrailTexRes;
-        if (dist < scaledImageArea) {
+        if (dist < scaledImageArea && dist < uImageRevealArea * uTrailTexRes) {
             dist = smoothstep(1.0, 0.1, dist/scaledImageArea);
             // WATCH OUT
             // AS WE ARE USING THE RED CHANNEL FOR SENSING THE TRAIL
@@ -71,7 +72,7 @@ void main() {
             // customImage.r = customImage.w;
             // we are not working with the alpha anymore, if black, discard.
             float colorAmount = customImage.r + customImage.g + customImage.b;
-            customImage.r = (colorAmount > 0.4) ? colorAmount : 0.0;
+            customImage.r = (colorAmount > 0.4) ? colorAmount * 1000.0 : 0.0;
             customImage.gb = vec2(0.0);
 
 
@@ -81,8 +82,8 @@ void main() {
             // later this could be actually animated tho.
             // the higher the d must
             // color = customImage;
-            color = customImage + d * 0.7;
-            // fc = customImage * dist;
+            // color = customImage + d * (1.0 - dist);
+            color = customImage * dist;
             // return;
         }
         // }
