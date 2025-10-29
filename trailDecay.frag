@@ -34,22 +34,10 @@ void main() {
         color = vec4(0.0);
     }
     else if (uHasCustomImage) {
-        if (uMouseDown) {
-            vec2 trailMouseCoords = uMouseCoords * uTrailTexRes;
-            // fc = vec4(nMouseCoords.xy, 0.0, 1.0);
-            // if (distance(gl_FragCoord.xy, uMouseCoords) < 100.0) d = 0.0;
-            float dist = distance(gl_FragCoord.xy, trailMouseCoords);
-            // vec2 topLeft = 0.5 * (uCanvas * uTrailTexRes - uCustomImageSize);
-            // ivec2 imagePlacement  = ivec2(floor(gl_FragCoord.xy - topLeft));
-            // bvec2 ge0 = greaterThanEqual(imagePlacement, ivec2(0));
-            // bvec2 ltS = lessThan(imagePlacement, ivec2(uCustomImageSize));
-            // bool inImg = all(ge0) && all(ltS);
-            //
-            // vec4 customImage = vec4(0.0);
-            // if (inImg) customImage = texelFetch(uCustomImage, imagePlacement, 0);
-
-
-
+        // if (uMouseDown) {
+            // dist is now from the image center.
+            // vec2 trailMouseCoords = uMouseCoords * uTrailTexRes;
+            // float dist = distance(gl_FragCoord.xy, trailMouseCoords);
 
 
             // Desired on-RT size = original size scaled by trailRes
@@ -58,6 +46,7 @@ void main() {
             // Center on the trail RT (whose pixel size = uCanvas * uTrailTexRes)
             vec2 trailSize = uCanvas * uTrailTexRes;
             vec2 topLeft   = 0.5 * (trailSize - scaledSize);
+            float dist = distance(gl_FragCoord.xy, uCanvas*uTrailTexRes*0.5);
 
             // Position of this fragment relative to the image rectangle (in trail pixels)
             vec2 rel       = gl_FragCoord.xy - topLeft;
@@ -89,7 +78,7 @@ void main() {
                 // fc = customImage * dist;
                 // return;
             }
-        }
+        // }
     }
     // color.w = clamp(color.w, 0.0, 20.0);
     fc = color;

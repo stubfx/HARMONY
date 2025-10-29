@@ -1,40 +1,58 @@
-precision highp float; out vec4 fragColor;
-in float vImportance;
-uniform sampler2D uCustomImage;
-uniform vec2 uCustomImageSize;
-uniform vec2 uCanvas;
-uniform vec2 uMouseCoords;
-uniform bool uMouseDown;
-uniform bool uHasCustomImage;
-uniform float uImageArea;
-uniform vec3 uPointColor;
+precision highp float;
+out vec4 fragColor;
 
-void main(){
-    vec2 p = gl_PointCoord - 0.5; 
-    // float r = length(p);
-    // if (r > 0.5) discard;
-    // float a = smoothstep(0.5, 0.45, r);
+in float vImportance;
+
+uniform sampler2D uCustomImage;
+uniform vec2  uCustomImageSize; // desired on-screen pixel size of the image
+uniform vec2  uCanvas;          // canvas size in pixels
+uniform vec2  uMouseCoords;
+uniform bool  uMouseDown;
+uniform bool  uHasCustomImage;
+uniform float uImageArea;
+uniform vec3  uPointColor;
+
+void main() {
+    // base point look (keep your point styling as-is)
+    vec2 p = gl_PointCoord - 0.5;
     vec4 color = vec4(uPointColor, 0.8);
-    // vec4 color = vec4(1.0,0.0,0.0,0.3);
-    // vec4 color = vec4(0.0, 0.5, 0.0, 0.5);
-    // vec3 color = vec3(1.0, 1.0/vImportance, 1.0/vImportance);
-    if (uMouseDown) {
-        if (uHasCustomImage) {
-            // color = vec4(0.3,0.3,0.3,.6);
-            vec2 topLeft = 0.5 * (uCanvas - uCustomImageSize);
-            ivec2 imagePlacement  = ivec2(floor(gl_FragCoord.xy - topLeft));
-            vec4 customImage = texelFetch(uCustomImage,   imagePlacement, 0);
-            float dist = distance(gl_FragCoord.xy, uMouseCoords);
-            // if (dist < 500.0) color.xyz = customImage.xyz;
-            if (dist < uImageArea) {
-                dist = smoothstep(1.0, 0.0, dist/uImageArea);
-                // color.xyz = customImage.xyz * dist + color.xyz * (.8 - dist);
-                // no color if alpha is dirty, im looking at you chatGPT.
-                vec3 imgColor = (customImage.w > 0.8) ? customImage.xyz * dist : vec3(0.0);
-                color.xyz = imgColor + color.xyz * (1.0 - dist);
-                // color += 0.6;
-            }
+
+    // if (uMouseDown && uHasCustomImage) {
+    if (uHasCustomImage) {
+        // Top-left of the image so that it's centered and sized to uCustomImageSize
+        vec2 topLeft = 0.5 * (uCanvas - uCustomImageSize);
+
+        // Fragment position relative to the image's top-left, in pixels
+        vec2 px = gl_FragCoord.xy - topLeft;
+
+        // Convert to UVs in [0,1] over the image rect
+        vec2 uv = px / uCustomImageSize;
+
+        // Check we're inside the image bounds before sampling
+        bool inside =
+            uv.x >= 0.0 && uv.x < 1.0 &&
+            uv.y >= 0.0 && uv.y < 1.0;
+
+        vec4 customImage = vec4(0.0);
+        if (inside) {
+            // Sample using normalized UVs
+            customImage = texture(uCustomImage, uv);
+        }
+
+        // Distance gating around the mouse
+        // float dist = distance(gl_FragCoord.xy, uMouseCoords);
+        float dist = distance(gl_FragCoord.xy, uCanvas*0.5);
+        if (dist < uImageArea) {
+            float t = smoothstep(1.0, 0.0, dist / uImageArea);
+
+            // Only use the image color if the source alpha is solid enough
+            vec3 imgColor = (customImage.a > 0.8) ? (customImage.rgb * t) : vec3(0.0);
+
+            // Simple crossfade: image dominates toward the cursor center
+            color.rgb = imgColor + color.rgb * (1.0 - t);
         }
     }
-    fragColor = vec4(color); // pale cyan points
+
+    fragColor = color;
 }
+

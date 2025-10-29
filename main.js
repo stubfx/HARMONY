@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import * as UTILS from '/utils.js';
 import {params, debug} from '/tunables.js';
-import {chat} from '/client-openai-api.js';
+import {chat, imagine} from '/client-openai-api.js';
 
 
 import simVert from './sim.vert?raw';
@@ -41,10 +41,12 @@ scene.background = new THREE.Color(0x000000);
 const texLoader = new THREE.TextureLoader();
 const RES = window.devicePixelRatio * params.RENDER_QUALITY;
 // let customImage = texLoader.load(colorImgUrl, () => {
-let customImage = texLoader.load(houseAlpha, () => {
-    customImage.colorSpace = THREE.SRGBColorSpace;
-    // console.log(customImage.width, customImage.height);
-});
+// let customImage = texLoader.load(houseAlpha, () => {
+//     customImage.colorSpace = THREE.SRGBColorSpace;
+//     // console.log(customImage.width, customImage.height);
+// });
+let customImage;
+params.uHasCustomImage = false;
 
 // renderer section
 const renderer = new THREE.WebGLRenderer();
@@ -77,27 +79,28 @@ document.querySelector("#chat-form").onsubmit = async (e) => {
     const formEl = document.querySelector("#chat-form");
     const text = inputEl.value;
     formEl.reset();
-    nuke = true;
-    // customImage = texLoader.load(logoImgUrl);
+    // nuke = true;
+    params.uHasCustomImage = false;
     const res = await chat(text);
-    nuke = false;
-    // const p = JSON.parse(res);
-    // image here:
-    const msg_obj = res.find((el) => el.type == "message");
-    const img_obj = res.find((el) => el.type == "image_generation_call");
-    if (img_obj) {
-        const dataUrl = "data:image/png;base64," + img_obj.result;
-        console.log(img_obj)
-        customImage = texLoader.load(dataUrl)
-        console.log(customImage)
-    }
-    const p = JSON.parse(msg_obj.content[0].text);
+    console.log(res)
+    // nuke = false;
+    const p = res;
     const c = new THREE.Color(p.color);
-    console.log(p)
     params.POINT_COLOR_HEX = c.getHexString();
     params.POINT_COLOR = [c.r, c.g, c.b]; 
     Object.assign(params, mapFeelings(p.feelings));
     console.log(params)
+
+    // updateImagePrompt
+    const img_promptEl = document.querySelector("#image_prompt");
+    img_promptEl.textContent = res.image_prompt;
+
+    const imageData = await imagine(res.image_prompt);
+    // console.log(imageData)
+    if (imageData) {
+        customImage = texLoader.load(imageData)
+        params.uHasCustomImage = true;
+    }
 };
 
 window.addEventListener('resize', () => {
@@ -106,13 +109,13 @@ window.addEventListener('resize', () => {
     initTextures();
 });
 
-// document.onkeydown = (event) => {
-//     nuke = event.key == "n";
-// }
-//
-// document.onkeyup = (event) => {
-//     if (event.key == "n") nuke = false;
-// }
+document.onkeydown = (event) => {
+    nuke = event.key == "n";
+}
+
+document.onkeyup = (event) => {
+    if (event.key == "n") nuke = false;
+}
 
 document.onmousemove = (e) => {
     const xDev = e.clientX * RES;
@@ -319,11 +322,11 @@ const matPoints = new THREE.RawShaderMaterial({
         uMouseDown: {value: false},
         uMouseCoords: {value: prevmousecoords},
         uImageArea: { value: params.IMAGE_AREA},
-        uCustomImageSize: {value: new THREE.Vector2(customImage.width, customImage.height)},
+        uCustomImageSize: {value: new THREE.Vector2(params.IMAGE_AREA, params.IMAGE_AREA)},
         uCustomImage: { value: customImage},
         uHasCustomImage: { value: false},
         uPointColor: { value: params.POINT_COLOR},
-
+        uTrailTexRes: {value: params.TRAIL_TEX_RES}
     },
     vertexShader: pointVert,
     fragmentShader: pointFrag,
@@ -370,7 +373,7 @@ const matTrailDecay = new THREE.RawShaderMaterial({
         uDt:         { value: 0.2 },
         uMouseCoords: { value: prevmousecoords},
         uMouseDown: { value: mouseDown}, 
-        uCustomImageSize: {value: new THREE.Vector2(customImage.width, customImage.height)},
+        uCustomImageSize: {value: new THREE.Vector2(params.IMAGE_AREA, params.IMAGE_AREA)},
         uCustomImage: { value: customImage},
         uHasCustomImage: { value: false},
         uImageArea: { value: params.IMAGE_AREA},
@@ -445,13 +448,11 @@ function frame() {
     renderer.render(sceneSim, camera);
 
     matTrailDecay.uniforms.uMouseCoords.value = prevmousecoords;
-    matTrailDecay.uniforms.uCustomImageSize.value = new THREE.Vector2(customImage.width, customImage.height);
     matTrailDecay.uniforms.uCustomImage.value = customImage;
-    matTrailDecay.uniforms.uHasCustomImage.value = true;
+    matTrailDecay.uniforms.uHasCustomImage.value = params.uHasCustomImage;
     matTrailDecay.uniforms.uNuke.value = nuke;
-    matPoints.uniforms.uCustomImageSize.value = new THREE.Vector2(customImage.width, customImage.height);
     matPoints.uniforms.uCustomImage.value = customImage;
-    matPoints.uniforms.uHasCustomImage.value = true;
+    matPoints.uniforms.uHasCustomImage.value = params.uHasCustomImage;
     matPoints.uniforms.uMouseCoords.value = prevmousecoords;
 
     matTrailDeposit.uniforms.uState.value = writeRT.texture;   // deposit uses agent positions

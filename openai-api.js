@@ -10,8 +10,8 @@ const openai = new OpenAI({
 export async function chat(text) {
     return await openai.responses.create({
         prompt: {
-            "id": "pmpt_69008cb402f08193af25c0255cf58bd00b05f606f3d9299e",
-            "version": "19"
+            "id": "pmpt_6901d285bcac819383687e9bbc72515a0067f4fc25dbf8d1",
+            "version": "2"
         },
         input: [
             {
@@ -93,31 +93,65 @@ export async function chat(text) {
                             "type": "string",
                             "description": "A hex color representing the combined emotion (e.g. #1A2B3C)",
                             "pattern": "^#[0-9A-Fa-f]{6}$"
+                        },
+                        "image_prompt": {
+                            "type": "string",
+                            "description": "A text prompt describing an image evoking the specified emotions",
+                            "minLength": 1
                         }
                     },
                     "required": [
                         "feelings",
-                        "color"
+                        "color",
+                        "image_prompt"
                     ],
                     "additionalProperties": false
                 }
             }
         },
         reasoning: {},
+        max_output_tokens: 2048,
+        store: true,
+        include: ["web_search_call.action.sources"]
+    });
+}
+
+export async function imagine(prompt) {
+    return await openai.responses.create({
+        prompt: {
+            "id": "pmpt_6901d8c6a23881979af6e5434008301408ca3d4bfa2b5c0d",
+            "version": "2"
+        },
+        input: [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_text",
+                        "text": prompt
+                    }
+                ]
+            }
+        ],
+        text: {
+            "format": {
+                "type": "text"
+            }
+        },
+        reasoning: {},
         tools: [
             {
                 "type": "image_generation",
-                "background": "transparent",
                 "model": "gpt-image-1-mini",
-                "moderation": "auto",
-                "output_compression": 100,
-                "output_format": "png",
+                "size": "1024x1024",
                 "quality": "low",
-                "size": "1024x1024"
+                "output_format": "webp",
+                "background": "transparent",
+                "moderation": "low"
             }
         ],
         max_output_tokens: 2048,
         store: true,
-        include: ["web_search_call.action.sources"]  
+        include: ["web_search_call.action.sources"]
     });
 }

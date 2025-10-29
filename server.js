@@ -1,7 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
-import {chat} from './openai-api.js';
+import {chat, imagine} from './openai-api.js';
 
 dotenv.config();
 
@@ -20,10 +20,19 @@ app.use(cors({
 
 app.post("/chat", async (req, res) => {
     const text = await chat(req.body.text);
-    res.json(text.output);
+    res.json(JSON.parse(text.output_text));
+});
+
+app.post("/imagine", async (req, res) => {
+    const imagine_res = await imagine(req.body.prompt);
+    const imageData = imagine_res.output.findLast(el => !!el.result)
+    if (imageData)
+        res.json("data:image/png;base64," + imageData.result)
+        else
+        res.json();
 });
 
 app.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}`);
+    console.log(`Server running at :${port}`);
 });
 

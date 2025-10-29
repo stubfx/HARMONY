@@ -34,7 +34,9 @@ textarea:focus, input:focus{
 #chat-container {
     position: absolute;
     display: flex;
+    flex-direction: column;
     justify-content: center;
+    align-items: center;
     width: 100vw;
     bottom: 0;
     padding-bottom: 1rem;
@@ -78,6 +80,13 @@ textarea:focus, input:focus{
     /* background: rgb(144 144 144 / 25%); */
     background: rgb(255 255 255 / 10%);
     /* backdrop-filter: blur(5px); */
+}
+
+.img-prompt-container {
+    padding: .5rem;
+    max-width: 50vw;
+    color: rgb(255 255 255 / 80%);
+    font-size: x-small;
 }
 
 button {

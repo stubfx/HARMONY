@@ -4,6 +4,7 @@
         "start": "nodemon ./server.js"
     },
     "dependencies": {
+        "@runware/sdk-js": "^1.1.50",
         "cors": "^2.8.5",
         "dat.gui": "^0.7.9",
         "dotenv": "^17.2.3",
