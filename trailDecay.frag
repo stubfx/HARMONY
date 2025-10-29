@@ -72,6 +72,7 @@ void main() {
             // we are not working with the alpha anymore, if black, discard.
             float colorAmount = customImage.r + customImage.g + customImage.b;
             customImage.r = (colorAmount > 0.4) ? colorAmount : 0.0;
+            customImage.gb = vec2(0.0);
 
 
 

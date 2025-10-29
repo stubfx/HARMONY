@@ -13,7 +13,7 @@ import trailVert from './trailDeposit.vert?raw';
 import trailDecayVert from './trailDecay.vert?raw';
 import trailDecayFrag from './trailDecay.frag?raw';
 import logoImgUrl from './assets/aant.png';
-import houseAlpha from './assets/house_alpha.png';
+import car from './assets/car.png';
 import colorImgUrl from './assets/a03.png';
 import { captureVolume } from './audio';
 import { mapFeelings } from './feelingsMapper.js'
@@ -41,12 +41,12 @@ scene.background = new THREE.Color(0x000000);
 const texLoader = new THREE.TextureLoader();
 const RES = window.devicePixelRatio * params.RENDER_QUALITY;
 // let customImage = texLoader.load(colorImgUrl, () => {
-// let customImage = texLoader.load(houseAlpha, () => {
-//     customImage.colorSpace = THREE.SRGBColorSpace;
-//     // console.log(customImage.width, customImage.height);
-// });
-let customImage;
-params.uHasCustomImage = false;
+let customImage = texLoader.load(car, () => {
+    customImage.colorSpace = THREE.SRGBColorSpace;
+    // console.log(customImage.width, customImage.height);
+});
+// let customImage;
+params.uHasCustomImage = true;
 
 // renderer section
 const renderer = new THREE.WebGLRenderer();

@@ -120,7 +120,7 @@ export async function imagine(prompt) {
     return await openai.responses.create({
         prompt: {
             "id": "pmpt_6901d8c6a23881979af6e5434008301408ca3d4bfa2b5c0d",
-            "version": "3"
+            "version": "4"
         },
         input: [
             {

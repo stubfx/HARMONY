@@ -15,7 +15,7 @@ uniform vec3  uPointColor;
 void main() {
     // base point look (keep your point styling as-is)
     vec2 p = gl_PointCoord - 0.5;
-    vec4 color = vec4(uPointColor, 0.8);
+    vec4 color = vec4(uPointColor, 0.5);
 
     // if (uMouseDown && uHasCustomImage) {
     if (uHasCustomImage) {
@@ -52,7 +52,7 @@ void main() {
             vec3 imgColor = (colorAmount > 0.4) ? customImage.rgb*t : vec3(0.0);
 
             // Simple crossfade: image dominates toward the cursor center
-            color.rgb = imgColor + color.rgb * (1.0 - t);
+            color.rgb = color.rgb * (1.0 - t) + customImage.rgb;
         }
     }
 
