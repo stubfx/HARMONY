@@ -4,6 +4,8 @@ uniform sampler2D uState;
 uniform vec2      uCanvas;
 uniform vec2      uTrailTexSize;
 uniform float     uTime, uDt, uDrag, uStepLen;
+// ya never know...
+// uniform bool uNuke;
 uniform float uTurnJitter;
 // uniform float uSpeedJitter;
 

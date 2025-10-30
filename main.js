@@ -49,8 +49,8 @@ params.uHasCustomImage = false;
 if (false) {
     customImage = texLoader.load(cake, () => {
         customImage.colorSpace = THREE.SRGBColorSpace;
-        // console.log(customImage.width, customImage.height);
     });
+
     params.uHasCustomImage = true;
 }
 
@@ -135,15 +135,23 @@ document.onkeyup = (event) => {
     if (event.key == "n") nuke = false;
 }
 
-document.onmousemove = (e) => {
+let mouseOnPage = false;
+
+document.onmouseenter = () => {
+  mouseOnPage = true;
+}
+
+document.onmouseleave = () => {
+  mouseOnPage = false;
+}
+
+document.onmousemove = e => {
     const xDev = e.clientX * RES;
     const yDev = (window.innerHeight - e.clientY) * RES; // flip in CSS, then scale
     prevmousecoords = [xDev, yDev];
-    // console.log(prevmousecoords);
 }
 
-document.onmousedown = (event) => {
-    // console.log(event.target == renderer.domElement)
+document.onmousedown = event => {
     mouseDown = event.target == renderer.domElement && params.ENABLE_MOUSE;
 }
 
@@ -294,6 +302,7 @@ const matSim = new THREE.RawShaderMaterial({
         uTurnJitter: { value: params.TURN_JITTER },
         // uSpeedJitter: { value: params.SPEED_JITTER },
         uMouseDown: { value: mouseDown},
+        uNuke: { value: nuke},
         uTrailTexSize: {value: new THREE.Vector2(trailBufferSize.x, trailBufferSize.y)}
     },
     vertexShader: simVert,
@@ -333,7 +342,8 @@ const matPoints = new THREE.RawShaderMaterial({
         uSecondaryColorAmount: {value: params.COLOR.SECONDARY_AMOUNT},
         uTertiaryColor: {value: params.COLOR.POINT_TERTIARY_COLOR},
         uTertiaryColorAmount: {value: params.COLOR.TERTIARY_AMOUNT},
-        uTrailTexRes: {value: params.TRAIL_TEX_RES}
+        uTrailTexRes: {value: params.TRAIL_TEX_RES},
+        uMouseOnCanvas: {values: mouseOnPage}
     },
     vertexShader: pointVert,
     fragmentShader: pointFrag,
@@ -388,7 +398,8 @@ const matTrailDecay = new THREE.RawShaderMaterial({
         uCanvas:    { value: new THREE.Vector2(W, H) },
         uTrailTexSize: {value: new THREE.Vector2(trailBufferSize.x, trailBufferSize.y)},
         uTrailTexRes: {value: params.TRAIL_TEX_RES},
-        uNuke: { value: nuke}
+        uNuke: { value: nuke},
+        uMouseOnCanvas: {values: mouseOnPage}
     },
     vertexShader: trailDecayVert,
     fragmentShader: trailDecayFrag,
@@ -535,8 +546,10 @@ function updateUniforms () {
     matTrailDeposit.uniforms.uChampImportanceMultiplier.value = params.CHAMP_IMP_MULTIPLIER;
     matTrailDecay.uniforms.uDecay.value = params.TRAIL_DECAY;
     matTrailDecay.uniforms.uImageRevealArea.value = params.IMAGE_REVEAL_AREA;
+    matTrailDecay.uniforms.uMouseOnCanvas.value = mouseOnPage;
 
 
     matTrailDecay.uniforms.uMouseDown.value = mouseDown;
     matPoints.uniforms.uMouseDown.value = mouseDown;
+    matPoints.uniforms.uMouseOnCanvas.value = mouseOnPage;
 }

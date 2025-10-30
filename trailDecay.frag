@@ -34,7 +34,11 @@ void main() {
     vec2 trailMouseCoords;
     float dist;
     if (uNuke) {
+        // clear everything
         color = vec4(0.0);
+        // bring all the colors to the center
+        // dist = distance(gl_FragCoord.xy, uCanvas*uTrailTexRes*0.5);
+        // color.r = smoothstep(1.0, 0.0, dist/1000.0);
     }
     else if (uHasCustomImage) {
         // Desired on-RT size = original size scaled by trailRes

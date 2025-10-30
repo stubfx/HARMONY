@@ -9,6 +9,7 @@ uniform sampler2D uCustomImage;
 uniform vec2  uCustomImageSize; // desired on-screen pixel size of the image
 uniform vec2  uCanvas;          // canvas size in pixels
 uniform vec2  uMouseCoords;
+uniform bool  uMouseOnCanvas;
 uniform bool  uMouseDown;
 uniform bool  uHasCustomImage;
 uniform float uImageArea;
@@ -56,8 +57,6 @@ void main() {
             customImage = texture(uCustomImage, uv);
         }
 
-        // Distance gating around the mouse
-        // float dist = distance(gl_FragCoord.xy, uMouseCoords);
         float dist = distance(gl_FragCoord.xy, uCanvas*0.5);
         if (uHasCustomImage && dist < uImageRevealArea) {
             // - 0.2 shifts the color to make a bit larger
@@ -79,6 +78,16 @@ void main() {
                 // color.rgb = customImage.rgb;
             }
         }
+    }
+    // Distance gating around the mouse
+    float mouseDist = distance(gl_FragCoord.xy, uMouseCoords);
+    // float area = max(uCanvas.x, uCanvas.y);
+    float area = 100.0;
+    if (uMouseOnCanvas && mouseDist < area) {
+        // color += 1.0/mouseDist;
+        // color = vec4(vec3(0.0),1.0);
+        // color.r = area/mouseDist;
+        color *= 1.0/smoothstep(0.0, 1.0, 1.0/area * mouseDist);
     }
 
     fragColor = color;
