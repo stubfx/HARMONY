@@ -64,8 +64,8 @@ void main() {
             customImage = texture(uCustomImage, uv);
         }
         float scaledImageArea = uImageArea * uTrailTexRes;
-        if (dist < scaledImageArea && dist < uImageRevealArea * uTrailTexRes) {
-            dist = smoothstep(1.0, 0.1, dist/scaledImageArea);
+        if (uHasCustomImage && dist < uImageRevealArea * uTrailTexRes) {
+            dist = smoothstep(1.0, 0.0, dist/scaledImageArea);
             // WATCH OUT
             // AS WE ARE USING THE RED CHANNEL FOR SENSING THE TRAIL
             // WE MUST DUMP THE TRAIL INTO THAT FOR THE SIM TO WORK.
@@ -83,7 +83,12 @@ void main() {
             // the higher the d must
             // color = customImage;
             // color = customImage + d * (1.0 - dist);
-            color = customImage * dist;
+
+
+            // use this if you need a clean circle for the image
+            // color = customImage * dist;
+            // this will make it look like the image is tangled in this
+            color = mix(customImage, d, 1.0 - dist);
             // return;
         }
         // }

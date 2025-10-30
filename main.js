@@ -43,12 +43,17 @@ scene.background = new THREE.Color(0x000000);
 const texLoader = new THREE.TextureLoader();
 const RES = window.devicePixelRatio * params.RENDER_QUALITY;
 // let customImage = texLoader.load(colorImgUrl, () => {
-// let customImage = texLoader.load(cake, () => {
-//     customImage.colorSpace = THREE.SRGBColorSpace;
-//     // console.log(customImage.width, customImage.height);
-// });
 let customImage;
 params.uHasCustomImage = false;
+
+if (false) {
+    customImage = texLoader.load(cake, () => {
+        customImage.colorSpace = THREE.SRGBColorSpace;
+        // console.log(customImage.width, customImage.height);
+    });
+    params.uHasCustomImage = true;
+}
+
 
 // renderer section
 const renderer = new THREE.WebGLRenderer();
@@ -196,8 +201,6 @@ for (let i=0;i<N;i++) {
     const k=i*4;
     init[k] = W/2; //x
     init[k+1] = H/2; //y
-    // init[k] = 0.0; //x
-    // init[k+1] = 0.0; //y
     // init[k] = Math.random() * W; //x
     // init[k+1] = Math.random() * H; //y
     //dx and dy
@@ -495,7 +498,7 @@ function frame() {
     if (params.SHOW_TRAIL) {
         renderer.render(sceneTrailDecay, camera);
     }
-        renderer.render(sceneDraw, camera);
+    renderer.render(sceneDraw, camera);
 
     frames++;
     const nowMs = performance.now();

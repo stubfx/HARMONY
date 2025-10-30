@@ -27,6 +27,13 @@ void main() {
     vec2 p = gl_PointCoord - 0.5;
     vec4 color = vec4(uPointColor, 0.5);
 
+    // is secondary
+    if (vIsSecondary == 1.0) {
+        color = vec4(uSecondaryColor,0.5);
+    } else if (vIsTertiary == 1.0) {
+        color = vec4(uTertiaryColor,0.5);
+    }
+
     // if (uMouseDown && uHasCustomImage) {
     if (uHasCustomImage) {
         // Top-left of the image so that it's centered and sized to uCustomImageSize
@@ -52,28 +59,26 @@ void main() {
         // Distance gating around the mouse
         // float dist = distance(gl_FragCoord.xy, uMouseCoords);
         float dist = distance(gl_FragCoord.xy, uCanvas*0.5);
-        if (dist < uImageArea && dist < uImageRevealArea) {
-            float t = smoothstep(1.0, 0.0, dist / uImageArea);
+        if (uHasCustomImage && dist < uImageRevealArea) {
+            // - 0.2 shifts the color to make a bit larger
+            float t = smoothstep(1.0, 0.0, (dist / uImageRevealArea) - 0.2);
 
             // // Only use the image color if the source alpha is solid enough
             // vec3 imgColor = (customImage.a > 0.8) ? (customImage.rgb * t) : vec3(0.0);
             // we are not working with the alpha anymore, if black, discard.
             float colorAmount = customImage.r + customImage.g + customImage.b;
-            // vec3 imgColor = (colorAmount > 0.4) ? customImage.rgb*t : vec3(0.0);
+            vec3 imgColor = (colorAmount > 0.4) ? customImage.rgb : vec3(0.0);
 
+                // color.rgb = vec3(t);
+            // this check avoid black circle cuts
             if (colorAmount > 0.7) {
                 // Simple crossfade: image dominates toward the cursor center
-                color.rgb = color.rgb * (1.0 - t) + customImage.rgb;
+                // color.rgb = imgColor.rgb ;//+ (color.rgb - imgColor.rgb);
+                // color.rgb = smoothstep(color.rgb, customImage.rgb, vec3(0.5));
+                color.rgb = mix(color.rgb, customImage.rgb, t);
+                // color.rgb = customImage.rgb;
             }
         }
-    }
-    // is secondary
-    if (vIsSecondary == 1.0) {
-        fragColor = vec4(uSecondaryColor,1.0);
-        return;
-    } else if (vIsTertiary == 1.0) {
-        fragColor = vec4(uTertiaryColor,1.0);
-        return;
     }
 
     fragColor = color;
