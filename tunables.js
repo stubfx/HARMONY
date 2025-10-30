@@ -4,8 +4,8 @@ import * as THREE from 'three';
 const urlParams = new URLSearchParams(window.location.search);
 const number = parseInt(urlParams.get("n"), 10);
 const renderQuality = urlParams.get("r");
+const panel = urlParams.get("panel");
 
-export const TEX_SIDE = number || 1200; // agents = TEX_SIDE^2
 // export let DRAG = 8; // damping, not used.
 export let IMAGE_AREA = 400.0;
 // still testing this with coords, they clearly need to be adjusted.
@@ -14,11 +14,18 @@ export let RENDER_QUALITY = renderQuality || 1;
 const gui = new dat.GUI();
 gui.width = 500;
 
+// primers go from -1 to 1
+export const primers = {
+    SPEED: 0,
+    FLOW: -0.8,
+    STRUCTURE: 0
+}
+
 export const baseParams = {
     STEP_LEN: 70.0,
     IMAGE_AREA: 500,
     IMAGE_REVEAL_AREA: 250,
-    RENDER_QUALITY: 1,
+    RENDER_QUALITY: renderQuality || 1,
     TURN_JITTER: 0.1,
     DRAG: 0.5,
     // SPEED_JITTER: 2.0,
@@ -61,13 +68,18 @@ export const debug = {
 }
 
 // folders for grouping
+const fPrimers   = gui.addFolder('Primers');
 const fSim   = gui.addFolder('Simulation');
 const fColors = fSim.addFolder('colors');
 const fDraw  = gui.addFolder('Draw Points');
 const fDep   = gui.addFolder('Trail Deposit');
 const fDecay = gui.addFolder('Trail Decay');
-// const fSpawn = gui.addFolder('Spawn Pattern');
 const fDebug = gui.addFolder('Debug');
+
+// primers
+fPrimers.add(primers, 'SPEED', -1, 1, 0.05);
+fPrimers.add(primers, 'FLOW', -1, 1, 0.05);
+fPrimers.add(primers, 'STRUCTURE', -1, 1, 0.05);
 
 // toggle
 fDebug.add(params, 'ENABLE_MOUSE')
@@ -122,10 +134,13 @@ fDecay.add(params, 'TRAIL_DECAY', 0, 1, .005)
 // fHeavy.add(params, 'RENDER_QUALITY', 0.25, 2, 0.05)
 // fHeavy.add(params, 'TEX_SIDE', 32, 4096, 32)
 
-fSim.open();
-fColors.open();
+fPrimers.open();
+// fSim.open();
+// fColors.open();
 // fDraw.open();
 // fDep.open();
 // fDecay.open();
 // fDebug.open();
-gui.close();
+if (import.meta.env.VITE_ENV != "DEV" && !panel) {
+    gui.hide();
+}

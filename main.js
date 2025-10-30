@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import * as UTILS from '/utils.js';
+import * as UTILS from '/src/utils.js';
 import {params, debug} from '/tunables.js';
 import {chat, imagine} from '/client-openai-api.js';
 
@@ -18,7 +18,6 @@ import cake from './assets/cake.png';
 import stadium from './assets/stadium.png';
 import colorImgUrl from './assets/a03.png';
 import { captureVolume } from './audio';
-import { mapFeelings } from './feelingsMapper.js'
 
 async function loadShader(url) {
     const res = await fetch(url);
@@ -106,7 +105,6 @@ document.querySelector("#chat-form").onsubmit = async (e) => {
     params.COLOR.POINT_SECONDARY_COLOR = [c[1].r, c[1].g, c[1].b]; 
     params.COLOR.POINT_TERTIARY_COLOR_HEX = c[2].getHexString();
     params.COLOR.POINT_TERTIARY_COLOR = [c[2].r, c[2].g, c[2].b]; 
-    Object.assign(params, mapFeelings(res.feelings));
     console.log(params)
 
     // updateImagePrompt
