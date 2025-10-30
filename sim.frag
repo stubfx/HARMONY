@@ -55,9 +55,10 @@ void main(){
     float weightRight   = sampleTrailPX_flipped(pos +  uSenseDist * rot(dir, -uSenseAngle));
 
     // 0..1 hash
-    float rnd = fract(sin(dot(vec3(gl_FragCoord.xy, floor(uTime*123.0)),
-                              vec3(127.1,311.7,74.7))) * 43758.5453123);
+    float rnd = fract(sin(dot(vec2(uTime), vec2(12.9898, 78.233))) * 43758.5453);
 
+    // float rnd = fract(sin(dot(vec3(gl_FragCoord.xy, floor(uTime*123.0)),
+    //                           vec3(127.1,311.7,74.7))) * 43758.5453123);
     // centered, signed noise in [-uTurnJitter, +uTurnJitter]
     float noise = (rnd * 2.0 - 1.0) * uTurnJitter;
 

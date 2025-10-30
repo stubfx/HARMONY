@@ -194,56 +194,42 @@ const positions = new Float32Array([
 ]);
 fsq.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
-// init state texture (rnd positions, zero velocities)
 const N = params.TEX_SIDE * params.TEX_SIDE;
-const init = new Float32Array(N*4);
-for (let i=0;i<N;i++) {
-    const k=i*4;
-    init[k] = W/2; //x
-    init[k+1] = H/2; //y
-    // init[k] = Math.random() * W; //x
-    // init[k+1] = Math.random() * H; //y
-    //dx and dy
+const init = new Float32Array(N * 4);
+const cx = W / 2;
+const cy = H / 2;
+const R = params.SPAWN_RADIUS;
+
+for (let i = 0; i < N; i++) {
+    const k = i * 4;
+
+    // Random polar position
+    const theta = Math.random() * Math.PI * 2;
+    const r = Math.sqrt(Math.random()) * R;
+
+    // Cartesian position
+    const x = cx + r * Math.cos(theta);
+    const y = cy + r * Math.sin(theta);
+    init[k] = x;
+    init[k + 1] = y;
+
+    // Direction vector toward center
+    let dx = cx - x;
+    let dy = cy - y;
+
+    // Normalize
+    const len = Math.hypot(dx, dy) || 1;
+    dx /= len;
+    dy /= len;
+
+    // Scale by random speed factor if you like
+    const rnd = Math.random() - 0.5; // tweak
+    // init[k + 2] = dx * speed;
+    // init[k + 3] = dy * speed;
     init[k+2] = (Math.random() - 0.5) ; //x
     init[k+3] = (Math.random() - 0.5); //y
-}
 
-// const N = params.TEX_SIDE * params.TEX_SIDE;
-// const init = new Float32Array(N * 4);
-// const cx = W / 2;
-// const cy = H / 2;
-// const R = 500;
-//
-// for (let i = 0; i < N; i++) {
-//     const k = i * 4;
-//
-//     // Random polar position
-//     const theta = Math.random() * Math.PI * 2;
-//     const r = Math.sqrt(Math.random()) * R;
-//
-//     // Cartesian position
-//     const x = cx + r * Math.cos(theta);
-//     const y = cy + r * Math.sin(theta);
-//     init[k] = x;
-//     init[k + 1] = y;
-//
-//     // Direction vector toward center
-//     let dx = cx - x;
-//     let dy = cy - y;
-//
-//     // Normalize
-//     const len = Math.hypot(dx, dy) || 1;
-//     dx /= len;
-//     dy /= len;
-//
-//     // Scale by random speed factor if you like
-//     const rnd = Math.random() - 0.5; // tweak
-//     // init[k + 2] = dx * speed;
-//     // init[k + 3] = dy * speed;
-//     init[k+2] = (Math.random() - 0.5) ; //x
-//     init[k+3] = (Math.random() - 0.5); //y
-//
-// }
+}
 
 
 

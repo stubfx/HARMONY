@@ -32,7 +32,7 @@ export const baseParams = {
     CHAMP_SAMPLE_INTERVAL: 50000.0,
     CHAMP_IMP_MULTIPLIER: 2.0,
     TRAIL_DECAY: 0.89,
-    SPAWN_RADIUS: 500.0,
+    SPAWN_RADIUS: 20.0,
     ENABLE_MOUSE: true,
     SHOW_TRAIL: false,
     RENDER_QUALITY: 1.0,
