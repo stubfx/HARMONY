@@ -102,7 +102,7 @@ export async function chat(text) {
                                     "description": "A hex color that goes well with the primary color",
                                     "pattern": "^#[0-9A-Fa-f]{6}$"
                                 },
-                                "terciary": {
+                                "tertiary": {
                                     "type": "string",
                                     "description": "A hex color that goes well with both the primary and secondary colors",
                                     "pattern": "^#[0-9A-Fa-f]{6}$"
@@ -111,7 +111,7 @@ export async function chat(text) {
                             "required": [
                                 "primary",
                                 "secondary",
-                                "terciary"
+                                "tertiary"
                             ],
                             "additionalProperties": false
                         },
