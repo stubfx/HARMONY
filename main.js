@@ -93,7 +93,9 @@ params.IMAGE_AREA = imageArea;
 params.IMAGE_REVEAL_AREA = imageArea * .5; 
 const fpsEl = document.querySelector("#fps");
 const agentsEl = document.querySelector("#agentsCount");
+const buildDate = document.querySelector("#buildDate");
 agentsEl.textContent = `${(params.TEX_SIDE * params.TEX_SIDE).toLocaleString()} agents`
+buildDate.textContent = BUILD_DATE;
 // const dtEl = document.querySelector("#deltaTime");
 
 function refreshSizes() {

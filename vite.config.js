@@ -1,12 +1,15 @@
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  // build: {
-  //   rollupOptions: {
-  //     output: {
-  //       assetFileNames: "[name][extname]", // disable hashing
-  //     }
-  //   }
-  // }
+    define: {
+        BUILD_DATE: JSON.stringify(new Date().toISOString())
+    },
+    // build: {
+    //   rollupOptions: {
+    //     output: {
+    //       assetFileNames: "[name][extname]", // disable hashing
+    //     }
+    //   }
+    // }
 });
 

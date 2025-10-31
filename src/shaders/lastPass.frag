@@ -110,9 +110,9 @@ void main() {
                 // use this if you need a clean circle for the image
                 // color = customImage * dist;
                 // this will make it look like the image is tangled in this
-                if (colorAmount > 0.4) {
+                if (colorAmount > 0.1) {
                     // color += customImage * 0.3;
-                    color += mix(customImage*1.0, vec4(0.0), 1.0 - dist);
+                    color += mix(customImage*0.5, vec4(0.0), 1.0 - dist);
                 }
             }
             // return;

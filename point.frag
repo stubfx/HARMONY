@@ -87,9 +87,11 @@ void main() {
         // color += 1.0/mouseDist;
         // color = vec4(vec3(0.0),1.0);
         // color.r = area/mouseDist;
-        color *= 1.0/smoothstep(0.0, 1.0, 1.0/area * mouseDist);
+        // color *= 1.0/smoothstep(0.0, 1.0, 1.0/area * mouseDist);
+        // color = mix(color, vec4(1.0), 1.0/area * mouseDist);
+        color = mix(color, vec4(1.0), 1.0 - mouseDist / area);
         // cap, otherwise bloom will send us to jesus after.
-        color = clamp(vec4(0.0), vec4(1.0), color);
+        // color = clamp(vec4(0.0), vec4(1.0), color);
     }
 
     fragColor = color;
