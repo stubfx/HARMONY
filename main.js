@@ -12,6 +12,14 @@ import trailFrag from './trailDeposit.frag?raw';
 import trailVert from './trailDeposit.vert?raw';
 import trailDecayVert from './trailDecay.vert?raw';
 import trailDecayFrag from './trailDecay.frag?raw';
+
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { ShaderPass }     from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { HorizontalBlurShader } from 'three/examples/jsm/shaders/HorizontalBlurShader.js';
+import { VerticalBlurShader }   from 'three/examples/jsm/shaders/VerticalBlurShader.js';
+
 import logoImgUrl from './assets/aant.png';
 import car from './assets/car.png';
 import cake from './assets/cake.png';
@@ -64,6 +72,15 @@ renderer.setPixelRatio(RES);
 const bufferSize = new THREE.Vector2();
 renderer.getDrawingBufferSize(bufferSize);
 const trailBufferSize = bufferSize.clone().multiplyScalar(params.TRAIL_TEX_RES);
+const composer = new EffectComposer(renderer);
+
+const h = new ShaderPass(HorizontalBlurShader);
+const v = new ShaderPass(VerticalBlurShader);
+
+function setBlur(px) {
+  h.uniforms.h.value = px / renderer.domElement.width;
+  v.uniforms.v.value = px / renderer.domElement.height;
+}
 
 document.body.appendChild( renderer.domElement );
 
@@ -438,6 +455,15 @@ const timeMult = 0.001;
 // main sim loop
 let prev = performance.now()*timeMult;
 
+// base render pass
+const renderPass = new RenderPass(sceneDraw, camera);
+composer.addPass(renderPass);
+
+setBlur(0.3); // blur radius in pixels
+
+composer.addPass(h);
+composer.addPass(v);
+
 function frame() {
     const now = performance.now()*timeMult;
 
@@ -503,7 +529,8 @@ function frame() {
     if (params.SHOW_TRAIL) {
         renderer.render(sceneTrailDecay, camera);
     }
-    renderer.render(sceneDraw, camera);
+    // renderer.render(sceneDraw, camera);
+    composer.render();
 
     frames++;
     const nowMs = performance.now();

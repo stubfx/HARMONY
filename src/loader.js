@@ -4,5 +4,5 @@ export function show(show) {
     // disable input field.
     const inputEl = document.querySelector("#chat-input");
     // const formEl = document.querySelector("#chat-form");
-    inputEl.disabled = true;
+    inputEl.disabled = show;
 }
