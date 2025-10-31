@@ -18,6 +18,7 @@ import cake from './assets/cake.png';
 import stadium from './assets/stadium.png';
 import colorImgUrl from './assets/a03.png';
 import { captureVolume } from './audio';
+import * as loader from './src/loader.js';
 
 async function loadShader(url) {
     const res = await fetch(url);
@@ -81,10 +82,13 @@ function refreshSizes() {
 
 refreshSizes();
 
-
+let loading = false;
 document.querySelector("#chat-form").onsubmit = async (e) => {
     // prevent page reoload
     e.preventDefault();
+    if (loading) return;
+    loading = true;
+    loader.show(loading);
     const inputEl = document.querySelector("#chat-input");
     const formEl = document.querySelector("#chat-form");
     const text = inputEl.value;
@@ -117,6 +121,8 @@ document.querySelector("#chat-form").onsubmit = async (e) => {
         customImage = texLoader.load(imageData)
         params.uHasCustomImage = true;
     }
+    loading = false;
+    loader.show(loading);
 };
 
 window.addEventListener('resize', () => {

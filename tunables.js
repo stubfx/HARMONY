@@ -14,13 +14,6 @@ export let RENDER_QUALITY = renderQuality || 1;
 const gui = new dat.GUI();
 gui.width = 500;
 
-// primers go from -1 to 1
-export const primers = {
-    SPEED: 0,
-    FLOW: -0.8,
-    STRUCTURE: 0
-}
-
 export const baseParams = {
     STEP_LEN: 70.0,
     IMAGE_AREA: 500,
@@ -68,18 +61,12 @@ export const debug = {
 }
 
 // folders for grouping
-const fPrimers   = gui.addFolder('Primers');
 const fSim   = gui.addFolder('Simulation');
 const fColors = fSim.addFolder('colors');
 const fDraw  = gui.addFolder('Draw Points');
 const fDep   = gui.addFolder('Trail Deposit');
 const fDecay = gui.addFolder('Trail Decay');
 const fDebug = gui.addFolder('Debug');
-
-// primers
-fPrimers.add(primers, 'SPEED', -1, 1, 0.05);
-fPrimers.add(primers, 'FLOW', -1, 1, 0.05);
-fPrimers.add(primers, 'STRUCTURE', -1, 1, 0.05);
 
 // toggle
 fDebug.add(params, 'ENABLE_MOUSE')
@@ -134,8 +121,7 @@ fDecay.add(params, 'TRAIL_DECAY', 0, 1, .005)
 // fHeavy.add(params, 'RENDER_QUALITY', 0.25, 2, 0.05)
 // fHeavy.add(params, 'TEX_SIDE', 32, 4096, 32)
 
-fPrimers.open();
-// fSim.open();
+fSim.open();
 // fColors.open();
 // fDraw.open();
 // fDep.open();
