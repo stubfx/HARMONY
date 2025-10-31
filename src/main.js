@@ -121,17 +121,18 @@ document.querySelector("#chat-form").onsubmit = async (e) => {
     const res = await chat(text);
     console.log(res)
     nuke = false;
-    const c = [
-        new THREE.Color(res.color.primary),
-        new THREE.Color(res.color.secondary),
-        new THREE.Color(res.color.tertiary)
-    ];
-    params.COLOR.POINT_COLOR_HEX = c[0].getHexString();
-    params.COLOR.POINT_COLOR = [c[0].r, c[0].g, c[0].b]; 
-    params.COLOR.POINT_SECONDARY_COLOR_HEX = c[1].getHexString();
-    params.COLOR.POINT_SECONDARY_COLOR = [c[1].r, c[1].g, c[1].b]; 
-    params.COLOR.POINT_TERTIARY_COLOR_HEX = c[2].getHexString();
-    params.COLOR.POINT_TERTIARY_COLOR = [c[2].r, c[2].g, c[2].b]; 
+    // const c = [
+    //     new THREE.Color(res.color.primary),
+    //     new THREE.Color(res.color.secondary),
+    //     new THREE.Color(res.color.tertiary)
+    // ];
+    // params.COLOR.POINT_COLOR_HEX = c[0].getHexString();
+    // params.COLOR.POINT_COLOR = [c[0].r, c[0].g, c[0].b]; 
+    // params.COLOR.POINT_SECONDARY_COLOR_HEX = c[1].getHexString();
+    // params.COLOR.POINT_SECONDARY_COLOR = [c[1].r, c[1].g, c[1].b]; 
+    // params.COLOR.POINT_TERTIARY_COLOR_HEX = c[2].getHexString();
+    // params.COLOR.POINT_TERTIARY_COLOR = [c[2].r, c[2].g, c[2].b]; 
+    Object.assign(params, structuredClone(res.simulation));
     console.log(params)
 
     // updateImagePrompt

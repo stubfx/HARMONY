@@ -1,0 +1,408 @@
+{
+    "format": {
+        "type": "json_schema",
+        "name": "emotion_to_simulation",
+        "strict": true,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "feelings": {
+                    "type": "object",
+                    "properties": {
+                        "arousal": {
+                            "type": "number",
+                            "description": "Energy / intensity / pace of activity, from 0 (low) to 1 (high)",
+                            "minimum": 0,
+                            "maximum": 1,
+                            "default": 0.5
+                        },
+                        "valence": {
+                            "type": "number",
+                            "description": "Emotional pleasantness, from 0 (negative) to 1 (positive)",
+                            "minimum": 0,
+                            "maximum": 1,
+                            "default": 0.5
+                        },
+                        "dominance": {
+                            "type": "number",
+                            "description": "Sense of control, confidence, or assertiveness, from 0 (low) to 1 (high)",
+                            "minimum": 0,
+                            "maximum": 1,
+                            "default": 0.5
+                        },
+                        "cohesion": {
+                            "type": "number",
+                            "description": "Unity and harmony among agents/elements, from 0 (low) to 1 (high)",
+                            "minimum": 0,
+                            "maximum": 1,
+                            "default": 0.5
+                        },
+                        "novelty": {
+                            "type": "number",
+                            "description": "Unpredictability, surprise, or exploration, from 0 (low) to 1 (high)",
+                            "minimum": 0,
+                            "maximum": 1,
+                            "default": 0.5
+                        },
+                        "focus": {
+                            "type": "number",
+                            "description": "Stability, precision, attention, from 0 (low) to 1 (high)",
+                            "minimum": 0,
+                            "maximum": 1,
+                            "default": 0.5
+                        },
+                        "tension": {
+                            "type": "number",
+                            "description": "Latent unease or unresolved energy, from 0 (low) to 1 (high)",
+                            "minimum": 0,
+                            "maximum": 1,
+                            "default": 0.5
+                        }
+                    },
+                    "required": [
+                        "arousal",
+                        "valence",
+                        "dominance",
+                        "cohesion",
+                        "novelty",
+                        "focus",
+                        "tension"
+                    ],
+                    "additionalProperties": false,
+                    "default": {
+                        "arousal": 0.5,
+                        "valence": 0.5,
+                        "dominance": 0.5,
+                        "cohesion": 0.5,
+                        "novelty": 0.5,
+                        "focus": 0.5,
+                        "tension": 0.5
+                    }
+                },
+                "color": {
+                    "type": "object",
+                    "properties": {
+                        "primary": {
+                            "type": "string",
+                            "description": "The main hex color representing the combined emotion (e.g. #1A2B3C)",
+                            "pattern": "^#[0-9A-Fa-f]{6}$",
+                            "default": "#FFFFFF"
+                        },
+                        "secondary": {
+                            "type": "string",
+                            "description": "A hex color that complements the primary color",
+                            "pattern": "^#[0-9A-Fa-f]{6}$",
+                            "default": "#FFFFFF"
+                        },
+                        "terciary": {
+                            "type": "string",
+                            "description": "A hex color that harmonizes with both the primary and secondary colors",
+                            "pattern": "^#[0-9A-Fa-f]{6}$",
+                            "default": "#FFFFFF"
+                        }
+                    },
+                    "required": [
+                        "primary",
+                        "secondary",
+                        "terciary"
+                    ],
+                    "additionalProperties": false,
+                    "default": {
+                        "primary": "#FFFFFF",
+                        "secondary": "#FFFFFF",
+                        "terciary": "#FFFFFF"
+                    }
+                },
+                "simulation": {
+                    "type": "object",
+                    "properties": {
+                        "STEP_LEN": {
+                            "type": "number",
+                            "description": "Length of each step in movement. Controls energy and speed.",
+                            "minimum": 0,
+                            "maximum": 200,
+                            "default": 70
+                        },
+                        "DRAG": {
+                            "type": "number",
+                            "description": "Resistance against movement. Higher values slow particles.",
+                            "minimum": 0,
+                            "maximum": 5,
+                            "default": 0.5
+                        },
+                        "TURN_JITTER": {
+                            "type": "number",
+                            "description": "Random variation in turning, affecting chaos and unpredictability.",
+                            "minimum": 0.05,
+                            "maximum": 2,
+                            "default": 0.1
+                        },
+                        "SENSE_DIST": {
+                            "type": "number",
+                            "description": "How far particles can sense or react to their surroundings.",
+                            "minimum": 1,
+                            "maximum": 200,
+                            "default": 20
+                        },
+                        "SENSE_ANGLE": {
+                            "type": "number",
+                            "description": "Field of view or sensing angle range (0 to 1).",
+                            "minimum": 0,
+                            "maximum": 1,
+                            "default": 0.2
+                        },
+                        "TURN_RATE": {
+                            "type": "number",
+                            "description": "How sharply or frequently particles turn.",
+                            "minimum": 0,
+                            "maximum": 100,
+                            "default": 20
+                        },
+                        "POINT_SIZE": {
+                            "type": "number",
+                            "description": "Visual size of each point on screen.",
+                            "minimum": 1,
+                            "maximum": 3,
+                            "default": 1
+                        },
+                        "DEPOSIT_SIZE": {
+                            "type": "number",
+                            "description": "Thickness or radius of deposited trails.",
+                            "minimum": 0.05,
+                            "maximum": 40,
+                            "default": 0.05
+                        },
+                        "DEPOSIT_STRENGTH": {
+                            "type": "number",
+                            "description": "Amount of material or intensity deposited per step.",
+                            "minimum": 0,
+                            "maximum": 20,
+                            "default": 10
+                        },
+                        "DEPOSIT_EDGE_SOFT": {
+                            "type": "number",
+                            "description": "Softness or diffusion at deposit edges.",
+                            "minimum": 0,
+                            "maximum": 1,
+                            "default": 0.5
+                        },
+                        "CHAMP_SAMPLE_INTERVAL": {
+                            "type": "number",
+                            "description": "Sampling interval for environmental feedback.",
+                            "minimum": 1,
+                            "maximum": 1000000,
+                            "default": 50000
+                        },
+                        "CHAMP_IMP_MULTIPLIER": {
+                            "type": "number",
+                            "description": "Multiplier for the influence of external fields.",
+                            "minimum": 1,
+                            "maximum": 5000,
+                            "default": 2
+                        },
+                        "TRAIL_DECAY": {
+                            "type": "number",
+                            "description": "Rate at which trails fade over time.",
+                            "minimum": 0,
+                            "maximum": 1,
+                            "default": 0.89
+                        },
+                        "SPAWN_RADIUS": {
+                            "type": "number",
+                            "description": "Initial spawning radius of agents around the origin.",
+                            "minimum": 0,
+                            "maximum": 1000,
+                            "default": 20
+                        },
+                        "COLOR": {
+                            "type": "object",
+                            "properties": {
+                                "POINT_COLOR_HEX": {
+                                    "type": "string",
+                                    "description": "Primary color of the points (hex format).",
+                                    "pattern": "^#[0-9A-Fa-f]{6}$",
+                                    "default": "#FFFFFF"
+                                },
+                                "POINT_COLOR": {
+                                    "type": "array",
+                                    "description": "RGB array of the primary color (values between 0 and 1).",
+                                    "items": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 1
+                                    },
+                                    "minItems": 3,
+                                    "maxItems": 3,
+                                    "default": [
+                                        1,
+                                        1,
+                                        1
+                                    ]
+                                },
+                                "SECONDARY_AMOUNT": {
+                                    "type": "number",
+                                    "description": "Blend amount for secondary color.",
+                                    "minimum": 0,
+                                    "maximum": 100,
+                                    "default": 10
+                                },
+                                "POINT_SECONDARY_COLOR_HEX": {
+                                    "type": "string",
+                                    "description": "Secondary color in hex format.",
+                                    "pattern": "^#[0-9A-Fa-f]{6}$",
+                                    "default": "#FFFFFF"
+                                },
+                                "POINT_SECONDARY_COLOR": {
+                                    "type": "array",
+                                    "description": "RGB array of the secondary color (values between 0 and 1).",
+                                    "items": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 1
+                                    },
+                                    "minItems": 3,
+                                    "maxItems": 3,
+                                    "default": [
+                                        1,
+                                        1,
+                                        1
+                                    ]
+                                },
+                                "TERTIARY_AMOUNT": {
+                                    "type": "number",
+                                    "description": "Blend amount for tertiary color.",
+                                    "minimum": 0,
+                                    "maximum": 100,
+                                    "default": 11
+                                },
+                                "POINT_TERTIARY_COLOR_HEX": {
+                                    "type": "string",
+                                    "description": "Tertiary color in hex format.",
+                                    "pattern": "^#[0-9A-Fa-f]{6}$",
+                                    "default": "#FFFFFF"
+                                },
+                                "POINT_TERTIARY_COLOR": {
+                                    "type": "array",
+                                    "description": "RGB array of the tertiary color (values between 0 and 1).",
+                                    "items": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 1
+                                    },
+                                    "minItems": 3,
+                                    "maxItems": 3,
+                                    "default": [
+                                        1,
+                                        1,
+                                        1
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "POINT_COLOR_HEX",
+                                "POINT_COLOR",
+                                "SECONDARY_AMOUNT",
+                                "POINT_SECONDARY_COLOR_HEX",
+                                "POINT_SECONDARY_COLOR",
+                                "TERTIARY_AMOUNT",
+                                "POINT_TERTIARY_COLOR_HEX",
+                                "POINT_TERTIARY_COLOR"
+                            ],
+                            "additionalProperties": false,
+                            "default": {
+                                "POINT_COLOR_HEX": "#FFFFFF",
+                                "POINT_COLOR": [
+                                    1,
+                                    1,
+                                    1
+                                ],
+                                "SECONDARY_AMOUNT": 10,
+                                "POINT_SECONDARY_COLOR_HEX": "#FFFFFF",
+                                "POINT_SECONDARY_COLOR": [
+                                    1,
+                                    1,
+                                    1
+                                ],
+                                "TERTIARY_AMOUNT": 11,
+                                "POINT_TERTIARY_COLOR_HEX": "#FFFFFF",
+                                "POINT_TERTIARY_COLOR": [
+                                    1,
+                                    1,
+                                    1
+                                ]
+                            }
+                        }
+                    },
+                    "required": [
+                        "STEP_LEN",
+                        "DRAG",
+                        "TURN_JITTER",
+                        "SENSE_DIST",
+                        "SENSE_ANGLE",
+                        "TURN_RATE",
+                        "POINT_SIZE",
+                        "DEPOSIT_SIZE",
+                        "DEPOSIT_STRENGTH",
+                        "DEPOSIT_EDGE_SOFT",
+                        "CHAMP_SAMPLE_INTERVAL",
+                        "CHAMP_IMP_MULTIPLIER",
+                        "TRAIL_DECAY",
+                        "SPAWN_RADIUS",
+                        "COLOR"
+                    ],
+                    "additionalProperties": false,
+                    "default": {
+                        "STEP_LEN": 70,
+                        "DRAG": 0.5,
+                        "TURN_JITTER": 0.1,
+                        "SENSE_DIST": 20,
+                        "SENSE_ANGLE": 0.2,
+                        "TURN_RATE": 20,
+                        "POINT_SIZE": 1,
+                        "DEPOSIT_SIZE": 0.05,
+                        "DEPOSIT_STRENGTH": 10,
+                        "DEPOSIT_EDGE_SOFT": 0.5,
+                        "CHAMP_SAMPLE_INTERVAL": 50000,
+                        "CHAMP_IMP_MULTIPLIER": 2,
+                        "TRAIL_DECAY": 0.89,
+                        "SPAWN_RADIUS": 20,
+                        "COLOR": {
+                            "POINT_COLOR_HEX": "#FFFFFF",
+                            "POINT_COLOR": [
+                                1,
+                                1,
+                                1
+                            ],
+                            "SECONDARY_AMOUNT": 10,
+                            "POINT_SECONDARY_COLOR_HEX": "#FFFFFF",
+                            "POINT_SECONDARY_COLOR": [
+                                1,
+                                1,
+                                1
+                            ],
+                            "TERTIARY_AMOUNT": 11,
+                            "POINT_TERTIARY_COLOR_HEX": "#FFFFFF",
+                            "POINT_TERTIARY_COLOR": [
+                                1,
+                                1,
+                                1
+                            ]
+                        }
+                    }
+                },
+                "image_prompt": {
+                    "type": "string",
+                    "description": "A text prompt describing an image evoking the specified emotions",
+                    "minLength": 1
+                }
+            },
+            "required": [
+                "feelings",
+                "color",
+                "simulation",
+                "image_prompt"
+            ],
+            "additionalProperties": false
+        }
+    }
+}

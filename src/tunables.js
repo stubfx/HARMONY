@@ -35,7 +35,6 @@ export const baseParams = {
     SPAWN_RADIUS: 20.0,
     ENABLE_MOUSE: false,
     SHOW_TRAIL: false,
-    RENDER_QUALITY: 1.0,
     TEX_SIDE: number || 1200,
     COLOR: {
         POINT_COLOR_HEX: 0xffffff,
