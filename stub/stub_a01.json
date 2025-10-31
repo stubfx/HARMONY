@@ -1,0 +1,55 @@
+{
+    "feelings": {
+        "arousal": 0.7,
+        "valence": 0.8,
+        "dominance": 0.6,
+        "cohesion": 0.5,
+        "novelty": 0.4,
+        "focus": 0.6,
+        "tension": 0.3
+    },
+    "color": {
+        "primary": "#FF0000",
+        "secondary": "#800000",
+        "terciary": "#FFAAAA"
+    },
+    "simulation": {
+        "STEP_LEN": 70,
+        "DRAG": 0.4,
+        "TURN_JITTER": 0.2,
+        "SENSE_DIST": 25,
+        "SENSE_ANGLE": 0.3,
+        "TURN_RATE": 22,
+        "POINT_SIZE": 1.2,
+        "DEPOSIT_SIZE": 0.05,
+        "DEPOSIT_STRENGTH": 12,
+        "DEPOSIT_EDGE_SOFT": 0.5,
+        "CHAMP_SAMPLE_INTERVAL": 50000,
+        "CHAMP_IMP_MULTIPLIER": 2.5,
+        "TRAIL_DECAY": 0.85,
+        "SPAWN_RADIUS": 25,
+        "COLOR": {
+            "POINT_COLOR_HEX": "#FF0000",
+            "POINT_COLOR": [
+                1,
+                0,
+                0
+            ],
+            "SECONDARY_AMOUNT": 10,
+            "POINT_SECONDARY_COLOR_HEX": "#800000",
+            "POINT_SECONDARY_COLOR": [
+                0.5,
+                0,
+                0
+            ],
+            "TERTIARY_AMOUNT": 11,
+            "POINT_TERTIARY_COLOR_HEX": "#FFAAAA",
+            "POINT_TERTIARY_COLOR": [
+                1,
+                0.6,
+                0.6
+            ]
+        }
+    },
+    "image_prompt": "A vibrant red sports car speeding along a dynamic, energetic scene with intense motion and fiery colors."
+}
