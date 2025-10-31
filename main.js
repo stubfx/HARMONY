@@ -456,8 +456,9 @@ function swap(){
     trailDecayRead = trailDecayWrite;
     trailDecayWrite = ttt;
 }
+let initTime = performance.now();
 let frames = 0;
-let lastTime = performance.now();
+let lastTime = initTime;
 let fps = 0;
 const timeMult = 0.001;
 // main sim loop
@@ -494,14 +495,27 @@ const shaderOverlay = new ShaderPass({
     // transparent:false
 });
 composer.addPass(shaderOverlay);
+// 2. bloom pass
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight), // resolution
+  0.01,   // strength
+  0,   // radius
+  0.998   // threshold
+);
+composer.addPass(bloomPass);
 // uncomment for blur
 // composer.addPass(h);
 // composer.addPass(v);
 
+// bro dont go higher than this unless you wanna see jesus.
+const maxBloom = 0.1;
 function frame() {
     const now = performance.now()*timeMult;
 
     let dt = Math.min(Math.max(now - prev, timeMult), 0.05);
+    if (bloomPass.strength < maxBloom) {
+        bloomPass.strength += 0.01*dt;
+    }
 
     matSim.uniforms.uDt.value    = dt;
     matTrailDeposit.uniforms.uDt.value = dt;
