@@ -1,3 +1,12 @@
+@import "tailwindcss";
+
+@theme {
+    --color-primary: white;
+    --border-radius: 5rem;
+    --blur: 15px;
+    --size: 
+}
+
 html, body { 
     box-sizing: border-box;
     margin: 0;
@@ -53,7 +62,7 @@ textarea:focus, input:focus{
 #chat-form {
     width: 50vw;
     display: flex;
-    border-radius: 5rem;
+    border-radius: var(--border-radius);
     border: 1px solid rgb(255 255 255 / 30%);
     /* background: black; */
     padding-left: 1.6rem;
@@ -75,7 +84,7 @@ textarea:focus, input:focus{
     height: 3rem;
     padding: 5px 15px;
     font-weight: bold;
-    border-radius: 5rem;
+    border-radius: var(--border-radius);
     border: 5px solid transparent;
     margin: 5px;
     color: white;

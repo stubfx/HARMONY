@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { params } from '../tunables';
+import { params } from './tunables';
 
 export function makeRT() {
     return new THREE.WebGLRenderTarget(params.TEX_SIDE, params.TEX_SIDE, {

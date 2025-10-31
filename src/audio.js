@@ -1,4 +1,4 @@
-import {baseParams, params, debug} from '/tunables.js';
+import {baseParams, params, debug} from './tunables.js';
 
 
 export async function captureVolume() {

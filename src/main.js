@@ -1,20 +1,20 @@
 import * as THREE from 'three';
 import './style.css';
-import * as UTILS from '/src/utils.js';
-import {params, debug} from '/tunables.js';
-import {chat, imagine} from '/client-openai-api.js';
+import * as UTILS from './utils.js';
+import {params, debug} from './tunables.js';
+import {chat, imagine} from './client-openai-api.js';
 
 
-import simVert from './sim.vert?raw';
-import simFrag from './sim.frag?raw';
-import pointVert from './point.vert?raw';
-import pointFrag from './point.frag?raw';
-import trailFrag from './trailDeposit.frag?raw';
-import trailVert from './trailDeposit.vert?raw';
-import trailDecayVert from './trailDecay.vert?raw';
-import trailDecayFrag from './trailDecay.frag?raw';
-import lastPassVert from './src/shaders/lastPass.vert?raw';
-import lastPassFrag from './src/shaders/lastPass.frag?raw';
+import simVert from './shaders/sim.vert?raw';
+import simFrag from './shaders/sim.frag?raw';
+import pointVert from './shaders/point.vert?raw';
+import pointFrag from './shaders/point.frag?raw';
+import trailFrag from './shaders/trailDeposit.frag?raw';
+import trailVert from './shaders/trailDeposit.vert?raw';
+import trailDecayVert from './shaders/trailDecay.vert?raw';
+import trailDecayFrag from './shaders/trailDecay.frag?raw';
+import lastPassVert from './shaders/lastPass.vert?raw';
+import lastPassFrag from './shaders/lastPass.frag?raw';
 
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
@@ -23,12 +23,12 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { HorizontalBlurShader } from 'three/examples/jsm/shaders/HorizontalBlurShader.js';
 import { VerticalBlurShader }   from 'three/examples/jsm/shaders/VerticalBlurShader.js';
 
-import logoImgUrl from './src/assets/aant.png';
-import car from './src/assets/car.png';
-import cake from './src/assets/cake.png';
-import stadium from './src/assets/stadium.png';
-import colorImgUrl from './src/assets/a03.png';
-import { captureVolume } from '../audio.js';
+import logoImgUrl from './assets/aant.png';
+import car from './assets/car.png';
+import cake from './assets/cake.png';
+import stadium from './assets/stadium.png';
+import colorImgUrl from './assets/a03.png';
+import { captureVolume } from './audio.js';
 import * as loader from './loader.js';
 
 async function loadShader(url) {
