@@ -81,7 +81,7 @@ void main() {
                 //   LinearFilter   -> smooth scale
                 customImage = blur25(uCustomImage, uv, uCustomImageSize / 2.0);
                 // customImage = texture(uCustomImage, uv);
-                dist = smoothstep(1.0, 0.0, dist/scaledImageArea + 0.4);
+                dist = smoothstep(1.0, 0.0, dist/uImageRevealArea);
                 // WATCH OUT
                 // AS WE ARE USING THE RED CHANNEL FOR SENSING THE TRAIL
                 // WE MUST DUMP THE TRAIL INTO THAT FOR THE SIM TO WORK.
@@ -89,27 +89,6 @@ void main() {
                 // we are not working with the alpha anymore, if black, discard.
                 float colorAmount = customImage.r + customImage.g + customImage.b;
 
-                // lets blur this image so it gives out just the colors
-                // customImage = 
-
-
-
-
-                // customImage = (colorAmount > 0.4) ? customImage : vec4(0.0);
-
-
-
-                // color = customImage*dist;
-                // do not consider the dist, otherwise everything will try to go in the middle.
-                // later this could be actually animated tho.
-                // the higher the d must
-                // color = customImage;
-                // color = customImage + d * (1.0 - dist);
-
-
-                // use this if you need a clean circle for the image
-                // color = customImage * dist;
-                // this will make it look like the image is tangled in this
                 if (colorAmount > 0.1) {
                     // color += customImage * 0.3;
                     color += mix(customImage*0.5, vec4(0.0), 1.0 - dist);

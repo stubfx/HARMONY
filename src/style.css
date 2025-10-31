@@ -42,6 +42,12 @@ textarea:focus, input:focus{
     padding: 10px;
 }
 
+#saveConfig {
+    display: none;
+    position: absolute;
+    margin: 1rem;
+}
+
 #chat-container {
     position: absolute;
     display: flex;

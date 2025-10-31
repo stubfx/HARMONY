@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import './style.css';
 import * as UTILS from './utils.js';
 import {params, debug} from './tunables.js';
-import {chat, imagine} from './client-openai-api.js';
+import {chat, imagine, saveConfig} from './client-openai-api.js';
 
 
 import simVert from './shaders/sim.vert?raw';
@@ -28,6 +28,7 @@ import car from './assets/car.png';
 import cake from './assets/cake.png';
 import stadium from './assets/stadium.png';
 import colorImgUrl from './assets/a03.png';
+import fullImg from './assets/full.png';
 import { captureVolume } from './audio.js';
 import * as loader from './loader.js';
 
@@ -59,7 +60,7 @@ params.uHasCustomImage = false;
 
 // debug this
 if (false) {
-    customImage = texLoader.load(cake, () => {
+    customImage = texLoader.load(fullImg, () => {
         customImage.colorSpace = THREE.SRGBColorSpace;
     });
 
@@ -106,6 +107,7 @@ function refreshSizes() {
 refreshSizes();
 
 let loading = false;
+let currentConfigName;
 document.querySelector("#chat-form").onsubmit = async (e) => {
     // prevent page reoload
     e.preventDefault();
@@ -120,18 +122,8 @@ document.querySelector("#chat-form").onsubmit = async (e) => {
     params.uHasCustomImage = false;
     const res = await chat(text);
     console.log(res)
+    currentConfigName = res.name;
     nuke = false;
-    // const c = [
-    //     new THREE.Color(res.color.primary),
-    //     new THREE.Color(res.color.secondary),
-    //     new THREE.Color(res.color.tertiary)
-    // ];
-    // params.COLOR.POINT_COLOR_HEX = c[0].getHexString();
-    // params.COLOR.POINT_COLOR = [c[0].r, c[0].g, c[0].b]; 
-    // params.COLOR.POINT_SECONDARY_COLOR_HEX = c[1].getHexString();
-    // params.COLOR.POINT_SECONDARY_COLOR = [c[1].r, c[1].g, c[1].b]; 
-    // params.COLOR.POINT_TERTIARY_COLOR_HEX = c[2].getHexString();
-    // params.COLOR.POINT_TERTIARY_COLOR = [c[2].r, c[2].g, c[2].b]; 
     Object.assign(params, structuredClone(res.simulation));
     console.log(params)
 
@@ -148,6 +140,14 @@ document.querySelector("#chat-form").onsubmit = async (e) => {
     loading = false;
     loader.show(loading);
 };
+
+document.querySelector("#saveConfig").onclick = () => {
+    if (!currentConfigName) {
+        console.log("Missing config name. Aborting");
+        return;
+    }
+    saveConfig(currentConfigName, structuredClone(params))
+}
 
 window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);

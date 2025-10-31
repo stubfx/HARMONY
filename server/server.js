@@ -1,7 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
-import {chat, imagine} from './openai-api.js';
+import {chat, imagine, saveFileInVectorStore} from './openai-api.js';
 
 dotenv.config();
 
@@ -21,6 +21,12 @@ app.use(cors({
 app.post("/chat", async (req, res) => {
     const text = await chat(req.body.text);
     res.json(JSON.parse(text.output_text));
+});
+
+app.post("/save", async (req, res) => {
+    const data = req.body;
+    const text = await saveFileInVectorStore(data.name, data.simConfig);
+    res.json('ok');
 });
 
 app.post("/imagine", async (req, res) => {
