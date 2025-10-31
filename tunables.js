@@ -33,7 +33,7 @@ export const baseParams = {
     CHAMP_IMP_MULTIPLIER: 2.0,
     TRAIL_DECAY: 0.89,
     SPAWN_RADIUS: 20.0,
-    ENABLE_MOUSE: true,
+    ENABLE_MOUSE: false,
     SHOW_TRAIL: false,
     RENDER_QUALITY: 1.0,
     TEX_SIDE: number || 1200,
@@ -127,6 +127,7 @@ fSim.open();
 // fDep.open();
 // fDecay.open();
 // fDebug.open();
+gui.close()
 if (import.meta.env.VITE_ENV != "DEV" && !panel) {
     gui.hide();
 }

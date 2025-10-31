@@ -12,6 +12,8 @@ import trailFrag from './trailDeposit.frag?raw';
 import trailVert from './trailDeposit.vert?raw';
 import trailDecayVert from './trailDecay.vert?raw';
 import trailDecayFrag from './trailDecay.frag?raw';
+import lastPassVert from './src/shaders/lastPass.vert?raw';
+import lastPassFrag from './src/shaders/lastPass.frag?raw';
 
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
@@ -54,6 +56,7 @@ const RES = window.devicePixelRatio * params.RENDER_QUALITY;
 let customImage;
 params.uHasCustomImage = false;
 
+// debug this
 if (false) {
     customImage = texLoader.load(cake, () => {
         customImage.colorSpace = THREE.SRGBColorSpace;
@@ -425,11 +428,16 @@ const matTrailDecay = new THREE.RawShaderMaterial({
     vertexShader: trailDecayVert,
     fragmentShader: trailDecayFrag,
     depthTest:false, depthWrite:false,
+    // do not change this ever, unless you need instant headache
     transparent:false
 });
 const trailDecay = new THREE.Mesh(fsq, matTrailDecay);
 trailDecay.frustumCulled = false;
 sceneTrailDecay.add(trailDecay);
+
+
+
+
 
 // ping pong RenderTarget helpers here
 let readRT = rtA, writeRT = rtB;
@@ -459,10 +467,36 @@ let prev = performance.now()*timeMult;
 const renderPass = new RenderPass(sceneDraw, camera);
 composer.addPass(renderPass);
 
-setBlur(0.3); // blur radius in pixels
+setBlur(0.1); // blur radius in pixels
 
-composer.addPass(h);
-composer.addPass(v);
+
+const shaderOverlay = new ShaderPass({
+    glslVersion: THREE.GLSL3,
+    uniforms: {
+        tDiffuse: { value: null },
+        color:    { value: new THREE.Color(0x88CCFF) },
+        uMouseCoords: { value: prevmousecoords},
+        uMouseDown: { value: mouseDown}, 
+        uCustomImageSize: {value: new THREE.Vector2(params.IMAGE_AREA, params.IMAGE_AREA)},
+        uCustomImage: { value: customImage},
+        uHasCustomImage: { value: false},
+        uImageArea: { value: params.IMAGE_AREA},
+        uImageRevealArea: { value: params.IMAGE_REVEAL_AREA },
+        uCanvas:    { value: new THREE.Vector2(W, H) },
+        uTrailTexSize: {value: new THREE.Vector2(trailBufferSize.x, trailBufferSize.y)},
+        uTrailTexRes: {value: params.TRAIL_TEX_RES},
+        uNuke: { value: nuke},
+        uMouseOnCanvas: {values: mouseOnPage}
+    },
+    vertexShader: lastPassVert,
+    fragmentShader: lastPassFrag,
+    // depthTest:false, depthWrite:false,
+    // transparent:false
+});
+composer.addPass(shaderOverlay);
+// uncomment for blur
+// composer.addPass(h);
+// composer.addPass(v);
 
 function frame() {
     const now = performance.now()*timeMult;
@@ -500,6 +534,10 @@ function frame() {
     matTrailDecay.uniforms.uCustomImage.value = customImage;
     matTrailDecay.uniforms.uHasCustomImage.value = params.uHasCustomImage;
     matTrailDecay.uniforms.uNuke.value = nuke;
+    shaderOverlay.uniforms.uMouseCoords.value = prevmousecoords;
+    shaderOverlay.uniforms.uCustomImage.value = customImage;
+    shaderOverlay.uniforms.uHasCustomImage.value = params.uHasCustomImage;
+    shaderOverlay.uniforms.uNuke.value = nuke;
     matPoints.uniforms.uCustomImage.value = customImage;
     matPoints.uniforms.uHasCustomImage.value = params.uHasCustomImage;
     matPoints.uniforms.uMouseCoords.value = prevmousecoords;
@@ -579,8 +617,11 @@ function updateUniforms () {
     matTrailDecay.uniforms.uImageRevealArea.value = params.IMAGE_REVEAL_AREA;
     matTrailDecay.uniforms.uMouseOnCanvas.value = mouseOnPage;
 
+    shaderOverlay.uniforms.uImageRevealArea.value = params.IMAGE_REVEAL_AREA;
+    shaderOverlay.uniforms.uMouseOnCanvas.value = mouseOnPage;
 
     matTrailDecay.uniforms.uMouseDown.value = mouseDown;
+    shaderOverlay.uniforms.uMouseDown.value = mouseDown;
     matPoints.uniforms.uMouseDown.value = mouseDown;
     matPoints.uniforms.uMouseOnCanvas.value = mouseOnPage;
 }
