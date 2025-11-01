@@ -60,3 +60,21 @@ export async function saveConfig(name, simConfig) {
         console.error(error.message);
     }
 }
+
+export async function rndImage(name, simConfig) {
+    console.log(simConfig)
+    try {
+        const response = await fetch(url + "rndImage", {
+            method: "POST",
+            headers: {
+            },
+        });
+        if (!response.ok) {
+            throw new Error(`Response status: ${response.status}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error(error.message);
+    }
+}

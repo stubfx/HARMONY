@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import './style.css';
 import * as UTILS from './utils.js';
 import {params, debug, refreshGUI} from './tunables.js';
-import {chat, imagine, saveConfig} from './client-openai-api.js';
+import {chat, imagine, saveConfig, rndImage} from './client-api.js';
 
 
 import simVert from './shaders/sim.vert?raw';
@@ -135,14 +135,22 @@ document.querySelector("#chat-form").onsubmit = async (e) => {
     img_promptEl.textContent = res.image_prompt;
 
     const imageData = await imagine(res.image_prompt);
-    // console.log(imageData)
     if (imageData) {
-        customImage = texLoader.load(imageData)
-        params.uHasCustomImage = true;
+        loadCustomImage(imageData);
     }
     loading = false;
     loader.show(loading);
 };
+
+setInterval(async () => {
+    console.log("running");
+    loadCustomImage(await rndImage());
+}, 5000);
+
+function loadCustomImage(imageData) {
+    customImage = texLoader.load(imageData)
+    params.uHasCustomImage = true;
+}
 
 const saveButton = document.querySelector("#saveConfig");
 if (import.meta.env.VITE_ENV == "DEV") saveButton.style.display = "block";
