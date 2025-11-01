@@ -61,8 +61,7 @@ export async function saveConfig(name, simConfig) {
     }
 }
 
-export async function rndImage(name, simConfig) {
-    console.log(simConfig)
+export async function rndImage() {
     try {
         const response = await fetch(url + "rndImage", {
             method: "POST",

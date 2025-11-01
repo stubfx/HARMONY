@@ -31,9 +31,10 @@ app.post("/save", async (req, res) => {
 });
 
 app.post("/rndImage", async (req, res) => {
-    const data = await Utils.randomPrevImage();
-    const decoded = data.data.toString('base64');
-    res.json("data:image/png;base64," + decoded)
+    const {fileName, data} = await Utils.randomPrevImage();
+    const decoded = data.toString('base64');
+    const base64 = "data:image/png;base64," + decoded;
+    res.json({name: fileName, data: base64})
 });
 
 app.post("/imagine", async (req, res) => {

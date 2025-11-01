@@ -3,6 +3,7 @@ import './style.css';
 import * as UTILS from './utils.js';
 import {params, debug, refreshGUI} from './tunables.js';
 import {chat, imagine, saveConfig, rndImage} from './client-api.js';
+import ColorThief from 'colorthief';
 
 
 import simVert from './shaders/sim.vert?raw';
@@ -56,6 +57,7 @@ const texLoader = new THREE.TextureLoader();
 const RES = window.devicePixelRatio * params.RENDER_QUALITY;
 // let customImage = texLoader.load(colorImgUrl, () => {
 let customImage;
+let customImageName;
 params.uHasCustomImage = false;
 
 // debug this
@@ -113,6 +115,7 @@ let canSaveConfig = false;
 document.querySelector("#chat-form").onsubmit = async (e) => {
     // prevent page reoload
     e.preventDefault();
+    clearInterval(placeholderInt);
     if (loading) return;
     loading = true;
     loader.show(loading);
@@ -142,14 +145,32 @@ document.querySelector("#chat-form").onsubmit = async (e) => {
     loader.show(loading);
 };
 
-setInterval(async () => {
-    console.log("running");
-    loadCustomImage(await rndImage());
-}, 5000);
+const placeholderInt = setInterval(async () => {
+    const data = await rndImage();
+    // only in this case we update the uniforms.
+    if (customImageName != data.name) {
+        loadCustomImage(data.data)
+    }
+    customImageName = data.name;
+}, 10000);
 
 function loadCustomImage(imageData) {
-    customImage = texLoader.load(imageData)
-    params.uHasCustomImage = true;
+    const thief = new ColorThief();
+    // browser will likely cache it.
+    // or at least i hope.
+    const img = new Image();
+    img.src = imageData;
+    img.onload = () => {
+        const p = thief.getPalette(img, 3);
+        params.COLOR.POINT_COLOR = {r: p[0][0], g: p[0][1], b: p[0][2]}
+        params.COLOR.POINT_SECONDARY_COLOR = {r: p[1][0], g: p[1][1], b: p[1][2]}
+        params.COLOR.POINT_TERTIARY_COLOR = {r: p[2][0], g: p[2][1], b: p[2][2]}
+        // only in this case we update the uniforms.
+
+        customImage = texLoader.load(imageData)
+        // but anyway, we keep this true.
+        params.uHasCustomImage = true;
+    }
 }
 
 const saveButton = document.querySelector("#saveConfig");

@@ -14,7 +14,11 @@ async function listFiles() {
     const entries = await readdir(assDir, { withFileTypes: true });
     return entries
         .filter(e => e.isFile())
-        .map(e => join(assDir, e.name));
+    // we already know the dir, we're gonna pass the fileName
+        // this way we can check if we got the same file at FE
+        // and we can log it properly if needed.
+        // .map(e => join(assDir, e.name));
+        .map(e => e.name);
 }
 
 export async function randomPrevImage() {
@@ -22,9 +26,11 @@ export async function randomPrevImage() {
     if (files.length === 0) return null;
     const i = Math.floor(Math.random() * files.length);
     const filePath = files[i];
-    const data = readFileSync(filePath);   // Buffer
-    return { filePath, data };
+    const data = readFileSync(`${assDir}/${filePath}`);   // Buffer
+    return { fileName: filePath, data };
 }
+
+randomPrevImage()
 
 export async function saveBase64Async(base64) {
     const buffer = Buffer.from(base64, 'base64');
