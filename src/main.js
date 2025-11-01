@@ -97,6 +97,7 @@ const agentsEl = document.querySelector("#agentsCount");
 const buildDate = document.querySelector("#buildDate");
 agentsEl.textContent = `${(params.TEX_SIDE * params.TEX_SIDE).toLocaleString()} agents`
 buildDate.textContent = BUILD_DATE;
+composer.setSize(W*RES, H*RES);
 // const dtEl = document.querySelector("#deltaTime");
 
 function refreshSizes() {
@@ -589,9 +590,9 @@ function frame() {
     renderer.setRenderTarget(null); 
     renderer.clear(true, false, false);
     // renderer.render(sceneTrail, camera);
-    if (params.SHOW_TRAIL) {
-        renderer.render(sceneTrailDecay, camera);
-    }
+    // if (params.SHOW_TRAIL) {
+    //     renderer.render(sceneTrailDecay, camera);
+    // }
     composer.render();
     if (params.SHOW_TRAIL) {
         renderer.render(sceneTrailDecay, camera);

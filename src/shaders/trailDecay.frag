@@ -39,6 +39,7 @@ void main() {
         // bring all the colors to the center
         // dist = distance(gl_FragCoord.xy, uCanvas*uTrailTexRes*0.5);
         // color.r = smoothstep(1.0, 0.0, dist/1000.0);
+        // color.r = gl_FragCoord.x / 10.0;
     }
     else if (uHasCustomImage) {
         // Desired on-RT size = original size scaled by trailRes
