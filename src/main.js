@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import './style.css';
 import * as UTILS from './utils.js';
-import {params, debug} from './tunables.js';
+import {params, debug, refreshGUI} from './tunables.js';
 import {chat, imagine, saveConfig} from './client-openai-api.js';
 
 
@@ -60,13 +60,12 @@ params.uHasCustomImage = false;
 
 // debug this
 if (false) {
-    customImage = texLoader.load(fullImg, () => {
+    customImage = texLoader.load(car, () => {
         customImage.colorSpace = THREE.SRGBColorSpace;
     });
 
     params.uHasCustomImage = true;
 }
-
 
 // renderer section
 const renderer = new THREE.WebGLRenderer();
@@ -124,9 +123,9 @@ document.querySelector("#chat-form").onsubmit = async (e) => {
     console.log(res)
     currentConfigName = res.name;
     nuke = false;
-    Object.assign(params, structuredClone(res.simulation));
-    console.log(params)
-
+    // Object.assign(params, structuredClone(res.simulation));
+    UTILS.deepReplace(params, res.simulation);
+    refreshGUI();
     // updateImagePrompt
     const img_promptEl = document.querySelector("#image_prompt");
     img_promptEl.textContent = res.image_prompt;
@@ -141,12 +140,17 @@ document.querySelector("#chat-form").onsubmit = async (e) => {
     loader.show(loading);
 };
 
-document.querySelector("#saveConfig").onclick = () => {
+const saveButton = document.querySelector("#saveConfig");
+if (import.meta.env.VITE_ENV == "DEV") saveButton.style.display = "block";
+
+saveButton.onclick = () => {
     if (!currentConfigName) {
         console.log("Missing config name. Aborting");
         return;
     }
-    saveConfig(currentConfigName, structuredClone(params))
+    // gotta fix the colors back.
+    const clone = structuredClone(params);
+    saveConfig(currentConfigName, clone)
 }
 
 window.addEventListener('resize', () => {
@@ -365,6 +369,7 @@ const matPoints = new THREE.RawShaderMaterial({
         uCustomImageSize: {value: new THREE.Vector2(params.IMAGE_AREA, params.IMAGE_AREA)},
         uCustomImage: { value: customImage},
         uHasCustomImage: { value: false},
+        uTrailTexRes: {value: params.TRAIL_TEX_RES},
         uPointColor: { value: params.COLOR.POINT_COLOR},
         uSecondaryColor: {value: params.COLOR.POINT_SECONDARY_COLOR},
         uSecondaryColorAmount: {value: params.COLOR.SECONDARY_AMOUNT},
@@ -479,7 +484,6 @@ const shaderOverlay = new ShaderPass({
     glslVersion: THREE.GLSL3,
     uniforms: {
         tDiffuse: { value: null },
-        color:    { value: new THREE.Color(0x88CCFF) },
         uMouseCoords: { value: prevmousecoords},
         uMouseDown: { value: mouseDown}, 
         uCustomImageSize: {value: new THREE.Vector2(params.IMAGE_AREA, params.IMAGE_AREA)},
@@ -514,6 +518,9 @@ composer.addPass(bloomPass);
 // bro dont go higher than this unless you wanna see jesus.
 const maxBloom = 0.1;
 function frame() {
+    requestAnimationFrame(frame);
+
+    // console.log(params.COLOR.POINT_COLOR_HEX)
     const now = performance.now()*timeMult;
 
     let dt = Math.min(Math.max(now - prev, timeMult), 0.05);
@@ -585,8 +592,10 @@ function frame() {
     if (params.SHOW_TRAIL) {
         renderer.render(sceneTrailDecay, camera);
     }
-    // renderer.render(sceneDraw, camera);
     composer.render();
+    if (params.SHOW_TRAIL) {
+        renderer.render(sceneTrailDecay, camera);
+    }
 
     frames++;
     const nowMs = performance.now();
@@ -597,9 +606,6 @@ function frame() {
         lastTime = nowMs;
         frames = 0;
     }
-
-
-    requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
@@ -615,14 +621,13 @@ function updateUniforms () {
     matSim.uniforms.uSenseAngle.value = params.SENSE_ANGLE;
     matSim.uniforms.uTurnRate.value = params.TURN_RATE;
 
-
+    matPoints.uniforms.uPointColor.value = params.COLOR.POINT_COLOR
+    matPoints.uniforms.uSecondaryColor.value = params.COLOR.POINT_SECONDARY_COLOR
+    matPoints.uniforms.uSecondaryColorAmount.value = params.COLOR.SECONDARY_AMOUNT
+    matPoints.uniforms.uTertiaryColor.value = params.COLOR.POINT_TERTIARY_COLOR
+    matPoints.uniforms.uTertiaryColorAmount.value = params.COLOR.TERTIARY_AMOUNT
     matPoints.uniforms.uPointSize.value = params.POINT_SIZE;
-    matPoints.uniforms.uPointColor.value = params.COLOR.POINT_COLOR;
     matPoints.uniforms.uImageRevealArea.value = params.IMAGE_REVEAL_AREA;
-    matPoints.uniforms.uSecondaryColor.value = params.COLOR.POINT_SECONDARY_COLOR;
-    matPoints.uniforms.uSecondaryColorAmount.value = params.COLOR.SECONDARY_AMOUNT;
-    matPoints.uniforms.uTertiaryColor.value = params.COLOR.POINT_TERTIARY_COLOR;
-    matPoints.uniforms.uTertiaryColorAmount.value = params.COLOR.TERTIARY_AMOUNT;
 
 
 

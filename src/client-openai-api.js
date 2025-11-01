@@ -40,6 +40,7 @@ export async function imagine(prompt) {
 
 
 export async function saveConfig(name, simConfig) {
+    console.log(simConfig)
     try {
         const response = await fetch(url + "save", {
             method: "POST",

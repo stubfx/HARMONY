@@ -88,7 +88,7 @@ export async function saveFileInVectorStore(name, simConfig) {
     console.log("bytes:", payload.byteLength);
 
     // 2) wrap as a proper file part
-    const filePart = await toFile(payload, `${name}`, { type: "application/json" });
+    const filePart = await toFile(payload, `${name}.json`, { type: "application/json" });
 
     // convert to a Buffer (or Uint8Array). Vector-store ingestion expects a file-like blob.
     // const fileBuffer = Buffer.from(JSON.stringify(chatSchema), "utf8");

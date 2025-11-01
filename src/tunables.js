@@ -1,6 +1,7 @@
 // tunables
-import * as dat from 'dat.gui';
+import * as lil from 'lil-gui';
 import * as THREE from 'three';
+import * as Utils from './utils.js';
 const urlParams = new URLSearchParams(window.location.search);
 const number = parseInt(urlParams.get("n"), 10);
 const renderQuality = urlParams.get("r");
@@ -11,8 +12,7 @@ export let IMAGE_AREA = 400.0;
 // still testing this with coords, they clearly need to be adjusted.
 export let RENDER_QUALITY = renderQuality || 1;
 
-const gui = new dat.GUI();
-gui.width = 500;
+export const GUI = new lil.GUI({width: 500});
 
 export const baseParams = {
     STEP_LEN: 70.0,
@@ -36,20 +36,15 @@ export const baseParams = {
     ENABLE_MOUSE: false,
     SHOW_TRAIL: false,
     TEX_SIDE: number || 1200,
+    TRAIL_TEX_RES: .4,
     COLOR: {
-        POINT_COLOR_HEX: 0xffffff,
-        // POINT_COLOR_HEX: 0x2dff,
-        POINT_COLOR: [],
+        POINT_COLOR: {r: 1.0, g: 1.0, b: 1.0 },
+        // POINT_COLOR: [1.0, 1.0, 1.0],
         SECONDARY_AMOUNT: 10,
-        // POINT_SECONDARY_COLOR_HEX: 0xff00ff,
-        POINT_SECONDARY_COLOR_HEX: 0xffffff,
-        POINT_SECONDARY_COLOR: [],
+        POINT_SECONDARY_COLOR: {r: 1.0, g: 1.0, b: 1.0 },
         TERTIARY_AMOUNT: 11,
-        // POINT_TERTIARY_COLOR_HEX: 0xff00,
-        POINT_TERTIARY_COLOR_HEX: 0xffffff,
-        POINT_TERTIARY_COLOR: [],
-    },
-    TRAIL_TEX_RES: .4
+        POINT_TERTIARY_COLOR: {r: 1.0, g: 1.0, b: 1.0 }
+    }
 };
 
 // this will be changed dinamically.
@@ -59,13 +54,32 @@ export const debug = {
     SHOW_INFO: false, 
 }
 
+// console.log(params)
+// Object.keys(params.COLOR).forEach(cl => {
+//     params.COLOR.cl = Utils.getRGB(params.COLOR.cl)});
+// console.log(params)
+
+export function refreshGUI () {
+    // fix colors that may not be read correctly if missing a floating points
+    // still looking at you chatGPT.
+    // Object.keys(params.COLOR).forEach(cl => {
+    //     if (typeof params.COLOR[cl] == "object") {
+    //         const color = params.COLOR[cl]
+    //         params.COLOR[cl] = Utils.getRGB(color)}
+    // });
+    GUI.controllers.forEach(c => c.updateDisplay());
+    Object.values(GUI.folders).forEach(folder => {
+        folder.controllers.forEach(c => c.updateDisplay());
+    });
+}
+
 // folders for grouping
-const fSim   = gui.addFolder('Simulation');
+const fSim   = GUI.addFolder('Simulation');
 const fColors = fSim.addFolder('colors');
-const fDraw  = gui.addFolder('Draw Points');
-const fDep   = gui.addFolder('Trail Deposit');
-const fDecay = gui.addFolder('Trail Decay');
-const fDebug = gui.addFolder('Debug');
+const fDraw  = GUI.addFolder('Draw Points');
+const fDep   = GUI.addFolder('Trail Deposit');
+const fDecay = GUI.addFolder('Trail Decay');
+const fDebug = GUI.addFolder('Debug');
 
 // toggle
 fDebug.add(params, 'ENABLE_MOUSE')
@@ -81,22 +95,13 @@ fSim.add(params, 'SENSE_DIST', 1, 200, 1)
 fSim.add(params, 'SENSE_ANGLE', 0, 1, 0.01)
 fSim.add(params, 'TURN_RATE', 0, 100, 1)
 
-fColors.addColor(params.COLOR, 'POINT_COLOR_HEX').onChange(v => {
-    const c = new THREE.Color(v); // or your own parser
-    params.COLOR.POINT_COLOR = [c.r,c.g,c.b]; // values 0–1
-}).setValue(params.COLOR.POINT_COLOR_HEX);
+fColors.addColor(params.COLOR, 'POINT_COLOR');
 
-fColors.addColor(params.COLOR, 'POINT_SECONDARY_COLOR_HEX').onChange(v => {
-    const c = new THREE.Color(v); // or your own parser
-    params.COLOR.POINT_SECONDARY_COLOR = [c.r,c.g,c.b]; // values 0–1
-}).setValue(params.COLOR.POINT_SECONDARY_COLOR_HEX);
+fColors.addColor(params.COLOR, 'POINT_SECONDARY_COLOR');
 
 fColors.add(params.COLOR, 'SECONDARY_AMOUNT', 0, 100, 1);
 
-fColors.addColor(params.COLOR, 'POINT_TERTIARY_COLOR_HEX').onChange(v => {
-    const c = new THREE.Color(v); // or your own parser
-    params.COLOR.POINT_TERTIARY_COLOR = [c.r,c.g,c.b]; // values 0–1
-}).setValue(params.COLOR.POINT_TERTIARY_COLOR_HEX);
+fColors.addColor(params.COLOR, 'POINT_TERTIARY_COLOR');
 
 fColors.add(params.COLOR, 'TERTIARY_AMOUNT', 0, 100, 1);
 
@@ -126,7 +131,7 @@ fSim.open();
 // fDep.open();
 // fDecay.open();
 // fDebug.open();
-gui.close()
+GUI.close()
 if (import.meta.env.VITE_ENV != "DEV" && !panel) {
-    gui.hide();
+    GUI.hide();
 }

@@ -84,40 +84,6 @@
               "tension": 0.5
             }
           },
-          "color": {
-            "type": "object",
-            "properties": {
-              "primary": {
-                "type": "string",
-                "description": "The main hex color representing the combined emotion (e.g. #1A2B3C)",
-                "pattern": "^#[0-9A-Fa-f]{6}$",
-                "default": "#FFFFFF"
-              },
-              "secondary": {
-                "type": "string",
-                "description": "A hex color that complements the primary color",
-                "pattern": "^#[0-9A-Fa-f]{6}$",
-                "default": "#FFFFFF"
-              },
-              "tertiary": {
-                "type": "string",
-                "description": "A hex color that harmonizes with both the primary and secondary colors",
-                "pattern": "^#[0-9A-Fa-f]{6}$",
-                "default": "#FFFFFF"
-              }
-            },
-            "required": [
-              "primary",
-              "secondary",
-              "tertiary"
-            ],
-            "additionalProperties": false,
-            "default": {
-              "primary": "#FFFFFF",
-              "secondary": "#FFFFFF",
-              "terciary": "#FFFFFF"
-            }
-          },
           "simulation": {
             "type": "object",
             "properties": {
@@ -222,27 +188,37 @@
               "COLOR": {
                 "type": "object",
                 "properties": {
-                  "POINT_COLOR_HEX": {
-                    "type": "string",
-                    "description": "Primary color of the points (hex format).",
-                    "pattern": "^#[0-9A-Fa-f]{6}$",
-                    "default": "#FFFFFF"
-                  },
                   "POINT_COLOR": {
-                    "type": "array",
-                    "description": "RGB array of the primary color (values between 0 and 1).",
-                    "items": {
-                      "type": "number",
-                      "minimum": 0,
-                      "maximum": 1
+                    "type": "object",
+                    "description": "RGB object of the primary color (values between 0 and 1).",
+                    "properties": {
+                      "r": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "g": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "b": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
                     },
-                    "minItems": 3,
-                    "maxItems": 3,
-                    "default": [
-                      1,
-                      1,
-                      1
-                    ]
+                    "required": [
+                      "r",
+                      "g",
+                      "b"
+                    ],
+                    "additionalProperties": false,
+                    "default": {
+                      "r": 1,
+                      "g": 1,
+                      "b": 1
+                    }
                   },
                   "SECONDARY_AMOUNT": {
                     "type": "number",
@@ -251,27 +227,37 @@
                     "maximum": 100,
                     "default": 10
                   },
-                  "POINT_SECONDARY_COLOR_HEX": {
-                    "type": "string",
-                    "description": "Secondary color in hex format.",
-                    "pattern": "^#[0-9A-Fa-f]{6}$",
-                    "default": "#FFFFFF"
-                  },
                   "POINT_SECONDARY_COLOR": {
-                    "type": "array",
-                    "description": "RGB array of the secondary color (values between 0 and 1).",
-                    "items": {
-                      "type": "number",
-                      "minimum": 0,
-                      "maximum": 1
+                    "type": "object",
+                    "description": "RGB object of the secondary color (values between 0 and 1).",
+                    "properties": {
+                      "r": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "g": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "b": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
                     },
-                    "minItems": 3,
-                    "maxItems": 3,
-                    "default": [
-                      1,
-                      1,
-                      1
-                    ]
+                    "required": [
+                      "r",
+                      "g",
+                      "b"
+                    ],
+                    "additionalProperties": false,
+                    "default": {
+                      "r": 1,
+                      "g": 1,
+                      "b": 1
+                    }
                   },
                   "TERTIARY_AMOUNT": {
                     "type": "number",
@@ -280,61 +266,65 @@
                     "maximum": 100,
                     "default": 11
                   },
-                  "POINT_TERTIARY_COLOR_HEX": {
-                    "type": "string",
-                    "description": "Tertiary color in hex format.",
-                    "pattern": "^#[0-9A-Fa-f]{6}$",
-                    "default": "#FFFFFF"
-                  },
                   "POINT_TERTIARY_COLOR": {
-                    "type": "array",
-                    "description": "RGB array of the tertiary color (values between 0 and 1).",
-                    "items": {
-                      "type": "number",
-                      "minimum": 0,
-                      "maximum": 1
+                    "type": "object",
+                    "description": "RGB object of the tertiary color (values between 0 and 1).",
+                    "properties": {
+                      "r": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "g": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "b": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
                     },
-                    "minItems": 3,
-                    "maxItems": 3,
-                    "default": [
-                      1,
-                      1,
-                      1
-                    ]
+                    "required": [
+                      "r",
+                      "g",
+                      "b"
+                    ],
+                    "additionalProperties": false,
+                    "default": {
+                      "r": 1,
+                      "g": 1,
+                      "b": 1
+                    }
                   }
                 },
                 "required": [
-                  "POINT_COLOR_HEX",
                   "POINT_COLOR",
                   "SECONDARY_AMOUNT",
-                  "POINT_SECONDARY_COLOR_HEX",
                   "POINT_SECONDARY_COLOR",
                   "TERTIARY_AMOUNT",
-                  "POINT_TERTIARY_COLOR_HEX",
                   "POINT_TERTIARY_COLOR"
                 ],
                 "additionalProperties": false,
                 "default": {
-                  "POINT_COLOR_HEX": "#FFFFFF",
-                  "POINT_COLOR": [
-                    1,
-                    1,
-                    1
-                  ],
+                  "POINT_COLOR": {
+                    "r": 1,
+                    "g": 1,
+                    "b": 1
+                  },
                   "SECONDARY_AMOUNT": 10,
-                  "POINT_SECONDARY_COLOR_HEX": "#FFFFFF",
-                  "POINT_SECONDARY_COLOR": [
-                    1,
-                    1,
-                    1
-                  ],
+                  "POINT_SECONDARY_COLOR": {
+                    "r": 1,
+                    "g": 1,
+                    "b": 1
+                  },
                   "TERTIARY_AMOUNT": 11,
-                  "POINT_TERTIARY_COLOR_HEX": "#FFFFFF",
-                  "POINT_TERTIARY_COLOR": [
-                    1,
-                    1,
-                    1
-                  ]
+                  "POINT_TERTIARY_COLOR": {
+                    "r": 1,
+                    "g": 1,
+                    "b": 1
+                  }
                 }
               }
             },
@@ -372,26 +362,23 @@
               "TRAIL_DECAY": 0.89,
               "SPAWN_RADIUS": 20,
               "COLOR": {
-                "POINT_COLOR_HEX": "#FFFFFF",
-                "POINT_COLOR": [
-                  1,
-                  1,
-                  1
-                ],
+                "POINT_COLOR": {
+                  "r": 1,
+                  "g": 1,
+                  "b": 1
+                },
                 "SECONDARY_AMOUNT": 10,
-                "POINT_SECONDARY_COLOR_HEX": "#FFFFFF",
-                "POINT_SECONDARY_COLOR": [
-                  1,
-                  1,
-                  1
-                ],
+                "POINT_SECONDARY_COLOR": {
+                  "r": 1,
+                  "g": 1,
+                  "b": 1
+                },
                 "TERTIARY_AMOUNT": 11,
-                "POINT_TERTIARY_COLOR_HEX": "#FFFFFF",
-                "POINT_TERTIARY_COLOR": [
-                  1,
-                  1,
-                  1
-                ]
+                "POINT_TERTIARY_COLOR": {
+                  "r": 1,
+                  "g": 1,
+                  "b": 1
+                }
               }
             }
           },
@@ -404,7 +391,6 @@
         "required": [
           "name",
           "feelings",
-          "color",
           "simulation",
           "image_prompt"
         ],
