@@ -13,7 +13,8 @@ const assDir = `${currentDir}/${process.env.SERVER_ASSETS_DIR}`;
 async function listFiles() {
     const entries = await readdir(assDir, { withFileTypes: true });
     return entries
-        .filter(e => e.isFile())
+        // avoiding gitkeep.
+        .filter(e => e.isFile() && e.name.endsWith("png"))
     // we already know the dir, we're gonna pass the fileName
         // this way we can check if we got the same file at FE
         // and we can log it properly if needed.
