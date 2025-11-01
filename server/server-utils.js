@@ -30,8 +30,6 @@ export async function randomPrevImage() {
     return { fileName: filePath, data };
 }
 
-randomPrevImage()
-
 export async function saveBase64Async(base64) {
     const buffer = Buffer.from(base64, 'base64');
     const fileName = `${assDir}/${randomUUID()}.png`;
