@@ -149,9 +149,12 @@ saveButton.onclick = () => {
         console.log("Missing config name. Aborting");
         return;
     }
+    console.log("saving configuration")
     // gotta fix the colors back.
     const clone = structuredClone(params);
     saveConfig(currentConfigName, clone)
+    // keep it like this for the moment, at least we prevent save spam
+    currentConfigName = null;
 }
 
 window.addEventListener('resize', () => {
