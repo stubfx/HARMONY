@@ -26,13 +26,13 @@ in float vIsTertiary;
 void main() {
     // base point look (keep your point styling as-is)
     vec2 p = gl_PointCoord - 0.5;
-    vec4 color = vec4(uPointColor, 0.5);
+    vec4 color = vec4(uPointColor, 0.3);
 
     // is secondary
     if (vIsSecondary == 1.0) {
-        color = vec4(uSecondaryColor,0.5);
+        color = vec4(uSecondaryColor,0.3);
     } else if (vIsTertiary == 1.0) {
-        color = vec4(uTertiaryColor,0.5);
+        color = vec4(uTertiaryColor,0.3);
     }
 
     // if (uMouseDown && uHasCustomImage) {

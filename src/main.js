@@ -108,6 +108,8 @@ refreshSizes();
 
 let loading = false;
 let currentConfigName;
+let canSaveConfig = false;
+
 document.querySelector("#chat-form").onsubmit = async (e) => {
     // prevent page reoload
     e.preventDefault();
@@ -123,6 +125,7 @@ document.querySelector("#chat-form").onsubmit = async (e) => {
     const res = await chat(text);
     console.log(res)
     currentConfigName = res.name;
+    canSaveConfig = true;
     nuke = false;
     // Object.assign(params, structuredClone(res.simulation));
     UTILS.deepReplace(params, res.simulation);
@@ -145,16 +148,16 @@ const saveButton = document.querySelector("#saveConfig");
 if (import.meta.env.VITE_ENV == "DEV") saveButton.style.display = "block";
 
 saveButton.onclick = () => {
-    if (!currentConfigName) {
-        console.log("Missing config name. Aborting");
+    if (!canSaveConfig) {
+        console.log("This config cannot be saved.");
         return;
     }
     console.log("saving configuration")
+    // prevent spam the right way.
+    canSaveConfig = false;
     // gotta fix the colors back.
     const clone = structuredClone(params);
     saveConfig(currentConfigName, clone)
-    // keep it like this for the moment, at least we prevent save spam
-    currentConfigName = null;
 }
 
 window.addEventListener('resize', () => {

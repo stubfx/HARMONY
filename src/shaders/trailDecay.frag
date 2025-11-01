@@ -36,12 +36,13 @@ void main() {
     if (uNuke) {
         // clear everything
         color = vec4(0.0);
-        // bring all the colors to the center
-        // dist = distance(gl_FragCoord.xy, uCanvas*uTrailTexRes*0.5);
-        // color.r = smoothstep(1.0, 0.0, dist/1000.0);
-        // color.r = gl_FragCoord.x / 10.0;
     }
     else if (uHasCustomImage) {
+        // bring all the colors to the center
+        // this still has to be tested properly. is leaving a black aura around
+        // dist = distance(gl_FragCoord.xy, uCanvas*uTrailTexRes*0.5);
+        // color.r = smoothstep(.4, 0.0, dist);
+
         // Desired on-RT size = original size scaled by trailRes
         vec2 scaledSize = uCustomImageSize * uTrailTexRes;
 
