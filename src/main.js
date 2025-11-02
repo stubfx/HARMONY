@@ -162,9 +162,10 @@ function loadCustomImage(imageData) {
     img.src = imageData;
     img.onload = () => {
         const p = thief.getPalette(img, 3);
-        params.COLOR.POINT_COLOR = {r: p[0][0], g: p[0][1], b: p[0][2]}
-        params.COLOR.POINT_SECONDARY_COLOR = {r: p[1][0], g: p[1][1], b: p[1][2]}
-        params.COLOR.POINT_TERTIARY_COLOR = {r: p[2][0], g: p[2][1], b: p[2][2]}
+        // this if far too bright for the moment.
+        // params.COLOR.POINT_COLOR = {r: p[0][0], g: p[0][1], b: p[0][2]}
+        // params.COLOR.POINT_SECONDARY_COLOR = {r: p[1][0], g: p[1][1], b: p[1][2]}
+        // params.COLOR.POINT_TERTIARY_COLOR = {r: p[2][0], g: p[2][1], b: p[2][2]}
         // only in this case we update the uniforms.
 
         customImage = texLoader.load(imageData)
