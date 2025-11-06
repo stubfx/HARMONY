@@ -4,6 +4,7 @@ import * as UTILS from './utils.js';
 import {params, debug, refreshGUI} from './tunables.js';
 import {chat, imagine, saveConfig, rndImage} from './client-api.js';
 import ColorThief from 'colorthief';
+import {io} from 'socket.io-client';
 
 
 import simVert from './shaders/sim.vert?raw';
@@ -32,6 +33,8 @@ import colorImgUrl from './assets/a03.png';
 import fullImg from './assets/full.png';
 import { captureVolume } from './audio.js';
 import * as loader from './loader.js';
+
+const socket = io(import.meta.env.VITE_HOSTNAME);
 
 async function loadShader(url) {
     const res = await fetch(url);
@@ -70,8 +73,8 @@ if (false) {
 }
 
 // renderer section
-const renderer = new THREE.WebGLRenderer();
-renderer.autoClear = false;
+const renderer = new THREE.WebGLRenderer(
+    {antialias: true, autoClear: false});
 // renderer.setSize(1000, 1000);
 renderer.setSize( window.innerWidth, window.innerHeight );
 renderer.setPixelRatio(RES);
@@ -539,7 +542,7 @@ const shaderOverlay = new ShaderPass({
     // depthTest:false, depthWrite:false,
     // transparent:false
 });
-composer.addPass(shaderOverlay);
+// composer.addPass(shaderOverlay);
 // 2. bloom pass
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight), // resolution
