@@ -4,7 +4,7 @@ import trailShader from './shaders/trail.wgsl?raw';
 import fullscreenShader from './shaders/fullscreen.wgsl?raw';
 
 const params = {
-  TEX_SIDE: 512,
+  TEX_SIDE: 1500,
   TRAIL_TEX_RES: 0.4,
   STEP_LEN: 70.0,
   DRAG: 0.5,

@@ -2,9 +2,10 @@ import * as THREE from 'three';
 import './style.css';
 import * as UTILS from './utils.js';
 import {params, debug, refreshGUI} from './tunables.js';
-import {chat, imagine, saveConfig, rndImage} from './client-api.js';
+import {chat, imagine, saveConfig, rndImage, uuid} from './client-api.js';
 import ColorThief from 'colorthief';
 import {io} from 'socket.io-client';
+import QRCode from 'qrcode';
 
 
 import simVert from './shaders/sim.vert?raw';
@@ -34,7 +35,23 @@ import fullImg from './assets/full.png';
 import { captureVolume } from './audio.js';
 import * as loader from './loader.js';
 
+let UUID = await uuid();
+// let UUID = "testme";
+console.log('UUID', UUID);
+
 const socket = io(import.meta.env.VITE_HOSTNAME);
+
+socket.on('connect', () => {
+    socket.emit("register-host", {room: UUID})
+});
+
+socket.on("event", (event) => {
+    console.log(event)
+});
+
+socket.on("gyro", (event) => {
+    console.log(event)
+});
 
 async function loadShader(url) {
     const res = await fetch(url);
@@ -61,15 +78,36 @@ const RES = window.devicePixelRatio * params.RENDER_QUALITY;
 // let customImage = texLoader.load(colorImgUrl, () => {
 let customImage;
 let customImageName;
+const imgEl = document.querySelector("#qrcode");
 params.uHasCustomImage = false;
+const qrData = `${import.meta.env.VITE_USER_URL}?s=${UUID}`;
+QRCode.toDataURL(qrData).then(base64 => {
+    imgEl.src = base64;
+    customImage = texLoader.load(logoImgUrl, () => {
+        customImage.colorSpace = THREE.SRGBColorSpace;
+    });
+    imgEl.onclick = () => window.open(qrData, "_blank")
+    params.uHasCustomImage = true;
+});
 
 // debug this
 if (false) {
-    customImage = texLoader.load(car, () => {
-        customImage.colorSpace = THREE.SRGBColorSpace;
+    QRCode.toDataURL(UUID).then(base64 => {
+        imgEl.src = base64;
+        customImage = texLoader.load(base64, () => {
+            customImage.colorSpace = THREE.SRGBColorSpace;
+        });
+        params.uHasCustomImage = true;
     });
-
-    params.uHasCustomImage = true;
+} else {
+    // const placeholderInt = setInterval(async () => {
+    //     const data = await rndImage();
+    //     // only in this case we update the uniforms.
+    //     if (customImageName != data.name) {
+    //         loadCustomImage(data.data)
+    //     }
+    //     customImageName = data.name;
+    // }, 10000);
 }
 
 // renderer section
@@ -148,14 +186,6 @@ document.querySelector("#chat-form").onsubmit = async (e) => {
     loader.show(loading);
 };
 
-const placeholderInt = setInterval(async () => {
-    const data = await rndImage();
-    // only in this case we update the uniforms.
-    if (customImageName != data.name) {
-        loadCustomImage(data.data)
-    }
-    customImageName = data.name;
-}, 10000);
 
 function loadCustomImage(imageData) {
     const thief = new ColorThief();

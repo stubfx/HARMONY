@@ -1,4 +1,24 @@
-const url = import.meta.env.VITE_HOSTNAME;
+const url = import.meta.env.VITE_API_HOSTNAME;
+
+
+
+export async function uuid() {
+    try {
+        const response = await fetch(url + "uuid", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+        });
+        if (!response.ok) {
+            throw new Error(`Response status: ${response.status}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error(error.message);
+    }
+}
 
 export async function chat(text) {
     try {

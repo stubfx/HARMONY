@@ -5,10 +5,11 @@ import dotenv from "dotenv";
 import cors from "cors";
 import * as Utils from './server-utils.js';
 import {chat, imagine, saveFileInVectorStore} from './openai-api.js';
+import { randomUUID } from "node:crypto";
 
 dotenv.config();
 
-const ORIGINS = ["https://stubfx.io", "http://localhost:5173"];
+const ORIGINS = ["https://stubfx.io", "https://localhost", "https://192.168.1.12:5173"];
 const app = express();
 const server = createServer(app);
 const port = process.env.PORT;
@@ -24,9 +25,25 @@ const io = new Server(server, {
 app.use(express.json())
 app.set('trust proxy', true);
 
+let hostList = {}
+
 io.on('connection', (socket) => {
-    console.log('AAAAAAAAAAAAAAAAAAAAAAA');
+    console.log('device connected');
+
+    socket.on("event", (event) => {
+        io.to(hostList[event.room]).emit("event", event.gyro);
+    });
+
+    socket.on("gyro", (event) => {
+        io.to(hostList[event.room]).emit("gyro", event.gyro);
+    });
+
+    socket.on("register-host", (host) => {
+        console.log("register-host", host.room);
+        hostList[host.room] = socket.id;
+    });
 });
+
 
 // allow only localhost:5173 (vite dev default)
 app.use(cors({
@@ -35,6 +52,10 @@ app.use(cors({
     allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
+
+app.post("/uuid", async (req, res) => {
+    res.json(randomUUID());
+});
 
 app.post("/chat", async (req, res) => {
     const text = await chat(req.body.text);
