@@ -39,7 +39,7 @@ let UUID = await uuid();
 // let UUID = "testme";
 console.log('UUID', UUID);
 
-const socket = io(import.meta.env.VITE_HOSTNAME);
+const socket = io(import.meta.env.VITE_API_HOSTNAME);
 
 socket.on('connect', () => {
     socket.emit("register-host", {room: UUID})
