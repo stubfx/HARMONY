@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import tailwindcss from '@tailwindcss/vite'
+import path from 'path'
 // import basicSsl from '@vitejs/plugin-basic-ssl';
 
 export default defineConfig({
@@ -9,13 +10,14 @@ export default defineConfig({
     plugins: [
         tailwindcss()
     ],
-    // build: {
-    //   rollupOptions: {
-    //     output: {
-    //       assetFileNames: "[name][extname]", // disable hashing
-    //     }
-    //   }
-    // },
+    build: {
+        rollupOptions: {
+            input: {
+                host: path.resolve(__dirname, 'index.html'),
+                user: path.resolve(__dirname + "/m_src", 'index.html'),
+            }
+        }
+    },
     // plugins: [
     //     basicSsl({
     //         // optional configuration: name, domains, certDir
