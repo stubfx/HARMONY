@@ -6,7 +6,7 @@ import {startGyro} from './gyro';
 const urlParams = new URLSearchParams(window.location.search);
 const uuid = urlParams.get("s");
 
-const socket = io(import.meta.env.VITE_HOSTNAME);
+const socket = io(import.meta.env.VITE_API_HOSTNAME);
 
 const testButton = document.querySelector("#test");
 
