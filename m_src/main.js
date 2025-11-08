@@ -3,6 +3,7 @@ import './style.css';
 import {io} from 'socket.io-client';
 import {startGyro} from './gyro';
 
+const ROLE = "spec";
 const urlParams = new URLSearchParams(window.location.search);
 const uuid = urlParams.get("s");
 
@@ -26,8 +27,12 @@ const formEl = document.querySelector("#input-form")
 formEl.onsubmit = (e) => {
     // prevent page reoload
     e.preventDefault();
+    const form = new FormData(formEl);
+    const data = Object.fromEntries(form);
+    if (!data.text1) return;
     sendEvent()
-    socket.emit("event", {room: uuid})
+    formEl.reset();
+    socket.emit("text-input", {room: uuid, role: ROLE, data: data.text1})
 }
 
 buttons.forEach((el) => {
@@ -35,7 +40,7 @@ buttons.forEach((el) => {
     console.log(color)
     el.style.backgroundColor = color;
     el.onclick = () => {
-        socket.emit("color", {room: uuid, role, color: color})
+        socket.emit("color", {room: uuid, role: ROLE, color: color})
     }
 })
 
@@ -44,7 +49,6 @@ startGyro(60, (data) => {
     gyroData = data;
 })
 
-const role = "spec";
 
 function sendEvent() {
     // sending the event will show a ui feedback
@@ -56,7 +60,7 @@ function sendEvent() {
 
 function loop() {
   if (gyroData) {
-    // socket.emit("gyro", {room: uuid, role, gyro: gyroData})
+    // socket.emit("gyro", {room: uuid, role: ROLE, gyro: gyroData})
   }
   setTimeout(loop, 1000);      // 1 Hz
 }

@@ -92,15 +92,15 @@ textarea:focus, input:focus{
     rgba(0, 0, 0, 0.95) 55%);
 }
 
-#chat-form {
+#input-form {
     width: 50vw;
     display: flex;
-    border-radius: var(--border-radius);
-    border: 1px solid rgb(255 255 255 / 30%);
-    /* background: black; */
-    padding-left: 1.6rem;
-    /* padding-right: 3rem; */
+    flex-direction: column;
+    justify-content: center;
+    border-radius: 1rem;
+    /* border: 1px solid rgb(255 255 255 / 30%); */
     font-weight: bold;
+    padding: 1rem;
     align-items: center;
     backdrop-filter: blur(15px);
 }
@@ -179,6 +179,7 @@ button {
     display: flex;
     flex-wrap: wrap;
     width: 30vw;
+    max-width: 200px;
     justify-content: center;
 }
 

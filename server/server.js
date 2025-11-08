@@ -42,6 +42,10 @@ io.on('connection', (socket) => {
         io.to(hostList[event.room]).emit("color", event.color);
     });
 
+    socket.on("text-input", (event) => {
+        io.to(hostList[event.room]).emit("text-input", event.data);
+    });
+
     socket.on("register-host", (host) => {
         console.log("register-host", host.room);
         hostList[host.room] = socket.id;

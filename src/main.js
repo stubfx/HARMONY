@@ -36,18 +36,18 @@ import { captureVolume } from './audio.js';
 import * as loader from './loader.js';
 
 let UUID = UTILS.isDEV() ? "test" : await uuid();
-console.log('DEV', import.meta.env.DEV)
-console.log('DEV', UTILS.isDEV())
-console.log('UUID', UUID);
 
 const socket = io(import.meta.env.VITE_API_HOSTNAME);
+let prevmousecoords = [0.0, 0.0]; 
+let mouseDown = false;
+let nuke = false;
 
 socket.on('connect', () => {
     socket.emit("register-host", {room: UUID})
 });
 
-socket.on("event", (event) => {
-    console.log(event)
+socket.on("text-input", (event) => {
+    event && onChatSend(event);
 });
 
 socket.on("color", (event) => {
@@ -67,9 +67,6 @@ async function loadShader(url) {
 
 // captureVolume();
 
-let prevmousecoords = [0.0, 0.0]; 
-let mouseDown = false;
-let nuke = false;
 
 
 // dealing with this tomorrow. it's late.
@@ -168,17 +165,12 @@ let loading = false;
 let currentConfigName;
 let canSaveConfig = false;
 
-document.querySelector("#chat-form").onsubmit = async (e) => {
+async function onChatSend(text) {
     // prevent page reoload
-    e.preventDefault();
     clearInterval(placeholderInt);
     if (loading) return;
     loading = true;
     loader.show(loading);
-    const inputEl = document.querySelector("#chat-input");
-    const formEl = document.querySelector("#chat-form");
-    const text = inputEl.value;
-    formEl.reset();
     nuke = true;
     params.uHasCustomImage = false;
     const res = await chat(text);
@@ -199,7 +191,20 @@ document.querySelector("#chat-form").onsubmit = async (e) => {
     }
     loading = false;
     loader.show(loading);
-};
+}
+
+// document.querySelector("#chat-form").onsubmit = async (e) => {
+//     // prevent page reoload
+//     e.preventDefault();
+//     clearInterval(placeholderInt);
+//     if (loading) return;
+//     loading = true;
+//     loader.show(loading);
+//     const inputEl = document.querySelector("#chat-input");
+//     const formEl = document.querySelector("#chat-form");
+//     const text = inputEl.value;
+//     onChatSend(text);
+// };
 
 
 function loadCustomImage(imageData) {
