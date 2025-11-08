@@ -35,8 +35,9 @@ import fullImg from './assets/full.png';
 import { captureVolume } from './audio.js';
 import * as loader from './loader.js';
 
-// let UUID = await uuid();
-let UUID = "testme";
+let UUID = UTILS.isDEV() ? "test" : await uuid();
+console.log('DEV', import.meta.env.DEV)
+console.log('DEV', UTILS.isDEV())
 console.log('UUID', UUID);
 
 const socket = io(import.meta.env.VITE_API_HOSTNAME);
@@ -222,7 +223,7 @@ function loadCustomImage(imageData) {
 }
 
 const saveButton = document.querySelector("#saveConfig");
-if (import.meta.env.VITE_ENV == "DEV") saveButton.style.display = "block";
+if (import.meta.env.DEV) saveButton.style.display = "block";
 
 saveButton.onclick = () => {
     if (!canSaveConfig) {

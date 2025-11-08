@@ -48,5 +48,5 @@ export function getRGB(c) {
 }
 
 export function isDEV() {
-    return import.meta.env.VITE_ENV != "DEV";
+    return !!import.meta.env.DEV;
 }
