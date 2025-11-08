@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import './style.css';
 import * as UTILS from './utils.js';
-import {params, debug, refreshGUI} from './tunables.js';
+import {params, debug, refreshGUI, baseParams} from './tunables.js';
 import {chat, imagine, saveConfig, rndImage, uuid} from './client-api.js';
 import ColorThief from 'colorthief';
 import {io} from 'socket.io-client';
@@ -35,8 +35,8 @@ import fullImg from './assets/full.png';
 import { captureVolume } from './audio.js';
 import * as loader from './loader.js';
 
-let UUID = await uuid();
-// let UUID = "testme";
+// let UUID = await uuid();
+let UUID = "testme";
 console.log('UUID', UUID);
 
 const socket = io(import.meta.env.VITE_API_HOSTNAME);
@@ -49,8 +49,14 @@ socket.on("event", (event) => {
     console.log(event)
 });
 
+socket.on("color", (event) => {
+    const color = new THREE.Color(event)
+    params.COLOR.POINT_COLOR = color;
+});
+
 socket.on("gyro", (event) => {
-    console.log(event)
+    console.log('gyro', event)
+    params.STEP_LEN = baseParams.STEP_LEN * event.a;
 });
 
 async function loadShader(url) {
@@ -109,6 +115,14 @@ if (false) {
     //     customImageName = data.name;
     // }, 10000);
 }
+    const placeholderInt = setInterval(async () => {
+        const data = await rndImage();
+        // only in this case we update the uniforms.
+        if (customImageName != data.name) {
+            loadCustomImage(data.data)
+        }
+        customImageName = data.name;
+    }, 10000);
 
 // renderer section
 const renderer = new THREE.WebGLRenderer(

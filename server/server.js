@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 
 dotenv.config();
 
-const ORIGINS = ["https://stubfx.io", "https://localhost", "https://192.168.1.12:5173"];
+const ORIGINS = ["https://stubfx.io", "https://localhost", "https://192.168.1.12"];
 const app = express();
 const server = createServer(app);
 const port = process.env.PORT;
@@ -36,6 +36,10 @@ io.on('connection', (socket) => {
 
     socket.on("gyro", (event) => {
         io.to(hostList[event.room]).emit("gyro", event.gyro);
+    });
+
+    socket.on("color", (event) => {
+        io.to(hostList[event.room]).emit("color", event.color);
     });
 
     socket.on("register-host", (host) => {

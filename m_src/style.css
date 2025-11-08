@@ -64,6 +64,11 @@ textarea:focus, input:focus{
     background: radial-gradient(ellipse 500% 80% at top, rgba(0, 255, 0, 1) 0%, rgba(0, 0, 0, 1) 20%);
 }
 
+#status.loading {
+    background: #0000ff;
+    background: radial-gradient(ellipse 500% 80% at top, rgba(0, 0, 255, 1) 0%, rgba(0, 0, 0, 1) 20%);
+}
+
 #saveConfig {
     display: none;
     position: absolute;
@@ -111,10 +116,25 @@ textarea:focus, input:focus{
 #interaction {
     position: absolute;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     width: 100vw;
     height: 100vh;
+}
+
+#interaction input, #interaction button {
+    height: 3rem;
+    padding: 5px 15px;
+    font-weight: bold;
+    border-radius: var(--border-radius);
+    border: 5px solid transparent;
+    margin: 5px;
+    color: white;
+    border: 1px solid rgb(255 255 255 / 10%);
+    /* background: rgb(144 144 144 / 25%); */
+    background: rgb(255 255 255 / 10%);
+    /* backdrop-filter: blur(5px); */
 }
 
 #chat-send, button {
@@ -153,6 +173,19 @@ button {
     width: 1.2rem;
     height: 1.2rem;
     animation: spin 1s linear infinite;
+}
+
+.quick-color-container {
+    display: flex;
+    flex-wrap: wrap;
+    width: 30vw;
+    justify-content: center;
+}
+
+.quick-color {
+    width: 50px;
+    height: 50px;
+    /* background-color: red !important; */
 }
 
 @keyframes spin {

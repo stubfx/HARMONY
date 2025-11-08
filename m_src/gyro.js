@@ -6,6 +6,7 @@ export function startGyro(freq = 1, cb) {
     // });
     // s.start();
     window.addEventListener("deviceorientation", e => {
+        if (!e.alpha || !e.beta || !e.gamma) return;
         cb({a: e.alpha, b: e.beta, g: e.gamma});   // yaw, pitch, roll
     });
 }
