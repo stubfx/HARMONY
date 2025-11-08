@@ -132,6 +132,6 @@ fSim.open();
 // fDecay.open();
 // fDebug.open();
 GUI.close()
-if (import.meta.env.DEV && !panel) {
+if (!import.meta.env.DEV && !panel) {
     GUI.hide();
 }
