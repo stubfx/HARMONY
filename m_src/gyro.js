@@ -2,7 +2,7 @@
  * startDeviceTilt(frequencyHz, cb) -> stop()
  * cb(payload):
  *  - enabled: true  => { a, b, g, motion, enabled:true }  // a/b/g,motion ∈ [0,1]
- *  - enabled: false => { enabled:false }                  // keep emitting; do NOT stop
+ *  - enabled: false => { enabled:false }                  // keep emitting; never auto-stop
  */
 export function startDeviceTilt(frequencyHz, cb) {
   if (typeof cb !== "function") throw new Error("callback required");
@@ -65,17 +65,33 @@ export function startDeviceTilt(frequencyHz, cb) {
   const deadband = deadbandDegPerSec * DEG2RAD;
   let speedPeak = minRef;
 
-  // best-effort permission requests (non-blocking)
-  try {
-    if (typeof DeviceOrientationEvent !== "undefined" &&
-        typeof DeviceOrientationEvent.requestPermission === "function") {
-      DeviceOrientationEvent.requestPermission().catch(() => {});
-    }
-    if (typeof DeviceMotionEvent !== "undefined" &&
-        typeof DeviceMotionEvent.requestPermission === "function") {
-      DeviceMotionEvent.requestPermission().catch(() => {});
-    }
-  } catch {}
+  // iOS: request once on first user gesture; keep emitting enabled:false until granted
+  let iosGateArmed = false;
+  function armIOSPermissionGate() {
+    if (iosGateArmed) return;
+    iosGateArmed = true;
+    const ask = async () => {
+      try {
+        if (typeof DeviceMotionEvent !== "undefined" &&
+            typeof DeviceMotionEvent.requestPermission === "function") {
+          try { await DeviceMotionEvent.requestPermission(); } catch {}
+        }
+      } catch {}
+      try {
+        if (typeof DeviceOrientationEvent !== "undefined" &&
+            typeof DeviceOrientationEvent.requestPermission === "function") {
+          try { await DeviceOrientationEvent.requestPermission(); } catch {}
+        }
+      } catch {}
+    };
+    const once = async () => { cleanup(); await ask(); };
+    const cleanup = () => {
+      ["pointerdown","touchend","click","keydown"].forEach(t =>
+        window.removeEventListener(t, once, {capture:false}));
+    };
+    ["pointerdown","touchend","click","keydown"].forEach(t =>
+      window.addEventListener(t, once, {capture:false, once:true}));
+  }
 
   // handlers
   const onDO = (e) => {
@@ -83,10 +99,8 @@ export function startDeviceTilt(frequencyHz, cb) {
     lastDOEvt = e;
 
     const aDeg = e.alpha, bDeg = e.beta, gDeg = e.gamma;
-    // enable as soon as pitch/roll are available; yaw can be derived
     if (bDeg == null || gDeg == null) return;
 
-    // stuck-alpha detection (if alpha exists)
     if (aDeg != null) {
       if (alphaPrev == null) alphaPrev = aDeg;
       const d = ((aDeg - alphaPrev + 540) % 360) - 180;
@@ -98,7 +112,6 @@ export function startDeviceTilt(frequencyHz, cb) {
     const dt = prevEventT == null ? 0 : Math.max(0, now - prevEventT);
     prevEventT = now;
 
-    // quaternion delta → angular speed
     const q = qFromEulerZXY(aDeg || 0, bDeg, gDeg);
     if (prevQ) {
       let dot = prevQ[0]*q[0] + prevQ[1]*q[1] + prevQ[2]*q[2] + prevQ[3]*q[3];
@@ -106,7 +119,6 @@ export function startDeviceTilt(frequencyHz, cb) {
       const deltaAngle = 2 * Math.acos(dot);          // rad
       const rawSpeed = dt > 0 ? deltaAngle / dt : 0;  // rad/s
 
-      // deadband + AGC peak
       const effSpeed = Math.max(0, rawSpeed - deadband);
       speedPeak = Math.max(effSpeed, speedPeak * expDecay(dt, agcFallSec));
       if (speedPeak < minRef) speedPeak = minRef;
@@ -114,21 +126,17 @@ export function startDeviceTilt(frequencyHz, cb) {
       const ref = Math.max(minRef, agcTarget * speedPeak);
       const normSpeed = ref > 0 ? clamp01(effSpeed / ref) : 0;
 
-      // motion EMA
       const a = expDecay(dt, decaySec);
       motion = motion * a + (1 - a) * normSpeed;
     }
     prevQ = q;
 
-    // pitch/roll smoothing
     const aa = expDecay(dt, angleSmoothSec);
     pitchNorm = aa * pitchNorm + (1 - aa) * clamp01((bDeg + 180) / 360);
     rollNorm  = aa * rollNorm  + (1 - aa) * clamp01((gDeg + 90) / 180);
 
-    // align decay baseline
     lastDecayT = now;
-
-    enabled = true; // we now have valid angles
+    enabled = true;
   };
 
   const onDM = (e) => {
@@ -137,10 +145,10 @@ export function startDeviceTilt(frequencyHz, cb) {
     const now = performance.now() * 1e-3;
     const dt = e.interval ? e.interval / 1000 : (gyroT == null ? 0 : Math.max(0, now - gyroT));
     gyroT = now;
-    gyroYaw = wrapTau(gyroYaw + (e.rotationRate.alpha * DEG2RAD) * dt); // deg/s about Z
+    gyroYaw = wrapTau(gyroYaw + (e.rotationRate.alpha * DEG2RAD) * dt);
   };
 
-  // attach listeners (if the APIs exist; keep running even if they don't)
+  // attach listeners and arm iOS permission gate
   if (typeof window !== "undefined") {
     if (typeof DeviceOrientationEvent !== "undefined") {
       window.addEventListener("deviceorientation", onDO, { passive: true });
@@ -148,23 +156,20 @@ export function startDeviceTilt(frequencyHz, cb) {
     if (typeof DeviceMotionEvent !== "undefined") {
       window.addEventListener("devicemotion", onDM, { passive: true });
     }
+    armIOSPermissionGate();
   }
 
-  // emit loop — never stops on its own; keeps reporting enabled:false until data appears
+  // emit loop — never auto-stops
   const intervalId = setInterval(() => {
     if (stopped) return;
 
-    // incremental passive decay
     const now = performance.now() * 1e-3;
     const dtInc = Math.max(0, now - lastDecayT);
     motion *= expDecay(dtInc, decaySec);
     if (motion < zeroSnap) motion = 0;
     lastDecayT = now;
 
-    if (!enabled) {
-      cb({ enabled: false });
-      return;
-    }
+    if (!enabled) { cb({ enabled: false }); return; }
 
     // yaw: compass > alpha (if not stuck) > gyro
     let yawRad = 0;
@@ -176,7 +181,6 @@ export function startDeviceTilt(frequencyHz, cb) {
       yawRad = gyroYaw;
     }
 
-    // circular smoothing for yaw
     const ay = expDecay(dtInc, angleSmoothSec);
     const yawNew = [Math.cos(yawRad), Math.sin(yawRad)];
     yawVec = norm2(ay * yawVec[0] + (1 - ay) * yawNew[0], ay * yawVec[1] + (1 - ay) * yawNew[1]);

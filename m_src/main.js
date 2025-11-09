@@ -30,6 +30,7 @@ startDeviceTilt(30, (d) => {
   // if (d.enabled) { /* disable UI */ return; }
   // d = { a, b, g, motion, enabled:true }
   // use normalized yaw/pitch/roll and recent-tilt "motion"
+    console.log(d)
     motion = d.enabled ? d.motion : 0;
 });
 
