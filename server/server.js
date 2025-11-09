@@ -35,6 +35,7 @@ io.on('connection', (socket) => {
     // });
 
     socket.on("motion", (event) => {
+        console.log(event)
         io.to(hostList[event.room]).emit("motion", event.motion);
     });
 
