@@ -20,7 +20,7 @@ socket.on('connect', s => {
     statusEl.classList.add("connected")
 });
 
-let motion = 0;
+let motion;
 
 const buttons = document.querySelectorAll(".quick-color")
 const formEl = document.querySelector("#input-form")
@@ -63,7 +63,9 @@ function sendEvent() {
 }
 
 function heartBeat() {
-    socket.emit("motion", {room: uuid, role: ROLE, motion: motion})
-    setTimeout(heartBeat, 1000);      // 1 Hz
+    if (motion) {
+        socket.emit("motion", {room: uuid, role: ROLE, motion: motion})
+        setTimeout(heartBeat, 1000);      // 1 Hz
+    }
 }
 heartBeat();
