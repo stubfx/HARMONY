@@ -30,12 +30,12 @@ let hostList = {}
 io.on('connection', (socket) => {
     console.log('device connected');
 
-    socket.on("event", (event) => {
-        io.to(hostList[event.room]).emit("event", event.gyro);
-    });
+    // socket.on("event", (event) => {
+    //     io.to(hostList[event.room]).emit("event", event.gyro);
+    // });
 
-    socket.on("gyro", (event) => {
-        io.to(hostList[event.room]).emit("gyro", event.gyro);
+    socket.on("motion", (event) => {
+        io.to(hostList[event.room]).emit("motion", event.motion);
     });
 
     socket.on("color", (event) => {

@@ -1,7 +1,8 @@
 import './style.css';
+import {getMovement} from './motion.js';
 
 import {io} from 'socket.io-client';
-import {startGyro} from './gyro';
+import {startDeviceTilt} from './gyro';
 
 const ROLE = "spec";
 const urlParams = new URLSearchParams(window.location.search);
@@ -19,10 +20,19 @@ socket.on('connect', s => {
     statusEl.classList.add("connected")
 });
 
-let gyroData;
+let motion;
 
 const buttons = document.querySelectorAll(".quick-color")
 const formEl = document.querySelector("#input-form")
+
+
+startDeviceTilt(30, (d) => {
+  // if (d.enabled) { /* disable UI */ return; }
+  // d = { a, b, g, motion, enabled:true }
+  // use normalized yaw/pitch/roll and recent-tilt "motion"
+    motion = d.enabled ? d.motion : 0;
+});
+
 
 formEl.onsubmit = (e) => {
     // prevent page reoload
@@ -44,12 +54,6 @@ buttons.forEach((el) => {
     }
 })
 
-startGyro(60, (data) => {
-    console.log(data)
-    gyroData = data;
-})
-
-
 function sendEvent() {
     // sending the event will show a ui feedback
     statusEl.classList.add("loading");   
@@ -58,10 +62,10 @@ function sendEvent() {
     }, 500);
 }
 
-function loop() {
-  if (gyroData) {
-    // socket.emit("gyro", {room: uuid, role: ROLE, gyro: gyroData})
+function heartBeat() {
+  if (motion) {
+    socket.emit("motion", {room: uuid, role: ROLE, motion: motion})
   }
-  setTimeout(loop, 1000);      // 1 Hz
+  setTimeout(heartBeat, 1000);      // 1 Hz
 }
-loop();
+heartBeat();

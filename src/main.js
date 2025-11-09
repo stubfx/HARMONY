@@ -55,9 +55,9 @@ socket.on("color", (event) => {
     params.COLOR.POINT_COLOR = color;
 });
 
-socket.on("gyro", (event) => {
-    console.log('gyro', event)
-    params.STEP_LEN = baseParams.STEP_LEN * event.a;
+socket.on("motion", (event) => {
+    console.log('motion', event)
+    params.STEP_LEN = baseParams.STEP_LEN * (event * 2);
 });
 
 async function loadShader(url) {
