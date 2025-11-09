@@ -2,7 +2,7 @@ import './style.css';
 import {getMovement} from './motion.js';
 
 import {io} from 'socket.io-client';
-import {startDeviceTilt} from './gyro';
+import { startDeviceTilt, requestMotionOrientationPermission } from './gyro';
 
 const ROLE = "spec";
 const urlParams = new URLSearchParams(window.location.search);
@@ -26,12 +26,18 @@ const buttons = document.querySelectorAll(".quick-color")
 const formEl = document.querySelector("#input-form")
 
 
-startDeviceTilt(30, (d) => {
-  // if (d.enabled) { /* disable UI */ return; }
-  // d = { a, b, g, motion, enabled:true }
-  // use normalized yaw/pitch/roll and recent-tilt "motion"
-    console.log(d)
-    motion = d.enabled ? d.motion : 0;
+
+document.getElementById('enable-motion').addEventListener('click', async () => {
+    await requestMotionOrientationPermission();
+    startDeviceTilt(30, (d) => {
+        // if (d.enabled) { /* disable UI */ return; }
+        // d = { a, b, g, motion, enabled:true }
+        // use normalized yaw/pitch/roll and recent-tilt "motion"
+        console.log(d)
+        motion = d.enabled ? d.motion : 0;
+    });
+
+    // startDeviceTilt keeps emitting; once granted, payloads switch to enabled:true with angles.
 });
 
 

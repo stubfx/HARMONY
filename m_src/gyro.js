@@ -1,4 +1,26 @@
 /**
+ * requestMotionOrientationPermission() -> Promise<boolean>
+ * Call this from a user gesture (tap/click/keydown) on iOS to enable sensors.
+ * Returns true if any permission was granted or not required.
+ */
+export async function requestMotionOrientationPermission() {
+  let granted = false;
+  try {
+    if (typeof DeviceMotionEvent !== "undefined" &&
+        typeof DeviceMotionEvent.requestPermission === "function") {
+      granted = (await DeviceMotionEvent.requestPermission()) === "granted" || granted;
+    }
+  } catch {}
+  try {
+    if (typeof DeviceOrientationEvent !== "undefined" &&
+        typeof DeviceOrientationEvent.requestPermission === "function") {
+      granted = (await DeviceOrientationEvent.requestPermission()) === "granted" || granted;
+    }
+  } catch {}
+  return granted;
+}
+
+/**
  * startDeviceTilt(frequencyHz, cb) -> stop()
  * cb(payload):
  *  - enabled: true  => { a, b, g, motion, enabled:true }  // a/b/g,motion ∈ [0,1]
@@ -65,34 +87,6 @@ export function startDeviceTilt(frequencyHz, cb) {
   const deadband = deadbandDegPerSec * DEG2RAD;
   let speedPeak = minRef;
 
-  // iOS: request once on first user gesture; keep emitting enabled:false until granted
-  let iosGateArmed = false;
-  function armIOSPermissionGate() {
-    if (iosGateArmed) return;
-    iosGateArmed = true;
-    const ask = async () => {
-      try {
-        if (typeof DeviceMotionEvent !== "undefined" &&
-            typeof DeviceMotionEvent.requestPermission === "function") {
-          try { await DeviceMotionEvent.requestPermission(); } catch {}
-        }
-      } catch {}
-      try {
-        if (typeof DeviceOrientationEvent !== "undefined" &&
-            typeof DeviceOrientationEvent.requestPermission === "function") {
-          try { await DeviceOrientationEvent.requestPermission(); } catch {}
-        }
-      } catch {}
-    };
-    const once = async () => { cleanup(); await ask(); };
-    const cleanup = () => {
-      ["pointerdown","touchend","click","keydown"].forEach(t =>
-        window.removeEventListener(t, once, {capture:false}));
-    };
-    ["pointerdown","touchend","click","keydown"].forEach(t =>
-      window.addEventListener(t, once, {capture:false, once:true}));
-  }
-
   // handlers
   const onDO = (e) => {
     if (stopped) return;
@@ -148,7 +142,7 @@ export function startDeviceTilt(frequencyHz, cb) {
     gyroYaw = wrapTau(gyroYaw + (e.rotationRate.alpha * DEG2RAD) * dt);
   };
 
-  // attach listeners and arm iOS permission gate
+  // attach listeners (keep running even if the APIs are missing)
   if (typeof window !== "undefined") {
     if (typeof DeviceOrientationEvent !== "undefined") {
       window.addEventListener("deviceorientation", onDO, { passive: true });
@@ -156,7 +150,6 @@ export function startDeviceTilt(frequencyHz, cb) {
     if (typeof DeviceMotionEvent !== "undefined") {
       window.addEventListener("devicemotion", onDM, { passive: true });
     }
-    armIOSPermissionGate();
   }
 
   // emit loop — never auto-stops
