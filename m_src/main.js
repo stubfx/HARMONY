@@ -72,7 +72,7 @@ function sendEvent() {
 function heartBeat() {
     if (motion) {
         socket.emit("motion", {room: uuid, role: ROLE, motion: motion})
-        setTimeout(heartBeat, 1000);      // 1 Hz
     }
+    setTimeout(heartBeat, 1000);      // 1 Hz
 }
 heartBeat();
