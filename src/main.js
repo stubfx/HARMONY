@@ -104,15 +104,6 @@ if (false) {
         params.uHasCustomImage = true;
     });
 } else {
-    // const placeholderInt = setInterval(async () => {
-    //     const data = await rndImage();
-    //     // only in this case we update the uniforms.
-    //     if (customImageName != data.name) {
-    //         loadCustomImage(data.data)
-    //     }
-    //     customImageName = data.name;
-    // }, 10000);
-}
     const placeholderInt = setInterval(async () => {
         const data = await rndImage();
         // only in this case we update the uniforms.
@@ -121,6 +112,15 @@ if (false) {
         }
         customImageName = data.name;
     }, 10000);
+}
+    // const placeholderInt = setInterval(async () => {
+    //     const data = await rndImage();
+    //     // only in this case we update the uniforms.
+    //     if (customImageName != data.name) {
+    //         loadCustomImage(data.data)
+    //     }
+    //     customImageName = data.name;
+    // }, 10000);
 
 // renderer section
 const renderer = new THREE.WebGLRenderer(
@@ -156,9 +156,9 @@ function setBlur(px) {
 document.body.appendChild( renderer.domElement );
 
 const W = renderer.domElement.width, H = renderer.domElement.height;
-const imageArea = Math.min(W, H) * .8;
+const imageArea = Math.min(W, H) * .5;
 params.IMAGE_AREA = imageArea;
-params.IMAGE_REVEAL_AREA = imageArea * .5; 
+params.IMAGE_REVEAL_AREA = imageArea * .6; 
 const fpsEl = document.querySelector("#fps");
 const agentsEl = document.querySelector("#agentsCount");
 const buildDate = document.querySelector("#buildDate");
@@ -204,20 +204,6 @@ async function onChatSend(text) {
     loading = false;
     loader.show(loading);
 }
-
-// document.querySelector("#chat-form").onsubmit = async (e) => {
-//     // prevent page reoload
-//     e.preventDefault();
-//     clearInterval(placeholderInt);
-//     if (loading) return;
-//     loading = true;
-//     loader.show(loading);
-//     const inputEl = document.querySelector("#chat-input");
-//     const formEl = document.querySelector("#chat-form");
-//     const text = inputEl.value;
-//     onChatSend(text);
-// };
-
 
 function loadCustomImage(imageData) {
     const thief = new ColorThief();
@@ -368,10 +354,11 @@ for (let i = 0; i < N; i++) {
     dx /= len;
     dy /= len;
 
-    // Scale by random speed factor if you like
-    const rnd = Math.random() - 0.5; // tweak
+    // const rnd = Math.random() - 0.5; // tweak
     // init[k + 2] = dx * speed;
     // init[k + 3] = dy * speed;
+    // init[k+2] = (Math.random() - 0.5) ; //x
+    // init[k+3] = (Math.random() - 0.5); //y
     init[k+2] = (Math.random() - 0.5) ; //x
     init[k+3] = (Math.random() - 0.5); //y
 
@@ -421,6 +408,8 @@ sceneSim.remove(quadCopy);
 matCopy.dispose();
 initTex.dispose();
 
+let uShowAmount = 0;
+uShowAmount = N;
 
 // Simulation material
 // responsible for the data manipulation on the matrix (gathering, moving and saving agents data)
@@ -463,6 +452,7 @@ const matPoints = new THREE.RawShaderMaterial({
         uState: { value: rtA.texture },
         uTexSize: { value: new THREE.Vector2(params.TEX_SIDE, params.TEX_SIDE) },
         uCanvas: { value: new THREE.Vector2(W, H) },
+        uShowAmount: { value: uShowAmount },
         uPointSize:{ value: params.POINT_SIZE },
         uMouseDown: {value: false},
         uMouseCoords: {value: prevmousecoords},
@@ -485,6 +475,8 @@ const matPoints = new THREE.RawShaderMaterial({
     transparent:true, depthTest:false, depthWrite:false,
     blending: THREE.AdditiveBlending
 });
+
+console.log("imagearea", params.IMAGE_AREA * TRAIL_TEX_RES)
 
 const points = new THREE.Points(ptsGeo, matPoints);
 points.frustumCulled = false;
@@ -617,6 +609,11 @@ composer.addPass(bloomPass);
 // composer.addPass(h);
 // composer.addPass(v);
 
+// setInterval(() => {
+//     uShowAmount+=100;
+//     // console.log(uShowAmount)
+// },1)
+
 // bro dont go higher than this unless you wanna see jesus.
 const maxBloom = 0.1;
 function frame() {
@@ -723,6 +720,7 @@ function updateUniforms () {
     matSim.uniforms.uSenseAngle.value = params.SENSE_ANGLE;
     matSim.uniforms.uTurnRate.value = params.TURN_RATE;
 
+    matPoints.uniforms.uShowAmount.value = uShowAmount;
     matPoints.uniforms.uPointColor.value = params.COLOR.POINT_COLOR
     matPoints.uniforms.uSecondaryColor.value = params.COLOR.POINT_SECONDARY_COLOR
     matPoints.uniforms.uSecondaryColorAmount.value = params.COLOR.SECONDARY_AMOUNT

@@ -19,6 +19,7 @@ uniform vec3 uSecondaryColor;
 uniform int uSecondaryColorAmount;
 uniform vec3 uTertiaryColor;
 uniform int uTertiaryColorAmount;
+// uniform float uShowAmount;
 
 in float vIsSecondary;
 in float vIsTertiary;
@@ -27,6 +28,7 @@ void main() {
     // base point look (keep your point styling as-is)
     vec2 p = gl_PointCoord - 0.5;
     vec4 color = vec4(uPointColor, 0.3);
+    // if (vVID > int(uShowAmount)) discard;
 
     // is secondary
     if (vIsSecondary == 1.0) {

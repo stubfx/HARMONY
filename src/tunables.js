@@ -16,10 +16,10 @@ export const GUI = new lil.GUI({width: 500});
 
 export const baseParams = {
     STEP_LEN: 70.0,
-    IMAGE_AREA: 50,
-    IMAGE_REVEAL_AREA: 250,
+    IMAGE_AREA: 50,// will be overwritten at runtime
+    IMAGE_REVEAL_AREA: 250,// will be overwritten at runtime.
     RENDER_QUALITY: renderQuality || 1,
-    TRAIL_TEX_SIZE: 400,
+    TRAIL_TEX_SIZE: 2000,
     TURN_JITTER: 0.1,
     DRAG: 0.5,
     // SPEED_JITTER: 2.0,

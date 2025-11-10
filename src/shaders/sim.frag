@@ -14,7 +14,6 @@ uniform float     uSenseDist;
 uniform float     uSenseAngle;   // radians
 uniform float     uTurnRate;     // radians/sec
 uniform bool uMouseDown;
-
 out vec4 fragColor;
 
 vec2 rot(vec2 v, float a){

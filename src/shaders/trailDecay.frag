@@ -36,8 +36,7 @@ void main() {
     if (uNuke) {
         // clear everything
         color = vec4(0.0);
-    }
-    else if (uHasCustomImage) {
+    } else if (uHasCustomImage) {
         // bring all the colors to the center
         // this still has to be tested properly. is leaving a black aura around
         // dist = distance(gl_FragCoord.xy, uCanvas*uTrailTexRes*0.5);
@@ -57,20 +56,20 @@ void main() {
         // Normalized UV into the source image (0..1)
         vec2 uv        = rel / scaledSize;
 
-        // Inside the image?
-        bvec2 in0 = greaterThanEqual(uv, vec2(0.0));
-        bvec2 in1 = lessThan(uv, vec2(1.0));
-        bool inImg = all(in0) && all(in1);
-
-        vec4 customImage = vec4(0.0);
-        if (inImg) {
-            // Filtering chosen by sampler state:
-            //   NearestFilter  -> crisp pixels
-            //   LinearFilter   -> smooth scale
-            customImage = texture(uCustomImage, uv);
-        }
-        float scaledImageArea = uImageArea * uTrailTexRes;
         if (uHasCustomImage && dist < uImageRevealArea * uTrailTexRes) {
+            float scaledImageArea = uImageArea * uTrailTexRes;
+            // Inside the image?
+            bvec2 in0 = greaterThanEqual(uv, vec2(0.0));
+            bvec2 in1 = lessThan(uv, vec2(1.0));
+            bool inImg = all(in0) && all(in1);
+
+            vec4 customImage = vec4(0.0);
+            if (inImg) {
+                // Filtering chosen by sampler state:
+                //   NearestFilter  -> crisp pixels
+                //   LinearFilter   -> smooth scale
+                customImage = texture(uCustomImage, uv);
+            }
             dist = smoothstep(1.0, 0.0, dist/scaledImageArea);
             // WATCH OUT
             // AS WE ARE USING THE RED CHANNEL FOR SENSING THE TRAIL
