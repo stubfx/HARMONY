@@ -79,6 +79,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
 const texLoader = new THREE.TextureLoader();
 const RES = window.devicePixelRatio * params.RENDER_QUALITY;
+console.log("Resolution", RES);
 // let customImage = texLoader.load(colorImgUrl, () => {
 let customImage;
 let customImageName;
@@ -127,7 +128,7 @@ const renderer = new THREE.WebGLRenderer(
     {antialias: true, autoClear: false});
 // renderer.setSize(1000, 1000);
 renderer.setSize( window.innerWidth, window.innerHeight );
-renderer.setPixelRatio(RES);
+// renderer.setPixelRatio(RES);
 const bufferSize = new THREE.Vector2();
 renderer.getDrawingBufferSize(bufferSize);
 // const trailBufferSize = bufferSize.clone().multiplyScalar(TRAIL_TEX_RES);
@@ -136,13 +137,11 @@ renderer.getDrawingBufferSize(bufferSize);
 // this way we can control the behaviour on different machines with a simpler metric
 // since the trail is always dumped in pixels and it will always be calculated in that grid.
 const trailScale = Math.min(1, params.TRAIL_TEX_SIZE / Math.max(window.innerWidth, window.innerHeight));
-console.log(trailScale)
-const TRAIL_TEX_RES = trailScale; 
+const TRAIL_TEX_RES = trailScale/RES; 
 // now we can actually get the real sizes:
 const trailWidth = window.innerWidth * TRAIL_TEX_RES;
 const trailHeight = window.innerHeight * TRAIL_TEX_RES;
 const trailBufferSize = new THREE.Vector2(trailWidth, trailHeight);
-console.log(trailBufferSize);
 const composer = new EffectComposer(renderer);
 
 const h = new ShaderPass(HorizontalBlurShader);
@@ -156,7 +155,7 @@ function setBlur(px) {
 document.body.appendChild( renderer.domElement );
 
 const W = renderer.domElement.width, H = renderer.domElement.height;
-const imageArea = Math.min(W, H) * .5;
+const imageArea = Math.min(W, H) * .5 / RES;
 params.IMAGE_AREA = imageArea;
 params.IMAGE_REVEAL_AREA = imageArea * .6; 
 const fpsEl = document.querySelector("#fps");
@@ -476,7 +475,6 @@ const matPoints = new THREE.RawShaderMaterial({
     blending: THREE.AdditiveBlending
 });
 
-console.log("imagearea", params.IMAGE_AREA * TRAIL_TEX_RES)
 
 const points = new THREE.Points(ptsGeo, matPoints);
 points.frustumCulled = false;
