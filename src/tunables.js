@@ -16,9 +16,10 @@ export const GUI = new lil.GUI({width: 500});
 
 export const baseParams = {
     STEP_LEN: 70.0,
-    IMAGE_AREA: 200,
+    IMAGE_AREA: 50,
     IMAGE_REVEAL_AREA: 250,
     RENDER_QUALITY: renderQuality || 1,
+    TRAIL_TEX_SIZE: 400,
     TURN_JITTER: 0.1,
     DRAG: 0.5,
     // SPEED_JITTER: 2.0,
@@ -36,7 +37,6 @@ export const baseParams = {
     ENABLE_MOUSE: false,
     SHOW_TRAIL: false,
     TEX_SIDE: number || 1200,
-    TRAIL_TEX_RES: .4,
     COLOR: {
         POINT_COLOR: {r: 1.0, g: 1.0, b: 1.0 },
         // POINT_COLOR: [1.0, 1.0, 1.0],

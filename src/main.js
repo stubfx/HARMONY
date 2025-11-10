@@ -130,7 +130,19 @@ renderer.setSize( window.innerWidth, window.innerHeight );
 renderer.setPixelRatio(RES);
 const bufferSize = new THREE.Vector2();
 renderer.getDrawingBufferSize(bufferSize);
-const trailBufferSize = bufferSize.clone().multiplyScalar(params.TRAIL_TEX_RES);
+// const trailBufferSize = bufferSize.clone().multiplyScalar(TRAIL_TEX_RES);
+
+// trail texture is now a dividend of the canvas with the biggest edge == TRAIL_TEX_SIZE
+// this way we can control the behaviour on different machines with a simpler metric
+// since the trail is always dumped in pixels and it will always be calculated in that grid.
+const trailScale = Math.min(1, params.TRAIL_TEX_SIZE / Math.max(window.innerWidth, window.innerHeight));
+console.log(trailScale)
+const TRAIL_TEX_RES = trailScale; 
+// now we can actually get the real sizes:
+const trailWidth = window.innerWidth * TRAIL_TEX_RES;
+const trailHeight = window.innerHeight * TRAIL_TEX_RES;
+const trailBufferSize = new THREE.Vector2(trailWidth, trailHeight);
+console.log(trailBufferSize);
 const composer = new EffectComposer(renderer);
 
 const h = new ShaderPass(HorizontalBlurShader);
@@ -459,13 +471,13 @@ const matPoints = new THREE.RawShaderMaterial({
         uCustomImageSize: {value: new THREE.Vector2(params.IMAGE_AREA, params.IMAGE_AREA)},
         uCustomImage: { value: customImage},
         uHasCustomImage: { value: false},
-        uTrailTexRes: {value: params.TRAIL_TEX_RES},
+        uTrailTexRes: {value: TRAIL_TEX_RES},
         uPointColor: { value: params.COLOR.POINT_COLOR},
         uSecondaryColor: {value: params.COLOR.POINT_SECONDARY_COLOR},
         uSecondaryColorAmount: {value: params.COLOR.SECONDARY_AMOUNT},
         uTertiaryColor: {value: params.COLOR.POINT_TERTIARY_COLOR},
         uTertiaryColorAmount: {value: params.COLOR.TERTIARY_AMOUNT},
-        uTrailTexRes: {value: params.TRAIL_TEX_RES},
+        uTrailTexRes: {value: TRAIL_TEX_RES},
         uMouseOnCanvas: {values: mouseOnPage}
     },
     vertexShader: pointVert,
@@ -520,7 +532,7 @@ const matTrailDecay = new THREE.RawShaderMaterial({
         uImageRevealArea: { value: params.IMAGE_REVEAL_AREA },
         uCanvas:    { value: new THREE.Vector2(W, H) },
         uTrailTexSize: {value: new THREE.Vector2(trailBufferSize.x, trailBufferSize.y)},
-        uTrailTexRes: {value: params.TRAIL_TEX_RES},
+        uTrailTexRes: {value: TRAIL_TEX_RES},
         uNuke: { value: nuke},
         uMouseOnCanvas: {values: mouseOnPage}
     },
@@ -583,7 +595,7 @@ const shaderOverlay = new ShaderPass({
         uImageRevealArea: { value: params.IMAGE_REVEAL_AREA },
         uCanvas:    { value: new THREE.Vector2(W, H) },
         uTrailTexSize: {value: new THREE.Vector2(trailBufferSize.x, trailBufferSize.y)},
-        uTrailTexRes: {value: params.TRAIL_TEX_RES},
+        uTrailTexRes: {value: TRAIL_TEX_RES},
         uNuke: { value: nuke},
         uMouseOnCanvas: {values: mouseOnPage}
     },
