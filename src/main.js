@@ -95,6 +95,8 @@ QRCode.toDataURL(qrData).then(base64 => {
     params.uHasCustomImage = true;
 });
 
+let placeholderInt;
+
 // debug this
 if (false) {
     QRCode.toDataURL(UUID).then(base64 => {
@@ -105,7 +107,7 @@ if (false) {
         params.uHasCustomImage = true;
     });
 } else {
-    const placeholderInt = setInterval(async () => {
+    placeholderInt = setInterval(async () => {
         const data = await rndImage();
         // only in this case we update the uniforms.
         if (customImageName != data.name) {
@@ -192,9 +194,6 @@ async function onChatSend(text) {
     // Object.assign(params, structuredClone(res.simulation));
     UTILS.deepReplace(params, res.simulation);
     refreshGUI();
-    // updateImagePrompt
-    const img_promptEl = document.querySelector("#image_prompt");
-    img_promptEl.textContent = res.image_prompt;
 
     const imageData = await imagine(res.image_prompt);
     if (imageData) {
