@@ -92,7 +92,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let right = sampleTrail(pos + params.senseDist * rot2(dir, -params.senseAngle));
 
     // ── Per-agent random noise (unique per agent AND frame) ───────────────────
-    let seed  = pcg(i * 2654435761u ^ params.frameCount * 40503u);
+    let seed  = pcg((i * 2654435761u) ^ (params.frameCount * 40503u));
     let noise = (rng(seed) * 2.0 - 1.0) * params.turnJitter;
 
     // ── Steering decision ─────────────────────────────────────────────────────

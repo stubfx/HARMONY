@@ -1,9 +1,59 @@
-# Thesis — Ant Simulation
+# Wind Particles
 
-A real-time GPU particle simulation for an art-direction thesis. The public
-(one or more people) interact with the simulation via their phones; the system
-**reacts** to them in its own way — mediated by an n8n workflow that can wire
-any AI or logic between input and response.
+A real-time GPU particle simulation for an art-direction thesis. Tens of
+thousands of independent particles move through two invisible mathematical
+fields — a *direction field* and a *wind field* — both defined live by the
+user through typed formulas.
+
+---
+
+## What This Simulation Is Meant to Feel Like
+
+### Wind as an invisible presence
+
+The wind formula does not animate particles directly. It exerts a *force* —
+a vector that accumulates into each particle's velocity. When you change the
+wind formula, you do not see the formula. You see its consequence: particles
+tilting, accelerating, curling. The mathematics is the weather.
+
+The wind is felt before it is understood. This is intentional.
+
+### Particles as autonomous yet subject
+
+Each particle follows its own *direction formula* — a heading it wants to
+maintain. But the wind keeps pulling it off course. The tension between
+intention and circumstance is what produces the visible motion: not chaos,
+not rigidity, but something that breathes.
+
+Particles do not know about each other. There is no communication, no
+pheromone, no collective signal. Pattern emerges purely from the shared
+mathematical space they inhabit. Like birds that flock without a leader,
+or dust that spirals without being instructed.
+
+### Speed as vitality
+
+A particle standing still is nearly invisible. A particle caught in the
+full force of the wind glows at full brightness. Brightness is not
+decoration — it is a direct readout of kinetic energy. The simulation
+makes speed visible as light.
+
+### The trail as memory
+
+Nothing persists. Trails fade within a second. But for that second, you
+can see where energy has been — the ghost of a gust, the after-image of a
+wave. Impermanence is part of the aesthetic: the field is always now, and
+the trail is already the past.
+
+### The formula as a way of touching the world
+
+Typing `sin(x * 0.008 + t) * PI` creates a weather pattern. Typing
+`atan2(y - cy, x - cx)` creates gravity. The formula is not a technical
+parameter — it is the act of deciding what kind of force exists in this
+space. Mathematical expressiveness becomes physical intuition.
+
+The simulation is meant to convey that physics is written, not given.
+
+---
 
 ---
 

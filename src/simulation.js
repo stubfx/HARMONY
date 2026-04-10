@@ -7,6 +7,7 @@ import depositWGSL    from './shaders/deposit.wgsl?raw';
 import normalizeWGSL  from './shaders/normalize.wgsl?raw';
 import decayWGSL      from './shaders/decay.wgsl?raw';
 import renderWGSL     from './shaders/render.wgsl?raw';
+import agentWGSL      from './shaders/agent.wgsl?raw';
 import bloomWGSL      from './shaders/bloom.wgsl?raw';
 import blitWGSL       from './shaders/blit.wgsl?raw';
 
@@ -98,7 +99,20 @@ export class Simulation {
         if (!navigator.gpu) throw new Error('WebGPU not supported');
         const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
         if (!adapter) throw new Error('No WebGPU adapter found');
-        this.device = await adapter.requestDevice();
+
+        // float32-filterable lets us linearly sample r32float trail/deposit textures.
+        // Without it, bind groups pairing a filtering sampler with r32float textures
+        // are invalid and the entire render pass encoder enters error state.
+        const requiredFeatures = adapter.features.has('float32-filterable')
+            ? ['float32-filterable']
+            : [];
+        if (!requiredFeatures.length) {
+            console.warn('[WebGPU] float32-filterable not available — trail may appear pixelated');
+        }
+        this.device = await adapter.requestDevice({ requiredFeatures });
+        this.device.addEventListener('uncapturederror', e => {
+            console.error('[WebGPU]', e.error.message);
+        });
 
         this.context = this.canvas.getContext('webgpu');
         this.context.configure({
@@ -154,6 +168,7 @@ export class Simulation {
         const normalizeMod = d.createShaderModule({ code: normalizeWGSL });
         const decayMod     = d.createShaderModule({ code: decayWGSL });
         const renderMod    = d.createShaderModule({ code: renderWGSL });
+        const agentMod     = d.createShaderModule({ code: agentWGSL });
         const bloomMod     = d.createShaderModule({ code: bloomWGSL });
         const blitMod      = d.createShaderModule({ code: blitWGSL });
 
@@ -197,9 +212,9 @@ export class Simulation {
         // ── Agent render pipeline (additive blend) ────────────────────────────
         this.agentRenderPipeline = d.createRenderPipeline({
             layout: 'auto',
-            vertex:   { module: renderMod, entryPoint: 'agentVs' },
+            vertex:   { module: agentMod, entryPoint: 'agentVs' },
             fragment: {
-                module: renderMod, entryPoint: 'agentFs',
+                module: agentMod, entryPoint: 'agentFs',
                 targets: [{
                     format: 'rgba8unorm',
                     blend: {
@@ -251,12 +266,11 @@ export class Simulation {
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         });
 
-        // ── Deposit texture (r32float, written by normalize, read by decay) ───
+        // ── Deposit texture (r32float) ────────────────────────────────────────
         this.depositTex = d.createTexture({
             size:   [this.trailW, this.trailH],
             format: 'r32float',
-            usage:  GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING
-                  | GPUTextureUsage.COPY_DST,
+            usage:  GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
         });
 
         // ── Trail decay textures (ping-pong, r32float) ────────────────────────
@@ -377,7 +391,7 @@ export class Simulation {
 
         // ── Agent render bind group ───────────────────────────────────────────
         this.agentRenderBG = d.createBindGroup({
-            layout: this.agentRenderPipeline.getBindGroupLayout(1),
+            layout: this.agentRenderPipeline.getBindGroupLayout(0),
             entries: [
                 { binding: 0, resource: { buffer: this.agentRenderUB } },
                 { binding: 1, resource: { buffer: this.agentBuf } },
@@ -482,7 +496,7 @@ export class Simulation {
     }
 
     // ── Seed agent buffer from CPU ────────────────────────────────────────────
-    seedAgents(spawnRadius) {
+    seedAgents(spawnRadius, initialSpeed = 1.0) {
         const N    = this.agentCount;
         const data = new Float32Array(N * 4);
         const cx   = this.W / 2;
@@ -492,10 +506,12 @@ export class Simulation {
             const k     = i * 4;
             const theta = Math.random() * Math.PI * 2;
             const r     = Math.sqrt(Math.random()) * R;
-            data[k]     = cx + r * Math.cos(theta);   // pos.x
-            data[k + 1] = cy + r * Math.sin(theta);   // pos.y
-            data[k + 2] = (Math.random() - 0.5);       // vel.x
-            data[k + 3] = (Math.random() - 0.5);       // vel.y
+            data[k]     = cx + r * Math.cos(theta);           // pos.x
+            data[k + 1] = cy + r * Math.sin(theta);           // pos.y
+            // Velocity at target speed in a random direction
+            const vTheta = Math.random() * Math.PI * 2;
+            data[k + 2] = Math.cos(vTheta) * initialSpeed;    // vel.x
+            data[k + 3] = Math.sin(vTheta) * initialSpeed;    // vel.y
         }
         this.device.queue.writeBuffer(this.agentBuf, 0, data);
     }
@@ -591,7 +607,7 @@ export class Simulation {
 
             // 5b. Agent quads (additive blend)
             pass.setPipeline(this.agentRenderPipeline);
-            pass.setBindGroup(1, this.agentRenderBG);
+            pass.setBindGroup(0, this.agentRenderBG);
             pass.draw(this.agentCount * 6);
             pass.end();
         }

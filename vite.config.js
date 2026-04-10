@@ -10,7 +10,7 @@ export default defineConfig({
     build: {
         rollupOptions: {
             input: {
-                host: path.resolve(__dirname, 'index.html'),
+                main: path.resolve(__dirname, 'index.html'),
                 user: path.resolve(__dirname + '/m_src', 'index.html'),
             },
         },
@@ -18,6 +18,16 @@ export default defineConfig({
     server: {
         host: '0.0.0.0',
         port: 5173,
-        // HTTPS is handled by Caddy; Vite runs plain HTTP internally
+        // In dev: proxy server endpoints so you don't need Caddy running.
+        // When using Caddy (e.g. for iOS), Caddy handles the proxy instead.
+        proxy: {
+            '/socket.io': {
+                target:      'http://localhost:3000',
+                ws:          true,
+                changeOrigin: true,
+            },
+            '/uuid':     'http://localhost:3000',
+            '/rndImage': 'http://localhost:3000',
+        },
     },
 });

@@ -50,7 +50,7 @@ socket.on('motion', (value) => {
 
 // ── Canvas & WebGPU bootstrap ─────────────────────────────────────────────────
 const canvas = document.createElement('canvas');
-canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;display:block;';
+canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;display:block;z-index:0;';
 document.body.prepend(canvas);
 
 function setCanvasSize() {
@@ -64,7 +64,7 @@ const N            = params.TEX_SIDE * params.TEX_SIDE;
 
 const sim = new Simulation(canvas);
 await sim.init(N, params.TRAIL_TEX_SIZE, canvasFormat);
-sim.seedAgents(params.SPAWN_RADIUS);
+sim.seedAgents(params.SPAWN_RADIUS, params.STEP_LEN);
 
 // Compute initial image area params based on canvas size
 const minDim = Math.min(canvas.width, canvas.height);
@@ -153,12 +153,17 @@ function clearMediaTrail() {
 let mediaActive = false;
 
 // ── Test buttons (temporary helpers for B&W media trail) ─────────────────────
+const restartBtn   = document.querySelector('#restartSim');
 const testImageBtn = document.querySelector('#testImage');
 const testVideoBtn = document.querySelector('#testVideo');
 const clearMediaBtn= document.querySelector('#clearMedia');
 const imageFileIn  = document.querySelector('#imageFile');
 const videoFileIn  = document.querySelector('#videoFile');
 
+restartBtn?.addEventListener('click', () => {
+    nuke = true;
+    sim.seedAgents(params.SPAWN_RADIUS, params.STEP_LEN);
+});
 testImageBtn?.addEventListener('click', () => imageFileIn?.click());
 testVideoBtn?.addEventListener('click', () => videoFileIn?.click());
 clearMediaBtn?.addEventListener('click', clearMediaTrail);

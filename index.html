@@ -3,46 +3,122 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Thesis — Ant Simulation</title>
+    <title>Wind Particles</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body   { margin: 0; background: #000; overflow: hidden; font-family: monospace; }
+
+        /* ── Formula panel ──────────────────────────────────────────────────── */
+        #ui {
+            position: fixed;
+            bottom: 1.2rem;
+            left:   1.2rem;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: .5rem;
+            pointer-events: none;
+        }
+        #ui > * { pointer-events: auto; }
+
+        .field-row {
+            display: flex;
+            flex-direction: column;
+            gap: .18rem;
+        }
+        .field-label {
+            font-size: .65rem;
+            color: #ffffff40;
+            user-select: none;
+            letter-spacing: .04em;
+        }
+        .formula-input {
+            font-family: monospace;
+            font-size: .8rem;
+            padding: .3rem .5rem;
+            width: 360px;
+            background: rgba(0, 0, 0, .72);
+            color: #c8ffc8;
+            border: 1px solid rgba(255, 255, 255, .18);
+            border-radius: 3px;
+            outline: none;
+            transition: border-color .15s;
+        }
+        .formula-input:focus { border-color: rgba(150, 255, 150, .5); }
+
+        #actions {
+            display: flex;
+            gap: .4rem;
+            align-items: center;
+        }
+        #apply-btn {
+            padding: .28rem .6rem;
+            background: rgba(255,255,255,.1);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,.2);
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: monospace;
+            font-size: .72rem;
+        }
+        #apply-btn:hover { background: rgba(255,255,255,.2); }
+
+        #presets {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .28rem;
+        }
+        .preset-btn {
+            padding: .18rem .45rem;
+            background: rgba(255,255,255,.06);
+            color: #ffffff60;
+            border: 1px solid rgba(255,255,255,.12);
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: monospace;
+            font-size: .65rem;
+        }
+        .preset-btn:hover { background: rgba(255,255,255,.16); color: #fff; }
+
+        #error-msg {
+            font-size: .68rem;
+            color: #ff6666;
+            max-width: 440px;
+            white-space: pre-wrap;
+            display: none;
+        }
+
+        /* ── Minimal HUD ────────────────────────────────────────────────────── */
+        #hud {
+            position: fixed;
+            top: .6rem;
+            left: .6rem;
+            font-size: .68rem;
+            color: #ffffff28;
+            pointer-events: none;
+            letter-spacing: .05em;
+        }
+    </style>
 </head>
 <body>
-    <script type="module" src="/src/main.js"></script>
+    <div id="hud">wind particles</div>
 
-    <!-- QR code linking mobile spectators -->
-    <img id="qrcode" style="position:fixed;bottom:1rem;right:1rem;width:120px;height:120px;opacity:.7;cursor:pointer;" />
-
-    <!-- HUD overlay -->
-    <div class="info" style="position:fixed;top:.5rem;left:.5rem;font-family:monospace;font-size:.75rem;color:#ffffff80;pointer-events:none;">
-        <span id="fps">—</span>
-        <span> / </span>
-        <span id="agentsCount">—</span>
-        <span> / </span>
-        <span id="buildDate">—</span>
+    <div id="ui">
+        <div class="field-row">
+            <span class="field-label">direction &nbsp; angle = f(x, y, t, idx, cx, cy)</span>
+            <input id="dir-input"  class="formula-input" type="text" spellcheck="false" autocomplete="off" />
+        </div>
+        <div class="field-row">
+            <span class="field-label">wind &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; angle = f(x, y, t, idx, cx, cy)</span>
+            <input id="wind-input" class="formula-input" type="text" spellcheck="false" autocomplete="off" />
+        </div>
+        <div id="actions">
+            <button id="apply-btn">Apply ↵</button>
+        </div>
+        <div id="presets"></div>
+        <div id="error-msg"></div>
     </div>
 
-    <!-- ─── Temporary media-trail test controls ─────────────────────────────── -->
-    <div id="media-controls"
-         style="position:fixed;bottom:1rem;left:1rem;display:flex;gap:.5rem;flex-direction:column;align-items:flex-start;">
-        <button id="testImage"  class="media-btn">Load B&W Image</button>
-        <button id="testVideo"  class="media-btn">Load B&W Video</button>
-        <button id="clearMedia" class="media-btn">Clear Media</button>
-        <input id="imageFile" type="file" accept="image/*"  style="display:none;">
-        <input id="videoFile" type="file" accept="video/*"  style="display:none;">
-    </div>
-
-    <style>
-        body { margin:0; background:#000; overflow:hidden; }
-        .media-btn {
-            background: rgba(255,255,255,.12);
-            color: #fff;
-            border: 1px solid rgba(255,255,255,.3);
-            padding: .3rem .7rem;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: .75rem;
-            font-family: monospace;
-        }
-        .media-btn:hover { background: rgba(255,255,255,.25); }
-    </style>
+    <script type="module" src="/src/solo.js"></script>
 </body>
 </html>

@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Solo — Formula Particles</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body   { margin: 0; background: #000; overflow: hidden; font-family: monospace; }
+        canvas { display: block; }
+
+        #ui {
+            position: fixed;
+            bottom: 1.2rem;
+            left:   1.2rem;
+            display: flex;
+            flex-direction: column;
+            gap: .45rem;
+            z-index: 10;
+        }
+
+        #formula-label {
+            font-size: .68rem;
+            color: #ffffff55;
+            user-select: none;
+        }
+
+        #formula-row {
+            display: flex;
+            gap: .4rem;
+            align-items: center;
+        }
+
+        #formula-input {
+            font-family: monospace;
+            font-size: .82rem;
+            padding: .32rem .55rem;
+            width: 340px;
+            background: rgba(0, 0, 0, .75);
+            color: #00ff99;
+            border: 1px solid rgba(255, 255, 255, .25);
+            border-radius: 4px;
+            outline: none;
+        }
+        #formula-input:focus { border-color: rgba(0, 255, 153, .55); }
+
+        #apply-btn {
+            padding: .32rem .65rem;
+            background: rgba(255,255,255,.1);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,.25);
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: monospace;
+            font-size: .75rem;
+            white-space: nowrap;
+        }
+        #apply-btn:hover { background: rgba(255,255,255,.22); }
+
+        #presets {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .3rem;
+        }
+        .preset-btn {
+            padding: .2rem .5rem;
+            background: rgba(255,255,255,.07);
+            color: #ffffff88;
+            border: 1px solid rgba(255,255,255,.15);
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: monospace;
+            font-size: .68rem;
+        }
+        .preset-btn:hover { background: rgba(255,255,255,.18); color: #fff; }
+
+        #error-msg {
+            font-size: .7rem;
+            color: #ff5555;
+            max-width: 480px;
+            white-space: pre-wrap;
+            display: none;
+        }
+
+        #hud {
+            position: fixed;
+            top: .5rem;
+            left: .5rem;
+            font-size: .72rem;
+            color: #ffffff40;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="hud">solo — formula particles</div>
+
+    <div id="ui">
+        <div id="formula-label">angle = f(x, y, t, idx, cx, cy)  —  press Enter or Apply</div>
+        <div id="formula-row">
+            <input id="formula-input" type="text" spellcheck="false" autocomplete="off" />
+            <button id="apply-btn">Apply ↵</button>
+        </div>
+        <div id="presets"></div>
+        <div id="error-msg"></div>
+    </div>
+
+    <script type="module" src="/src/solo.js"></script>
+</body>
+</html>

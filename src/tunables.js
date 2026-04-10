@@ -19,16 +19,16 @@ export const baseParams = {
     SENSE_DIST:         20.0,
     SENSE_ANGLE:        0.2,
     TURN_RATE:          20.0,
-    POINT_SIZE:         1.0,
+    POINT_SIZE:         2.0,
     DEPOSIT_SIZE:       0.05,
     DEPOSIT_STRENGTH:   10,
     DEPOSIT_EDGE_SOFT:  0.5,
     CHAMP_SAMPLE_INTERVAL: 50000,
     CHAMP_IMP_MULTIPLIER:  2.0,
     TRAIL_DECAY:        0.89,
-    SPAWN_RADIUS:       20.0,
+    SPAWN_RADIUS:       300.0,
     ENABLE_MOUSE:       false,
-    SHOW_TRAIL:         false,
+    SHOW_TRAIL:         true,
     TRAIL_BRIGHTNESS:   0.002,
     BLOOM_STRENGTH:     0.08,
     BLOOM_THRESHOLD:    0.8,
@@ -98,5 +98,4 @@ fFX.add(params, 'BLOOM_RADIUS',     1,    8,    1);
 fFX.add(params, 'GAMMA',            0.5,  2.5,  0.05);
 
 fSim.open();
-GUI.close();
 if (!import.meta.env.DEV && !panel) { GUI.hide(); }
