@@ -1,29 +1,27 @@
 {
     "type": "module",
     "scripts": {
-        "start": "nodemon ./server/server.js"
+        "dev":    "concurrently -n server,n8n,vite -c cyan,yellow,green \"npm run server\" \"npm run n8n\" \"vite\"",
+        "server": "nodemon ./server/server.js",
+        "n8n":    "n8n start",
+        "build":  "vite build",
+        "start":  "node ./server/server.js"
     },
     "dependencies": {
-        "@runware/sdk-js": "^1.1.50",
-        "colorthief": "^2.6.0",
-        "cors": "^2.8.5",
-        "dat.gui": "^0.7.9",
-        "dotenv": "^17.2.3",
-        "express": "^5.1.0",
-        "lil-gui": "^0.21.0",
-        "nodemon": "^3.1.10",
-        "openai": "^6.7.0",
-        "qrcode": "^1.5.4",
-        "socket.io": "^4.8.1",
-        "socket.io-client": "^4.8.1",
-        "three": "^0.180.0"
+        "cors":            "^2.8.5",
+        "dotenv":          "^17.2.3",
+        "express":         "^5.1.0",
+        "lil-gui":         "^0.21.0",
+        "nodemon":         "^3.1.10",
+        "qrcode":          "^1.5.4",
+        "socket.io":       "^4.8.1",
+        "socket.io-client":"^4.8.1"
     },
     "devDependencies": {
-        "@tailwindcss/cli": "^4.1.16",
-        "@tailwindcss/vite": "^4.1.16",
-        "@vitejs/plugin-basic-ssl": "^2.1.0",
-        "local-ssl-proxy": "^2.0.5",
-        "tailwindcss": "^4.1.16",
-        "vite": "^7.1.10"
+        "@tailwindcss/cli":   "^4.1.16",
+        "@tailwindcss/vite":  "^4.1.16",
+        "concurrently":       "^9.1.2",
+        "tailwindcss":        "^4.1.16",
+        "vite":               "^7.1.10"
     }
 }

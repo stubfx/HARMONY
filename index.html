@@ -1,20 +1,48 @@
-<html>
-    <head>
-        <meta charset="utf-8">
-        <title>Thesis</title>
-    </head>
-    <body>
-        <script type="module" src="/src/main.js"></script>
-        <!-- <canvas id="renderCanvas"></canvas> -->
-        <img id="qrcode"/>
-        <div class="info">
-            <span id="fps">N/A</span>
-            <span>/</span>
-            <span id="agentsCount">N/A</span>
-            <span>/</span>
-            <span id="buildDate">N/A</span>
-            <!-- <span id="deltaTime">N/A</span> -->
-        </div>
-        <button id="saveConfig">Save</button>
-    </body>
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Thesis — Ant Simulation</title>
+</head>
+<body>
+    <script type="module" src="/src/main.js"></script>
+
+    <!-- QR code linking mobile spectators -->
+    <img id="qrcode" style="position:fixed;bottom:1rem;right:1rem;width:120px;height:120px;opacity:.7;cursor:pointer;" />
+
+    <!-- HUD overlay -->
+    <div class="info" style="position:fixed;top:.5rem;left:.5rem;font-family:monospace;font-size:.75rem;color:#ffffff80;pointer-events:none;">
+        <span id="fps">—</span>
+        <span> / </span>
+        <span id="agentsCount">—</span>
+        <span> / </span>
+        <span id="buildDate">—</span>
+    </div>
+
+    <!-- ─── Temporary media-trail test controls ─────────────────────────────── -->
+    <div id="media-controls"
+         style="position:fixed;bottom:1rem;left:1rem;display:flex;gap:.5rem;flex-direction:column;align-items:flex-start;">
+        <button id="testImage"  class="media-btn">Load B&W Image</button>
+        <button id="testVideo"  class="media-btn">Load B&W Video</button>
+        <button id="clearMedia" class="media-btn">Clear Media</button>
+        <input id="imageFile" type="file" accept="image/*"  style="display:none;">
+        <input id="videoFile" type="file" accept="video/*"  style="display:none;">
+    </div>
+
+    <style>
+        body { margin:0; background:#000; overflow:hidden; }
+        .media-btn {
+            background: rgba(255,255,255,.12);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,.3);
+            padding: .3rem .7rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: .75rem;
+            font-family: monospace;
+        }
+        .media-btn:hover { background: rgba(255,255,255,.25); }
+    </style>
+</body>
 </html>

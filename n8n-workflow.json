@@ -1,0 +1,42 @@
+{
+  "name": "Simulation Parameters",
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "simulation",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "2",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [300, 0],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"name\": \"default\",\n  \"feelings\": {\n    \"arousal\": 0.5,\n    \"valence\": 0.5,\n    \"dominance\": 0.5,\n    \"cohesion\": 0.5,\n    \"novelty\": 0.5,\n    \"focus\": 0.5,\n    \"tension\": 0.5\n  },\n  \"simulation\": {\n    \"STEP_LEN\": 70,\n    \"DRAG\": 0.5,\n    \"TURN_JITTER\": 0.1,\n    \"SENSE_DIST\": 20,\n    \"SENSE_ANGLE\": 0.2,\n    \"TURN_RATE\": 20,\n    \"POINT_SIZE\": 1.0,\n    \"DEPOSIT_SIZE\": 0.05,\n    \"DEPOSIT_STRENGTH\": 10,\n    \"DEPOSIT_EDGE_SOFT\": 0.5,\n    \"CHAMP_SAMPLE_INTERVAL\": 50000,\n    \"CHAMP_IMP_MULTIPLIER\": 2,\n    \"TRAIL_DECAY\": 0.89,\n    \"SPAWN_RADIUS\": 20,\n    \"COLOR\": {\n      \"POINT_COLOR\": { \"r\": 1.0, \"g\": 1.0, \"b\": 1.0 },\n      \"SECONDARY_AMOUNT\": 10,\n      \"POINT_SECONDARY_COLOR\": { \"r\": 1.0, \"g\": 1.0, \"b\": 1.0 },\n      \"TERTIARY_AMOUNT\": 11,\n      \"POINT_TERTIARY_COLOR\": { \"r\": 1.0, \"g\": 1.0, \"b\": 1.0 }\n    }\n  },\n  \"image_prompt\": \"abstract flowing network of luminous particles\"\n}"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [{ "node": "Respond to Webhook", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Receives text prompts from the simulation's mobile interface and returns simulation parameters. Replace the Respond to Webhook node with an AI Agent (OpenAI, Claude, etc.) to generate dynamic parameters from the user's input."
+  }
+}

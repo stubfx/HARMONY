@@ -1,102 +1,105 @@
-import express from "express";
-import {createServer} from 'node:http';
-import {Server} from 'socket.io';
-import dotenv from "dotenv";
-import cors from "cors";
-import * as Utils from './server-utils.js';
-import {chat, imagine, saveFileInVectorStore} from './openai-api.js';
-import { randomUUID } from "node:crypto";
+// ─── Backend Server — Socket.IO relay + n8n bridge ───────────────────────────
+// The server no longer calls OpenAI directly.
+// ALL AI/parameter logic is delegated to n8n via webhook.
+
+import express     from 'express';
+import { createServer } from 'node:http';
+import { Server }  from 'socket.io';
+import dotenv      from 'dotenv';
+import cors        from 'cors';
+import { randomUUID } from 'node:crypto';
+import * as Utils  from './server-utils.js';
+import { forwardToN8n } from './n8n-proxy.js';
 
 dotenv.config();
 
-const ORIGINS = ["https://stubfx.io", "https://localhost", "https://192.168.1.12"];
-const app = express();
-const server = createServer(app);
-const port = process.env.PORT;
+const ORIGINS = [
+    'https://stubfx.io',
+    'https://localhost',
+    'https://192.168.1.12',
+    // Allow any local IP during dev
+    ...(process.env.EXTRA_ORIGINS ?? '').split(',').filter(Boolean),
+];
 
+const app    = express();
+const server = createServer(app);
+const port   = process.env.PORT ?? 3000;
+
+// ── Socket.IO ─────────────────────────────────────────────────────────────────
 const io = new Server(server, {
-  path: "/socket.io",// keep in sync with client
-  cors: {
-    origin: ORIGINS,// no "*" if credentials=true
-    methods: ["GET", "POST"],
-    credentials: true
-  }
+    path: '/socket.io',
+    cors: {
+        origin:      ORIGINS,
+        methods:     ['GET', 'POST'],
+        credentials: true,
+    },
 });
-app.use(express.json())
+
+app.use(express.json());
 app.set('trust proxy', true);
 
-let hostList = {}
+// host socket-id registry: { [UUID]: socketId }
+const hostList = {};
 
 io.on('connection', (socket) => {
-    console.log('device connected');
+    console.log('[socket] connected', socket.id);
 
-    // socket.on("event", (event) => {
-    //     io.to(hostList[event.room]).emit("event", event.gyro);
-    // });
-
-    socket.on("motion", (event) => {
-        console.log(event)
-        io.to(hostList[event.room]).emit("motion", event.motion);
+    // Host registers its session UUID
+    socket.on('register-host', ({ room }) => {
+        console.log('[socket] register-host', room);
+        hostList[room] = socket.id;
     });
 
-    socket.on("color", (event) => {
-        io.to(hostList[event.room]).emit("color", event.color);
+    // ── Mobile → Host relay events ─────────────────────────────────────────
+
+    // Raw colour override (bypasses n8n, instant)
+    socket.on('color', ({ room, color }) => {
+        io.to(hostList[room]).emit('color', color);
     });
 
-    socket.on("text-input", (event) => {
-        io.to(hostList[event.room]).emit("text-input", event.data);
+    // Device motion intensity (bypasses n8n, instant)
+    socket.on('motion', ({ room, motion }) => {
+        io.to(hostList[room]).emit('motion', motion);
     });
 
-    socket.on("register-host", (host) => {
-        console.log("register-host", host.room);
-        hostList[host.room] = socket.id;
+    // ── Text prompt: forward to n8n, relay params back to host ───────────────
+    socket.on('text-input', async ({ room, data }) => {
+        // Immediately echo the text to the host so it can show loading state
+        io.to(hostList[room]).emit('text-input', data);
+
+        // Forward to n8n workflow
+        const result = await forwardToN8n('simulation', { text: data, room });
+
+        if (result) {
+            // n8n returns the full response: { name, feelings, simulation, image_prompt, image_data? }
+            io.to(hostList[room]).emit('sim-params', result);
+        }
+    });
+
+    socket.on('disconnect', () => {
+        // Clean up host registry if the host disconnects
+        for (const [room, id] of Object.entries(hostList)) {
+            if (id === socket.id) delete hostList[room];
+        }
     });
 });
 
+// ── HTTP endpoints ────────────────────────────────────────────────────────────
+app.use(cors({ origin: ORIGINS, methods: ['GET', 'POST'], allowedHeaders: ['Content-Type'] }));
 
-// allow only localhost:5173 (vite dev default)
-app.use(cors({
-    origin: ORIGINS,   // or "*" for all origins
-    methods: ["GET", "POST"],
-    allowedHeaders: ["Content-Type", "Authorization"]
-}));
-
-
-app.post("/uuid", async (req, res) => {
+// Session UUID
+app.post('/uuid', (_req, res) => {
     res.json(randomUUID());
 });
 
-app.post("/chat", async (req, res) => {
-    const text = await chat(req.body.text);
-    res.json(JSON.parse(text.output_text));
-});
-
-app.post("/save", async (req, res) => {
-    const data = req.body;
-    const text = await saveFileInVectorStore(data.name, data.simConfig);
-    res.json('ok');
-});
-
-app.post("/rndImage", async (req, res) => {
-    const {fileName, data} = await Utils.randomPrevImage();
-    const decoded = data.toString('base64');
-    const base64 = "data:image/png;base64," + decoded;
-    res.json({name: fileName, data: base64})
-});
-
-app.post("/imagine", async (req, res) => {
-    const imagine_res = await imagine(req.body.prompt);
-    const imageData = imagine_res.output.findLast(el => !!el.result)
-    if (imageData) {
-        // save the image first.
-        Utils.saveBase64Async(imageData.result);
-        res.json("data:image/png;base64," + imageData.result)
-    } else {
-        res.json();
+// Serve a random cached image (for placeholder media trail)
+app.post('/rndImage', async (_req, res) => {
+    try {
+        const { fileName, data } = await Utils.randomPrevImage();
+        res.json({ name: fileName, data: 'data:image/png;base64,' + data.toString('base64') });
+    } catch (e) {
+        res.status(404).json(null);
     }
 });
 
-server.listen(port, () => {
-    console.log(`Server running at :${port}`);
-});
-
+server.listen(port, () => console.log(`[server] :${port}`));
