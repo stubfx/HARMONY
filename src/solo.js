@@ -21,13 +21,13 @@ const params = {
     minSpeed:    0.2,
     // Wind
     windEnabled: true,
-    windStr:     0.3,
+    windStr:     0.2,
     showWindVis: false,
     autoWind:    true,   // cycle through WIND_FORMULAS every 10 s
     // Visual
     trailDecay:  0.055,
     pointSize:   2.0,
-    color:       '#ffffff',
+    color:       '#0000ff',
     speedColor:  '#ff4400',   // color approached at max speed
     // Magnet
     magnetStr:   1.0,
@@ -38,13 +38,18 @@ const params = {
     // Motion behaviour
     followFormula: true,  // false = free drift (wind + magnet only)
     autoDir:       true,  // randomly cycle dir formula every 30 s
+    restFormula:   false, // lock both formulas to REST_DIR / REST_WIND
 };
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const AGENT_COUNT = 1_000_000;
+const AGENT_COUNT = 1_200_000;
 
 const DEFAULT_DIR  = 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI';
 const DEFAULT_WIND = 'sin(x * 0.004 - y * 0.003 + t * 0.4) * TWO_PI';
+
+// Resting formulas — applied when params.restFormula is on
+const REST_DIR  = 'sin(x * 0.009 + sin(y * 0.006 + t)) * TWO_PI';
+const REST_WIND = 'atan2(cy - y, cx - x) + sin(length(vec2(x-cx,y-cy)) * 0.015 + t) * PI * 0.5';
 
 // 20 direction formulas cycled automatically when params.autoDir is true.
 // Variables: x, y, t, cx, cy, PI, TWO_PI
@@ -256,8 +261,8 @@ function seedAgents() {
     const data = new Float32Array(AGENT_COUNT * 6);   // 6 floats × 4 bytes = 24 bytes/agent
     for (let i = 0; i < AGENT_COUNT; i++) {
         const b = i * 6;
-        data[b]     = Math.random() * canvas.width;
-        data[b + 1] = Math.random() * canvas.height;
+        data[b]     = canvas.width  * 0.5;
+        data[b + 1] = canvas.height * 0.5;
         const a = Math.random() * Math.PI * 2;
         const s = 0.5 + Math.random() * 1.5;
         data[b + 2] = Math.cos(a) * s;
@@ -529,7 +534,10 @@ async function applyFormulas(dir, wind, { reseed = false } = {}) {
     }
 }
 
-await applyFormulas(DEFAULT_DIR, DEFAULT_WIND, { reseed: true });
+const rndPick   = arr => arr[Math.floor(Math.random() * arr.length)];
+const startDir  = rndPick(DIR_FORMULAS);
+const startWind = rndPick(WIND_FORMULAS);
+await applyFormulas(startDir, startWind, { reseed: true });
 
 // ── Session: QR code + SSE ────────────────────────────────────────────────────
 try {
@@ -610,6 +618,12 @@ fMagnet.add({ load: () => document.querySelector('#image-input').click() }, 'loa
 fMagnet.add({ clear: clearMagnetImage }, 'clear').name('Clear image');
 
 gui.add({ restart: () => seedAgents() }, 'restart').name('↺  Restart');
+gui.add(params, 'restFormula').name('⌂  rest position').onChange(v => {
+    if (!v) return;
+    dirInput.value  = REST_DIR;
+    windInput.value = REST_WIND;
+    applyFormulas(REST_DIR, REST_WIND);
+});
 
 fMotion.open();
 fWind.open();
@@ -620,15 +634,15 @@ const windInput = document.querySelector('#wind-input');
 const applyBtn  = document.querySelector('#apply-btn');
 const presetsEl = document.querySelector('#presets');
 
-dirInput.value  = DEFAULT_DIR;
-windInput.value = DEFAULT_WIND;
+dirInput.value  = startDir;
+windInput.value = startWind;
 
 // ── Auto formula cycle — random pick every 30 s ───────────────────────────────
 // Each flag is checked independently; both can fire in the same tick.
-// followFormula / windEnabled guard: no point cycling a formula that has no effect.
-const rndPick = arr => arr[Math.floor(Math.random() * arr.length)];
-
+// restFormula overrides everything; followFormula / windEnabled guard the rest.
 setInterval(() => {
+    if (params.restFormula) return;
+
     let newDir  = dirInput.value;
     let newWind = windInput.value;
     let changed = false;
