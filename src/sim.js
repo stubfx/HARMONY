@@ -607,6 +607,18 @@ function applySimParams(data) {
     }
 }
 
+// ── HUD visibility — hidden by default; show with ?gui=true or Ctrl ──────────
+let guiVisible = new URLSearchParams(location.search).get('gui') === 'true';
+const uiEl      = document.querySelector('#ui');
+const monitorEl = document.querySelector('#monitor');
+
+function applyGUIVisibility() {
+    const d = guiVisible ? '' : 'none';
+    uiEl.style.display      = d;
+    monitorEl.style.display = d;
+    gui.domElement.style.display = d;
+}
+
 // ── lil-gui ───────────────────────────────────────────────────────────────────
 const gui = new GUI({ title: 'Wind Particles', width: 260 });
 
@@ -659,6 +671,12 @@ gui.add(params, 'restFormula').name('⌂  rest position').onChange(v => {
 
 fMotion.open();
 fWind.open();
+
+applyGUIVisibility();
+
+window.addEventListener('keydown', e => {
+    if (e.key === 'Control') { guiVisible = !guiVisible; applyGUIVisibility(); }
+});
 
 // ── Formula UI wiring ─────────────────────────────────────────────────────────
 const dirInput  = document.querySelector('#dir-input');
