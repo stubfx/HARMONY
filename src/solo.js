@@ -490,7 +490,7 @@ await applyFormulas(DEFAULT_DIR, DEFAULT_WIND);
         await QRCode.toCanvas(qrCanvas, userUrl, {
             width:  120,
             margin: 1,
-            color:  { dark: '#ffffff', light: '#00000000' },
+            color:  { dark: '#000000', light: '#ffffff' },
         });
         qrCanvas.style.display = 'block';
     } catch { /* server not running in this context — silently skip */ }
