@@ -8,8 +8,8 @@
 
 import GUI              from 'lil-gui';
 import QRCode           from 'qrcode';
-import soloSimTemplate  from './shaders/solo_sim.wgsl?raw';
-import soloRenderWGSL   from './shaders/solo_render.wgsl?raw';
+import soloSimTemplate  from './shaders/compute.wgsl?raw';
+import soloRenderWGSL   from './shaders/render.wgsl?raw';
 import { uuid }         from './client-api.js';
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -35,6 +35,7 @@ const params = {
     pointSize:   2.0,
     color:       '#0000ff',
     speedColor:  '#ff4400',   // color approached at max speed
+    brightness:  0.08,        // per-particle alpha; prevents additive saturation to white
     // Magnet
     magnetStr:   1.0,
     imageSize:   0.316,   // fraction of each screen dimension (0.316² ≈ 1/10 screen area)
@@ -260,7 +261,7 @@ const soloUB = device.createBuffer({
     size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
-    size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const fadeUB = device.createBuffer({
     size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -339,7 +340,8 @@ const fadeBG = device.createBindGroup({
     entries: [{ binding: 0, resource: { buffer: fadeUB } }],
 });
 
-// Particles: additive blend — now with image sampler/texture at bindings 2 & 3
+// Particles: attenuated additive blend (src-alpha × one) so brightness controls
+// accumulation — prevents saturation to white on dense clusters.
 const renderMod = device.createShaderModule({ code: soloRenderWGSL });
 const renderPipe = device.createRenderPipeline({
     layout: 'auto',
@@ -349,8 +351,8 @@ const renderPipe = device.createRenderPipeline({
         targets: [{
             format: 'rgba8unorm',
             blend: {
-                color: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
-                alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
+                color: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' },
+                alpha: { srcFactor: 'one',        dstFactor: 'one', operation: 'add' },
             },
         }],
     },
@@ -553,8 +555,8 @@ async function applyFormulas(dir, wind, { reseed = false } = {}) {
 }
 
 const rndPick   = arr => arr[Math.floor(Math.random() * arr.length)];
-const startDir  = rndPick(DIR_FORMULAS);
-const startWind = rndPick(WIND_FORMULAS);
+const startDir  = 'atan2(cy - y, cx - x)';
+const startWind = 'atan2(y - cy, x - cx) + sin(length(vec2(x-cx,y-cy)) * 0.008) * PI + t';
 let introActive = true;
 await applyFormulas(startDir, startWind, { reseed: true });
 setTimeout(() => { introActive = false; }, params.introDelay * 1000);
@@ -637,7 +639,8 @@ fVis.add(params, 'renderScale', 0.1, 1.0, 0.05).name('render scale').onChange(()
 fVis.add(params,  'trailDecay', 0.005, 0.4, 0.005).name('trail decay');
 fVis.add(params,  'pointSize',  1, 6, 0.1).name('agent size');
 fVis.addColor(params, 'color').name('base color');
-fVis.addColor(params, 'speedColor').name('speed color');
+fVis.addColor(params, 'speedColor').name('fast color');
+fVis.add(params, 'brightness', 0.01, 0.5, 0.005).name('brightness');
 
 const fMagnet = gui.addFolder('Magnet Image');
 fMagnet.add(params, 'magnetStr',  0, 10,  0.1).name('strength');
@@ -747,7 +750,7 @@ function writeSoloUB(dt, time) {
 }
 
 function writeRenderUB() {
-    const ab   = new ArrayBuffer(64);
+    const ab   = new ArrayBuffer(80);
     const u    = new Uint32Array(ab);
     const f    = new Float32Array(ab);
     const rgb  = hexToF(params.color);
@@ -769,6 +772,7 @@ function writeRenderUB() {
     f[13] = srgb[0];
     f[14] = srgb[1];
     f[15] = srgb[2];
+    f[16] = params.brightness;
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 
