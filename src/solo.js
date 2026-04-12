@@ -7,8 +7,10 @@
 // Speed drives brightness. A fading trail accumulates on an offscreen texture.
 
 import GUI              from 'lil-gui';
+import QRCode           from 'qrcode';
 import soloSimTemplate  from './shaders/solo_sim.wgsl?raw';
 import soloRenderWGSL   from './shaders/solo_render.wgsl?raw';
+import { uuid }         from './client-api.js';
 
 // ── Tunable parameters (mutated by lil-gui) ───────────────────────────────────
 const params = {
@@ -476,6 +478,23 @@ async function applyFormulas(dir, wind) {
 }
 
 await applyFormulas(DEFAULT_DIR, DEFAULT_WIND);
+
+// ── QR code — bottom-left link to mobile spectator page ──────────────────────
+(async () => {
+    try {
+        const sessionId = await uuid();
+        if (!sessionId) return;
+        const userUrl   = (import.meta.env.VITE_USER_URL ?? '/m_src/') + '?s=' + sessionId;
+        const qrCanvas  = document.querySelector('#qr-canvas');
+        if (!qrCanvas) return;
+        await QRCode.toCanvas(qrCanvas, userUrl, {
+            width:  120,
+            margin: 1,
+            color:  { dark: '#ffffff', light: '#00000000' },
+        });
+        qrCanvas.style.display = 'block';
+    } catch { /* server not running in this context — silently skip */ }
+})();
 
 // ── lil-gui ───────────────────────────────────────────────────────────────────
 const gui = new GUI({ title: 'Wind Particles', width: 260 });
