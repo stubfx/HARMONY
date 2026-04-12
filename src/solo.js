@@ -211,9 +211,19 @@ function setSize() {
 setSize();
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
-const errEl = document.querySelector('#error-msg');
+const errEl     = document.querySelector('#error-msg');
+const monRes    = document.querySelector('#mon-res');
+const monFps    = document.querySelector('#mon-fps');
+const monAgents = document.querySelector('#mon-agents');
+
 function showError(msg) { if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; } }
 function hideError()    { if (errEl) errEl.style.display = 'none'; }
+
+function updateMonitor(fps) {
+    if (monRes)    monRes.textContent    = `${canvas.width} × ${canvas.height}`;
+    if (monFps)    monFps.textContent    = `${fps.toFixed(1)} fps`;
+    if (monAgents) monAgents.textContent = `${AGENT_COUNT.toLocaleString()} agents`;
+}
 
 // ── Image region: centered square, size = params.imageSize fraction of each dimension ──
 // imageSize = 1.0 → full screen; 0.316 → ~1/10 of screen area (√0.1 per side)
@@ -606,7 +616,7 @@ fWind.add(params, 'autoWind').name('auto-cycle formula');
 
 const fVis = gui.addFolder('Visual');
 fVis.add(params,  'trailDecay', 0.005, 0.4, 0.005).name('trail decay');
-fVis.add(params,  'pointSize',  1, 6, 0.1).name('point size');
+fVis.add(params,  'pointSize',  1, 6, 0.1).name('agent size');
 fVis.addColor(params, 'color').name('base color');
 fVis.addColor(params, 'speedColor').name('speed color');
 
@@ -778,7 +788,9 @@ function writeImageDebugUB() {
 
 // ── Frame loop ────────────────────────────────────────────────────────────────
 const TIME_MULT = 0.001;
-let prevTime = performance.now() * TIME_MULT;
+let prevTime  = performance.now() * TIME_MULT;
+let fpsFrames = 0;
+let fpsLast   = performance.now();
 
 function frame(ts) {
     requestAnimationFrame(frame);
@@ -845,6 +857,14 @@ function frame(ts) {
     bp.end();
 
     device.queue.submit([enc.finish()]);
+
+    fpsFrames++;
+    const nowMs = performance.now();
+    if (nowMs - fpsLast >= 1000) {
+        updateMonitor((fpsFrames * 1000) / (nowMs - fpsLast));
+        fpsFrames = 0;
+        fpsLast   = nowMs;
+    }
 }
 
 requestAnimationFrame(frame);

@@ -88,20 +88,28 @@
             display: none;
         }
 
-        /* ── Minimal HUD ────────────────────────────────────────────────────── */
-        #hud {
+        /* ── Monitor ────────────────────────────────────────────────────────── */
+        #monitor {
             position: fixed;
-            top: .6rem;
-            left: .6rem;
+            top: .8rem;
+            left: .8rem;
+            display: flex;
+            flex-direction: column;
+            gap: .15rem;
             font-size: .68rem;
-            color: #ffffff28;
+            color: #ffffff35;
             pointer-events: none;
-            letter-spacing: .05em;
+            letter-spacing: .06em;
+            line-height: 1;
         }
     </style>
 </head>
 <body>
-    <div id="hud">wind particles</div>
+    <div id="monitor">
+        <span id="mon-res"></span>
+        <span id="mon-fps"></span>
+        <span id="mon-agents"></span>
+    </div>
 
     <div id="ui">
         <div class="field-row">
