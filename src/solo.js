@@ -39,8 +39,8 @@ const params = {
 // ── Config ────────────────────────────────────────────────────────────────────
 const AGENT_COUNT = 1_000_000;
 
-const DEFAULT_DIR  = 'sin(x * 0.006 + t * 0.4) * PI';
-const DEFAULT_WIND = 'sin(x * 0.004 + t * 0.3) * PI + cos(y * 0.003 + t * 0.2) * 0.8';
+const DEFAULT_DIR  = 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI';
+const DEFAULT_WIND = 'sin(x * 0.004 - y * 0.003 + t * 0.4) * TWO_PI';
 
 const PRESETS = [
     { label: 'waves + weather', dir: 'sin(x * 0.006 + t * 0.4) * PI',                                       wind: 'sin(x * 0.004 + t * 0.3) * PI + cos(y * 0.003 + t * 0.2) * 0.8' },
