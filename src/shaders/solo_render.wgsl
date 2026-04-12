@@ -5,38 +5,40 @@
 // colour replaces the sim colour (still modulated by speed).
 //
 // SoloRenderParams layout (64 bytes):
-//   [0]  agentCount u32
-//   [4]  canvasW    f32
-//   [8]  canvasH    f32
-//   [12] pointSize  f32  (px)
-//   [16] colorR     f32
-//   [20] colorG     f32
-//   [24] colorB     f32
-//   [28] maxSpeed   f32
-//   [32] hasImage   u32
-//   [36] imgX0      f32  (left edge of image region, canvas px)
-//   [40] imgY0      f32  (top edge)
-//   [44] imgX1      f32  (right edge)
-//   [48] imgY1      f32  (bottom edge)
-//   [52..63] padding
+//   [0]  agentCount  u32
+//   [4]  canvasW     f32
+//   [8]  canvasH     f32
+//   [12] pointSize   f32  (px)
+//   [16] colorR      f32  (base sim color — shown at low speed)
+//   [20] colorG      f32
+//   [24] colorB      f32
+//   [28] maxSpeed    f32
+//   [32] hasImage    u32
+//   [36] imgX0       f32  (left edge of image region, canvas px)
+//   [40] imgY0       f32  (top edge)
+//   [44] imgX1       f32  (right edge)
+//   [48] imgY1       f32  (bottom edge)
+//   [52] speedColorR f32  (target color approached at max speed)
+//   [56] speedColorG f32
+//   [60] speedColorB f32
 
 struct SoloRenderParams {
-    agentCount: u32,
-    canvasW:    f32,
-    canvasH:    f32,
-    pointSize:  f32,
-    colorR:     f32,
-    colorG:     f32,
-    colorB:     f32,
-    maxSpeed:   f32,
-    hasImage:   u32,
-    imgX0:      f32,
-    imgY0:      f32,
-    imgX1:      f32,
-    imgY1:      f32,
-    _pad0:      u32,
-    _pad1:      u32,
-    _pad2:      u32,
+    agentCount:  u32,
+    canvasW:     f32,
+    canvasH:     f32,
+    pointSize:   f32,
+    colorR:      f32,
+    colorG:      f32,
+    colorB:      f32,
+    maxSpeed:    f32,
+    hasImage:    u32,
+    imgX0:       f32,
+    imgY0:       f32,
+    imgX1:       f32,
+    imgY1:       f32,
+    speedColorR: f32,
+    speedColorG: f32,
+    speedColorB: f32,
 }
 
 struct Agent {
@@ -53,9 +55,9 @@ struct Agent {
 
 struct VsOut {
     @builtin(position) pos:      vec4<f32>,
-    @location(0)       color:    vec3<f32>,   // sim color × brightness
+    @location(0)       color:    vec3<f32>,   // mix(simColor, speedColor, speedRatio)
     @location(1)       agentPos: vec2<f32>,   // canvas-pixel center of the agent
-    @location(2)       bright:   f32,
+    @location(2)       bright:   f32,         // speed ratio [0..1], used for image blend
 }
 
 @vertex fn vs(@builtin(vertex_index) vi: u32) -> VsOut {
@@ -81,12 +83,14 @@ struct VsOut {
     );
     let finalNdc = ndc + corners[corner] * half * 2.0;
 
-    // Speed → brightness: still = near invisible, fast = full glow
-    let speed  = length(agent.vel);
-    let bright = clamp(speed / max(params.maxSpeed, 0.001), 0.08, 1.0);
-    let color  = vec3<f32>(params.colorR, params.colorG, params.colorB) * bright;
+    // Speed → color: slow particles keep base sim color, fast ones approach speed color
+    let speed      = length(agent.vel);
+    let t          = clamp(speed / max(params.maxSpeed, 0.001), 0.0, 1.0);
+    let baseColor  = vec3<f32>(params.colorR,      params.colorG,      params.colorB);
+    let speedColor = vec3<f32>(params.speedColorR, params.speedColorG, params.speedColorB);
+    let color      = mix(baseColor, speedColor, t);
 
-    return VsOut(vec4<f32>(finalNdc, 0.0, 1.0), color, agent.pos, bright);
+    return VsOut(vec4<f32>(finalNdc, 0.0, 1.0), color, agent.pos, t);
 }
 
 @fragment fn fs(in: VsOut) -> @location(0) vec4<f32> {

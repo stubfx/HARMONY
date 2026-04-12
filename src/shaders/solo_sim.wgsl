@@ -11,41 +11,47 @@
 //   PI, TWO_PI
 //   Full WGSL built-in set: sin, cos, atan2, sqrt, fract, length, mix, …
 //
-// SoloParams layout (64 bytes):
-//   [0]  agentCount u32
-//   [4]  canvasW    f32
-//   [8]  canvasH    f32
-//   [12] stepLen    f32   (base speed, px per nominal 60-fps frame)
-//   [16] dt         f32
-//   [20] time       f32
-//   [24] windStr    f32   (wind force magnitude per nominal frame)
-//   [28] turnRate   f32   (lerp factor toward desired dir, 0..1 per frame)
-//   [32] maxSpeed   f32
-//   [36] minSpeed   f32
-//   [40] hasImage   u32   (1 when a magnet image is bound)
-//   [44] magnetStr  f32   (image gradient force multiplier)
-//   [48] imgX0      f32   (left edge of image region, canvas px)
-//   [52] imgY0      f32   (top edge)
-//   [56] imgX1      f32   (right edge)
-//   [60] imgY1      f32   (bottom edge)
+// SoloParams layout (80 bytes):
+//   [0]  agentCount    u32
+//   [4]  canvasW       f32
+//   [8]  canvasH       f32
+//   [12] stepLen       f32   (base speed, px per nominal 60-fps frame)
+//   [16] dt            f32
+//   [20] time          f32
+//   [24] windStr       f32   (wind force magnitude per nominal frame)
+//   [28] turnRate      f32   (lerp factor toward desired dir, 0..1 per frame)
+//   [32] maxSpeed      f32
+//   [36] minSpeed      f32
+//   [40] hasImage      u32   (1 when a magnet image is bound)
+//   [44] magnetStr     f32   (image gradient force multiplier)
+//   [48] imgX0         f32   (left edge of image region, canvas px)
+//   [52] imgY0         f32   (top edge)
+//   [56] imgX1         f32   (right edge)
+//   [60] imgY1         f32   (bottom edge)
+//   [64] followFormula u32   (1 = steer toward direction formula; 0 = free drift)
+//   [68..79] padding
 
 struct SoloParams {
-    agentCount: u32,
-    canvasW:    f32,
-    canvasH:    f32,
-    stepLen:    f32,
-    dt:         f32,
-    time:       f32,
-    windStr:    f32,
-    turnRate:   f32,
-    maxSpeed:   f32,
-    minSpeed:   f32,
-    hasImage:   u32,
-    magnetStr:  f32,
-    imgX0:      f32,
-    imgY0:      f32,
-    imgX1:      f32,
-    imgY1:      f32,
+    agentCount:    u32,
+    canvasW:       f32,
+    canvasH:       f32,
+    stepLen:       f32,
+    dt:            f32,
+    time:          f32,
+    windStr:       f32,
+    turnRate:      f32,
+    maxSpeed:      f32,
+    minSpeed:      f32,
+    hasImage:      u32,
+    magnetStr:     f32,
+    imgX0:         f32,
+    imgY0:         f32,
+    imgX1:         f32,
+    imgY1:         f32,
+    followFormula: u32,
+    _pad0:         u32,
+    _pad1:         u32,
+    _pad2:         u32,
 }
 
 // [pos.xy, vel.xy, weight, _pad] — 24 bytes
@@ -91,8 +97,10 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let wind      = vec2<f32>(cos(windAngle), sin(windAngle)) * params.windStr;
 
     // ── Velocity update ───────────────────────────────────────────────────────
-    // Lerp toward desired direction; weight scales each particle's target speed
-    vel  = mix(vel, desired * (params.stepLen * weight), params.turnRate);
+    // Steer toward direction formula only when followFormula is enabled
+    if (params.followFormula != 0u) {
+        vel = mix(vel, desired * (params.stepLen * weight), params.turnRate);
+    }
     vel += wind * params.dt * 60.0;
 
     // ── Magnet: image gradient pulls particles toward bright areas ────────────

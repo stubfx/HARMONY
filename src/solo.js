@@ -25,12 +25,15 @@ const params = {
     trailDecay:  0.055,
     pointSize:   2.0,
     color:       '#ffffff',
+    speedColor:  '#ff4400',   // color approached at max speed
     // Magnet
     magnetStr:   1.0,
     imageSize:   0.316,   // fraction of each screen dimension (0.316² ≈ 1/10 screen area)
     showImage:   false,
     // Weight
     weightSpread: 0.8,    // 0 = all equal; 1 = weights span [0.05 … 1.95]
+    // Motion behaviour
+    followFormula: true,  // false = free drift (wind + magnet only)
 };
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -180,7 +183,7 @@ const agentBuf = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 const soloUB = device.createBuffer({
-    size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
     size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -482,8 +485,9 @@ fMotion.add(params, 'stepLen',      0.1, 8,    0.1).name('base speed');
 fMotion.add(params, 'turnRate',     0.005, 0.3, 0.005).name('turn rate');
 fMotion.add(params, 'maxSpeed',     1,    15,   0.5).name('max speed');
 fMotion.add(params, 'minSpeed',     0,    2,    0.05).name('min speed');
-fMotion.add(params, 'weightSpread', 0,    1,    0.01).name('weight spread')
+fMotion.add(params, 'weightSpread',   0, 1, 0.01).name('weight spread')
     .onChange(() => seedAgents());
+fMotion.add(params, 'followFormula').name('follow formula');
 
 const fWind = gui.addFolder('Wind');
 const windStrCtrl = fWind.add(params, 'windStr', 0, 2, 0.01).name('strength');
@@ -493,7 +497,8 @@ fWind.add(params, 'showWindVis').name('show arrows');
 const fVis = gui.addFolder('Visual');
 fVis.add(params,  'trailDecay', 0.005, 0.4, 0.005).name('trail decay');
 fVis.add(params,  'pointSize',  1, 6, 0.1).name('point size');
-fVis.addColor(params, 'color').name('color');
+fVis.addColor(params, 'color').name('base color');
+fVis.addColor(params, 'speedColor').name('speed color');
 
 const fMagnet = gui.addFolder('Magnet Image');
 fMagnet.add(params, 'magnetStr',  0, 10,  0.1).name('strength');
@@ -549,7 +554,7 @@ function hexToF(hex) {
 
 // ── Uniform writers ───────────────────────────────────────────────────────────
 function writeSoloUB(dt, time) {
-    const ab = new ArrayBuffer(64);
+    const ab = new ArrayBuffer(80);
     const u  = new Uint32Array(ab);
     const f  = new Float32Array(ab);
     const { x0, y0, x1, y1 } = getImageRegion();
@@ -569,14 +574,16 @@ function writeSoloUB(dt, time) {
     f[13] = y0;
     f[14] = x1;
     f[15] = y1;
+    u[16] = params.followFormula ? 1 : 0;
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
 function writeRenderUB() {
-    const ab  = new ArrayBuffer(64);
-    const u   = new Uint32Array(ab);
-    const f   = new Float32Array(ab);
-    const rgb = hexToF(params.color);
+    const ab   = new ArrayBuffer(64);
+    const u    = new Uint32Array(ab);
+    const f    = new Float32Array(ab);
+    const rgb  = hexToF(params.color);
+    const srgb = hexToF(params.speedColor);
     const { x0, y0, x1, y1 } = getImageRegion();
     u[0] = AGENT_COUNT;
     f[1] = canvas.width;
@@ -591,6 +598,9 @@ function writeRenderUB() {
     f[10] = y0;
     f[11] = x1;
     f[12] = y1;
+    f[13] = srgb[0];
+    f[14] = srgb[1];
+    f[15] = srgb[2];
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 
