@@ -22,8 +22,8 @@
 //   [28] turnRate   f32   (lerp factor toward desired dir, 0..1 per frame)
 //   [32] maxSpeed   f32
 //   [36] minSpeed   f32
-//   [40] _pad0      u32
-//   [44] _pad1      u32
+//   [40] hasImage   u32   (1 when a magnet image is bound)
+//   [44] magnetStr  f32   (image gradient force multiplier)
 
 struct SoloParams {
     agentCount: u32,
@@ -36,18 +36,24 @@ struct SoloParams {
     turnRate:   f32,
     maxSpeed:   f32,
     minSpeed:   f32,
-    _pad0:      u32,
-    _pad1:      u32,
+    hasImage:   u32,
+    magnetStr:  f32,
 }
 
-// [pos.xy, vel.xy] — 16 bytes
+// [pos.xy, vel.xy, weight, _pad] — 24 bytes
+// weight is seeded once (JS) and scales each particle's desired speed.
+// _pad is required: vec2<f32> has 8-byte alignment, so struct size must be ≥ 24.
 struct Agent {
-    pos: vec2<f32>,
-    vel: vec2<f32>,
+    pos:    vec2<f32>,
+    vel:    vec2<f32>,
+    weight: f32,
+    _pad:   f32,
 }
 
-@group(0) @binding(0) var<uniform>             params: SoloParams;
-@group(0) @binding(1) var<storage, read_write> agents: array<Agent>;
+@group(0) @binding(0) var<uniform>             params:   SoloParams;
+@group(0) @binding(1) var<storage, read_write> agents:   array<Agent>;
+@group(0) @binding(2) var                      imageSmp: sampler;
+@group(0) @binding(3) var                      imageTex: texture_2d<f32>;
 
 const PI:     f32 = 3.14159265358979;
 const TWO_PI: f32 = 6.28318530717959;
@@ -57,8 +63,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let i = gid.x;
     if (i >= params.agentCount) { return; }
 
-    var pos = agents[i].pos;
-    var vel = agents[i].vel;
+    var pos    = agents[i].pos;
+    var vel    = agents[i].vel;
+    let weight = agents[i].weight;
 
     let x   = pos.x;
     let y   = pos.y;
@@ -76,9 +83,21 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let wind      = vec2<f32>(cos(windAngle), sin(windAngle)) * params.windStr;
 
     // ── Velocity update ───────────────────────────────────────────────────────
-    // Lerp toward desired direction at base speed, then superimpose wind
-    vel  = mix(vel, desired * params.stepLen, params.turnRate);
+    // Lerp toward desired direction; weight scales each particle's target speed
+    vel  = mix(vel, desired * (params.stepLen * weight), params.turnRate);
     vel += wind * params.dt * 60.0;
+
+    // ── Magnet: image gradient pulls particles toward bright areas ────────────
+    if (params.hasImage != 0u) {
+        let uv  = vec2<f32>(pos.x / params.canvasW, pos.y / params.canvasH);
+        let eps = 24.0 / min(params.canvasW, params.canvasH);
+        let bR  = textureSampleLevel(imageTex, imageSmp, clamp(uv + vec2<f32>(eps, 0.0), vec2<f32>(0.0), vec2<f32>(1.0)), 0.0).r;
+        let bL  = textureSampleLevel(imageTex, imageSmp, clamp(uv - vec2<f32>(eps, 0.0), vec2<f32>(0.0), vec2<f32>(1.0)), 0.0).r;
+        let bD  = textureSampleLevel(imageTex, imageSmp, clamp(uv + vec2<f32>(0.0, eps), vec2<f32>(0.0), vec2<f32>(1.0)), 0.0).r;
+        let bU  = textureSampleLevel(imageTex, imageSmp, clamp(uv - vec2<f32>(0.0, eps), vec2<f32>(0.0), vec2<f32>(1.0)), 0.0).r;
+        let grad = vec2<f32>(bR - bL, bD - bU);
+        vel += grad * params.magnetStr * params.dt * 60.0;
+    }
 
     // Speed bounds
     let spd = length(vel);

@@ -1,8 +1,10 @@
 // ─── Solo Particle Render Shader ──────────────────────────────────────────────
 // Each agent renders as a 2-triangle quad drawn into the offscreen trail texture.
 // Brightness is proportional to speed: fast particles glow; slow ones are dim.
+// If a magnet image is active and the agent overlaps its canvas region, the image
+// colour replaces the sim colour (still modulated by speed).
 //
-// SoloRenderParams layout (32 bytes):
+// SoloRenderParams layout (64 bytes):
 //   [0]  agentCount u32
 //   [4]  canvasW    f32
 //   [8]  canvasH    f32
@@ -10,7 +12,13 @@
 //   [16] colorR     f32
 //   [20] colorG     f32
 //   [24] colorB     f32
-//   [28] maxSpeed   f32  (speed at which brightness reaches 1.0)
+//   [28] maxSpeed   f32
+//   [32] hasImage   u32
+//   [36] imgX0      f32  (left edge of image region, canvas px)
+//   [40] imgY0      f32  (top edge)
+//   [44] imgX1      f32  (right edge)
+//   [48] imgY1      f32  (bottom edge)
+//   [52..63] padding
 
 struct SoloRenderParams {
     agentCount: u32,
@@ -21,19 +29,33 @@ struct SoloRenderParams {
     colorG:     f32,
     colorB:     f32,
     maxSpeed:   f32,
+    hasImage:   u32,
+    imgX0:      f32,
+    imgY0:      f32,
+    imgX1:      f32,
+    imgY1:      f32,
+    _pad0:      u32,
+    _pad1:      u32,
+    _pad2:      u32,
 }
 
 struct Agent {
-    pos: vec2<f32>,
-    vel: vec2<f32>,
+    pos:    vec2<f32>,
+    vel:    vec2<f32>,
+    weight: f32,   // seeded per-particle; unused here but required for correct stride
+    _pad:   f32,
 }
 
 @group(0) @binding(0) var<uniform>       params: SoloRenderParams;
 @group(0) @binding(1) var<storage, read> agents: array<Agent>;
+@group(0) @binding(2) var               imgSmp: sampler;
+@group(0) @binding(3) var               imgTex: texture_2d<f32>;
 
 struct VsOut {
-    @builtin(position) pos:   vec4<f32>,
-    @location(0)       color: vec3<f32>,
+    @builtin(position) pos:      vec4<f32>,
+    @location(0)       color:    vec3<f32>,   // sim color × brightness
+    @location(1)       agentPos: vec2<f32>,   // canvas-pixel center of the agent
+    @location(2)       bright:   f32,
 }
 
 @vertex fn vs(@builtin(vertex_index) vi: u32) -> VsOut {
@@ -64,9 +86,18 @@ struct VsOut {
     let bright = clamp(speed / max(params.maxSpeed, 0.001), 0.08, 1.0);
     let color  = vec3<f32>(params.colorR, params.colorG, params.colorB) * bright;
 
-    return VsOut(vec4<f32>(finalNdc, 0.0, 1.0), color);
+    return VsOut(vec4<f32>(finalNdc, 0.0, 1.0), color, agent.pos, bright);
 }
 
 @fragment fn fs(in: VsOut) -> @location(0) vec4<f32> {
+    // If this agent's center sits inside the image region, colour it from the image
+    if (params.hasImage != 0u) {
+        let u = (in.agentPos.x - params.imgX0) / (params.imgX1 - params.imgX0);
+        let v = (in.agentPos.y - params.imgY0) / (params.imgY1 - params.imgY0);
+        if (u >= 0.0 && u <= 1.0 && v >= 0.0 && v <= 1.0) {
+            let imgColor = textureSampleLevel(imgTex, imgSmp, vec2<f32>(u, v), 0.0).rgb;
+            return vec4<f32>(imgColor * in.bright, 1.0);
+        }
+    }
     return vec4<f32>(in.color, 1.0);
 }

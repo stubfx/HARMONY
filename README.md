@@ -53,6 +53,20 @@ space. Mathematical expressiveness becomes physical intuition.
 
 The simulation is meant to convey that physics is written, not given.
 
+### The image as a hidden attractor
+
+A black-and-white image can be loaded as a magnet layer. Bright areas
+exert a pull — particles drift toward light, dark areas repel or are
+ignored. The image is never rendered directly. It is felt.
+
+What emerges is a kind of collective tracing: thousands of particles
+that do not know what they are drawing, yet gradually reveal its shape
+through density. Like iron filings near a magnet. Like sand settling
+into a pattern it cannot see.
+
+The image is always there, hidden beneath the motion. The particles
+are the only way to know it exists.
+
 ---
 
 ---
@@ -192,6 +206,30 @@ n8n must respond with:
   "image_data":   "optional base64 data URL for media trail"
 }
 ```
+
+---
+
+## Magnet Image Layer
+
+A B&W image can be loaded via the **Magnet Image** panel in the GUI. Once
+loaded, the sim shader samples the image at each particle's UV position and
+computes a central-difference brightness gradient. Particles accelerate toward
+brighter areas — high-contrast edges become corridors, bright fills become
+attractors.
+
+**Controls (lil-gui → Magnet Image):**
+
+| Control | Effect |
+|---------|--------|
+| **strength** | Force multiplier (0 = off, higher = stronger pull) |
+| **show image** | Toggles a 50%-opacity grayscale overlay for debugging |
+| **Load image…** | Opens file picker (any image format the browser supports) |
+| **Clear image** | Removes the image; particles return to wind + formula only |
+
+The image is uploaded to a GPU texture (`rgba8unorm`). The `.r` channel is
+used as brightness, so a true grayscale image works best. The magnet force
+is applied after the wind force and before speed clamping, so it competes
+with the other fields rather than overriding them.
 
 ---
 
