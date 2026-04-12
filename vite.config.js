@@ -11,23 +11,19 @@ export default defineConfig({
         rollupOptions: {
             input: {
                 main: path.resolve(__dirname, 'index.html'),
-                user: path.resolve(__dirname + '/m_src', 'index.html'),
             },
         },
     },
     server: {
         host: '0.0.0.0',
         port: 5173,
-        // In dev: proxy server endpoints so you don't need Caddy running.
-        // When using Caddy (e.g. for iOS), Caddy handles the proxy instead.
+        // Dev: proxy server endpoints to Express so Vite dev server works standalone.
+        // In prod these are same-origin — no proxy needed.
         proxy: {
-            '/socket.io': {
-                target:      'http://localhost:3000',
-                ws:          true,
-                changeOrigin: true,
-            },
-            '/uuid':     'http://localhost:3000',
-            '/rndImage': 'http://localhost:3000',
+            '/uuid':              'http://localhost:3000',
+            '/rndImage':          'http://localhost:3000',
+            '/simulation-events': { target: 'http://localhost:3000', changeOrigin: true },
+            '/n8n-sim-update':    'http://localhost:3000',
         },
     },
 });

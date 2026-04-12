@@ -1,26 +1,22 @@
 {
     "type": "module",
     "scripts": {
-        "dev":    "concurrently -n server,n8n,vite -c cyan,yellow,green \"npm run server\" \"npm run n8n\" \"vite\"",
-        "server": "nodemon ./server/server.js",
-        "n8n":    "n8n start",
-        "build":  "vite build",
-        "start":  "node ./server/server.js"
+        "dev":   "concurrently -n server,n8n,vite -c cyan,yellow,green \"nodemon ./server/server.js\" \"n8n start\" \"vite\"",
+        "build": "vite build",
+        "start": "concurrently -n server,n8n -c cyan,yellow \"node ./server/server.js\" \"n8n start\""
     },
     "dependencies": {
+        "concurrently":    "^9.1.2",
         "cors":            "^2.8.5",
         "dotenv":          "^17.2.3",
         "express":         "^5.1.0",
         "lil-gui":         "^0.21.0",
         "nodemon":         "^3.1.10",
-        "qrcode":          "^1.5.4",
-        "socket.io":       "^4.8.1",
-        "socket.io-client":"^4.8.1"
+        "qrcode":          "^1.5.4"
     },
     "devDependencies": {
         "@tailwindcss/cli":   "^4.1.16",
         "@tailwindcss/vite":  "^4.1.16",
-        "concurrently":       "^9.1.2",
         "tailwindcss":        "^4.1.16",
         "vite":               "^7.1.10"
     }

@@ -23,6 +23,7 @@ const params = {
     windEnabled: true,
     windStr:     0.3,
     showWindVis: false,
+    autoWind:    true,   // cycle through WIND_FORMULAS every 10 s
     // Visual
     trailDecay:  0.055,
     pointSize:   2.0,
@@ -36,6 +37,7 @@ const params = {
     weightSpread: 0.8,    // 0 = all equal; 1 = weights span [0.05 … 1.95]
     // Motion behaviour
     followFormula: true,  // false = free drift (wind + magnet only)
+    autoDir:       true,  // randomly cycle dir formula every 30 s
 };
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -43,6 +45,56 @@ const AGENT_COUNT = 1_000_000;
 
 const DEFAULT_DIR  = 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI';
 const DEFAULT_WIND = 'sin(x * 0.004 - y * 0.003 + t * 0.4) * TWO_PI';
+
+// 20 direction formulas cycled automatically when params.autoDir is true.
+// Variables: x, y, t, cx, cy, PI, TWO_PI
+const DIR_FORMULAS = [
+    'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI',
+    'atan2(y - cy, x - cx) + t * 0.3',
+    'atan2(y - cy, x - cx) - t * 0.4',
+    'sin(x * 0.006 + t * 0.4) * PI',
+    'sin(x * 0.006) * cos(y * 0.006) * TWO_PI',
+    'atan2(y - cy, x - cx) + PI * 0.5',
+    'sin(x * 0.009 + sin(y * 0.006 + t)) * TWO_PI',
+    'sin((x + y) * 0.005 + t * 0.3) * TWO_PI',
+    'sin(y * 0.007 + t * 0.25) * PI',
+    'atan2(y-cy,x-cx) + cos(length(vec2(x-cx,y-cy)) * 0.008 - t * 0.8) * PI',
+    'atan2(cy - y, cx - x)',
+    'atan2(y - cy, x - cx) + sin(t * 1.2) * PI * 0.5',
+    'sin(x * 0.005 + sin(y * 0.007 + t * 0.3) * 2.0) * TWO_PI',
+    'sin(x * 0.008) * cos(y * 0.008) * PI + t * 0.15',
+    'atan2(y-cy,x-cx) + length(vec2(x-cx,y-cy)) * 0.003 + t * 0.5',
+    'sin(x * 0.004 + cos(y * 0.006 + t * 0.3) * 3.0) * TWO_PI',
+    'sin(x * 0.004 + t * 0.2) * cos(y * 0.004 - t * 0.15) * TWO_PI',
+    'sin(length(vec2(x-cx,y-cy)) * 0.015 - t * 2.5) * TWO_PI',
+    'atan2(y - cy, x - cx) * 2.0 + t * 0.2',
+    'sin(x * 0.003 + y * 0.002 + t * 0.15) * TWO_PI',
+];
+
+// 20 wind formulas cycled automatically when params.autoWind is true.
+// Variables: x, y, t, cx, cy, PI, TWO_PI
+const WIND_FORMULAS = [
+    'sin(x * 0.004 - y * 0.003 + t * 0.4) * TWO_PI',
+    'sin(y * 0.005 + t * 0.5) * PI',
+    'cos(x * 0.005 + t * 0.3) * PI',
+    'sin((x + y) * 0.004 + t * 0.3) * TWO_PI',
+    'sin((x - y) * 0.004 - t * 0.3) * TWO_PI',
+    'atan2(y - cy, x - cx) + PI * 0.5',
+    'sin(length(vec2(x-cx,y-cy)) * 0.01 - t * 2.0) * TWO_PI',
+    'sin(x * 0.006 + t * 0.5) * PI + cos(y * 0.004 - t * 0.4) * PI',
+    'sin(x * 0.007 + sin(y * 0.005 + t * 0.3)) * TWO_PI',
+    'atan2(y - cy, x - cx) + sin(length(vec2(x-cx,y-cy)) * 0.008) * PI + t',
+    'sin(x * 0.008 + sin(y * 0.006 + t * 0.2) * 3.0) * TWO_PI',
+    'sin(x * 0.002 + y * 0.001 + t * 0.15) * TWO_PI',
+    'sin(x * 0.009 + t * 1.2) * cos(y * 0.007 - t * 0.9) * TWO_PI',
+    'atan2(cy - y, cx - x) + sin(length(vec2(x-cx,y-cy)) * 0.015 + t) * PI * 0.5',
+    'sin(x * 0.005) * cos(t * 0.3) * PI + cos(y * 0.005) * sin(t * 0.25) * PI',
+    'sin(x * 0.006 + cos(y * 0.007 - t * 0.4) * 4.0) * TWO_PI',
+    'sin(x * 0.004 + t * 0.4) * PI + sin(y * 0.004 - t * 0.3) * PI',
+    'atan2(y - cy, x - cx) + sin(t * 0.8) * PI',
+    'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.006 - t*0.8)*PI + cos(length(vec2(x-cx,y-cy))*0.003 + t*0.5)*PI*0.5',
+    'sin(x * 0.003 + t * 0.6) * cos(y * 0.004 + t * 0.35) * TWO_PI',
+];
 
 const PRESETS = [
     { label: 'waves + weather', dir: 'sin(x * 0.006 + t * 0.4) * PI',                                       wind: 'sin(x * 0.004 + t * 0.3) * PI + cos(y * 0.003 + t * 0.2) * 0.8' },
@@ -467,34 +519,63 @@ async function buildSimPipeline(dir, wind) {
     });
 }
 
-async function applyFormulas(dir, wind) {
+async function applyFormulas(dir, wind, { reseed = false } = {}) {
     try {
         await buildSimPipeline(dir.trim() || DEFAULT_DIR, wind.trim() || DEFAULT_WIND);
         hideError();
-        seedAgents();
+        if (reseed) seedAgents();
     } catch (e) {
         showError(e.message);
     }
 }
 
-await applyFormulas(DEFAULT_DIR, DEFAULT_WIND);
+await applyFormulas(DEFAULT_DIR, DEFAULT_WIND, { reseed: true });
 
-// ── QR code — bottom-left link to mobile spectator page ──────────────────────
-(async () => {
-    try {
-        const sessionId = await uuid();
-        if (!sessionId) return;
-        const userUrl   = (import.meta.env.VITE_USER_URL ?? '/m_src/') + '?s=' + sessionId;
-        const qrCanvas  = document.querySelector('#qr-canvas');
-        if (!qrCanvas) return;
-        await QRCode.toCanvas(qrCanvas, userUrl, {
-            width:  120,
-            margin: 1,
-            color:  { dark: '#000000', light: '#ffffff' },
+// ── Session: QR code + SSE ────────────────────────────────────────────────────
+try {
+    const sessionId = await uuid();
+    if (sessionId) {
+        // QR — bottom-left link to mobile spectator page
+        const userUrl  = (import.meta.env.VITE_USER_URL ?? '/m_src/') + '?s=' + sessionId;
+        const qrCanvas = document.querySelector('#qr-canvas');
+        if (qrCanvas) {
+            await QRCode.toCanvas(qrCanvas, userUrl, {
+                width:  120,
+                margin: 1,
+                color:  { dark: '#000000', light: '#ffffff' },
+            });
+            qrCanvas.style.display = 'block';
+            qrCanvas.style.cursor  = 'pointer';
+            qrCanvas.addEventListener('click', () => window.open(userUrl, '_blank'));
+        }
+
+        // SSE — receive processed params back from n8n via server
+        const es = new EventSource('/simulation-events?room=' + sessionId);
+        es.addEventListener('sim-params', (e) => {
+            try { applySimParams(JSON.parse(e.data)); }
+            catch { /* malformed payload — ignore */ }
         });
-        qrCanvas.style.display = 'block';
-    } catch { /* server not running in this context — silently skip */ }
-})();
+        es.onerror = () => console.warn('[sse] connection lost, will retry…');
+    }
+} catch { /* server not running — skip silently */ }
+
+// Merge n8n-provided params into the live simulation.
+// Only numeric/boolean keys present in the payload are applied;
+// if formulas are included they re-trigger pipeline compilation.
+function applySimParams(data) {
+    const { dir, wind, ...rest } = data;
+    Object.entries(rest).forEach(([k, v]) => {
+        if (k in params) params[k] = v;
+    });
+    gui.controllersRecursive().forEach(c => c.updateDisplay());
+    if (dir !== undefined || wind !== undefined) {
+        const newDir  = dir  ?? dirInput.value;
+        const newWind = wind ?? windInput.value;
+        dirInput.value  = newDir;
+        windInput.value = newWind;
+        applyFormulas(newDir, newWind);
+    }
+}
 
 // ── lil-gui ───────────────────────────────────────────────────────────────────
 const gui = new GUI({ title: 'Wind Particles', width: 260 });
@@ -507,11 +588,13 @@ fMotion.add(params, 'minSpeed',     0,    2,    0.05).name('min speed');
 fMotion.add(params, 'weightSpread',   0, 1, 0.01).name('weight spread')
     .onChange(() => seedAgents());
 fMotion.add(params, 'followFormula').name('follow formula');
+fMotion.add(params, 'autoDir').name('auto-cycle formula');
 
 const fWind = gui.addFolder('Wind');
 const windStrCtrl = fWind.add(params, 'windStr', 0, 2, 0.01).name('strength');
 fWind.add(params, 'windEnabled').name('enabled').onChange(v => windStrCtrl.enable(v));
 fWind.add(params, 'showWindVis').name('show arrows');
+fWind.add(params, 'autoWind').name('auto-cycle formula');
 
 const fVis = gui.addFolder('Visual');
 fVis.add(params,  'trailDecay', 0.005, 0.4, 0.005).name('trail decay');
@@ -539,6 +622,29 @@ const presetsEl = document.querySelector('#presets');
 
 dirInput.value  = DEFAULT_DIR;
 windInput.value = DEFAULT_WIND;
+
+// ── Auto formula cycle — random pick every 30 s ───────────────────────────────
+// Each flag is checked independently; both can fire in the same tick.
+// followFormula / windEnabled guard: no point cycling a formula that has no effect.
+const rndPick = arr => arr[Math.floor(Math.random() * arr.length)];
+
+setInterval(() => {
+    let newDir  = dirInput.value;
+    let newWind = windInput.value;
+    let changed = false;
+
+    if (params.autoDir && params.followFormula) {
+        newDir = rndPick(DIR_FORMULAS);
+        dirInput.value = newDir;
+        changed = true;
+    }
+    if (params.autoWind && params.windEnabled) {
+        newWind = rndPick(WIND_FORMULAS);
+        windInput.value = newWind;
+        changed = true;
+    }
+    if (changed) applyFormulas(newDir, newWind);
+}, 30_000);
 
 function apply() { applyFormulas(dirInput.value, windInput.value); }
 applyBtn.addEventListener('click', apply);

@@ -1,12 +1,10 @@
 // ─── HTTP API client ──────────────────────────────────────────────────────────
-// All AI processing is now handled by n8n.
-// The server still exposes /uuid and /rndImage for session management.
-
-const url = import.meta.env.VITE_API_HOSTNAME;
+// Production-only: frontend and backend share the same origin (Express serves
+// the Vite build). All endpoints are relative so no env config is needed.
 
 async function post(endpoint, body = null) {
     try {
-        const res = await fetch(url + endpoint, {
+        const res = await fetch('/' + endpoint, {
             method:  'POST',
             headers: body ? { 'Content-Type': 'application/json' } : {},
             body:    body ? JSON.stringify(body) : null,

@@ -1,78 +1,71 @@
 import './style.css';
-import {getMovement} from './motion.js';
-
-import {io} from 'socket.io-client';
+import { getMovement } from './motion.js';
 import { startDeviceTilt, requestMotionOrientationPermission } from './gyro';
 
-const ROLE = "spec";
-const urlParams = new URLSearchParams(window.location.search);
-const uuid = urlParams.get("s");
+const urlParams    = new URLSearchParams(window.location.search);
+const uuid         = urlParams.get('s');   // host room ID (from QR)
 
-const socket = io(import.meta.env.VITE_API_HOSTNAME);
+// Unique ID for this spectator — stable across refreshes, fresh each new tab
+const spectatorId  = sessionStorage.getItem('spectator-id') ?? (() => {
+    const id = crypto.randomUUID();
+    sessionStorage.setItem('spectator-id', id);
+    return id;
+})();
 
-const randomColor = () =>
-  '#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0');
+// n8n webhook — set VITE_N8N_EVENT_URL in .env
+const N8N_URL = import.meta.env.VITE_N8N_EVENT_URL ?? 'http://localhost:5678/webhook-test/user-event';
 
-console.log(randomColor());
+// Fire-and-forget: m_src → n8n directly (no server in the path)
+function sendEvent(type, data) {
+    fetch(N8N_URL, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ type, room: uuid, spectatorId, data, timestamp: Date.now() }),
+    })
+    .then(res => { if (!res.ok) console.warn(`[n8n] HTTP ${res.status}`); })
+    .catch(err => console.error('[n8n] unreachable:', err.message));
+}
 
-const statusEl = document.querySelector("#status");
-socket.on('connect', s => {
-    statusEl.classList.add("connected")
-});
+const statusEl = document.querySelector('#status');
 
 let motion;
 
-const buttons = document.querySelectorAll(".quick-color")
-const formEl = document.querySelector("#input-form")
+const buttons = document.querySelectorAll('.quick-color');
+const formEl  = document.querySelector('#input-form');
 
-
+const randomColor = () =>
+    '#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0');
 
 document.getElementById('enable-motion').addEventListener('click', async () => {
     await requestMotionOrientationPermission();
     startDeviceTilt(30, (d) => {
-        // if (d.enabled) { /* disable UI */ return; }
-        // d = { a, b, g, motion, enabled:true }
-        // use normalized yaw/pitch/roll and recent-tilt "motion"
-        console.log(d)
         motion = d.enabled ? d.motion : 0;
     });
-
-    // startDeviceTilt keeps emitting; once granted, payloads switch to enabled:true with angles.
 });
 
-
 formEl.onsubmit = (e) => {
-    // prevent page reoload
     e.preventDefault();
     const form = new FormData(formEl);
     const data = Object.fromEntries(form);
     if (!data.text1) return;
-    sendEvent()
+    flashStatus();
+    sendEvent('text', data.text1);
     formEl.reset();
-    socket.emit("text-input", {room: uuid, role: ROLE, data: data.text1})
-}
+};
 
 buttons.forEach((el) => {
     const color = randomColor();
-    console.log(color)
     el.style.backgroundColor = color;
-    el.onclick = () => {
-        socket.emit("color", {room: uuid, role: ROLE, color: color})
-    }
-})
+    el.onclick = () => sendEvent('color', color);
+});
 
-function sendEvent() {
-    // sending the event will show a ui feedback
-    statusEl.classList.add("loading");   
-    setTimeout(() => {
-        statusEl.classList.remove("loading");   
-    }, 500);
+function flashStatus() {
+    statusEl.classList.add('loading');
+    setTimeout(() => statusEl.classList.remove('loading'), 500);
 }
 
 function heartBeat() {
-    if (motion) {
-        socket.emit("motion", {room: uuid, role: ROLE, motion: motion})
-    }
-    setTimeout(heartBeat, 1000);      // 1 Hz
+    if (motion) sendEvent('motion', motion);
+    setTimeout(heartBeat, 1000);   // 1 Hz
 }
 heartBeat();
