@@ -12,8 +12,13 @@ import soloSimTemplate  from './shaders/solo_sim.wgsl?raw';
 import soloRenderWGSL   from './shaders/solo_render.wgsl?raw';
 import { uuid }         from './client-api.js';
 
+// ── Config ────────────────────────────────────────────────────────────────────
+const MAX_AGENTS = 1_200_000;
+
 // ── Tunable parameters (mutated by lil-gui) ───────────────────────────────────
 const params = {
+    // Agents
+    agentCount:  MAX_AGENTS,
     // Motion
     stepLen:     2.0,
     turnRate:    0.04,
@@ -40,9 +45,6 @@ const params = {
     autoDir:       true,  // randomly cycle dir formula every 30 s
     restFormula:   false, // lock both formulas to REST_DIR / REST_WIND
 };
-
-// ── Config ────────────────────────────────────────────────────────────────────
-const AGENT_COUNT = 1_200_000;
 
 const DEFAULT_DIR  = 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI';
 const DEFAULT_WIND = 'sin(x * 0.004 - y * 0.003 + t * 0.4) * TWO_PI';
@@ -222,7 +224,7 @@ function hideError()    { if (errEl) errEl.style.display = 'none'; }
 function updateMonitor(fps) {
     if (monRes)    monRes.textContent    = `${canvas.width} × ${canvas.height}`;
     if (monFps)    monFps.textContent    = `${fps.toFixed(1)} fps`;
-    if (monAgents) monAgents.textContent = `${AGENT_COUNT.toLocaleString()} agents`;
+    if (monAgents) monAgents.textContent = `${params.agentCount.toLocaleString()} agents`;
 }
 
 // ── Image region: centered square, size = params.imageSize fraction of each dimension ──
@@ -248,7 +250,7 @@ ctx.configure({ device, format: canvasFormat, alphaMode: 'opaque' });
 
 // ── Persistent GPU buffers ────────────────────────────────────────────────────
 const agentBuf = device.createBuffer({
-    size: AGENT_COUNT * 24,   // [pos.xy, vel.xy, weight, _pad] = 6 × f32 = 24 bytes
+    size: MAX_AGENTS * 24,    // [pos.xy, vel.xy, weight, _pad] = 6 × f32 = 24 bytes
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 const soloUB = device.createBuffer({
@@ -268,12 +270,15 @@ const imageDebugUB = device.createBuffer({
 });
 
 function seedAgents() {
-    const data = new Float32Array(AGENT_COUNT * 6);   // 6 floats × 4 bytes = 24 bytes/agent
-    for (let i = 0; i < AGENT_COUNT; i++) {
+    const count = params.agentCount;
+    const data  = new Float32Array(count * 6);   // 6 floats × 4 bytes = 24 bytes/agent
+    const TAU   = Math.PI * 2;
+    for (let i = 0; i < count; i++) {
         const b = i * 6;
         data[b]     = canvas.width  * 0.5;
         data[b + 1] = canvas.height * 0.5;
-        const a = Math.random() * Math.PI * 2;
+        // Evenly distribute angles so every agent points radially outward
+        const a = (i / count) * TAU;
         const s = 0.5 + Math.random() * 1.5;
         data[b + 2] = Math.cos(a) * s;
         data[b + 3] = Math.sin(a) * s;
@@ -599,6 +604,9 @@ function applySimParams(data) {
 const gui = new GUI({ title: 'Wind Particles', width: 260 });
 
 const fMotion = gui.addFolder('Motion');
+fMotion.add(params, 'agentCount', 1_000, MAX_AGENTS, 1_000)
+    .name('agents')
+    .onChange(() => seedAgents());
 fMotion.add(params, 'stepLen',      0.1, 8,    0.1).name('base speed');
 fMotion.add(params, 'turnRate',     0.005, 0.3, 0.005).name('turn rate');
 fMotion.add(params, 'maxSpeed',     1,    15,   0.5).name('max speed');
@@ -707,7 +715,7 @@ function writeSoloUB(dt, time) {
     const u  = new Uint32Array(ab);
     const f  = new Float32Array(ab);
     const { x0, y0, x1, y1 } = getImageRegion();
-    u[0] = AGENT_COUNT;
+    u[0] = params.agentCount;
     f[1] = canvas.width;
     f[2] = canvas.height;
     f[3] = params.stepLen;
@@ -734,7 +742,7 @@ function writeRenderUB() {
     const rgb  = hexToF(params.color);
     const srgb = hexToF(params.speedColor);
     const { x0, y0, x1, y1 } = getImageRegion();
-    u[0] = AGENT_COUNT;
+    u[0] = params.agentCount;
     f[1] = canvas.width;
     f[2] = canvas.height;
     f[3] = params.pointSize;
@@ -810,7 +818,7 @@ function frame(ts) {
         const cp = enc.beginComputePass();
         cp.setPipeline(simPipe);
         cp.setBindGroup(0, simBG);
-        cp.dispatchWorkgroups(Math.ceil(AGENT_COUNT / 64));
+        cp.dispatchWorkgroups(Math.ceil(params.agentCount / 64));
         cp.end();
     }
 
@@ -825,7 +833,7 @@ function frame(ts) {
     rp.draw(3);
     rp.setPipeline(renderPipe);
     rp.setBindGroup(0, renderBG);
-    rp.draw(AGENT_COUNT * 6);
+    rp.draw(params.agentCount * 6);
     rp.end();
 
     const visStep  = Math.round(100 * window.devicePixelRatio);
