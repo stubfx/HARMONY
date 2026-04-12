@@ -45,6 +45,7 @@ const params = {
     followFormula: true,  // false = free drift (wind + magnet only)
     autoDir:       true,  // randomly cycle dir formula every 30 s
     restFormula:   false, // lock both formulas to REST_DIR / REST_WIND
+    introDelay:    5,     // seconds of free drift before formulas engage
 };
 
 const DEFAULT_DIR  = 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI';
@@ -554,7 +555,9 @@ async function applyFormulas(dir, wind, { reseed = false } = {}) {
 const rndPick   = arr => arr[Math.floor(Math.random() * arr.length)];
 const startDir  = rndPick(DIR_FORMULAS);
 const startWind = rndPick(WIND_FORMULAS);
+let introActive = true;
 await applyFormulas(startDir, startWind, { reseed: true });
+setTimeout(() => { introActive = false; }, params.introDelay * 1000);
 
 // ── Session: QR code + SSE ────────────────────────────────────────────────────
 try {
@@ -617,6 +620,7 @@ fMotion.add(params, 'weightSpread',   0, 1, 0.01).name('weight spread')
     .onChange(() => seedAgents());
 fMotion.add(params, 'followFormula').name('follow formula');
 fMotion.add(params, 'autoDir').name('auto-cycle formula');
+fMotion.add(params, 'introDelay', 0, 30, 0.5).name('intro delay (s)');
 
 const fWind = gui.addFolder('Wind');
 const windStrCtrl = fWind.add(params, 'windStr', 0, 2, 0.01).name('strength');
@@ -728,7 +732,7 @@ function writeSoloUB(dt, time) {
     f[3] = params.stepLen;
     f[4] = dt;
     f[5] = time;
-    f[6] = params.windEnabled ? params.windStr : 0.0;
+    f[6] = (params.windEnabled && !introActive) ? params.windStr : 0.0;
     f[7] = params.turnRate;
     f[8] = params.maxSpeed;
     f[9] = params.minSpeed;
@@ -738,7 +742,7 @@ function writeSoloUB(dt, time) {
     f[13] = y0;
     f[14] = x1;
     f[15] = y1;
-    u[16] = params.followFormula ? 1 : 0;
+    u[16] = (params.followFormula && !introActive) ? 1 : 0;
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
