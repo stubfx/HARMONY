@@ -90,13 +90,19 @@ struct VsOut {
 }
 
 @fragment fn fs(in: VsOut) -> @location(0) vec4<f32> {
-    // If this agent's center sits inside the image region, colour it from the image
+    // If this agent's center sits inside the image region, colour it from the image.
+    // Near-black image pixels blend back toward the sim colour so black areas are
+    // effectively transparent (particles keep their simulation colour there).
     if (params.hasImage != 0u) {
         let u = (in.agentPos.x - params.imgX0) / (params.imgX1 - params.imgX0);
         let v = (in.agentPos.y - params.imgY0) / (params.imgY1 - params.imgY0);
         if (u >= 0.0 && u <= 1.0 && v >= 0.0 && v <= 1.0) {
             let imgColor = textureSampleLevel(imgTex, imgSmp, vec2<f32>(u, v), 0.0).rgb;
-            return vec4<f32>(imgColor * in.bright, 1.0);
+            let lum      = dot(imgColor, vec3<f32>(0.299, 0.587, 0.114));
+            // smoothstep: lum < 0.1 → 0 (sim color), lum > 0.35 → 1 (image color)
+            let blend    = smoothstep(0.1, 0.35, lum);
+            let color    = mix(in.color, imgColor * in.bright, blend);
+            return vec4<f32>(color, 1.0);
         }
     }
     return vec4<f32>(in.color, 1.0);

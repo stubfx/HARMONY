@@ -180,7 +180,7 @@ const agentBuf = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 const soloUB = device.createBuffer({
-    size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
     size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -549,9 +549,10 @@ function hexToF(hex) {
 
 // ── Uniform writers ───────────────────────────────────────────────────────────
 function writeSoloUB(dt, time) {
-    const ab = new ArrayBuffer(48);
+    const ab = new ArrayBuffer(64);
     const u  = new Uint32Array(ab);
     const f  = new Float32Array(ab);
+    const { x0, y0, x1, y1 } = getImageRegion();
     u[0] = AGENT_COUNT;
     f[1] = canvas.width;
     f[2] = canvas.height;
@@ -564,6 +565,10 @@ function writeSoloUB(dt, time) {
     f[9] = params.minSpeed;
     u[10] = hasImage ? 1 : 0;
     f[11] = params.magnetStr;
+    f[12] = x0;
+    f[13] = y0;
+    f[14] = x1;
+    f[15] = y1;
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 

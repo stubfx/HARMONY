@@ -11,7 +11,7 @@
 //   PI, TWO_PI
 //   Full WGSL built-in set: sin, cos, atan2, sqrt, fract, length, mix, …
 //
-// SoloParams layout (48 bytes):
+// SoloParams layout (64 bytes):
 //   [0]  agentCount u32
 //   [4]  canvasW    f32
 //   [8]  canvasH    f32
@@ -24,6 +24,10 @@
 //   [36] minSpeed   f32
 //   [40] hasImage   u32   (1 when a magnet image is bound)
 //   [44] magnetStr  f32   (image gradient force multiplier)
+//   [48] imgX0      f32   (left edge of image region, canvas px)
+//   [52] imgY0      f32   (top edge)
+//   [56] imgX1      f32   (right edge)
+//   [60] imgY1      f32   (bottom edge)
 
 struct SoloParams {
     agentCount: u32,
@@ -38,6 +42,10 @@ struct SoloParams {
     minSpeed:   f32,
     hasImage:   u32,
     magnetStr:  f32,
+    imgX0:      f32,
+    imgY0:      f32,
+    imgX1:      f32,
+    imgY1:      f32,
 }
 
 // [pos.xy, vel.xy, weight, _pad] — 24 bytes
@@ -88,15 +96,24 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     vel += wind * params.dt * 60.0;
 
     // ── Magnet: image gradient pulls particles toward bright areas ────────────
+    // UV is computed relative to the image region (same coords as render shader
+    // and debug overlay), so the force matches exactly what is displayed.
     if (params.hasImage != 0u) {
-        let uv  = vec2<f32>(pos.x / params.canvasW, pos.y / params.canvasH);
-        let eps = 24.0 / min(params.canvasW, params.canvasH);
-        let bR  = textureSampleLevel(imageTex, imageSmp, clamp(uv + vec2<f32>(eps, 0.0), vec2<f32>(0.0), vec2<f32>(1.0)), 0.0).r;
-        let bL  = textureSampleLevel(imageTex, imageSmp, clamp(uv - vec2<f32>(eps, 0.0), vec2<f32>(0.0), vec2<f32>(1.0)), 0.0).r;
-        let bD  = textureSampleLevel(imageTex, imageSmp, clamp(uv + vec2<f32>(0.0, eps), vec2<f32>(0.0), vec2<f32>(1.0)), 0.0).r;
-        let bU  = textureSampleLevel(imageTex, imageSmp, clamp(uv - vec2<f32>(0.0, eps), vec2<f32>(0.0), vec2<f32>(1.0)), 0.0).r;
-        let grad = vec2<f32>(bR - bL, bD - bU);
-        vel += grad * params.magnetStr * params.dt * 60.0;
+        let regionW = params.imgX1 - params.imgX0;
+        let regionH = params.imgY1 - params.imgY0;
+        let u = (pos.x - params.imgX0) / regionW;
+        let v = (pos.y - params.imgY0) / regionH;
+        if (u >= 0.0 && u <= 1.0 && v >= 0.0 && v <= 1.0) {
+            // eps: 24 canvas-pixels converted to image-UV space
+            let epsU = 24.0 / regionW;
+            let epsV = 24.0 / regionH;
+            let bR = textureSampleLevel(imageTex, imageSmp, clamp(vec2(u + epsU, v),       vec2(0.0), vec2(1.0)), 0.0).r;
+            let bL = textureSampleLevel(imageTex, imageSmp, clamp(vec2(u - epsU, v),       vec2(0.0), vec2(1.0)), 0.0).r;
+            let bD = textureSampleLevel(imageTex, imageSmp, clamp(vec2(u, v + epsV),       vec2(0.0), vec2(1.0)), 0.0).r;
+            let bU = textureSampleLevel(imageTex, imageSmp, clamp(vec2(u, v - epsV),       vec2(0.0), vec2(1.0)), 0.0).r;
+            let grad = vec2<f32>(bR - bL, bD - bU);
+            vel += grad * params.magnetStr * params.dt * 60.0;
+        }
     }
 
     // Speed bounds
