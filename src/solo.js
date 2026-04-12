@@ -30,6 +30,7 @@ const params = {
     showWindVis: false,
     autoWind:    true,   // cycle through WIND_FORMULAS every 10 s
     // Visual
+    renderScale: 1.0,    // multiplied with DPR — reduce on high-res screens
     trailDecay:  0.055,
     pointSize:   2.0,
     color:       '#0000ff',
@@ -50,8 +51,8 @@ const DEFAULT_DIR  = 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1
 const DEFAULT_WIND = 'sin(x * 0.004 - y * 0.003 + t * 0.4) * TWO_PI';
 
 // Resting formulas — applied when params.restFormula is on
-const REST_DIR  = 'sin(x * 0.009 + sin(y * 0.006 + t)) * TWO_PI';
-const REST_WIND = 'atan2(cy - y, cx - x) + sin(length(vec2(x-cx,y-cy)) * 0.015 + t) * PI * 0.5';
+const REST_DIR  = 'atan2(y - cy, x - cx) + sin(t * 1.2) * PI * 0.5';
+const REST_WIND = 'atan2(y - cy, x - cx) + sin(length(vec2(x-cx,y-cy)) * 0.008) * PI + t';
 
 // 20 direction formulas cycled automatically when params.autoDir is true.
 // Variables: x, y, t, cx, cy, PI, TWO_PI
@@ -207,8 +208,9 @@ canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;displ
 document.body.prepend(canvas);
 
 function setSize() {
-    canvas.width  = Math.floor(window.innerWidth  * window.devicePixelRatio);
-    canvas.height = Math.floor(window.innerHeight * window.devicePixelRatio);
+    const scale   = window.devicePixelRatio * params.renderScale;
+    canvas.width  = Math.floor(window.innerWidth  * scale);
+    canvas.height = Math.floor(window.innerHeight * scale);
 }
 setSize();
 
@@ -222,7 +224,7 @@ function showError(msg) { if (errEl) { errEl.textContent = msg; errEl.style.disp
 function hideError()    { if (errEl) errEl.style.display = 'none'; }
 
 function updateMonitor(fps) {
-    if (monRes)    monRes.textContent    = `${canvas.width} × ${canvas.height}`;
+    if (monRes)    monRes.textContent    = `${canvas.width} × ${canvas.height}  @${(window.devicePixelRatio * params.renderScale).toFixed(2)}x`;
     if (monFps)    monFps.textContent    = `${fps.toFixed(1)} fps`;
     if (monAgents) monAgents.textContent = `${params.agentCount.toLocaleString()} agents`;
 }
@@ -623,6 +625,11 @@ fWind.add(params, 'showWindVis').name('show arrows');
 fWind.add(params, 'autoWind').name('auto-cycle formula');
 
 const fVis = gui.addFolder('Visual');
+fVis.add(params, 'renderScale', 0.1, 1.0, 0.05).name('render scale').onChange(() => {
+    setSize();
+    rebuildOffscreen();
+    seedAgents();
+});
 fVis.add(params,  'trailDecay', 0.005, 0.4, 0.005).name('trail decay');
 fVis.add(params,  'pointSize',  1, 6, 0.1).name('agent size');
 fVis.addColor(params, 'color').name('base color');
