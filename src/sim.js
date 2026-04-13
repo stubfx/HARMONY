@@ -222,7 +222,10 @@ const monRes    = document.querySelector('#mon-res');
 const monFps    = document.querySelector('#mon-fps');
 const monAgents = document.querySelector('#mon-agents');
 
-function showError(msg) { if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; } }
+function showError(msg) {
+    console.error('[sim]', msg);
+    if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
+}
 function hideError()    { if (errEl) errEl.style.display = 'none'; }
 
 function updateMonitor(fps) {
@@ -246,7 +249,10 @@ if (!navigator.gpu) { showError('WebGPU not supported in this browser.'); throw 
 const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
 if (!adapter)       { showError('No WebGPU adapter found.'); throw new Error(); }
 const device = await adapter.requestDevice();
-device.addEventListener('uncapturederror', e => showError(e.error.message));
+device.addEventListener('uncapturederror', e => {
+    console.error('[WebGPU uncaptured error]', e.error.message);
+    showError(e.error.message);
+});
 
 const canvasFormat = navigator.gpu.getPreferredCanvasFormat();
 const ctx = canvas.getContext('webgpu');
@@ -254,7 +260,7 @@ ctx.configure({ device, format: canvasFormat, alphaMode: 'opaque' });
 
 // ── Persistent GPU buffers ────────────────────────────────────────────────────
 const agentBuf = device.createBuffer({
-    size: MAX_AGENTS * 24,    // [pos.xy, vel.xy, weight, _pad] = 6 × f32 = 24 bytes
+    size: MAX_AGENTS * 32,    // [pos.xy, vel.xy, home.xy, weight, _pad] = 8 × f32 = 32 bytes
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 const soloUB = device.createBuffer({
@@ -275,20 +281,34 @@ const imageDebugUB = device.createBuffer({
 
 function seedAgents() {
     const count = params.agentCount;
-    const data  = new Float32Array(count * 6);   // 6 floats × 4 bytes = 24 bytes/agent
+    const data  = new Float32Array(count * 8);   // 8 floats × 4 bytes = 32 bytes/agent
     const TAU   = Math.PI * 2;
+
+    // Divide the canvas into a grid — one cell per agent — aspect-ratio aware.
+    // Each agent's home is the centre of its assigned cell.
+    const aspect = canvas.width / canvas.height;
+    const gridW  = Math.ceil(Math.sqrt(count * aspect));
+    const gridH  = Math.ceil(count / gridW);
+    const cellW  = canvas.width  / gridW;
+    const cellH  = canvas.height / gridH;
+
     for (let i = 0; i < count; i++) {
-        const b = i * 6;
-        data[b]     = canvas.width  * 0.5;
-        data[b + 1] = canvas.height * 0.5;
-        // Evenly distribute angles so every agent points radially outward
+        const b = i * 8;
+        // Spawn at canvas centre, pointing radially outward
+        data[b]     = canvas.width  * 0.5;          // pos.x
+        data[b + 1] = canvas.height * 0.5;          // pos.y
         const a = (i / count) * TAU;
         const s = 0.5 + Math.random() * 1.5;
-        data[b + 2] = Math.cos(a) * s;
-        data[b + 3] = Math.sin(a) * s;
-        // weight: centred on 1.0, spread controlled by GUI
-        data[b + 4] = Math.max(0.05, 1.0 + (Math.random() * 2 - 1) * params.weightSpread);
-        data[b + 5] = 0;   // _pad
+        data[b + 2] = Math.cos(a) * s;              // vel.x
+        data[b + 3] = Math.sin(a) * s;              // vel.y
+        // Home: centre of this agent's assigned grid cell
+        const col  = i % gridW;
+        const row  = Math.floor(i / gridW);
+        data[b + 4] = (col + 0.5) * cellW;          // home.x
+        data[b + 5] = (row + 0.5) * cellH;          // home.y
+        // Weight
+        data[b + 6] = Math.max(0.05, 1.0 + (Math.random() * 2 - 1) * params.weightSpread);
+        data[b + 7] = 0;                             // _pad
     }
     device.queue.writeBuffer(agentBuf, 0, data);
 }
@@ -343,6 +363,15 @@ const fadeBG = device.createBindGroup({
 // Particles: attenuated additive blend (src-alpha × one) so brightness controls
 // accumulation — prevents saturation to white on dense clusters.
 const renderMod = device.createShaderModule({ code: soloRenderWGSL });
+{
+    const info = await renderMod.getCompilationInfo();
+    const errs = info.messages.filter(m => m.type === 'error');
+    if (errs.length) {
+        const msg = '[render.wgsl] ' + errs.map(m => `line ${m.lineNum}: ${m.message}`).join('\n');
+        console.error(msg);
+        showError(msg);
+    }
+}
 const renderPipe = device.createRenderPipeline({
     layout: 'auto',
     vertex:   { module: renderMod, entryPoint: 'vs' },
@@ -499,14 +528,11 @@ let windVisBG   = null;
 
 function rebuildSimBG() {
     if (!simPipe) return;
-    const texView = (hasImage && imageTexView) ? imageTexView : placeholderTexView;
     simBG = device.createBindGroup({
         layout: simPipe.getBindGroupLayout(0),
         entries: [
             { binding: 0, resource: { buffer: soloUB } },
             { binding: 1, resource: { buffer: agentBuf } },
-            { binding: 2, resource: imageSampler },
-            { binding: 3, resource: texView },
         ],
     });
 }
@@ -864,9 +890,11 @@ function frame(ts) {
     rp.setPipeline(fadePipe);
     rp.setBindGroup(0, fadeBG);
     rp.draw(3);
-    rp.setPipeline(renderPipe);
-    rp.setBindGroup(0, renderBG);
-    rp.draw(params.agentCount * 6);
+    if (renderBG) {
+        rp.setPipeline(renderPipe);
+        rp.setBindGroup(0, renderBG);
+        rp.draw(params.agentCount * 6);
+    }
     rp.end();
 
     const visStep  = Math.round(100 * window.devicePixelRatio);

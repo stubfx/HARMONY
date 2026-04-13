@@ -50,7 +50,8 @@ struct SoloRenderParams {
 struct Agent {
     pos:    vec2<f32>,
     vel:    vec2<f32>,
-    weight: f32,   // seeded per-particle; unused here but required for correct stride
+    home:   vec2<f32>,  // assigned grid-cell centre; used for image colour sampling
+    weight: f32,        // unused here; present for correct stride
     _pad:   f32,
 }
 
@@ -63,7 +64,8 @@ struct VsOut {
     @builtin(position) pos:      vec4<f32>,
     @location(0)       color:    vec3<f32>,   // mix(simColor, speedColor, speedRatio)
     @location(1)       agentPos: vec2<f32>,   // canvas-pixel center of the agent
-    @location(2)       bright:   f32,         // speed ratio [0..1], used for image blend
+    @location(2)       bright:   f32,         // speed ratio [0..1]
+    @location(3)       homeUV:   vec2<f32>,   // home position in image UV space
 }
 
 @vertex fn vs(@builtin(vertex_index) vi: u32) -> VsOut {
@@ -96,23 +98,25 @@ struct VsOut {
     let speedColor = vec3<f32>(params.speedColorR, params.speedColorG, params.speedColorB);
     let color      = mix(baseColor, speedColor, t);
 
-    return VsOut(vec4<f32>(finalNdc, 0.0, 1.0), color, agent.pos, t);
+    // Home position in image UV space — used in fragment to colour home-agents
+    // from the image at their assigned pixel rather than their current position.
+    let homeUV = vec2<f32>(
+        (agent.home.x - params.imgX0) / (params.imgX1 - params.imgX0),
+        (agent.home.y - params.imgY0) / (params.imgY1 - params.imgY0),
+    );
+
+    return VsOut(vec4<f32>(finalNdc, 0.0, 1.0), color, agent.pos, t, homeUV);
 }
 
 @fragment fn fs(in: VsOut) -> @location(0) vec4<f32> {
-    // If this agent's center sits inside the image region, colour it from the image.
-    // Near-black image pixels blend back toward the sim colour so black areas are
-    // effectively transparent (particles keep their simulation colour there).
     if (params.hasImage != 0u) {
-        let u = (in.agentPos.x - params.imgX0) / (params.imgX1 - params.imgX0);
-        let v = (in.agentPos.y - params.imgY0) / (params.imgY1 - params.imgY0);
-        if (u >= 0.0 && u <= 1.0 && v >= 0.0 && v <= 1.0) {
-            let imgColor = textureSampleLevel(imgTex, imgSmp, vec2<f32>(u, v), 0.0).rgb;
-            let lum      = dot(imgColor, vec3<f32>(0.299, 0.587, 0.114));
-            // smoothstep: lum < 0.1 → 0 (sim color), lum > 0.35 → 1 (image color)
-            let blend    = smoothstep(0.1, 0.35, lum);
-            let color    = mix(in.color, imgColor * in.bright, blend);
-            return vec4<f32>(color, 1.0);
+        let homeInImg = in.homeUV.x >= 0.0 && in.homeUV.x <= 1.0 &&
+                        in.homeUV.y >= 0.0 && in.homeUV.y <= 1.0;
+        if (homeInImg) {
+            // This agent's home is inside the image: always show the image colour
+            // at the home UV, regardless of where the agent currently is on screen.
+            let imgColor = textureSampleLevel(imgTex, imgSmp, in.homeUV, 0.0).rgb;
+            return vec4<f32>(imgColor, params.brightness);
         }
     }
     return vec4<f32>(in.color, params.brightness);

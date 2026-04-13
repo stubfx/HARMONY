@@ -54,20 +54,19 @@ struct SoloParams {
     _pad2:         u32,
 }
 
-// [pos.xy, vel.xy, weight, _pad] — 24 bytes
-// weight is seeded once (JS) and scales each particle's desired speed.
-// _pad is required: vec2<f32> has 8-byte alignment, so struct size must be ≥ 24.
+// [pos.xy, vel.xy, home.xy, weight, _pad] — 32 bytes
+// home is assigned once at seed time (grid cell centre) and never mutated by GPU.
+// weight scales each particle's desired speed.
 struct Agent {
     pos:    vec2<f32>,
     vel:    vec2<f32>,
+    home:   vec2<f32>,
     weight: f32,
     _pad:   f32,
 }
 
 @group(0) @binding(0) var<uniform>             params:   SoloParams;
 @group(0) @binding(1) var<storage, read_write> agents:   array<Agent>;
-@group(0) @binding(2) var                      imageSmp: sampler;
-@group(0) @binding(3) var                      imageTex: texture_2d<f32>;
 
 const PI:     f32 = 3.14159265358979;
 const TWO_PI: f32 = 6.28318530717959;
@@ -79,6 +78,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     var pos    = agents[i].pos;
     var vel    = agents[i].vel;
+    let home   = agents[i].home;
     let weight = agents[i].weight;
 
     let x   = pos.x;
@@ -96,38 +96,49 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let windAngle = evalWindFormula(x, y, t, idx, cx, cy);
     let wind      = vec2<f32>(cos(windAngle), sin(windAngle)) * params.windStr;
 
-    // ── Velocity update ───────────────────────────────────────────────────────
-    // Steer toward direction formula only when followFormula is enabled
-    if (params.followFormula != 0u) {
-        vel = mix(vel, desired * (params.stepLen * weight), params.turnRate);
-    }
-    vel += wind * params.dt * 60.0;
-
-    // ── Magnet: image gradient pulls particles toward bright areas ────────────
-    // UV is computed relative to the image region (same coords as render shader
-    // and debug overlay), so the force matches exactly what is displayed.
+    // ── Image: home-based attraction / repulsion ──────────────────────────────
+    // homeInImg: this agent's assigned home pixel falls inside the image region
+    // posInImg:  this agent is currently drifting through the image region
+    var homeInImg = false;
+    var posInImg  = false;
     if (params.hasImage != 0u) {
-        let regionW = params.imgX1 - params.imgX0;
-        let regionH = params.imgY1 - params.imgY0;
-        let u = (pos.x - params.imgX0) / regionW;
-        let v = (pos.y - params.imgY0) / regionH;
-        if (u >= 0.0 && u <= 1.0 && v >= 0.0 && v <= 1.0) {
-            // eps: 24 canvas-pixels converted to image-UV space
-            let epsU = 24.0 / regionW;
-            let epsV = 24.0 / regionH;
-            let bR = textureSampleLevel(imageTex, imageSmp, clamp(vec2(u + epsU, v),       vec2(0.0), vec2(1.0)), 0.0).r;
-            let bL = textureSampleLevel(imageTex, imageSmp, clamp(vec2(u - epsU, v),       vec2(0.0), vec2(1.0)), 0.0).r;
-            let bD = textureSampleLevel(imageTex, imageSmp, clamp(vec2(u, v + epsV),       vec2(0.0), vec2(1.0)), 0.0).r;
-            let bU = textureSampleLevel(imageTex, imageSmp, clamp(vec2(u, v - epsV),       vec2(0.0), vec2(1.0)), 0.0).r;
-            let grad = vec2<f32>(bR - bL, bD - bU);
-            vel += grad * params.magnetStr * params.dt * 60.0;
+        homeInImg = home.x >= params.imgX0 && home.x <= params.imgX1 &&
+                    home.y >= params.imgY0 && home.y <= params.imgY1;
+        posInImg  = pos.x  >= params.imgX0 && pos.x  <= params.imgX1 &&
+                    pos.y  >= params.imgY0 && pos.y  <= params.imgY1;
+    }
+
+    if (homeInImg) {
+        // This agent belongs in the image: override all other forces and
+        // return to home at max speed. Stop when close enough.
+        let toHome = home - pos;
+        let dist   = length(toHome);
+        if (dist > 0.5) {
+            vel = normalize(toHome) * params.maxSpeed;
+        } else {
+            vel = vec2<f32>(0.0, 0.0);
+        }
+    } else {
+        // Normal physics: direction formula + wind
+        if (params.followFormula != 0u) {
+            vel = mix(vel, desired * (params.stepLen * weight), params.turnRate);
+        }
+        vel += wind * params.dt * 60.0;
+
+        // Repulsion: agent is passing through an image region it doesn't belong
+        // to — steer it away from the image centre.
+        if (posInImg) {
+            let imgCx = (params.imgX0 + params.imgX1) * 0.5;
+            let imgCy = (params.imgY0 + params.imgY1) * 0.5;
+            let away  = normalize(pos - vec2<f32>(imgCx, imgCy));
+            vel += away * params.magnetStr * params.dt * 60.0 * 5.0;
         }
     }
 
     // Speed bounds
     let spd = length(vel);
-    if (spd > params.maxSpeed)                     { vel = vel * (params.maxSpeed / spd); }
-    if (spd < params.minSpeed && spd > 0.00001)    { vel = vel * (params.minSpeed / spd); }
+    if (spd > params.maxSpeed)                  { vel = vel * (params.maxSpeed / spd); }
+    if (spd < params.minSpeed && spd > 0.00001) { vel = vel * (params.minSpeed / spd); }
 
     // ── Position update with toroidal wrap ────────────────────────────────────
     var np = pos + vel * params.dt * 60.0;
