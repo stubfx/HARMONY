@@ -326,24 +326,46 @@ Starts three processes concurrently:
 
 | Process | Port | Description |
 |---------|------|-------------|
-| Vite | 5173 | Dev server with HMR; proxies `/socket.io` (WebSocket), `/rndImage`, `/n8n-sim-update` to Express |
-| Express | 3000 | Socket.IO session assignment, n8n relay, static assets |
+| Vite | 5173 | Dev server with HMR; proxies `/rndImage` and `/n8n-sim-update` to Express |
+| Express | 3000 | Socket.IO session assignment, n8n relay, static assets; HTML page requests redirect to Vite |
 | n8n | 5678 | Workflow automation |
+
+Socket.IO clients connect **directly** to Express in dev (bypassing Vite) because Vite's HTTP proxy can't reliably handle Socket.IO's polling handshake. The socket URL is controlled by `VITE_SERVER_PORT`.
 
 ### 5. Production
 
+Set all `VITE_*` variables in `.env` **before** building — Vite bakes them into
+the bundle at compile time. Changing them later requires a rebuild.
+
 ```bash
-npm run build
-npm run start
+# .env (production values)
+VITE_USER_URL=https://api.stubfx.io
+VITE_SOCKET_URL=https://api.stubfx.io
+
+npm run build          # bakes VITE_* into dist/
+npm run start          # starts Express (no n8n unless you need it)
 ```
 
-Builds with Vite, then serves everything from Express on `:3000`.
+Verify the socket URL was baked in:
+```bash
+grep -r "api.stubfx.io" dist/assets/*.js
+```
+
+Caddy serves `dist/` at `stubfx.io` and proxies `api.stubfx.io` to Express.
+See the `Caddyfile` for the full configuration.
 
 ### 6. HTTPS with Caddy (required for iOS spectators)
 
+**Development (local CA):**
 ```bash
-cd ../caddy-proxy
 caddy trust   # once — installs local CA
+caddy run     # reads Caddyfile from current directory
+```
+
+**Production:**
+Caddy obtains Let's Encrypt certificates automatically when the DNS A records
+for `stubfx.io` and `api.stubfx.io` point to the server. Just run:
+```bash
 caddy run
 ```
 
@@ -390,15 +412,33 @@ The server emits `'sim-params'` to the simulation socket. Only the fields you in
 
 ## Environment Variables
 
+`VITE_*` variables are **baked into the bundle at build time** by Vite. Changing them requires a rebuild (`npm run build`).
+
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3000` | Express server port |
+| `VITE_PORT` | `5173` | Vite dev server port — Express redirects HTML requests here in dev |
+| `VITE_SERVER_PORT` | `3000` | Express port exposed to browser clients for direct Socket.IO connection in dev |
 | `RELAY_MODE` | `direct` | `direct` or `n8n` — controls spectator event routing |
 | `N8N_WEBHOOK_URL` | `http://localhost:5678/webhook/user-event` | n8n webhook (RELAY_MODE=n8n only) |
 | `SERVER_CALLBACK_URL` | `http://localhost:3000/n8n-sim-update` | URL n8n POSTs results back to |
-| `VITE_USER_URL` | `http://localhost:3000` | Base URL used to generate the QR code |
+| `VITE_USER_URL` | `http://localhost:3000` | Origin used to build the QR code URL (`$VITE_USER_URL/remote/?s=<uuid>`) |
+| `VITE_SOCKET_URL` | — | Socket.IO server origin used by browser clients **in production**. Set to your public API domain (e.g. `https://api.stubfx.io`). In dev this is ignored — clients always connect directly to Express. Falls back to `'/'` (page origin) if unset. |
 | `SERVER_ASSETS_DIR` | `prev-images` | Directory for cached random images |
 | `EXTRA_ORIGINS` | — | Comma-separated extra CORS origins |
+
+### Split-domain production setup
+
+The production deployment uses two domains:
+
+| Domain | Role | Points to |
+|--------|------|-----------|
+| `stubfx.io` | Static site — simulation page + `/remote` | Caddy → `dist/` (file server) |
+| `api.stubfx.io` | API + Socket.IO | Caddy → Express `:3000` |
+
+Because the page (`stubfx.io`) and the API (`api.stubfx.io`) are different origins, `VITE_SOCKET_URL` **must** be set explicitly so browser clients connect to the right origin. Express's CORS allowlist must include `https://stubfx.io` (already the default).
+
+Caddy handles TLS automatically via Let's Encrypt and proxies WebSocket upgrade handshakes without extra configuration.
 
 ---
 

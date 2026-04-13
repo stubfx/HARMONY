@@ -1,39 +1,62 @@
-# The Caddyfile is an easy way to configure your Caddy web server.
-#
-# https://caddyserver.com/docs/caddyfile
-#
-# The configuration below serves a welcome page over HTTP on port 80.
-# To use your own domain name (with automatic HTTPS), first make
-# sure your domain's A/AAAA DNS records are properly pointed to
-# this machine's public IP, then replace the line below with your
-# domain name.
-#
-# https://caddyserver.com/docs/caddyfile/concepts#addresses
 {
-	# Restrict the admin interface to a local unix file socket whose directory
-	# is restricted to caddy:caddy. By default the TCP socket allows arbitrary
-	# modification for any process and user that has access to the local
-	# interface. If admin over TCP is turned on one should make sure
-	# implications are well understood.
-	admin "unix//run/caddy/admin.socket"
+    # Restrict admin interface to a local unix socket.
+    admin "unix//run/caddy/admin.socket"
 }
+
+# ── Production ─────────────────────────────────────────────────────────────────
+# Two domains, two responsibilities:
+#
+#   stubfx.io        — serves the Vite production build (static files from dist/)
+#   api.stubfx.io    — reverse-proxies to Express (Socket.IO + API endpoints)
+#
+# The browser clients connect Socket.IO to api.stubfx.io (VITE_SOCKET_URL in .env).
+# CORS on Express must list stubfx.io as an allowed origin (already the default).
+# Caddy handles TLS automatically via Let's Encrypt — no extra config needed.
+
+stubfx.io {
+    root * /var/www/thesis-sim/dist
+
+    encode gzip
+
+    # MPA fallbacks: /remote/* → remote/index.html, everything else → index.html.
+    # This mirrors the Express catch-all routes used in development.
+    handle /remote/* {
+        try_files {path} /remote/index.html
+    }
+    handle {
+        try_files {path} /index.html
+    }
+
+    file_server
+}
+
+api.stubfx.io {
+    # All Express API endpoints, including Socket.IO long-polling and WebSocket.
+    # Caddy proxies WebSocket upgrade handshakes automatically.
+    reverse_proxy localhost:3000
+}
+
+
+# ── Local development ──────────────────────────────────────────────────────────
+# Used with `caddy trust` (installs local CA) for HTTPS in dev.
+# Vite dev server runs on :5173; Express on :3000.
+# Socket.IO clients connect directly to Express (no Caddy proxy needed for sockets in dev).
 
 localhost, 192.168.1.12 {
     tls internal
-    root * /usr/share/caddy
-    file_server
 
-    reverse_proxy /socket.io* http://localhost:3000
-    reverse_proxy http://localhost:5173
+    # Proxy Socket.IO directly to Express.
+    reverse_proxy /socket.io* localhost:3000
+
+    # All other requests go to the Vite dev server.
+    reverse_proxy localhost:5173
 }
 
 api.localhost {
     tls internal
-    root * /usr/share/caddy
-    file_server
 
-    reverse_proxy /socket.io* http://localhost:3000
-    reverse_proxy http://localhost:3000
+    # Everything goes to Express (API + Socket.IO).
+    reverse_proxy localhost:3000
 }
 
 # Import additional caddy config files in /etc/caddy/conf.d/
