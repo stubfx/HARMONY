@@ -686,11 +686,12 @@ setTimeout(() => { introActive = false; }, params.introDelay * 1000);
 // a small scannable overlay and a large trace image in the canvas centre.
 // n8n posts processed params to the server, which forwards them via 'sim-params'.
 {
-    // In dev, Vite runs on a different port from Express, so connect directly.
-    // In production both are on the same origin — pass '/' and let the browser resolve it.
+    // In dev, Vite runs on a different port from Express, so connect directly to Express.
+    // In production, use VITE_SOCKET_URL (the Caddy-fronted public origin) so Socket.IO
+    // traffic is routed through Caddy → Express. Falls back to '/' (same origin) if unset.
     const socketUrl = import.meta.env.DEV
         ? `http://localhost:${import.meta.env.VITE_SERVER_PORT ?? 3000}`
-        : '/';
+        : (import.meta.env.VITE_SOCKET_URL || '/');
     const socket = ioConnect(socketUrl, { reconnectionDelay: 2000 });
 
     // Identify this socket as the host simulation so the server can distinguish
