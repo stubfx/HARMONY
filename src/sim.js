@@ -31,8 +31,8 @@ const params = {
     autoWind:    true,   // cycle through WIND_FORMULAS every 10 s
     // Visual
     renderScale:    1.0,    // multiplied with DPR — reduce on high-res screens
-    trailDecay:     0.025,
-    bgBlackCutoff:  0.012, // luminance below which trail pixels are clamped to 0 at display time
+    trailDecay:     0.04,
+    bgBlackCutoff:  0.05, // luminance below which trail pixels are clamped to 0 at display time
     pointSize:      2.0,
     color:       '#000000',
     speedColor:  '#ff4400',   // color approached at max speed
