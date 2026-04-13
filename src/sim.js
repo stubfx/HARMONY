@@ -45,16 +45,16 @@ const params = {
     // Motion behaviour
     followFormula: true,  // false = free drift (wind + magnet only)
     autoDir:       true,  // randomly cycle dir formula every 30 s
-    restFormula:   false, // lock both formulas to REST_DIR / REST_WIND
+    restFormula:   false, // lock both formulas to IDLE_DIR / IDLE_WIND
     introDelay:    5,     // seconds of free drift before formulas engage
 };
 
 const DEFAULT_DIR  = 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI';
 const DEFAULT_WIND = 'sin(x * 0.004 - y * 0.003 + t * 0.4) * TWO_PI';
 
-// Resting formulas — applied when params.restFormula is on
-const REST_DIR  = 'atan2(y - cy, x - cx) + sin(t * 1.2) * PI * 0.5';
-const REST_WIND = 'atan2(y - cy, x - cx) + sin(length(vec2(x-cx,y-cy)) * 0.008) * PI + t';
+// Idle formulas — applied when params.restFormula is on
+const IDLE_DIR  = 'atan2(cy - y, cx - x)';
+const IDLE_WIND = 'atan2(y - cy, x - cx) + sin(length(vec2(x-cx,y-cy)) * 0.008) * PI + t';
 
 // 20 direction formulas cycled automatically when params.autoDir is true.
 // Variables: x, y, t, cx, cy, PI, TWO_PI
@@ -688,11 +688,11 @@ fMagnet.add({ load: () => document.querySelector('#image-input').click() }, 'loa
 fMagnet.add({ clear: clearMagnetImage }, 'clear').name('Clear image');
 
 gui.add({ restart: () => seedAgents() }, 'restart').name('↺  Restart');
-gui.add(params, 'restFormula').name('⌂  rest position').onChange(v => {
+gui.add(params, 'restFormula').name('⌂  idle').onChange(v => {
     if (!v) return;
-    dirInput.value  = REST_DIR;
-    windInput.value = REST_WIND;
-    applyFormulas(REST_DIR, REST_WIND);
+    dirInput.value  = IDLE_DIR;
+    windInput.value = IDLE_WIND;
+    applyFormulas(IDLE_DIR, IDLE_WIND);
 });
 
 fMotion.open();
