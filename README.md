@@ -107,10 +107,26 @@ without reallocation.
 On load, agents spawn from screen centre pointing radially outward. For the first
 `introDelay` seconds (default 5 s) the simulation runs in free-drift mode:
 `followFormula` and `windEnabled` are silently suppressed without mutating the
-GUI values. After the intro window, the start formulas engage:
+GUI values. After the intro window, the active direction and wind formulas engage.
 
-- **Direction:** `atan2(cy - y, cx - x)` — pure inward pull
-- **Wind:** `atan2(y - cy, x - cx) + sin(length(vec2(x-cx,y-cy)) * 0.008) * PI + t`
+The intro delay is tunable via the GUI (Motion → intro delay).
+
+---
+
+## Trace Text
+
+An amber-styled text field sits above the direction formula input in the bottom-left panel. Whatever is typed there is rendered as a particle attractor — agents whose home positions fall inside the text glyphs steer toward them, making the particle field collectively write the text.
+
+The text is rendered as **white glyphs on a transparent canvas** using the browser's Canvas 2D API, then composited with any loaded trace image, and uploaded to the GPU as a single `rgba8unorm` texture. From the shader's perspective it is identical to a loaded image: the same alpha threshold, black cutoff, and edge fade controls all apply.
+
+**Key behaviours:**
+
+- Texture rebuilds 300 ms after the last keystroke — no Enter needed
+- When combined with a loaded image, text is drawn on top in white
+- Clearing the image leaves text active; clearing the text field leaves the image active
+- Font is bold sans-serif, auto-fitted to the canvas width
+
+See [PARAMETERS.md](PARAMETERS.md) for full details on how sizing and layering work.
 
 ---
 
@@ -144,21 +160,24 @@ below the input; the previous valid pipeline stays active.
 
 ### Auto-cycle
 
-Every 30 seconds a scheduler randomly picks a new formula from each of two
-20-formula libraries. Guards:
-- Direction auto-cycle only fires when `autoDir` and `followFormula` are both on
-- Wind auto-cycle only fires when `autoWind` and `windEnabled` are both on
-- Both are suppressed when `restFormula` is active
+Every ~30 seconds a scheduler randomly picks a new formula from each of two
+20-formula built-in libraries. Guards:
+- Direction auto-cycle only fires when `follow formula` and `auto-cycle formula` are both on
+- Wind auto-cycle only fires when wind is `enabled` and its `auto-cycle formula` is on
+- Both are suppressed while `idle` mode is active
 
-### REST position
+### Idle mode
 
-When the `⌂ rest position` toggle is on, both fields lock to fixed "resting"
-formulas and auto-cycle is suspended:
+When the `⌂ idle` toggle is on, both fields lock to fixed formulas and auto-cycle
+is suspended:
 
 ```
-Direction: atan2(y - cy, x - cx) + sin(t * 1.2) * PI * 0.5
+Direction: atan2(cy - y, cx - x)
 Wind:      atan2(y - cy, x - cx) + sin(length(vec2(x-cx,y-cy)) * 0.008) * PI + t
 ```
+
+This creates a calm inward-pull state — useful as a neutral resting state between
+performances.
 
 **Formula changes never reseed agents.** Particle positions are preserved across
 any formula switch. Only the `↺ Restart` button reseeds.
@@ -174,7 +193,7 @@ The HUD is **hidden by default**. Toggle it with:
 | `?gui=true` URL parameter | Open with GUI visible |
 | `Ctrl` key | Toggle all panels on/off at runtime |
 
-The GUI has four folders:
+The GUI has four folders. See [PARAMETERS.md](PARAMETERS.md) for a full description of every control.
 
 ### Motion
 
@@ -186,6 +205,9 @@ The GUI has four folders:
 | max speed | Speed cap; also sets the slow/fast colour blend breakpoint |
 | min speed | Floor speed |
 | weight spread | Per-agent weight variation (0 = uniform, 1 = wide spread) |
+| follow formula | Enable/disable direction formula steering |
+| auto-cycle formula | Randomly switch direction formula every ~30 s |
+| intro delay (s) | Free-drift seconds at startup before formulas engage |
 
 ### Wind
 
@@ -193,8 +215,8 @@ The GUI has four folders:
 |---------|-------------|
 | enabled | Master wind toggle |
 | strength | Wind force multiplier |
-| auto cycle | Randomly switch wind formula every 30 s |
-| show wind vis | Debug overlay showing wind direction as coloured lines |
+| auto-cycle formula | Randomly switch wind formula every ~30 s |
+| show arrows | Debug overlay showing wind direction as coloured arrows |
 
 ### Visual
 
@@ -207,15 +229,21 @@ The GUI has four folders:
 | fast color | Colour approached at max speed |
 | brightness | Per-particle alpha; controls additive accumulation — prevents saturation to white |
 
-### Magnet Image
+### Trace
+
+The trace layer loads an image onto the GPU and uses it to redirect agents.
+The image is never rendered directly — it is felt through collective agent density and colour.
 
 | Control | Description |
 |---------|-------------|
-| strength | Attractor force multiplier |
-| size | Image footprint as fraction of screen |
-| show image | Grayscale debug overlay |
-| Load image… | File picker (any browser-supported image) |
-| Clear image | Remove magnet; return to formula-only fields |
+| homing speed | px/frame agents move toward their home when homing is active |
+| alpha threshold | Min image alpha required at an agent's home to activate homing |
+| black cutoff | Luminance below which pixels are treated as fully transparent |
+| edge fade | Width of smooth rectangular fade applied to all four image edges |
+| size | Image footprint as fraction of `min(canvasW, canvasH)`; aspect ratio preserved |
+| show image | Grayscale debug overlay of the loaded image |
+| Load image… | File picker (any browser-supported image format) |
+| Clear image | Remove trace image; return to formula-only mode |
 
 ---
 
@@ -361,6 +389,8 @@ thesis-sim/
 │   └── server-utils.js      File I/O for cached images
 │
 ├── index.html
+├── README.md                Project overview and architecture
+├── PARAMETERS.md            Full parameter reference with detailed explanations
 ├── n8n-workflow.json        Importable n8n workflow template
 ├── package.json
 ├── vite.config.js

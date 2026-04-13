@@ -88,6 +88,21 @@
             display: none;
         }
 
+        .text-input {
+            font-family: monospace;
+            font-size: .8rem;
+            padding: .3rem .5rem;
+            width: 360px;
+            background: rgba(0, 0, 0, .72);
+            color: #ffd580;
+            border: 1px solid rgba(255, 200, 80, .22);
+            border-radius: 3px;
+            outline: none;
+            transition: border-color .15s;
+        }
+        .text-input:focus { border-color: rgba(255, 200, 80, .55); }
+        .text-input::placeholder { color: rgba(255, 200, 80, .25); }
+
         /* ── Monitor ────────────────────────────────────────────────────────── */
         #monitor {
             position: fixed;
@@ -112,6 +127,10 @@
     </div>
 
     <div id="ui">
+        <div class="field-row">
+            <span class="field-label">trace text &nbsp; imprints as agent attractor</span>
+            <input id="trace-text-input" class="text-input" type="text" spellcheck="false" autocomplete="off" placeholder="type to imprint text as trace…" />
+        </div>
         <div class="field-row">
             <span class="field-label">direction &nbsp; angle = f(x, y, t, idx, cx, cy)</span>
             <input id="dir-input"  class="formula-input" type="text" spellcheck="false" autocomplete="off" />

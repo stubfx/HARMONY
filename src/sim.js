@@ -465,13 +465,20 @@ window.addEventListener('resize', () => {
     seedAgents();
 });
 
-// ── Magnet image state ────────────────────────────────────────────────────────
+// ── Trace layer state ─────────────────────────────────────────────────────────
+// The trace layer is a single GPU texture that is the composite of:
+//   - an optional loaded image (imageBitmap, stored for re-compositing)
+//   - optional text drawn on top (from #trace-text-input)
+// Both are rendered onto traceCanvas (a 2D offscreen canvas) and uploaded as
+// one rgba8unorm texture. Changing either source re-runs renderTraceCanvas().
 let hasImage      = false;
 let imageTex      = null;
 let imageTexView  = null;
 let imageDebugBG  = null;
-let imageNaturalW = 1;   // natural pixel dimensions of the loaded image
+let imageNaturalW = 1;
 let imageNaturalH = 1;
+let imageBitmap   = null;   // retained ImageBitmap so text changes can re-composite
+let traceCanvas   = null;   // offscreen 2D canvas used for compositing
 
 // Rebuilds particle render bind group — called after pipeline creation and on image change
 function rebuildRenderBG() {
@@ -500,21 +507,83 @@ function rebuildImageDebugBG() {
     });
 }
 
-async function loadMagnetImage(file) {
-    const bmp = await createImageBitmap(file, { colorSpaceConversion: 'none' });
-    imageNaturalW = bmp.width;
-    imageNaturalH = bmp.height;
+// ── Trace canvas compositor ───────────────────────────────────────────────────
+// Composites imageBitmap (if any) + trace text (if any) onto a single 2D canvas,
+// then uploads the result to the GPU as the trace texture.
+// Called whenever either source changes.
+function renderTraceCanvas() {
+    if (!device) return;
+
+    const text    = document.querySelector('#trace-text-input')?.value.trim() ?? '';
+    const hasText = text.length > 0;
+
+    // Nothing to show — tear everything down and return to formula-only mode
+    if (!imageBitmap && !hasText) {
+        hasImage      = false;
+        imageTexView  = null;
+        imageNaturalW = 1;
+        imageNaturalH = 1;
+        if (imageTex) { imageTex.destroy(); imageTex = null; }
+        imageDebugBG  = null;
+        rebuildSimBG();
+        rebuildRenderBG();
+        rebuildImageDebugBG();
+        return;
+    }
+
+    // ── 1. Determine composite canvas dimensions ──────────────────────────────
+    // Image size is used as base; text-only auto-sizes from a reference height.
+    let cw, ch;
+    if (imageBitmap) {
+        cw = imageBitmap.width;
+        ch = imageBitmap.height;
+    } else {
+        // Text only: derive canvas width from measured text width at reference height
+        const refH    = 256;
+        const refSize = Math.round(refH * 0.72);
+        const tmp     = document.createElement('canvas').getContext('2d');
+        tmp.font      = `bold ${refSize}px sans-serif`;
+        const tw      = tmp.measureText(text).width;
+        cw = Math.max(Math.ceil(tw * 1.14), 64);
+        ch = refH;
+    }
+
+    // ── 2. Paint the composite canvas ─────────────────────────────────────────
+    if (!traceCanvas) traceCanvas = document.createElement('canvas');
+    traceCanvas.width  = cw;
+    traceCanvas.height = ch;
+    const ctx = traceCanvas.getContext('2d');
+    ctx.clearRect(0, 0, cw, ch);
+
+    // Layer 1: image (if loaded)
+    if (imageBitmap) ctx.drawImage(imageBitmap, 0, 0, cw, ch);
+
+    // Layer 2: text on top, white fill, auto-fitted to canvas width
+    if (hasText) {
+        let fontSize = ch * 0.72;
+        ctx.font = `bold ${Math.round(fontSize)}px sans-serif`;
+        const measured = ctx.measureText(text).width;
+        const maxW     = cw * 0.92;
+        if (measured > maxW) {
+            fontSize = fontSize * (maxW / measured);
+            ctx.font = `bold ${Math.round(fontSize)}px sans-serif`;
+        }
+        ctx.fillStyle    = 'white';
+        ctx.textAlign    = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, cw / 2, ch / 2);
+    }
+
+    // ── 3. Upload composite to GPU ────────────────────────────────────────────
+    imageNaturalW = cw;
+    imageNaturalH = ch;
     if (imageTex) imageTex.destroy();
     imageTex = device.createTexture({
-        size:  [bmp.width, bmp.height],
+        size:   [cw, ch],
         format: 'rgba8unorm',
         usage:  GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
     });
-    device.queue.copyExternalImageToTexture(
-        { source: bmp },
-        { texture: imageTex },
-        [bmp.width, bmp.height],
-    );
+    device.queue.copyExternalImageToTexture({ source: traceCanvas }, { texture: imageTex }, [cw, ch]);
     imageTexView = imageTex.createView();
     hasImage     = true;
     rebuildSimBG();
@@ -522,15 +591,14 @@ async function loadMagnetImage(file) {
     rebuildImageDebugBG();
 }
 
+async function loadMagnetImage(file) {
+    imageBitmap = await createImageBitmap(file, { colorSpaceConversion: 'none' });
+    renderTraceCanvas();
+}
+
 function clearMagnetImage() {
-    hasImage      = false;
-    imageTexView  = null;
-    imageNaturalW = 1;
-    imageNaturalH = 1;
-    if (imageTex) { imageTex.destroy(); imageTex = null; }
-    imageDebugBG  = null;
-    rebuildSimBG();
-    rebuildRenderBG();
+    imageBitmap = null;
+    renderTraceCanvas();   // re-render text-only if text is present; otherwise clears
 }
 
 // ── Formula compute + wind-vis pipelines (rebuilt on each formula change) ──────
@@ -772,11 +840,20 @@ PRESETS.forEach(({ label, dir, wind }) => {
     presetsEl?.appendChild(btn);
 });
 
-// ── File input for magnet image ───────────────────────────────────────────────
+// ── File input for trace image ────────────────────────────────────────────────
 document.querySelector('#image-input').addEventListener('change', e => {
     const file = e.target.files[0];
     if (file) loadMagnetImage(file);
     e.target.value = '';
+});
+
+// ── Trace text input ──────────────────────────────────────────────────────────
+// Debounced: re-composites and uploads the trace texture 300 ms after the user
+// stops typing. The text is drawn as white glyphs on top of any loaded image.
+let traceTextTimer = null;
+document.querySelector('#trace-text-input').addEventListener('input', () => {
+    clearTimeout(traceTextTimer);
+    traceTextTimer = setTimeout(renderTraceCanvas, 300);
 });
 
 // ── Hex color → float RGB ─────────────────────────────────────────────────────
