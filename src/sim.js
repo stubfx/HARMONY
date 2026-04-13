@@ -741,6 +741,11 @@ setTimeout(() => { introActive = false; }, params.introDelay * 1000);
     // In n8n mode these never arrive here; sim-params carries the processed result instead.
     socket.on('remote-event', (event) => {
         console.log('[remote]', event.type, '|', JSON.stringify(event.data), '| from', event.spectatorId);
+        if (event.type === 'text' && event.data?.text) {
+            const input = document.querySelector('#trace-text-input');
+            if (input) input.value = event.data.text;
+            renderTraceCanvas();
+        }
     });
 
     socket.on('connect_error', () => console.warn('[socket] connection failed, will retry…'));
