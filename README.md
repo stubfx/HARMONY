@@ -60,27 +60,63 @@ is never rendered directly. It is felt through collective density.
 
 ## Architecture
 
+The simulation is the key visual and the session owner. It connects to the server
+on startup, receives a UUID session token, and displays a QR code that spectators
+scan to join. All communication flows through the server via Socket.IO.
+
 ```
-Mobile phones (spectators)
-    │  text prompts
-    │  HTTP POST
+Host browser — simulation display (WebGPU)
+    │  Socket.IO  'register-host'  →  server assigns session UUID
+    │  Socket.IO  'session-id'     ←  server emits UUID back
+    │  QR code generated: /remote/?s=<uuid>
+    │
+    │                     ┌─────────────────────────────────────────────┐
+    │                     │  RELAY_MODE=direct (default)                │
+    │  'remote-event'  ←──┤  server forwards user events straight here  │
+    │                     └─────────────────────────────────────────────┘
+    │                     ┌─────────────────────────────────────────────┐
+    │  'sim-params'   ←───┤  RELAY_MODE=n8n                            │
+    │                     │  server → n8n → /n8n-sim-update → sim       │
+    │                     └─────────────────────────────────────────────┘
     ▼
-n8n workflow  (:5678)
+Display / projection
+
+Spectators  (/remote?s=<uuid>)
+    │  Socket.IO  'join-session'  →  server (identified by UUID)
+    │  Socket.IO  'user-event'   →  server routes per RELAY_MODE
+    ▼
+Node.js server  (:3000)
+    │  direct mode: io.to(room).emit('remote-event', ...)
+    │  n8n mode:    HTTP POST → n8n webhook
+    ▼
+[n8n workflow  (:5678)]      ← only in RELAY_MODE=n8n
     │  AI processing → parameter generation
     │  HTTP POST /n8n-sim-update
     ▼
-Node.js server  (:3000)
-    │  SSE push  /simulation-events
-    ▼
-Host browser (WebGPU simulation)
-    │  applies new parameters in real-time
-    ▼
-Display / projection
+Server → Socket.IO 'sim-params' → simulation
 ```
 
-The server is intentionally thin: it generates session IDs, relays n8n results
-to the simulation via Server-Sent Events, and serves the production build. Mobile
-spectator pages POST directly to n8n. No Socket.IO.
+### Session lifecycle
+
+1. Simulation connects via Socket.IO and emits `'register-host'`
+2. Server generates a UUID, puts the socket in room `<uuid>`, emits `'session-id'` back
+3. Simulation logs the remote URL to the console and displays a QR code:
+   - **Small scannable overlay** in the bottom-left UI panel (click to open)
+   - **Large trace image** in the canvas centre — the particle field writes the QR pattern
+4. Spectators scan the QR, open `/remote/?s=<uuid>`, connect via Socket.IO
+5. Spectator events are routed per `RELAY_MODE` (see Environment Variables)
+6. Server keeps sockets alive using Socket.IO's built-in heartbeat/ping-timeout mechanism
+
+### RELAY_MODE
+
+Set `RELAY_MODE` in `.env` to control how spectator events are processed:
+
+| Value | Path | Use when |
+|-------|------|----------|
+| `direct` | remote → server → simulation | Testing, no AI processing needed |
+| `n8n` | remote → server → n8n → simulation | Full performance with AI parameter generation |
+
+The simulation receives `'remote-event'` in direct mode and `'sim-params'` in n8n mode. Both paths ultimately land in the same JavaScript handler in the simulation.
 
 ---
 
@@ -93,7 +129,7 @@ All computation runs on the GPU. No Three.js. No WebGL.
 | **Compute** | Compute | Agent physics: formula steering, wind force, drag, speed clamping, edge wrap |
 | **Fade** | Render | Black fullscreen quad with alpha blend — exponential trail decay each frame |
 | **Particles** | Render | Per-agent quads drawn into offscreen texture; attenuated additive blend |
-| **Blit** | Render | Copy offscreen texture → canvas swap-chain |
+| **Blit** | Render | Copy offscreen texture → canvas swap-chain; applies `bgBlackCutoff` to clamp near-zero trail residual to pure black |
 
 Agents are stored as `array<Agent>` (pos.xy, vel.xy, weight, _pad — 24 bytes each)
 in a persistent GPU storage buffer. The buffer is always allocated at
@@ -290,8 +326,8 @@ Starts three processes concurrently:
 
 | Process | Port | Description |
 |---------|------|-------------|
-| Vite | 5173 | Dev server with HMR; proxies `/uuid`, `/rndImage`, `/simulation-events`, `/n8n-sim-update` to Express |
-| Express | 3000 | Session IDs, SSE relay, static assets |
+| Vite | 5173 | Dev server with HMR; proxies `/socket.io` (WebSocket), `/rndImage`, `/n8n-sim-update` to Express |
+| Express | 3000 | Socket.IO session assignment, n8n relay, static assets |
 | n8n | 5678 | Workflow automation |
 
 ### 5. Production
@@ -321,13 +357,13 @@ caddy run
 
 ## n8n Workflow Contract
 
-n8n receives a POST from a spectator's browser:
+Only relevant when `RELAY_MODE=n8n`. The server POSTs user events to `N8N_WEBHOOK_URL`:
 
 ```json
-{ "text": "user prompt", "room": "session-UUID" }
+{ "type": "text", "room": "session-UUID", "spectatorId": "socket-id", "data": { "text": "user prompt" }, "timestamp": 1234567890 }
 ```
 
-It must POST back to `http://localhost:3000/n8n-sim-update`:
+n8n processes the event and must POST back to `SERVER_CALLBACK_URL` (default `http://localhost:3000/n8n-sim-update`):
 
 ```json
 {
@@ -348,18 +384,21 @@ It must POST back to `http://localhost:3000/n8n-sim-update`:
 }
 ```
 
-The server pushes the payload to the host simulation via SSE. Only the fields
-you include are applied; unrecognised keys are ignored.
+The server emits `'sim-params'` to the simulation socket. Only the fields you include are applied; unrecognised keys are ignored.
 
 ---
 
 ## Environment Variables
 
-```
-PORT=3000
-EXTRA_ORIGINS=                  # comma-separated extra allowed CORS origins
-SERVER_ASSETS_DIR=prev-images   # directory for cached/random images
-```
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3000` | Express server port |
+| `RELAY_MODE` | `direct` | `direct` or `n8n` — controls spectator event routing |
+| `N8N_WEBHOOK_URL` | `http://localhost:5678/webhook/user-event` | n8n webhook (RELAY_MODE=n8n only) |
+| `SERVER_CALLBACK_URL` | `http://localhost:3000/n8n-sim-update` | URL n8n POSTs results back to |
+| `VITE_USER_URL` | `http://localhost:3000` | Base URL used to generate the QR code |
+| `SERVER_ASSETS_DIR` | `prev-images` | Directory for cached random images |
+| `EXTRA_ORIGINS` | — | Comma-separated extra CORS origins |
 
 ---
 
@@ -381,11 +420,15 @@ thesis-sim/
 │       ├── compute.wgsl     Agent physics compute shader
 │       └── render.wgsl      Per-agent quad rendering (speed→colour blend)
 │
-├── m_src/
-│   └── main.js              Mobile spectator page (POSTs prompts to n8n)
+├── remote/
+│   ├── index.html           Spectator page (served at /remote/?s=<uuid>)
+│   ├── main.js              Socket.IO client — emits user events to server
+│   ├── style.css
+│   ├── gyro.js              Device orientation helpers
+│   └── motion.js            Motion smoothing
 │
 ├── server/
-│   ├── server.js            Express: SSE relay, /uuid, /rndImage, SPA fallback
+│   ├── server.js            Socket.IO host/remote routing, /n8n-sim-update, static assets
 │   └── server-utils.js      File I/O for cached images
 │
 ├── index.html

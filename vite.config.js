@@ -3,6 +3,9 @@ import tailwindcss      from '@tailwindcss/vite';
 import path             from 'path';
 
 export default defineConfig({
+    // MPA mode: disables Vite's SPA catch-all so each HTML file is served at
+    // its own path (/remote/ → remote/index.html, / → index.html).
+    appType: 'mpa',
     define: {
         BUILD_DATE: JSON.stringify(new Date().toISOString()),
     },
@@ -10,7 +13,8 @@ export default defineConfig({
     build: {
         rollupOptions: {
             input: {
-                main: path.resolve(__dirname, 'index.html'),
+                main:   path.resolve(__dirname, 'index.html'),
+                remote: path.resolve(__dirname, 'remote/index.html'),
             },
         },
     },
@@ -20,10 +24,9 @@ export default defineConfig({
         // Dev: proxy server endpoints to Express so Vite dev server works standalone.
         // In prod these are same-origin — no proxy needed.
         proxy: {
-            '/uuid':              'http://localhost:3000',
-            '/rndImage':          'http://localhost:3000',
-            '/simulation-events': { target: 'http://localhost:3000', changeOrigin: true },
-            '/n8n-sim-update':    'http://localhost:3000',
+            // Socket.IO connects directly to Express (no proxy) — see sim.js / remote/main.js.
+            '/rndImage':       'http://localhost:3000',
+            '/n8n-sim-update': 'http://localhost:3000',
         },
     },
 });

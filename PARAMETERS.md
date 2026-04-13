@@ -4,6 +4,8 @@ A thorough explanation of every tunable parameter in the simulation, grouped by 
 
 The formula panel at the bottom-left of the screen also contains a **trace text** input (described below) that is separate from the GUI.
 
+On startup the simulation connects to the server via Socket.IO, receives a session UUID, and automatically displays a **QR code** as the initial trace image — see the QR / Session section below.
+
 ---
 
 ## Trace Text (formula panel)
@@ -253,6 +255,34 @@ This creates a calm inward-pull state — useful as a neutral resting state betw
 ## Restart (`↺ Restart`)
 
 Re-seeds all agents: positions are randomised from screen centre, home coordinates are reassigned, and weights are redistributed according to `weight spread`. The formula, wind state, and all other parameters are preserved. This is the only operation that resets agent positions.
+
+---
+
+## QR Code / Session
+
+On startup the simulation connects to the server via Socket.IO and emits `'register-host'`. The server generates a UUID, assigns the socket to that room, and emits `'session-id'` back. The URL is immediately logged to the browser console (`[session] remote URL: ...`), then two QR codes are generated:
+
+### Small scannable QR (bottom-left UI panel)
+A 120×120 px standard black-on-white QR code rendered in the formula panel (visible when the GUI is shown). Links to `/remote/?s=<uuid>`. Clicking it opens the spectator page in a new tab. This is the physically scannable one.
+
+### Large trace QR (canvas centre)
+A 512×512 QR code generated with **white modules on a transparent background** and loaded immediately as the trace image. The trace pipeline treats it like any other image:
+- White pixels (alpha = 1, luminance = 1) → pass `alphaThreshold` → agents home there
+- Transparent pixels (alpha = 0) → ignored → agents drift freely
+
+The particle field collectively writes the QR pattern. Agents whose home positions fall on QR modules converge; the rest roam freely around the shape.
+
+The QR trace is stored as `imageBitmap` in the standard trace state:
+- **Loading a different image** replaces it
+- **Typing in the trace text field** layers text on top of it
+- **Clear image** removes it
+
+### Signal routing
+Spectators open `/remote/?s=<uuid>`, connect via Socket.IO, and emit `user-event` messages. The server routes them based on `RELAY_MODE`:
+- `direct` — event arrives at the simulation as a `'remote-event'` and is logged to the console
+- `n8n` — event is POSTed to the n8n webhook; n8n processes it and sends `'sim-params'` back
+
+The session UUID is stable for the lifetime of the page. A socket disconnect/reconnect generates a new UUID and a new QR.
 
 ---
 

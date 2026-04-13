@@ -8,9 +8,9 @@
 
 import GUI              from 'lil-gui';
 import QRCode           from 'qrcode';
+import { io as ioConnect } from 'socket.io-client';
 import soloSimTemplate  from './shaders/compute.wgsl?raw';
 import soloRenderWGSL   from './shaders/render.wgsl?raw';
-import { uuid }         from './client-api.js';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const MAX_AGENTS = 1_200_000;
@@ -680,33 +680,71 @@ let introActive = true;
 await applyFormulas(startDir, startWind, { reseed: true });
 setTimeout(() => { introActive = false; }, params.introDelay * 1000);
 
-// ── Session: QR code + SSE ────────────────────────────────────────────────────
-try {
-    const sessionId = await uuid();
-    if (sessionId) {
-        // QR — bottom-left link to mobile spectator page
-        const userUrl  = (import.meta.env.VITE_USER_URL ?? '/m_src/') + '?s=' + sessionId;
-        const qrCanvas = document.querySelector('#qr-canvas');
-        if (qrCanvas) {
-            await QRCode.toCanvas(qrCanvas, userUrl, {
-                width:  120,
-                margin: 1,
-                color:  { dark: '#000000', light: '#ffffff' },
+// ── Session: Socket.IO connection + QR code ───────────────────────────────────
+// The server assigns a session UUID on socket connect and emits it back as
+// 'session-id'. The sim renders a QR code pointing to /remote/?s=<id> as both
+// a small scannable overlay and a large trace image in the canvas centre.
+// n8n posts processed params to the server, which forwards them via 'sim-params'.
+{
+    // In dev, Vite runs on a different port from Express, so connect directly.
+    // In production both are on the same origin — pass '/' and let the browser resolve it.
+    const socketUrl = import.meta.env.DEV
+        ? `http://localhost:${import.meta.env.VITE_SERVER_PORT ?? 3000}`
+        : '/';
+    const socket = ioConnect(socketUrl, { reconnectionDelay: 2000 });
+
+    // Identify this socket as the host simulation so the server can distinguish
+    // it from remote spectator sockets and assign a UUID session room.
+    socket.emit('register-host');
+
+    socket.on('session-id', async (sessionId) => {
+        // Extract only the origin from VITE_USER_URL (strips any stale path like /m_src/).
+        // Falls back to the page's own origin in dev when no env var is set.
+        const envUrl  = import.meta.env.VITE_USER_URL;
+        const base    = envUrl ? new URL(envUrl).origin : window.location.origin;
+        const userUrl = `${base}/remote/?s=${sessionId}`;
+
+        console.log('[session] remote URL:', userUrl);
+
+        // ── Small scannable QR in the UI panel ──────────────────────────────
+        const uiQr = document.querySelector('#qr-canvas');
+        if (uiQr) {
+            await QRCode.toCanvas(uiQr, userUrl, {
+                width: 120, margin: 1,
+                color: { dark: '#000000', light: '#ffffff' },
             });
-            qrCanvas.style.display = 'block';
-            qrCanvas.style.cursor  = 'pointer';
-            qrCanvas.addEventListener('click', () => window.open(userUrl, '_blank'));
+            uiQr.style.display = 'block';
+            uiQr.style.cursor  = 'pointer';
+            uiQr.addEventListener('click', () => window.open(userUrl, '_blank'));
         }
 
-        // SSE — receive processed params back from n8n via server
-        const es = new EventSource('/simulation-events?room=' + sessionId);
-        es.addEventListener('sim-params', (e) => {
-            try { applySimParams(JSON.parse(e.data)); }
-            catch { /* malformed payload — ignore */ }
+        // ── Large QR as trace image — white modules on transparent background
+        // The trace pipeline uses alpha to gate homing: white pixels (alpha=1)
+        // attract agents; transparent pixels (alpha=0) are ignored.
+        // This makes the particle field collectively write the QR pattern.
+        const qrOffscreen = document.createElement('canvas');
+        await QRCode.toCanvas(qrOffscreen, userUrl, {
+            width: 512, margin: 2,
+            color: { dark: '#ffffffff', light: '#00000000' },
         });
-        es.onerror = () => console.warn('[sse] connection lost, will retry…');
-    }
-} catch { /* server not running — skip silently */ }
+        // Treat as a loaded image so Clear image removes it and user images replace it
+        imageBitmap = await createImageBitmap(qrOffscreen);
+        renderTraceCanvas();
+    });
+
+    socket.on('sim-params', (data) => {
+        try { applySimParams(data); }
+        catch { /* malformed payload — ignore */ }
+    });
+
+    // Direct remote events (RELAY_MODE=direct on server).
+    // In n8n mode these never arrive here; sim-params carries the processed result instead.
+    socket.on('remote-event', (event) => {
+        console.log('[remote]', event.type, '|', JSON.stringify(event.data), '| from', event.spectatorId);
+    });
+
+    socket.on('connect_error', () => console.warn('[socket] connection failed, will retry…'));
+}
 
 // Merge n8n-provided params into the live simulation.
 // Only numeric/boolean keys present in the payload are applied;

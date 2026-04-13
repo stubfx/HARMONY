@@ -50,23 +50,17 @@ textarea:focus, input:focus{
     color: rgb(255 255 255 / 60%);
 }
 
-#status {
-    background: #ff0000;
-    background: radial-gradient(ellipse 500% 80% at top, rgba(255, 0, 0, 1) 0%, rgba(0, 0, 0, 1) 20%);
-    position: absolute;
+#session-info {
+    position: fixed;
     top: 0;
-    height: 100vh;
-    width: 100vw;
-}
-
-#status.connected {
-    background: #00ff00;
-    background: radial-gradient(ellipse 500% 80% at top, rgba(0, 255, 0, 1) 0%, rgba(0, 0, 0, 1) 20%);
-}
-
-#status.loading {
-    background: #0000ff;
-    background: radial-gradient(ellipse 500% 80% at top, rgba(0, 0, 255, 1) 0%, rgba(0, 0, 0, 1) 20%);
+    left: 0;
+    right: 0;
+    padding: 0.35rem 0.75rem;
+    font-family: monospace;
+    font-size: 0.65rem;
+    color: rgb(255 255 255 / 30%);
+    letter-spacing: 0.04em;
+    pointer-events: none;
 }
 
 #saveConfig {
