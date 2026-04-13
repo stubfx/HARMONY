@@ -30,9 +30,10 @@ const params = {
     showWindVis: false,
     autoWind:    true,   // cycle through WIND_FORMULAS every 10 s
     // Visual
-    renderScale: 1.0,    // multiplied with DPR — reduce on high-res screens
-    trailDecay:  0.025,
-    pointSize:   2.0,
+    renderScale:    1.0,    // multiplied with DPR — reduce on high-res screens
+    trailDecay:     0.025,
+    bgBlackCutoff:  0.012, // luminance below which trail pixels are clamped to 0 at display time
+    pointSize:      2.0,
     color:       '#000000',
     speedColor:  '#ff4400',   // color approached at max speed
     brightness:  0.06,        // per-particle alpha; prevents additive saturation to white
@@ -131,16 +132,21 @@ struct V { @builtin(position) pos: vec4<f32> }
 `;
 
 const BLIT_WGSL = `
-@group(0) @binding(0) var s: sampler;
-@group(0) @binding(1) var t: texture_2d<f32>;
+struct BP { cutoff: f32, _0: u32, _1: u32, _2: u32 }
+@group(0) @binding(0) var<uniform> p: BP;
+@group(0) @binding(1) var s: sampler;
+@group(0) @binding(2) var t: texture_2d<f32>;
 struct V { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> }
 @vertex fn vs(@builtin(vertex_index) i: u32) -> V {
-    var p = array<vec2<f32>,3>(vec2(-1.,3.),vec2(3.,-1.),vec2(-1.,-1.));
-    var u = array<vec2<f32>,3>(vec2(0.,-1.),vec2(2.,1.),vec2(0.,1.));
-    return V(vec4<f32>(p[i],0.,1.), u[i]);
+    var pts = array<vec2<f32>,3>(vec2(-1.,3.),vec2(3.,-1.),vec2(-1.,-1.));
+    var uvs = array<vec2<f32>,3>(vec2(0.,-1.),vec2(2.,1.),vec2(0.,1.));
+    return V(vec4<f32>(pts[i],0.,1.), uvs[i]);
 }
 @fragment fn fs(v: V) -> @location(0) vec4<f32> {
-    return textureSampleLevel(t, s, v.uv, 0.0);
+    let col  = textureSampleLevel(t, s, v.uv, 0.0);
+    let luma = dot(col.rgb, vec3<f32>(0.299, 0.587, 0.114));
+    if (luma < p.cutoff) { return vec4<f32>(0.0, 0.0, 0.0, 1.0); }
+    return col;
 }
 `;
 
@@ -277,6 +283,9 @@ const renderUB = device.createBuffer({
     size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const fadeUB = device.createBuffer({
+    size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+});
+const blitUB = device.createBuffer({
     size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const windVisUB = device.createBuffer({
@@ -443,8 +452,9 @@ function rebuildOffscreen() {
     blitBG = device.createBindGroup({
         layout: blitPipe.getBindGroupLayout(0),
         entries: [
-            { binding: 0, resource: screenSmp },
-            { binding: 1, resource: offscreenView },
+            { binding: 0, resource: { buffer: blitUB } },
+            { binding: 1, resource: screenSmp },
+            { binding: 2, resource: offscreenView },
         ],
     });
     const enc = device.createCommandEncoder();
@@ -757,8 +767,9 @@ fVis.add(params, 'renderScale', 0.1, 1.0, 0.05).name('render scale').onChange(()
     rebuildOffscreen();
     seedAgents();
 });
-fVis.add(params,  'trailDecay', 0.005, 0.4, 0.005).name('trail decay');
-fVis.add(params,  'pointSize',  1, 6, 0.1).name('agent size');
+fVis.add(params,  'trailDecay',    0.005, 0.4,  0.005).name('trail decay');
+fVis.add(params,  'bgBlackCutoff', 0,     0.05, 0.001).name('black cutoff');
+fVis.add(params,  'pointSize',     1,     6,    0.1  ).name('agent size');
 fVis.addColor(params, 'color').name('base color');
 fVis.addColor(params, 'speedColor').name('fast color');
 fVis.add(params, 'brightness', 0.01, 0.5, 0.005).name('brightness');
@@ -927,6 +938,12 @@ function writeFadeUB() {
     device.queue.writeBuffer(fadeUB, 0, ab);
 }
 
+function writeBlitUB() {
+    const ab = new ArrayBuffer(16);
+    new Float32Array(ab)[0] = params.bgBlackCutoff;
+    device.queue.writeBuffer(blitUB, 0, ab);
+}
+
 function writeWindVisUB(time, gridW) {
     const step = Math.round(100 * window.devicePixelRatio);
     const ab = new ArrayBuffer(32);
@@ -970,6 +987,7 @@ function frame(ts) {
     writeSoloUB(dt, now);
     writeRenderUB();
     writeFadeUB();
+    writeBlitUB();
 
     const enc = device.createCommandEncoder();
 

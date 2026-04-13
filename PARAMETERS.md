@@ -123,6 +123,15 @@ Canvas resolution multiplier applied on top of the device pixel ratio (DPR). At 
 
 Controls how quickly particle trails fade. Each frame a black fullscreen quad is blended over the offscreen texture at this alpha — higher values erase trails faster, lower values leave longer ghosts. At the minimum, trails persist for many seconds; at the maximum they vanish almost instantly.
 
+### black cutoff (`bgBlackCutoff`)
+**Range:** 0 – 0.05 | **Default:** 0.012
+
+Trail decay is exponential — each frame multiplies the remaining brightness by `(1 − trailDecay)`. This approaches zero asymptotically and never actually reaches it, leaving a faint "dirty" residual on the background between particles.
+
+This control clamps that residual away at display time. During the final blit from the offscreen buffer to the canvas, any pixel whose luminance falls below this threshold is clamped to pure black. The offscreen buffer itself is unaffected — it continues to decay normally — so this is purely a cosmetic fix applied at the output stage.
+
+At the default of 0.012 the residual is invisible in practice while the fix is imperceptible on real trail content (which is always well above this level). Raising it above ~0.02 may clip the very tail end of long trails; lowering to 0 disables the cutoff entirely.
+
 ### agent size (`pointSize`)
 **Range:** 1 – 6 | **Default:** 2.0
 
