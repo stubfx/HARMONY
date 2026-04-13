@@ -37,9 +37,10 @@ const params = {
     speedColor:  '#ff4400',   // color approached at max speed
     brightness:  0.08,        // per-particle alpha; prevents additive saturation to white
     // Magnet
-    magnetStr:   1.0,
-    imageSize:   0.316,   // fraction of each screen dimension (0.316² ≈ 1/10 screen area)
-    showImage:   false,
+    magnetStr:      5.0,  // homing speed: px/frame agents move toward their home position
+    alphaThreshold: 0.1,  // min image alpha to trigger homing (0–1)
+    imageSize:      0.316, // image size as fraction of min(canvasW, canvasH)
+    showImage:    false,
     // Weight
     weightSpread: 0.8,    // 0 = all equal; 1 = weights span [0.05 … 1.95]
     // Motion behaviour
@@ -179,7 +180,7 @@ const PI:f32 = 3.14159265358979; const TWO_PI:f32 = 6.28318530717959;
 @fragment fn fs(v: V) -> @location(0) vec4<f32> { return vec4<f32>(v.bright, 0.0, 0.0, 1.0); }
 `;
 
-// Image debug: grayscale 50% overlay, drawn as a centered 1/4-screen quad.
+// Image debug: grayscale overlay of the image region with the vignette circle applied.
 // DP layout (32 bytes): canvasW, canvasH, x0, y0, x1, y1, _p0, _p1
 const IMAGE_DEBUG_WGSL = `
 struct DP { canvasW:f32, canvasH:f32, x0:f32, y0:f32, x1:f32, y1:f32, _p0:u32, _p1:u32 }
@@ -199,8 +200,9 @@ struct V { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> }
     return V(vec4<f32>(ndc, 0., 1.), lp);
 }
 @fragment fn fs(v: V) -> @location(0) vec4<f32> {
-    let c = textureSampleLevel(t, s, v.uv, 0.0).r;
-    return vec4<f32>(c, c, c, 0.5);
+    let c = textureSampleLevel(t, s, v.uv, 0.0);
+    let luma = dot(c.rgb, vec3<f32>(0.299, 0.587, 0.114));
+    return vec4<f32>(luma, luma, luma, c.a * 0.6);
 }
 `;
 
@@ -234,13 +236,16 @@ function updateMonitor(fps) {
     if (monAgents) monAgents.textContent = `${params.agentCount.toLocaleString()} agents`;
 }
 
-// ── Image region: centered square, size = params.imageSize fraction of each dimension ──
-// imageSize = 1.0 → full screen; 0.316 → ~1/10 of screen area (√0.1 per side)
+// ── Image region: centered, preserves image aspect ratio ─────────────────────
+// imageSize scales the image so its longer side = imageSize × min(canvasW, canvasH).
 function getImageRegion() {
-    const hw = canvas.width  * params.imageSize / 2;
-    const hh = canvas.height * params.imageSize / 2;
-    const cx = canvas.width  / 2;
-    const cy = canvas.height / 2;
+    const cx     = canvas.width  / 2;
+    const cy     = canvas.height / 2;
+    const refDim = Math.min(canvas.width, canvas.height) * params.imageSize;
+    const aspect = imageNaturalW / imageNaturalH;
+    let hw, hh;
+    if (aspect >= 1) { hw = refDim / 2;         hh = refDim / aspect / 2; }
+    else             { hh = refDim / 2;          hw = refDim * aspect / 2; }
     return { x0: cx - hw, y0: cy - hh, x1: cx + hw, y1: cy + hh };
 }
 
@@ -459,10 +464,12 @@ window.addEventListener('resize', () => {
 });
 
 // ── Magnet image state ────────────────────────────────────────────────────────
-let hasImage     = false;
-let imageTex     = null;
-let imageTexView = null;
-let imageDebugBG = null;
+let hasImage      = false;
+let imageTex      = null;
+let imageTexView  = null;
+let imageDebugBG  = null;
+let imageNaturalW = 1;   // natural pixel dimensions of the loaded image
+let imageNaturalH = 1;
 
 // Rebuilds particle render bind group — called after pipeline creation and on image change
 function rebuildRenderBG() {
@@ -493,9 +500,11 @@ function rebuildImageDebugBG() {
 
 async function loadMagnetImage(file) {
     const bmp = await createImageBitmap(file, { colorSpaceConversion: 'none' });
+    imageNaturalW = bmp.width;
+    imageNaturalH = bmp.height;
     if (imageTex) imageTex.destroy();
     imageTex = device.createTexture({
-        size:   [bmp.width, bmp.height],
+        size:  [bmp.width, bmp.height],
         format: 'rgba8unorm',
         usage:  GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
     });
@@ -512,10 +521,12 @@ async function loadMagnetImage(file) {
 }
 
 function clearMagnetImage() {
-    hasImage     = false;
-    imageTexView = null;
+    hasImage      = false;
+    imageTexView  = null;
+    imageNaturalW = 1;
+    imageNaturalH = 1;
     if (imageTex) { imageTex.destroy(); imageTex = null; }
-    imageDebugBG = null;
+    imageDebugBG  = null;
     rebuildSimBG();
     rebuildRenderBG();
 }
@@ -528,11 +539,13 @@ let windVisBG   = null;
 
 function rebuildSimBG() {
     if (!simPipe) return;
+    const texView = (hasImage && imageTexView) ? imageTexView : placeholderTexView;
     simBG = device.createBindGroup({
         layout: simPipe.getBindGroupLayout(0),
         entries: [
             { binding: 0, resource: { buffer: soloUB } },
             { binding: 1, resource: { buffer: agentBuf } },
+            { binding: 2, resource: texView },
         ],
     });
 }
@@ -680,8 +693,9 @@ fVis.addColor(params, 'color').name('base color');
 fVis.addColor(params, 'speedColor').name('fast color');
 fVis.add(params, 'brightness', 0.01, 0.5, 0.005).name('brightness');
 
-const fMagnet = gui.addFolder('Magnet Image');
-fMagnet.add(params, 'magnetStr',  0, 10,  0.1).name('strength');
+const fMagnet = gui.addFolder('Trace');
+fMagnet.add(params, 'magnetStr',      0, 20,  0.1 ).name('homing speed');
+fMagnet.add(params, 'alphaThreshold', 0,  1,  0.01).name('alpha threshold');
 fMagnet.add(params, 'imageSize', 0.05, 1.0, 0.01).name('size');
 fMagnet.add(params, 'showImage').name('show image');
 fMagnet.add({ load: () => document.querySelector('#image-input').click() }, 'load').name('Load image…');
@@ -790,6 +804,8 @@ function writeSoloUB(dt, time) {
     f[14] = x1;
     f[15] = y1;
     u[16] = (params.followFormula && !introActive) ? 1 : 0;
+    f[17] = params.alphaThreshold;
+    // f[18], f[19] → padding (_pad1, _pad2)
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
@@ -817,6 +833,8 @@ function writeRenderUB() {
     f[14] = srgb[1];
     f[15] = srgb[2];
     f[16] = params.brightness;
+    f[17] = params.alphaThreshold;
+    // f[18], f[19] → padding (_p1, _p2)
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 
