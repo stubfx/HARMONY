@@ -31,11 +31,11 @@ const params = {
     autoWind:    true,   // cycle through WIND_FORMULAS every 10 s
     // Visual
     renderScale: 1.0,    // multiplied with DPR — reduce on high-res screens
-    trailDecay:  0.055,
+    trailDecay:  0.025,
     pointSize:   2.0,
-    color:       '#0000ff',
+    color:       '#000000',
     speedColor:  '#ff4400',   // color approached at max speed
-    brightness:  0.08,        // per-particle alpha; prevents additive saturation to white
+    brightness:  0.06,        // per-particle alpha; prevents additive saturation to white
     // Magnet
     magnetStr:      5.0,  // homing speed: px/frame agents move toward their home position
     alphaThreshold: 0.1,  // min image alpha to trigger homing (0–1)
