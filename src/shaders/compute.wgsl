@@ -22,8 +22,8 @@
 //   [60] imgY1          f32
 //   [64] followFormula  u32
 //   [68] alphaThreshold f32   (min image alpha to trigger homing)
-//   [72] _pad1          u32
-//   [76] _pad2          u32
+//   [72] blackThreshold f32   (luminance below which pixels are transparent)
+//   [76] vignetteEdge   f32   (edge fade width in UV units)
 
 struct SoloParams {
     agentCount:     u32,
@@ -44,8 +44,8 @@ struct SoloParams {
     imgY1:          f32,
     followFormula:  u32,
     alphaThreshold: f32,
-    _pad1:          u32,
-    _pad2:          u32,
+    blackThreshold: f32,
+    vignetteEdge:   f32,
 }
 
 struct Agent {
@@ -63,17 +63,25 @@ struct Agent {
 const PI:     f32 = 3.14159265358979;
 const TWO_PI: f32 = 6.28318530717959;
 
-// Sample image alpha at a canvas-pixel position.
-// Returns 0 if the position is outside the image rect.
+// Sample effective image alpha at a canvas-pixel position.
+// Applies black cutoff (luminance) and rectangular edge fade.
+// Returns 0 if outside the image rect or below cutoffs.
 fn imgAlphaAt(canvasPx: vec2<f32>, texDims: vec2<u32>) -> f32 {
     let uv = vec2<f32>(
         (canvasPx.x - params.imgX0) / (params.imgX1 - params.imgX0),
         (canvasPx.y - params.imgY0) / (params.imgY1 - params.imgY0),
     );
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { return 0.0; }
-    let tx = u32(clamp(uv.x, 0.0, 1.0) * f32(texDims.x - 1u));
-    let ty = u32(clamp(uv.y, 0.0, 1.0) * f32(texDims.y - 1u));
-    return textureLoad(imageTex, vec2<u32>(tx, ty), 0u).a;
+    let tx  = u32(clamp(uv.x, 0.0, 1.0) * f32(texDims.x - 1u));
+    let ty  = u32(clamp(uv.y, 0.0, 1.0) * f32(texDims.y - 1u));
+    let px  = textureLoad(imageTex, vec2<u32>(tx, ty), 0u);
+    // Black cutoff: pixels below this luminance are fully transparent
+    let luma = dot(px.rgb, vec3<f32>(0.299, 0.587, 0.114));
+    if (luma < params.blackThreshold) { return 0.0; }
+    // Rectangular edge fade
+    let distEdge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
+    let vig = smoothstep(0.0, max(params.vignetteEdge, 0.0001), distEdge);
+    return px.a * vig;
 }
 
 @compute @workgroup_size(64)

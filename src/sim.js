@@ -39,6 +39,8 @@ const params = {
     // Magnet
     magnetStr:      5.0,  // homing speed: px/frame agents move toward their home position
     alphaThreshold: 0.1,  // min image alpha to trigger homing (0–1)
+    blackThreshold: 0.05, // luminance below which pixels are treated as transparent
+    vignetteEdge:   0.08, // edge fade width in UV units (0 = none, 0.5 = half image)
     imageSize:      0.316, // image size as fraction of min(canvasW, canvasH)
     showImage:    false,
     // Weight
@@ -696,6 +698,8 @@ fVis.add(params, 'brightness', 0.01, 0.5, 0.005).name('brightness');
 const fMagnet = gui.addFolder('Trace');
 fMagnet.add(params, 'magnetStr',      0, 20,  0.1 ).name('homing speed');
 fMagnet.add(params, 'alphaThreshold', 0,  1,  0.01).name('alpha threshold');
+fMagnet.add(params, 'blackThreshold', 0,  0.5, 0.005).name('black cutoff');
+fMagnet.add(params, 'vignetteEdge',   0,  0.5, 0.005).name('edge fade');
 fMagnet.add(params, 'imageSize', 0.05, 1.0, 0.01).name('size');
 fMagnet.add(params, 'showImage').name('show image');
 fMagnet.add({ load: () => document.querySelector('#image-input').click() }, 'load').name('Load image…');
@@ -805,7 +809,8 @@ function writeSoloUB(dt, time) {
     f[15] = y1;
     u[16] = (params.followFormula && !introActive) ? 1 : 0;
     f[17] = params.alphaThreshold;
-    // f[18], f[19] → padding (_pad1, _pad2)
+    f[18] = params.blackThreshold;
+    f[19] = params.vignetteEdge;
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
@@ -834,7 +839,8 @@ function writeRenderUB() {
     f[15] = srgb[2];
     f[16] = params.brightness;
     f[17] = params.alphaThreshold;
-    // f[18], f[19] → padding (_p1, _p2)
+    f[18] = params.blackThreshold;
+    f[19] = params.vignetteEdge;
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 

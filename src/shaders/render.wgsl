@@ -1,25 +1,25 @@
 // ─── Solo Particle Render Shader ──────────────────────────────────────────────
 // SoloRenderParams layout (80 bytes):
-//   [0]  agentCount    u32
-//   [4]  canvasW       f32
-//   [8]  canvasH       f32
-//   [12] pointSize     f32
-//   [16] colorR        f32
-//   [20] colorG        f32
-//   [24] colorB        f32
-//   [28] maxSpeed      f32
-//   [32] hasImage      u32
-//   [36] imgX0         f32
-//   [40] imgY0         f32
-//   [44] imgX1         f32
-//   [48] imgY1         f32
-//   [52] speedColorR   f32
-//   [56] speedColorG   f32
-//   [60] speedColorB   f32
-//   [64] brightness    f32
+//   [0]  agentCount     u32
+//   [4]  canvasW        f32
+//   [8]  canvasH        f32
+//   [12] pointSize      f32
+//   [16] colorR         f32
+//   [20] colorG         f32
+//   [24] colorB         f32
+//   [28] maxSpeed       f32
+//   [32] hasImage       u32
+//   [36] imgX0          f32
+//   [40] imgY0          f32
+//   [44] imgX1          f32
+//   [48] imgY1          f32
+//   [52] speedColorR    f32
+//   [56] speedColorG    f32
+//   [60] speedColorB    f32
+//   [64] brightness     f32
 //   [68] alphaThreshold f32
-//   [72] _p1           f32
-//   [76] _p2           f32
+//   [72] blackThreshold f32
+//   [76] vignetteEdge   f32
 
 struct SoloRenderParams {
     agentCount:     u32,
@@ -40,8 +40,8 @@ struct SoloRenderParams {
     speedColorB:    f32,
     brightness:     f32,
     alphaThreshold: f32,
-    _p1:            f32,
-    _p2:            f32,
+    blackThreshold: f32,
+    vignetteEdge:   f32,
 }
 
 struct Agent {
@@ -105,10 +105,13 @@ struct VsOut {
             let uv        = clamp(in.homeUV, vec2<f32>(0.0), vec2<f32>(1.0));
             let imgSample = textureSampleLevel(imgTex, imgSmp, uv, 0.0);
 
-            // Mirror the compute shader's alpha threshold: only show image colour
-            // for pixels opaque enough to trigger homing.
-            if (imgSample.a >= params.alphaThreshold) {
-                return vec4<f32>(imgSample.rgb, params.brightness * imgSample.a);
+            // Black cutoff: skip pixels whose luminance is below the threshold.
+            let luma = dot(imgSample.rgb, vec3<f32>(0.299, 0.587, 0.114));
+            if (luma >= params.blackThreshold && imgSample.a >= params.alphaThreshold) {
+                // Rectangular edge fade: smoothstep from each of the four edges inward.
+                let distEdge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
+                let vig      = smoothstep(0.0, max(params.vignetteEdge, 0.0001), distEdge);
+                return vec4<f32>(imgSample.rgb, params.brightness * imgSample.a * vig);
             }
         }
     }
