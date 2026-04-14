@@ -75,16 +75,17 @@ function updateUserState(roomId, socketId, type, data) {
     if (!room) return;
     let user = room.users.get(socketId);
     if (!user) {
-        user = { pitch: 0.5, roll: 0.5, temperature: 0.5, lastSeen: Date.now() };
+        user = { pitch: 0.5, roll: 0.5, temperature: 0.5, coherence: 0.5, lastSeen: Date.now() };
         room.users.set(socketId, user);
     }
     user.lastSeen = Date.now();
     if (type === 'tilt') {
-        user.pitch       = data.pitch ?? 0.5;
-        user.roll        = data.roll  ?? 0.5;
+        user.pitch     = data.pitch ?? 0.5;
+        user.roll      = data.roll  ?? 0.5;
     }
     if (type === 'touch') {
-        user.temperature = data.temp  ?? 0.5;
+        user.temperature = data.temp ?? 0.5;
+        user.coherence   = data.x   ?? 0.5; // X axis → coherence (left=chaos, right=order)
     }
 }
 
@@ -99,15 +100,16 @@ setInterval(() => {
         }
         if (!room.hostSocketId || !room.users.size) continue;
 
-        let sp = 0, sr = 0, st = 0;
-        for (const u of room.users.values()) { sp += u.pitch; sr += u.roll; st += u.temperature; }
+        let sp = 0, sr = 0, st = 0, sc = 0;
+        for (const u of room.users.values()) { sp += u.pitch; sr += u.roll; st += u.temperature; sc += u.coherence; }
         const n = room.users.size;
 
         io.to(room.hostSocketId).emit('collective-state', {
-            avgPitch:  sp / n,
-            avgRoll:   sr / n,
-            avgTemp:   st / n,
-            userCount: n,
+            avgPitch:     sp / n,
+            avgRoll:      sr / n,
+            avgTemp:      st / n,
+            avgCoherence: sc / n,
+            userCount:    n,
         });
     }
 }, 300);
@@ -134,9 +136,17 @@ io.on('connection', (socket) => {
     socket.on('join-session', ({ room, spectatorId }) => {
         assignedRoom = room;
         const roomData = getOrCreateRoom(room);
-        roomData.users.set(socket.id, { pitch: 0.5, roll: 0.5, temperature: 0.5, lastSeen: Date.now() });
+        roomData.users.set(socket.id, { pitch: 0.5, roll: 0.5, temperature: 0.5, coherence: 0.5, lastSeen: Date.now() });
+        // Join a spectator sub-room so peers can be notified of each other's presence
+        socket.join(`${room}:spectators`);
         console.log('[socket] remote joined     room:', room, '| spectator:', spectatorId ?? '—');
         socket.emit('joined', { room });
+        // Notify the host simulation — triggers the join burst on the big screen
+        if (roomData.hostSocketId) {
+            io.to(roomData.hostSocketId).emit('spectator-joined', { userCount: roomData.users.size });
+        }
+        // Notify all other spectators in the room — brief pulse on their screens
+        socket.to(`${room}:spectators`).emit('peer-joined');
     });
 
     // ── User event from remote ────────────────────────────────────────────────

@@ -66,13 +66,20 @@ scan to join. All communication flows through the server via Socket.IO.
 
 ```
 Host browser — simulation display (WebGPU)
-    │  Socket.IO  'register-host'  →  server assigns session UUID
-    │  Socket.IO  'session-id'     ←  server emits UUID back
+    │  Socket.IO  'register-host'   →  server assigns session UUID
+    │  Socket.IO  'session-id'      ←  server emits UUID back
     │  QR code generated: /remote/?s=<uuid>
+    │
+    │  'spectator-joined'  ←─── server (fires on each new spectator join)
+    │                            → brief directional gust in the particle field
+    │
+    │  'collective-state'  ←─── server ticker every 300 ms
+    │                            { avgPitch, avgRoll, avgTemp, avgCoherence, userCount }
+    │                            → wind bias, turnRate scale, speed-color tint
     │
     │                     ┌─────────────────────────────────────────────┐
     │                     │  RELAY_MODE=direct (default)                │
-    │  'remote-event'  ←──┤  server forwards user events straight here  │
+    │  'remote-event'  ←──┤  server forwards touch/text events here     │
     │                     └─────────────────────────────────────────────┘
     │                     ┌─────────────────────────────────────────────┐
     │  'sim-params'   ←───┤  RELAY_MODE=n8n                            │
@@ -81,13 +88,17 @@ Host browser — simulation display (WebGPU)
     ▼
 Display / projection
 
-Spectators  (/remote?s=<uuid>)
-    │  Socket.IO  'join-session'  →  server (identified by UUID)
-    │  Socket.IO  'user-event'   →  server routes per RELAY_MODE
+Spectators  (/remote/?s=<uuid>)
+    │  Socket.IO  'join-session'  →  server
+    │  Socket.IO  'user-event'    →  server routes per RELAY_MODE
+    │                                 tilt events: aggregated only, not forwarded
+    │  Socket.IO  'peer-joined'  ←─  server (brief aura pulse when another spectator joins)
     ▼
 Node.js server  (:3000)
     │  direct mode: io.to(room).emit('remote-event', ...)
     │  n8n mode:    HTTP POST → n8n webhook
+    │  always:      updates room state (pitch, roll, temperature, coherence per user)
+    │  ticker:      emits 'collective-state' to host every 300 ms
     ▼
 [n8n workflow  (:5678)]      ← only in RELAY_MODE=n8n
     │  AI processing → parameter generation
@@ -104,19 +115,35 @@ Server → Socket.IO 'sim-params' → simulation
    - **Small scannable overlay** in the bottom-left UI panel (click to open)
    - **Large trace image** in the canvas centre — the particle field writes the QR pattern
 4. Spectators scan the QR, open `/remote/?s=<uuid>`, connect via Socket.IO
-5. Spectator events are routed per `RELAY_MODE` (see Environment Variables)
-6. Server keeps sockets alive using Socket.IO's built-in heartbeat/ping-timeout mechanism
+5. Server emits `spectator-joined` to the host — a brief gust fires in the particle field
+6. Server emits `peer-joined` to all other spectators — their aura briefly dims and recovers
+7. Every 300 ms the server aggregates all spectators' state and emits `collective-state` to the host
+8. Spectator touch/text events are also routed per `RELAY_MODE`
 
 ### RELAY_MODE
 
-Set `RELAY_MODE` in `.env` to control how spectator events are processed:
+Set `RELAY_MODE` in `.env` to control how spectator touch/text events are processed:
 
 | Value | Path | Use when |
 |-------|------|----------|
 | `direct` | remote → server → simulation | Testing, no AI processing needed |
 | `n8n` | remote → server → n8n → simulation | Full performance with AI parameter generation |
 
-The simulation receives `'remote-event'` in direct mode and `'sim-params'` in n8n mode. Both paths ultimately land in the same JavaScript handler in the simulation.
+Tilt events are **always** consumed server-side for aggregation regardless of `RELAY_MODE` — they are never forwarded individually to the simulation.
+
+### Collective state aggregation
+
+The server maintains a per-room user table. Every 300 ms it averages all active spectators' values and emits `collective-state` to the host simulation:
+
+| Field | Source | Effect in simulation |
+|-------|--------|----------------------|
+| `avgPitch` | phone tilt (Y axis) | wind bias Y — field tilts forward/back |
+| `avgRoll` | phone tilt (X axis) | wind bias X — field tilts left/right |
+| `avgTemp` | touch Y position | speed-color hue: blue (top/cold) → amber (bottom/warm), 65% blend |
+| `avgCoherence` | touch X position | turnRate multiplier: 0.08× (left/chaos) → 3.0× (right/order) |
+| `userCount` | active connections | logged; future use for presence-driven parameter scaling |
+
+All collective values are smoothed with an exponential moving average (~0.8 s time constant) in the simulation before being written to the GPU, preventing jarring jumps when spectators join or leave.
 
 ---
 
@@ -126,15 +153,21 @@ All computation runs on the GPU. No Three.js. No WebGL.
 
 | Pass | Type | Description |
 |------|------|-------------|
-| **Compute** | Compute | Agent physics: formula steering, wind force, drag, speed clamping, edge wrap |
+| **Compute** | Compute | Agent physics: formula steering, wind force + collective tilt bias, drag, speed clamping, edge wrap |
 | **Fade** | Render | Black fullscreen quad with alpha blend — exponential trail decay each frame |
-| **Particles** | Render | Per-agent quads drawn into offscreen texture; attenuated additive blend |
+| **Particles** | Render | Per-agent quads drawn into offscreen texture; attenuated additive blend; speed-color tinted by collective temperature |
 | **Blit** | Render | Copy offscreen texture → canvas swap-chain; applies `bgBlackCutoff` to clamp near-zero trail residual to pure black |
 
-Agents are stored as `array<Agent>` (pos.xy, vel.xy, weight, _pad — 24 bytes each)
+Agents are stored as `array<Agent>` (pos.xy, vel.xy, home.xy, weight, _pad — 32 bytes each)
 in a persistent GPU storage buffer. The buffer is always allocated at
-`MAX_AGENTS × 24` bytes; `params.agentCount` drives actual dispatch and draw counts
+`MAX_AGENTS × 32` bytes; `params.agentCount` drives actual dispatch and draw counts
 without reallocation.
+
+The compute uniform buffer (`SoloParams`, 96 bytes) carries two extra fields beyond
+the base physics params: `windBiasX` and `windBiasY` — the smoothed collective tilt
+vector added directly to the formula wind each frame. The coherence multiplier is
+applied to `turnRate` in JavaScript before writing the buffer, so no shader change
+is needed for coherence.
 
 ---
 
@@ -146,6 +179,29 @@ On load, agents spawn from screen centre pointing radially outward. For the firs
 GUI values. After the intro window, the active direction and wind formulas engage.
 
 The intro delay is tunable via the GUI (Motion → intro delay).
+
+---
+
+## Remote Spectator Interactions
+
+Spectators open the `/remote/` page on their phones. The page is intentionally minimal — a dark full-screen surface with no labels or visible controls. Three interaction channels feed the simulation collectively:
+
+| Channel | Phone gesture | Aggregation | Simulation effect |
+|---------|--------------|-------------|-------------------|
+| **Tilt** | Hold and tilt phone in any direction | Server averages all pitch/roll vectors | Collective wind bias — the whole field leans with the crowd |
+| **Temperature** | Touch anywhere — Y position matters | Server averages all touch Y values | Speed-color hue: cold blue (finger at top) → warm amber (finger at bottom) |
+| **Coherence** | Touch anywhere — X position matters | Server averages all touch X values | turnRate multiplier: left = agents drift chaotically, right = agents snap to formula |
+| **Text** | Type in the bottom input | Forwarded directly to simulation | Trace attractor — particle field writes the word |
+
+No single person steers the simulation. The field responds to the *average* of everyone's input. Individual gestures dissolve into the collective.
+
+### Feedback loops
+
+- **On the big screen**: every new spectator join fires a brief directional gust in the particle field — a visible pulse that confirms the join without any text or notification
+- **On the phone**: the aura behind the screen reflects all three axes simultaneously (hue = temperature, tightness = coherence, anchor point = tilt). When another spectator joins, all phones feel a brief aura dimming pulse.
+- **Tilt indicator**: after motion permission is granted, a small bubble appears at the center of the phone screen and moves with the physical phone orientation.
+
+See [behavior.md](behavior.md) for the full art-direction intent behind these interactions.
 
 ---
 
@@ -455,32 +511,38 @@ Caddy handles TLS automatically via Let's Encrypt and proxies WebSocket upgrade 
 ```
 thesis-sim/
 ├── src/
-│   ├── sim.js               Main entry point: GPU setup, frame loop, GUI, formula system
+│   ├── sim.js               Main entry point: GPU setup, frame loop, GUI, formula system,
+│   │                        Socket.IO host, collective-state handler, join burst
 │   └── shaders/
-│       ├── compute.wgsl     Agent physics compute shader
+│       ├── compute.wgsl     Agent physics compute shader (SoloParams 96 bytes,
+│       │                    includes windBiasX/Y for collective tilt)
 │       └── render.wgsl      Per-agent quad rendering (speed→colour blend)
 │
 ├── remote/
 │   ├── index.html           Spectator page (served at /remote/?s=<uuid>)
-│   ├── main.js              Socket.IO client — emits user events to server
-│   ├── style.css
-│   ├── gyro.js              Device orientation helpers
+│   ├── main.js              Socket.IO client — tilt, touch (temp+coherence), text events;
+│   │                        aura reflects all three axes; peer-joined pulse
+│   ├── style.css            Dark atmospheric design, ripple animation, tilt indicator
+│   ├── gyro.js              Device orientation helpers (pitch, roll, motion magnitude)
 │   └── motion.js            Motion smoothing
 │
 ├── server/
-│   ├── server.js            Socket.IO host/remote routing, /n8n-sim-update, static assets
+│   ├── server.js            Socket.IO host/remote routing; room state aggregation;
+│   │                        collective-state ticker (300 ms); spectator-joined/peer-joined
 │   └── server-utils.js      File I/O for cached images
 │
 ├── index.html
+├── Caddyfile                Reverse proxy config (dev + production blocks)
 ├── README.md                Project overview and architecture
 ├── PARAMETERS.md            Full parameter reference with detailed explanations
+├── behavior.md              Art-direction intent — the experience from the inside
 ├── n8n-workflow.json        Importable n8n workflow template
 ├── package.json
 ├── vite.config.js
 └── .env.example
 ```
 
-Caddy reverse proxy lives in a separate project at `../caddy-proxy/`.
+Caddy reverse proxy config is in `Caddyfile` at the project root (dev + production `stubfx.io` / `api.stubfx.io` blocks).
 
 ---
 

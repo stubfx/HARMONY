@@ -67,30 +67,46 @@ socket.on('disconnect', () => {
     connDotEl?.classList.remove('connected');
 });
 
+// Another spectator just joined the same session — brief aura pulse.
+socket.on('peer-joined', () => {
+    if (!auraEl) return;
+    auraEl.style.transition = 'background 0s, opacity 0.05s ease';
+    auraEl.style.opacity = '0.6';
+    setTimeout(() => {
+        auraEl.style.transition = 'background 0.6s ease, opacity 0.5s ease';
+        auraEl.style.opacity = '1';
+    }, 80);
+});
+
 function sendEvent(type, data) {
     if (!socket.connected) return;
     socket.emit('user-event', { type, data });
 }
 
 // ── Aura ──────────────────────────────────────────────────────────────────────
-// Background glow that reflects the user's current temperature and tilt.
-// Cold (touch top) → deep blue  ·  Warm (touch bottom) → deep amber
-// Anchor point drifts with tilt so the glow follows the phone's lean.
-let currentTemp = 0.5;
-let currentRoll = 0.5;
-let currentPitch = 0.5;
+// Background glow that reflects all three interaction axes simultaneously:
+//   Y (temperature) → hue shift: cold blue (top) → warm amber (bottom)
+//   tilt            → anchor point: the glow leans with the phone
+//   X (coherence)   → gradient tightness: diffuse (left/chaos) → focused (right/order)
+let currentTemp      = 0.5;
+let currentRoll      = 0.5;
+let currentPitch     = 0.5;
+let currentCoherence = 0.5;
 
 function updateAura() {
     if (!auraEl) return;
     // Hue: 215 (cold blue) → 32 (warm amber)
-    const h = 215 + (32 - 215) * currentTemp;
-    const s = 65 + 20 * currentTemp;
-    const l = 10 + 8 * currentTemp;
-    // Anchor follows tilt so the glow leans with the phone
-    const ax = 50 + (currentRoll  - 0.5) * 60;   // 20%–80%
+    const h  = 215 + (32 - 215) * currentTemp;
+    const s  = 60 + 25 * currentTemp;
+    const l  = 9  + 10 * currentTemp;
+    // Anchor follows tilt
+    const ax = 50 + (currentRoll  - 0.5) * 60;
     const ay = 50 + (currentPitch - 0.5) * 60;
+    // Coherence: diffuse wide ellipse (chaos) → tight narrow ellipse (order)
+    const ew = 190 - currentCoherence * 110;  // 190% → 80%
+    const eh = 110 - currentCoherence * 70;   // 110% → 40%
     auraEl.style.background =
-        `radial-gradient(ellipse 130% 70% at ${ax}% ${ay}%, hsl(${h},${s}%,${l}%) 0%, #000 58%)`;
+        `radial-gradient(ellipse ${ew}% ${eh}% at ${ax}% ${ay}%, hsl(${h},${s}%,${l}%) 0%, #000 60%)`;
 }
 updateAura();
 
@@ -115,7 +131,8 @@ function handleTouch(e) {
     const ny = touch.clientY / window.innerHeight;
     const temp = ny; // top=cold, bottom=warm
 
-    currentTemp = temp;
+    currentTemp      = temp;
+    currentCoherence = nx;   // left=chaos, right=order
     updateAura();
 
     if (touchThrottle) return;

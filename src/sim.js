@@ -741,13 +741,23 @@ setTimeout(() => { introActive = false; }, params.introDelay * 1000);
     // Collective swarm state — aggregated by the server from all spectators in the room.
     // Tilt bias: avgPitch/avgRoll are 0-1 (0.5 = phone held flat/neutral).
     // Temperature: 0 = cold (top of phone screen), 1 = warm (bottom of phone screen).
-    socket.on('collective-state', ({ avgPitch, avgRoll, avgTemp, userCount }) => {
-        const biasStr = params.windStr;                 // scale with current wind strength
-        collectiveBiasX = (avgRoll  - 0.5) * 2 * biasStr;
-        collectiveBiasY = (avgPitch - 0.5) * 2 * biasStr;
-        collectiveTemp  = avgTemp ?? 0.5;
+    socket.on('collective-state', ({ avgPitch, avgRoll, avgTemp, avgCoherence, userCount }) => {
+        const biasStr = params.windStr;
+        collectiveBiasX   = (avgRoll  - 0.5) * 2 * biasStr;
+        collectiveBiasY   = (avgPitch - 0.5) * 2 * biasStr;
+        collectiveTemp    = avgTemp      ?? 0.5;
+        collectiveCoherence = avgCoherence ?? 0.5;
         if (userCount > 0)
-            console.log(`[swarm] ${userCount} user${userCount > 1 ? 's' : ''} · tilt (${collectiveBiasX.toFixed(2)}, ${collectiveBiasY.toFixed(2)}) · temp ${collectiveTemp.toFixed(2)}`);
+            console.log(`[swarm] ${userCount} · tilt (${collectiveBiasX.toFixed(2)}, ${collectiveBiasY.toFixed(2)}) · temp ${collectiveTemp.toFixed(2)} · coherence ${collectiveCoherence.toFixed(2)}`);
+    });
+
+    // A spectator joined — fire a brief directional gust into the field.
+    // Random angle each time so every join feels distinct.
+    socket.on('spectator-joined', ({ userCount }) => {
+        const angle = Math.random() * Math.PI * 2;
+        burstX = Math.cos(angle) * BURST_STRENGTH;
+        burstY = Math.sin(angle) * BURST_STRENGTH;
+        console.log(`[swarm] spectator joined — ${userCount} total · burst angle ${(angle * 180 / Math.PI).toFixed(0)}°`);
     });
 
     // Direct remote events (RELAY_MODE=direct on server).
@@ -935,20 +945,45 @@ function lerpColor(a, b, t) {
 
 // ── Collective swarm state (written by 'collective-state' socket events) ───────
 // Smoothed each frame via exponential moving average to avoid jarring jumps.
-let collectiveBiasX   = 0;   // target wind bias X
-let collectiveBiasY   = 0;   // target wind bias Y
-let collectiveTemp    = 0.5; // target temperature [0=cold … 1=warm]
-let smoothBiasX       = 0;   // smoothed
+let collectiveBiasX   = 0;   // target wind bias X (from tilt)
+let collectiveBiasY   = 0;   // target wind bias Y (from tilt)
+let collectiveTemp    = 0.5; // target temperature [0=cold … 1=warm] (from touch Y)
+let collectiveCoherence = 0.5; // target coherence [0=chaos … 1=order] (from touch X)
+let smoothBiasX       = 0;   // smoothed versions
 let smoothBiasY       = 0;
 let smoothTemp        = 0.5;
+let smoothCoherence   = 0.5;
+
+// ── Join burst state ──────────────────────────────────────────────────────────
+// When a spectator joins, a brief directional gust fires into the particle field.
+const BURST_STRENGTH  = 2.0;
+const BURST_DECAY     = 0.88; // per frame — fully dissipated in ~0.5 s at 60 fps
+const BURST_THRESHOLD = 0.01;
+let burstX = 0;
+let burstY = 0;
 
 // ── Uniform writers ───────────────────────────────────────────────────────────
 function writeSoloUB(dt, time) {
-    // Smooth collective state toward targets
-    const a   = Math.exp(-dt / 0.8); // ~0.8 s smoothing constant
-    smoothBiasX = smoothBiasX * a + collectiveBiasX * (1 - a);
-    smoothBiasY = smoothBiasY * a + collectiveBiasY * (1 - a);
-    smoothTemp  = smoothTemp  * a + collectiveTemp  * (1 - a);
+    // Smooth collective state toward targets (~0.8 s time constant)
+    const a = Math.exp(-dt / 0.8);
+    smoothBiasX     = smoothBiasX     * a + collectiveBiasX     * (1 - a);
+    smoothBiasY     = smoothBiasY     * a + collectiveBiasY     * (1 - a);
+    smoothTemp      = smoothTemp      * a + collectiveTemp      * (1 - a);
+    smoothCoherence = smoothCoherence * a + collectiveCoherence * (1 - a);
+
+    // Decay join burst exponentially each frame
+    burstX *= BURST_DECAY;
+    burstY *= BURST_DECAY;
+    if (Math.abs(burstX) < BURST_THRESHOLD) burstX = 0;
+    if (Math.abs(burstY) < BURST_THRESHOLD) burstY = 0;
+
+    // Coherence multiplier for turnRate:
+    //   0.0 (chaos / left)  → 0.08× (agents barely steer, each follows own momentum)
+    //   0.5 (neutral)       → 1.0×  (GUI turnRate unchanged)
+    //   1.0 (order / right) → 3.0×  (agents snap instantly to formula direction)
+    const coherenceMult = smoothCoherence < 0.5
+        ? 0.08 + smoothCoherence * 2 * 0.92   // 0.08 → 1.0
+        : 1.0  + (smoothCoherence - 0.5) * 4; // 1.0  → 3.0
 
     const ab = new ArrayBuffer(96);
     const u  = new Uint32Array(ab);
@@ -961,7 +996,7 @@ function writeSoloUB(dt, time) {
     f[4] = dt;
     f[5] = time;
     f[6] = (params.windEnabled && !introActive) ? params.windStr : 0.0;
-    f[7] = params.turnRate;
+    f[7] = params.turnRate * coherenceMult;  // coherence scales how sharply agents follow the formula
     f[8] = params.maxSpeed;
     f[9] = params.minSpeed;
     u[10] = hasImage ? 1 : 0;
@@ -974,8 +1009,8 @@ function writeSoloUB(dt, time) {
     f[17] = params.alphaThreshold;
     f[18] = params.blackThreshold;
     f[19] = params.vignetteEdge;
-    f[20] = smoothBiasX;
-    f[21] = smoothBiasY;
+    f[20] = smoothBiasX + burstX;  // collective tilt + join burst
+    f[21] = smoothBiasY + burstY;
     // f[22], f[23] = 0 padding
     device.queue.writeBuffer(soloUB, 0, ab);
 }
@@ -987,15 +1022,14 @@ function writeRenderUB() {
     const rgb  = hexToF(params.color);
     const srgb = hexToF(params.speedColor);
 
-    // Collective temperature tints the fast (speed) colour by up to 30%.
-    // Cold (0) → deep blue  ·  warm (1) → amber
-    // The user's own speedColor is always the neutral anchor at temp=0.5.
+    // Collective temperature tints the fast (speed) colour by up to 65%.
+    // Cold (0) → deep blue  ·  neutral (0.5) → user speedColor  ·  warm (1) → amber
     const COLD  = [0.05, 0.15, 0.90];
     const WARM  = [1.00, 0.40, 0.05];
     const tintTarget = smoothTemp < 0.5
         ? lerpColor(COLD, srgb, smoothTemp * 2)
         : lerpColor(srgb, WARM, (smoothTemp - 0.5) * 2);
-    const tinted = lerpColor(srgb, tintTarget, 0.30);
+    const tinted = lerpColor(srgb, tintTarget, 0.65);
 
     const { x0, y0, x1, y1 } = getImageRegion();
     u[0] = params.agentCount;

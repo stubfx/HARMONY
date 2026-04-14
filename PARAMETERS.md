@@ -57,6 +57,8 @@ The nominal step length an agent wants to travel each frame, in canvas pixels. A
 
 How sharply each agent steers toward the direction formula each frame. This is a `mix` factor: `vel = mix(vel, desired, turnRate)`. At 0 the agent ignores the formula entirely and coasts on inertia. At 1 the agent snaps to the desired direction immediately. Low values produce long, sweeping curves; high values produce tight, reactive motion.
 
+> **Collective coherence modulation**: this value is scaled every frame by the smoothed average of all spectators' horizontal touch position (left = chaos multiplier 0.08×, right = order multiplier 3.0×, neutral = 1.0×). The GUI value sets the baseline; the crowd scales it. See *Remote / Swarm Inputs* below.
+
 ### max speed
 **Range:** 1 – 15 | **Default:** 5.0
 
@@ -148,6 +150,8 @@ The color of slow or stationary agents. This is the low end of the speed-to-colo
 **Default:** `#ff4400`
 
 The color agents approach as their speed reaches `max speed`. The two colors are blended linearly using `speed / maxSpeed` as the interpolation factor.
+
+> **Collective temperature tint**: before the color is written to the GPU each frame, it is blended up to 65% toward a temperature target driven by the average spectator touch Y position. Cold (top of phone screen) tints toward deep blue `#0d26e6`; warm (bottom) tints toward amber `#ff6600`. At neutral (no spectators touching) the GUI color is used unchanged.
 
 ### brightness
 **Range:** 0.01 – 0.5 | **Default:** 0.08
@@ -258,6 +262,100 @@ Re-seeds all agents: positions are randomised from screen centre, home coordinat
 
 ---
 
+## Remote / Swarm Inputs
+
+Spectators open `/remote/?s=<uuid>` on their phones. The page is a dark, minimal gesture surface — no labels, no buttons at rest. Three channels feed the simulation collectively through the server's aggregation layer. No single person controls the outcome; the simulation responds to the *average* of all inputs.
+
+The server maintains a per-room state table (one entry per connected spectator, pruned after 15 s of inactivity). Every 300 ms it computes averages and emits `collective-state` to the host simulation, where all values are smoothed with an exponential moving average (~0.8 s time constant) before being applied.
+
+---
+
+### Tilt — collective wind bias
+
+**Phone gesture:** hold the phone and tilt it in any direction.
+**Data sent:** `pitch` (0–1, from vertical axis) and `roll` (0–1, from lateral axis), 0.5 = neutral/flat.
+**Aggregation:** server averages all active spectators' pitch and roll.
+**Effect:** the averaged tilt vector is converted to a wind bias — a constant velocity contribution added directly to the formula wind each frame:
+
+```
+windBiasX = (avgRoll  − 0.5) × 2 × windStr
+windBiasY = (avgPitch − 0.5) × 2 × windStr
+```
+
+When everyone tilts the same way, the field bends coherently in that direction. When tilts cancel out, the bias is zero and only the formula wind remains. The bias scales with the current `windStr` GUI value so it always feels proportional to the existing wind.
+
+This value is written to the GPU as `windBiasX` / `windBiasY` in the `SoloParams` uniform buffer (bytes [80] and [84]).
+
+---
+
+### Temperature — collective color mood
+
+**Phone gesture:** touch anywhere on the screen; the **vertical position** of your finger determines temperature.
+**Data sent:** `temp` value derived from touch Y — `0` (finger at top, cold) to `1` (finger at bottom, warm).
+**Aggregation:** server averages all active spectators' temperature values.
+**Effect:** the smoothed average temperature tints the `fast color` (speed color) every frame by up to 65%:
+
+| avgTemp | Color shift |
+|---------|-------------|
+| 0.0 | Deep blue `#0d26e6` |
+| 0.5 | Your GUI `fast color` unchanged |
+| 1.0 | Amber `#ff6600` |
+
+The blend is nonlinear: the GUI color is always the neutral anchor at 0.5, fading toward cold or warm as the crowd drifts toward either extreme. This affects the fast-color only; the `base color` is unchanged.
+
+---
+
+### Coherence — collective order vs chaos
+
+**Phone gesture:** touch anywhere on the screen; the **horizontal position** of your finger determines coherence.
+**Data sent:** `x` value from touch position — `0` (left edge) to `1` (right edge).
+**Aggregation:** server averages all active spectators' X positions.
+**Effect:** the smoothed average coherence is applied as a multiplier on `turnRate` every frame:
+
+| avgCoherence | Multiplier | Field character |
+|---|---|---|
+| 0.0 (all left) | 0.08× | Agents barely steer — each follows its own momentum, field dissolves into texture |
+| 0.5 (centre) | 1.0× | GUI `turn rate` unchanged |
+| 1.0 (all right) | 3.0× | Agents snap instantly to formula — field becomes crystalline, almost rigid |
+
+The transition is smooth. A crowd touching left and right simultaneously averages to neutral. The effect is most visible when many spectators coordinate.
+
+---
+
+### Text — trace attractor
+
+**Phone gesture:** type in the bottom input field and submit.
+**Data sent:** `text` string, forwarded directly to the simulation as a `remote-event`.
+**Effect:** the text is rendered as white glyphs on a transparent canvas and uploaded as the trace image — the same pipeline as a locally typed trace text. The last received text wins. See the *Trace Text* section above for full compositing details.
+
+---
+
+### Join burst — presence signal on the big screen
+
+When a spectator connects, the server emits `spectator-joined` to the host simulation. This triggers a brief directional gust in the particle field:
+- A random angle is chosen (so each join looks different)
+- The burst vector starts at strength 2.0 and decays by 0.88× per frame
+- At 60 fps the gust is fully dissipated in ~0.5 s
+- No text, no notification — the field simply bends and recovers
+
+When the same event fires, all other connected phones receive `peer-joined` and their aura dims briefly (80 ms) before fading back in.
+
+---
+
+### Remote page aura — per-user feedback
+
+The atmospheric glow behind the phone screen reflects all three interaction axes simultaneously:
+
+| Axis | Visual effect |
+|------|--------------|
+| Temperature (touch Y) | Hue: deep blue (top) → warm amber (bottom) |
+| Coherence (touch X) | Gradient tightness: wide/diffuse (left) → narrow/focused (right) |
+| Tilt | Anchor point of the gradient follows the phone's physical lean |
+
+This gives each spectator private, immediate feedback on what they are sending — without showing them what the collective result looks like.
+
+---
+
 ## QR Code / Session
 
 On startup the simulation connects to the server via Socket.IO and emits `'register-host'`. The server generates a UUID, assigns the socket to that room, and emits `'session-id'` back. The URL is immediately logged to the browser console (`[session] remote URL: ...`), then two QR codes are generated:
@@ -278,9 +376,13 @@ The QR trace is stored as `imageBitmap` in the standard trace state:
 - **Clear image** removes it
 
 ### Signal routing
-Spectators open `/remote/?s=<uuid>`, connect via Socket.IO, and emit `user-event` messages. The server routes them based on `RELAY_MODE`:
-- `direct` — event arrives at the simulation as a `'remote-event'` and is logged to the console
+Spectators open `/remote/?s=<uuid>`, connect via Socket.IO, and emit `user-event` messages. The server routes touch/text events based on `RELAY_MODE`:
+- `direct` — event arrives at the simulation as a `'remote-event'`
 - `n8n` — event is POSTed to the n8n webhook; n8n processes it and sends `'sim-params'` back
+
+Tilt events are never forwarded to the simulation individually — they are aggregated server-side into the periodic `collective-state` emission.
+
+Each new spectator connection fires a `spectator-joined` event to the host, producing a brief visible gust in the particle field. See *Remote / Swarm Inputs — Join burst* above.
 
 The session UUID is stable for the lifetime of the page. A socket disconnect/reconnect generates a new UUID and a new QR.
 
