@@ -13,11 +13,13 @@
 
 import './style.css';
 import { io as ioConnect } from 'socket.io-client';
+import QRCode from 'qrcode';
 import { startDeviceTilt, requestMotionOrientationPermission } from './gyro';
 
 // ── Session ───────────────────────────────────────────────────────────────────
-const urlParams   = new URLSearchParams(window.location.search);
-const room        = urlParams.get('s');
+const urlParams      = new URLSearchParams(window.location.search);
+const room           = urlParams.get('s');
+const maxSpectators  = parseInt(urlParams.get('max') ?? '10', 10);
 
 const spectatorId = sessionStorage.getItem('spectator-id') ?? (() => {
     const id = crypto.randomUUID();
@@ -34,6 +36,7 @@ const tiltDotEl     = document.querySelector('#tilt-dot');
 const gestureSurface = document.querySelector('#gesture-surface');
 const motionBtn     = document.querySelector('#motion-btn');
 const formEl        = document.querySelector('#input-form');
+const sessionQrEl   = document.querySelector('#session-qr');
 
 // ── Session info ──────────────────────────────────────────────────────────────
 if (sessionInfoEl) {
@@ -67,8 +70,32 @@ socket.on('disconnect', () => {
     connDotEl?.classList.remove('connected');
 });
 
-// Another spectator just joined the same session — brief aura pulse.
-socket.on('peer-joined', () => {
+// ── Session QR visibility ─────────────────────────────────────────────────────
+// QR hides permanently once the user interacts (they're in — no need to share).
+// QR also hides when peer count ≥ maxSpectators (room is full enough).
+// It reappears if count drops back below the threshold and no interaction yet.
+let peerCount    = 0;     // count of other spectators in this room
+let hasInteracted = false; // true after first touch / tilt / text — never resets
+
+function updateQRVisibility() {
+    if (!sessionQrEl) return;
+    const shouldHide = hasInteracted || peerCount >= maxSpectators;
+    sessionQrEl.style.opacity = shouldHide ? '0' : '0.18';
+    sessionQrEl.style.pointerEvents = shouldHide ? 'none' : 'none'; // always non-interactive
+}
+
+function markInteracted() {
+    if (hasInteracted) return;
+    hasInteracted = true;
+    updateQRVisibility();
+}
+
+// Another spectator just joined the same session.
+socket.on('peer-joined', ({ userCount } = {}) => {
+    peerCount = (userCount ?? peerCount + 1) - 1; // userCount includes self, peers don't
+    updateQRVisibility();
+
+    // Brief aura pulse to acknowledge a new peer.
     if (!auraEl) return;
     auraEl.style.transition = 'background 0s, opacity 0.05s ease';
     auraEl.style.opacity = '0.6';
@@ -76,6 +103,11 @@ socket.on('peer-joined', () => {
         auraEl.style.transition = 'background 0.6s ease, opacity 0.5s ease';
         auraEl.style.opacity = '1';
     }, 80);
+});
+
+socket.on('peer-left', ({ userCount } = {}) => {
+    peerCount = Math.max(0, (userCount ?? peerCount - 1));
+    updateQRVisibility();
 });
 
 function sendEvent(type, data) {
@@ -144,6 +176,7 @@ function handleTouch(e) {
 
 gestureSurface?.addEventListener('touchstart', (e) => {
     e.preventDefault();
+    markInteracted();
     createRipple(e.touches[0].clientX, e.touches[0].clientY);
     handleTouch(e);
 }, { passive: false });
@@ -172,6 +205,7 @@ let motionEnabled = false;
 let tiltThrottle  = null;
 
 motionBtn?.addEventListener('click', async () => {
+    markInteracted();
     await requestMotionOrientationPermission();
     motionEnabled = true;
     motionBtn.style.opacity = '0';
@@ -199,7 +233,18 @@ formEl?.addEventListener('submit', (e) => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(formEl));
     if (!data.text1?.trim()) return;
+    markInteracted();
     sendEvent('text', { text: data.text1.trim() });
     formEl.reset();
     console.log('[remote] → text', data.text1.trim());
 });
+
+// ── Session QR — always-visible small code in corner ─────────────────────────
+// Renders the current page URL so another device can scan and join the same room.
+if (sessionQrEl) {
+    QRCode.toCanvas(sessionQrEl, window.location.href, {
+        width:  72,
+        margin: 1,
+        color:  { dark: '#ffffff', light: '#00000000' },
+    }).catch(err => console.warn('[remote] QR render failed:', err));
+}

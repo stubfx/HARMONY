@@ -53,6 +53,9 @@ const params = {
     contamRadius:  150,   // radius of each contamination circle, in canvas pixels
     // Auto-clear
     clearDelay:    20,    // seconds before auto-clearing user trace content (0 = disabled)
+    // Session / QR restore
+    remoteTimeout:  60,   // seconds of silence from all remotes before QR is restored (0 = disabled)
+    maxSpectators:  10,   // remote QR hides when connected count reaches this threshold
     // Weight
     weightSpread: 0.8,    // 0 = all equal; 1 = weights span [0.05 … 1.95]
     // Motion behaviour
@@ -562,6 +565,21 @@ function clearTraceText() {
     renderTraceCanvas();
 }
 
+// Restore the session QR as the active trace image.
+// Called when all spectators leave or the inactivity timeout fires.
+// No-op if QR is already showing or hasn't been generated yet.
+function restoreQR() {
+    if (isQRBitmap || !qrBitmap) return;
+    const input = document.querySelector('#trace-text-input');
+    if (input) input.value = '';
+    clearTimeout(autoClearTimer);
+    autoClearTimer = null;
+    imageBitmap = qrBitmap;
+    isQRBitmap  = true;
+    renderTraceCanvas();
+    console.log('[session] QR restored');
+}
+
 // ── Formula compute + wind-vis pipelines (rebuilt on each formula change) ──────
 let simPipe     = null;
 let simBG       = null;
@@ -631,6 +649,9 @@ const startWind = 'atan2(y - cy, x - cx) + sin(length(vec2(x-cx,y-cy)) * 0.008) 
 let introActive      = true;
 let qrPendingRender  = false;  // QR bitmap ready but waiting for intro to finish
 let isQRBitmap       = false;  // current imageBitmap is the session QR (not user-loaded)
+let qrBitmap         = null;   // permanent reference to the session QR bitmap
+let simSpectatorCount   = 0;   // local spectator count — synced from server events
+let lastRemoteActivity  = Date.now(); // timestamp of last remote-event (touch or text)
 
 await applyFormulas(startDir, startWind, { reseed: true });
 setTimeout(() => {
@@ -665,7 +686,7 @@ setTimeout(() => {
         // Falls back to the page's own origin in dev when no env var is set.
         const envUrl  = import.meta.env.VITE_USER_URL;
         const base    = envUrl ? new URL(envUrl).origin : window.location.origin;
-        const userUrl = `${base}/remote/?s=${sessionId}`;
+        const userUrl = `${base}/remote/?s=${sessionId}&max=${params.maxSpectators}`;
 
         console.log('[session] remote URL:', userUrl);
 
@@ -693,9 +714,11 @@ setTimeout(() => {
         // Treat as a loaded image so Clear image removes it and user images replace it.
         // Delay trace render until the intro ends — prevents particles being trapped
         // in the QR pattern during the radial spread-out phase.
+        // Stored permanently in qrBitmap so it can be restored at any time.
         // Flagged as QR so auto-clear never wipes it.
+        qrBitmap    = await createImageBitmap(qrOffscreen);
+        imageBitmap = qrBitmap;
         isQRBitmap  = true;
-        imageBitmap = await createImageBitmap(qrOffscreen);
         if (introActive) {
             qrPendingRender = true;
         } else {
@@ -724,17 +747,29 @@ setTimeout(() => {
     // A spectator joined — fire a brief directional gust into the field.
     // Random angle each time so every join feels distinct.
     socket.on('spectator-joined', ({ userCount }) => {
+        simSpectatorCount = userCount ?? simSpectatorCount + 1;
         const angle = Math.random() * Math.PI * 2;
         burstX = Math.cos(angle) * BURST_STRENGTH;
         burstY = Math.sin(angle) * BURST_STRENGTH;
         console.log(`[swarm] spectator joined — ${userCount} total · burst angle ${(angle * 180 / Math.PI).toFixed(0)}°`);
     });
 
+    // A spectator left — decrement internal count and restore QR if room is empty.
+    socket.on('spectator-left', ({ userCount }) => {
+        simSpectatorCount = userCount ?? Math.max(0, simSpectatorCount - 1);
+        console.log(`[swarm] spectator left — ${simSpectatorCount} remaining`);
+        if (simSpectatorCount === 0) restoreQR();
+    });
+
     // Direct remote events (RELAY_MODE=direct on server).
     // In n8n mode these never arrive here; sim-params carries the processed result instead.
     socket.on('remote-event', (event) => {
         console.log('[remote]', event.type, '|', JSON.stringify(event.data), '| from', event.spectatorId);
+        // Every remote-event (touch or text) resets the inactivity timer.
+        lastRemoteActivity = Date.now();
         if (event.type === 'text' && event.data?.text) {
+            // Text content replaces the QR if it is currently showing.
+            if (isQRBitmap) { imageBitmap = null; isQRBitmap = false; }
             const input = document.querySelector('#trace-text-input');
             if (input) input.value = event.data.text;
             renderTraceCanvas();
@@ -826,6 +861,10 @@ fMagnet.add({ load: () => document.querySelector('#image-input').click() }, 'loa
 fMagnet.add({ clear: clearMagnetImage }, 'clear').name('Clear image');
 fMagnet.add({ clear: clearTraceText },   'clear').name('Clear text');
 
+const fSession = gui.addFolder('Session');
+fSession.add(params, 'remoteTimeout',  0, 180,  5).name('idle restore QR (s)');
+fSession.add(params, 'maxSpectators',  1,  50,  1).name('QR hides at N users');
+
 gui.add({ restart: () => seedAgents() }, 'restart').name('↺  Restart');
 gui.add(params, 'restFormula').name('⌂  idle').onChange(v => {
     if (!v) return;
@@ -874,6 +913,19 @@ setInterval(() => {
     }
     if (changed) applyFormulas(newDir, newWind);
 }, 30_000);
+
+// ── QR restore fallback ticker ────────────────────────────────────────────────
+// Runs every 5 s. Two independent triggers:
+//   1. Inactivity — no remote events for params.remoteTimeout seconds (0 = disabled)
+//   2. Empty room — simSpectatorCount dropped to 0 but spectator-left was missed
+setInterval(() => {
+    if (isQRBitmap || !qrBitmap) return;
+    const now = Date.now();
+    if (params.remoteTimeout > 0 && now - lastRemoteActivity > params.remoteTimeout * 1000) {
+        restoreQR(); return;
+    }
+    if (simSpectatorCount <= 0) restoreQR();
+}, 5_000);
 
 function apply() { applyFormulas(dirInput.value, windInput.value); }
 applyBtn.addEventListener('click', apply);

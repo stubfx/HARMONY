@@ -145,8 +145,8 @@ io.on('connection', (socket) => {
         if (roomData.hostSocketId) {
             io.to(roomData.hostSocketId).emit('spectator-joined', { userCount: roomData.users.size });
         }
-        // Notify all other spectators in the room — brief pulse on their screens
-        socket.to(`${room}:spectators`).emit('peer-joined');
+        // Notify all other spectators in the room — brief pulse + updated count
+        socket.to(`${room}:spectators`).emit('peer-joined', { userCount: roomData.users.size });
     });
 
     // ── User event from remote ────────────────────────────────────────────────
@@ -182,8 +182,20 @@ io.on('connection', (socket) => {
         console.log('[socket] disconnected      room:', assignedRoom);
         const room = rooms.get(assignedRoom);
         if (room) {
+            const isHost = room.hostSocketId === socket.id;
             room.users.delete(socket.id);
-            if (room.hostSocketId === socket.id) room.hostSocketId = null;
+            if (isHost) {
+                room.hostSocketId = null;
+            } else {
+                const remaining = room.users.size;
+                // Notify the host simulation — used to restore QR when room empties.
+                if (room.hostSocketId) {
+                    io.to(room.hostSocketId).emit('spectator-left', { userCount: remaining });
+                }
+                // Notify remaining spectators — used to show QR again if count drops below threshold.
+                io.to(`${assignedRoom}:spectators`).emit('peer-left', { userCount: remaining });
+                console.log('[socket] spectator left    room:', assignedRoom, '| remaining:', remaining);
+            }
             // Clean up fully empty rooms
             if (!room.hostSocketId && !room.users.size) rooms.delete(assignedRoom);
         }
