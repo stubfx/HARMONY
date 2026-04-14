@@ -790,6 +790,9 @@ setTimeout(() => {
     // (clearMagnetImage also applies a random formula so the sim breathes).
     socket.on('spectator-joined', ({ userCount }) => {
         simSpectatorCount = userCount ?? simSpectatorCount + 1;
+        // Reset activity clock so the remoteTimeout inactivity timer starts
+        // from when someone actually arrives, not from sim boot.
+        lastRemoteActivity = Date.now();
         const angle = Math.random() * Math.PI * 2;
         burstX = Math.cos(angle) * BURST_STRENGTH;
         burstY = Math.sin(angle) * BURST_STRENGTH;
