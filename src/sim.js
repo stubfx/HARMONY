@@ -786,11 +786,16 @@ setTimeout(() => {
 
     // A spectator joined — fire a brief directional gust into the field.
     // Random angle each time so every join feels distinct.
+    // Once the connected count reaches maxSpectators the QR is dismissed
+    // (clearMagnetImage also applies a random formula so the sim breathes).
     socket.on('spectator-joined', ({ userCount }) => {
         simSpectatorCount = userCount ?? simSpectatorCount + 1;
         const angle = Math.random() * Math.PI * 2;
         burstX = Math.cos(angle) * BURST_STRENGTH;
         burstY = Math.sin(angle) * BURST_STRENGTH;
+        if (isQRBitmap && simSpectatorCount >= params.maxSpectators) {
+            clearMagnetImage();
+        }
     });
 
     // A spectator left — decrement internal count and restore QR if room is empty.
