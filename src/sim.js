@@ -594,18 +594,7 @@ function restoreQR() {
     imageBitmap = qrBitmap;
     isQRBitmap  = true;
     renderTraceCanvas();
-    applyQRFormulas();
     console.log('[session] QR restored');
-}
-
-// Switch to the ripple-outward formula pair — called whenever the QR becomes visible.
-function applyQRFormulas() {
-    applyFormulas(QR_DIR, QR_WIND);
-    const di = document.querySelector('#dir-input');
-    const wi = document.querySelector('#wind-input');
-    if (di) di.value = QR_DIR;
-    if (wi) wi.value = QR_WIND;
-    console.log('[formula] QR ripple formulas applied');
 }
 
 // Pick a fresh random formula pair — called whenever user content replaces the QR.
@@ -687,13 +676,6 @@ const rndPick   = arr => arr[Math.floor(Math.random() * arr.length)];
 const startDir  = 'atan2(y-cy,x-cx) + length(vec2(x-cx,y-cy)) * 0.003 + t * 0.5';
 const startWind = 'atan2(y - cy, x - cx) + sin(length(vec2(x-cx,y-cy)) * 0.008) * PI + t';
 
-// ── QR formulas — active while the session QR trace is displayed ──────────────
-// Base direction is radially outward (atan2 pointing away from centre).
-// sin(r*k - t*ω) adds expanding ripple rings that pulse agents outward.
-// Wind is tangential (perpendicular to radius) — adds a gentle orbital component
-// without fighting or doubling the outward push.
-const QR_DIR  = 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.018 - t*2.0)*PI*0.35';
-const QR_WIND = 'atan2(y-cy,x-cx) + PI*0.5';
 let introActive      = true;
 let qrPendingRender  = false;  // QR bitmap ready but waiting for intro to finish
 let isQRBitmap       = false;  // current imageBitmap is the session QR (not user-loaded)
@@ -704,13 +686,11 @@ let lastRemoteActivity  = Date.now(); // timestamp of last remote-event (touch o
 await applyFormulas(startDir, startWind, { reseed: true });
 setTimeout(() => {
     introActive = false;
-    // If the QR session-id arrived during the intro, render it now and apply its formulas.
+    // If the QR session-id arrived during the intro, render it now.
     if (qrPendingRender) {
         qrPendingRender = false;
         renderTraceCanvas();
     }
-    // Apply QR formulas whenever the intro ends with the QR already active.
-    if (isQRBitmap) applyQRFormulas();
 }, params.introDelay * 1000);
 
 // ── Session: Socket.IO connection + QR code ───────────────────────────────────
@@ -752,14 +732,15 @@ setTimeout(() => {
             uiQr.addEventListener('click', () => window.open(userUrl, '_blank'));
         }
 
-        // ── Large QR as trace image — white modules on transparent background
-        // The trace pipeline uses alpha to gate homing: white pixels (alpha=1)
-        // attract agents; transparent pixels (alpha=0) are ignored.
-        // This makes the particle field collectively write the QR pattern.
+        // ── Large QR as trace image — inverted: white background, transparent modules
+        // light=#ffffffff fills the quiet zone and inter-module background with white (alpha=1)
+        // so homing agents are attracted to the whole field. The QR modules are transparent
+        // (dark=#00000000, alpha=0) — no agents there — leaving dark gaps that form the
+        // readable QR pattern (dark on white, standard orientation).
         const qrOffscreen = document.createElement('canvas');
         await QRCode.toCanvas(qrOffscreen, userUrl, {
             width: 512, margin: 2,
-            color: { dark: '#ffffffff', light: '#00000000' },
+            color: { dark: '#00000000', light: '#ffffffff' },
         });
         // Treat as a loaded image so Clear image removes it and user images replace it.
         // Delay trace render until the intro ends — prevents particles being trapped
@@ -773,7 +754,6 @@ setTimeout(() => {
             qrPendingRender = true;
         } else {
             renderTraceCanvas();
-            applyQRFormulas();
         }
     });
 
@@ -950,7 +930,6 @@ windInput.value = startWind;
 // restFormula overrides everything; followFormula / windEnabled guard the rest.
 setInterval(() => {
     if (params.restFormula) return;
-    if (isQRBitmap) return;           // never overwrite QR formulas while QR is showing
 
     let newDir  = dirInput.value;
     let newWind = windInput.value;
