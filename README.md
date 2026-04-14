@@ -90,7 +90,7 @@ Host browser — simulation display (WebGPU)
     ▼
 Display / projection
 
-Spectators  (/remote/?s=<uuid>&max=<n>)
+Spectators  (/remote/?s=<uuid>)
     │  Socket.IO  'join-session'   →  server
     │  Socket.IO  'user-event'     →  server routes per RELAY_MODE
     │                                  tilt events: aggregated only, not forwarded
@@ -114,12 +114,12 @@ Server → Socket.IO 'sim-params' → simulation
 
 1. Simulation connects via Socket.IO and emits `'register-host'`
 2. Server generates a UUID, puts the socket in room `<uuid>`, emits `'session-id'` back
-3. Simulation builds the remote URL (`/remote/?s=<uuid>&max=<maxSpectators>`) and displays a QR code:
+3. Simulation builds the remote URL (`/remote/?s=<uuid>`) and displays a QR code:
    - **Small scannable overlay** in the bottom-left UI panel (click to open)
    - **Large trace image** in the canvas centre — the particle field writes the QR pattern after the intro delay
-4. Spectators scan the QR, open `/remote/?s=<uuid>&max=<n>`, connect via Socket.IO
+4. Spectators scan the QR, open `/remote/?s=<uuid>`, connect via Socket.IO
 5. Server emits `spectator-joined` to the host — a brief gust fires in the particle field
-6. Server emits `peer-joined` (with updated `userCount`) to all other spectators — aura pulse; remote QR hides if `userCount ≥ max`
+6. Server emits `peer-joined` (with updated `userCount`) to all other spectators — aura pulse; remote QR hides if `userCount ≥ maxSpectators` (configured in Session GUI)
 7. Every 300 ms the server aggregates all spectators' state and emits `collective-state` to the host
 8. Spectator touch/text events are routed per `RELAY_MODE`; `lastRemoteActivity` timestamp is updated on every event
 9. When a spectator disconnects, server emits `spectator-left` (with `userCount`) to host and `peer-left` to remaining spectators
@@ -582,7 +582,7 @@ Caddy handles TLS automatically via Let's Encrypt and proxies WebSocket upgrade 
 | Parameter | Effect |
 |-----------|--------|
 | `?s=<uuid>` | Session room UUID — required to join a simulation session |
-| `?max=<n>` | Spectator threshold above which the persistent QR on the remote page hides (default 10; baked into the QR URL at session generation time from the Session GUI) |
+| `?max=<n>` | Spectator threshold above which the persistent QR on the remote page hides (default 10 if absent; controlled via Session → QR hides at N users in the sim GUI — not included in the scanned QR) |
 
 ---
 
@@ -606,7 +606,7 @@ thesis-sim/
 │       └── image-debug.wgsl Grayscale image region debug overlay
 │
 ├── remote/
-│   ├── index.html           Spectator page (served at /remote/?s=<uuid>&max=<n>);
+│   ├── index.html           Spectator page (served at /remote/?s=<uuid>);
 │   │                        includes persistent #session-qr canvas (bottom-right corner)
 │   ├── main.js              Socket.IO client — tilt, touch (temp+coherence), text events;
 │   │                        aura reflects all three axes; peer-joined/peer-left for QR

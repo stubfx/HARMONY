@@ -556,18 +556,22 @@ function scheduleAutoClear() {
 }
 
 async function loadMagnetImage(file) {
+    const wasQR = isQRBitmap;
     isQRBitmap  = false;
     imageBitmap = await createImageBitmap(file, { colorSpaceConversion: 'none' });
     renderTraceCanvas();
     scheduleAutoClear();
+    if (wasQR) applyRandomFormulas();
 }
 
 function clearMagnetImage() {
+    const wasQR = isQRBitmap;
     isQRBitmap = false;
     imageBitmap = null;
     clearTimeout(autoClearTimer);
     autoClearTimer = null;
     renderTraceCanvas();
+    if (wasQR) applyRandomFormulas();
 }
 
 function clearTraceText() {
@@ -590,7 +594,30 @@ function restoreQR() {
     imageBitmap = qrBitmap;
     isQRBitmap  = true;
     renderTraceCanvas();
+    applyQRFormulas();
     console.log('[session] QR restored');
+}
+
+// Switch to the ripple-outward formula pair — called whenever the QR becomes visible.
+function applyQRFormulas() {
+    applyFormulas(QR_DIR, QR_WIND);
+    const di = document.querySelector('#dir-input');
+    const wi = document.querySelector('#wind-input');
+    if (di) di.value = QR_DIR;
+    if (wi) wi.value = QR_WIND;
+    console.log('[formula] QR ripple formulas applied');
+}
+
+// Pick a fresh random formula pair — called whenever user content replaces the QR.
+function applyRandomFormulas() {
+    const dir  = rndPick(DIR_FORMULAS);
+    const wind = rndPick(WIND_FORMULAS);
+    applyFormulas(dir, wind);
+    const di = document.querySelector('#dir-input');
+    const wi = document.querySelector('#wind-input');
+    if (di) di.value = dir;
+    if (wi) wi.value = wind;
+    console.log('[formula] random formulas applied after QR dismissed');
 }
 
 // ── Formula compute + wind-vis pipelines (rebuilt on each formula change) ──────
@@ -659,6 +686,14 @@ async function applyFormulas(dir, wind, { reseed = false } = {}) {
 const rndPick   = arr => arr[Math.floor(Math.random() * arr.length)];
 const startDir  = 'atan2(y-cy,x-cx) + length(vec2(x-cx,y-cy)) * 0.003 + t * 0.5';
 const startWind = 'atan2(y - cy, x - cx) + sin(length(vec2(x-cx,y-cy)) * 0.008) * PI + t';
+
+// ── QR formulas — active while the session QR trace is displayed ──────────────
+// Base direction is radially outward (atan2 pointing away from centre).
+// sin(r*k - t*ω) adds expanding ripple rings that pulse agents outward.
+// Wind is tangential (perpendicular to radius) — adds a gentle orbital component
+// without fighting or doubling the outward push.
+const QR_DIR  = 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.018 - t*2.0)*PI*0.35';
+const QR_WIND = 'atan2(y-cy,x-cx) + PI*0.5';
 let introActive      = true;
 let qrPendingRender  = false;  // QR bitmap ready but waiting for intro to finish
 let isQRBitmap       = false;  // current imageBitmap is the session QR (not user-loaded)
@@ -669,11 +704,13 @@ let lastRemoteActivity  = Date.now(); // timestamp of last remote-event (touch o
 await applyFormulas(startDir, startWind, { reseed: true });
 setTimeout(() => {
     introActive = false;
-    // If the QR session-id arrived during the intro, render it now.
+    // If the QR session-id arrived during the intro, render it now and apply its formulas.
     if (qrPendingRender) {
         qrPendingRender = false;
         renderTraceCanvas();
     }
+    // Apply QR formulas whenever the intro ends with the QR already active.
+    if (isQRBitmap) applyQRFormulas();
 }, params.introDelay * 1000);
 
 // ── Session: Socket.IO connection + QR code ───────────────────────────────────
@@ -699,7 +736,7 @@ setTimeout(() => {
         // Falls back to the page's own origin in dev when no env var is set.
         const envUrl  = import.meta.env.VITE_USER_URL;
         const base    = envUrl ? new URL(envUrl).origin : window.location.origin;
-        const userUrl = `${base}/remote/?s=${sessionId}&max=${params.maxSpectators}`;
+        const userUrl = `${base}/remote/?s=${sessionId}`;
 
         console.log('[session] remote URL:', userUrl);
 
@@ -736,6 +773,7 @@ setTimeout(() => {
             qrPendingRender = true;
         } else {
             renderTraceCanvas();
+            applyQRFormulas();
         }
     });
 
@@ -782,11 +820,13 @@ setTimeout(() => {
         lastRemoteActivity = Date.now();
         if (event.type === 'text' && event.data?.text) {
             // Text content replaces the QR if it is currently showing.
+            const wasQR = isQRBitmap;
             if (isQRBitmap) { imageBitmap = null; isQRBitmap = false; }
             const input = document.querySelector('#trace-text-input');
             if (input) input.value = event.data.text;
             renderTraceCanvas();
             scheduleAutoClear();
+            if (wasQR) applyRandomFormulas();
         }
     });
 
@@ -910,6 +950,7 @@ windInput.value = startWind;
 // restFormula overrides everything; followFormula / windEnabled guard the rest.
 setInterval(() => {
     if (params.restFormula) return;
+    if (isQRBitmap) return;           // never overwrite QR formulas while QR is showing
 
     let newDir  = dirInput.value;
     let newWind = windInput.value;
