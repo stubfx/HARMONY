@@ -51,6 +51,8 @@ const params = {
     // Contamination
     contamMouse:   true,  // treat mouse cursor as a contamination point
     contamRadius:  150,   // radius of each contamination circle, in canvas pixels
+    // Auto-clear
+    clearDelay:    20,    // seconds before auto-clearing user trace content (0 = disabled)
     // Weight
     weightSpread: 0.8,    // 0 = all equal; 1 = weights span [0.05 … 1.95]
     // Motion behaviour
@@ -517,14 +519,47 @@ function renderTraceCanvas() {
     rebuildImageDebugBG();
 }
 
+// ── Auto-clear timer ──────────────────────────────────────────────────────────
+// Started whenever user-added content (image or text) appears in the trace layer.
+// Fires after params.clearDelay seconds and wipes user text + any non-QR image.
+// Cancelled when the user explicitly clears content; reset when new content arrives.
+// The session QR is considered system content and is never auto-cleared.
+let autoClearTimer = null;
+
+function scheduleAutoClear() {
+    clearTimeout(autoClearTimer);
+    if (params.clearDelay <= 0) return;
+    autoClearTimer = setTimeout(() => {
+        autoClearTimer = null;
+        const input = document.querySelector('#trace-text-input');
+        if (input) input.value = '';
+        if (!isQRBitmap) imageBitmap = null;
+        renderTraceCanvas();
+        console.log('[trace] auto-cleared after', params.clearDelay, 's');
+    }, params.clearDelay * 1000);
+}
+
 async function loadMagnetImage(file) {
+    isQRBitmap  = false;
     imageBitmap = await createImageBitmap(file, { colorSpaceConversion: 'none' });
     renderTraceCanvas();
+    scheduleAutoClear();
 }
 
 function clearMagnetImage() {
+    isQRBitmap = false;
     imageBitmap = null;
-    renderTraceCanvas();   // re-render text-only if text is present; otherwise clears
+    clearTimeout(autoClearTimer);
+    autoClearTimer = null;
+    renderTraceCanvas();
+}
+
+function clearTraceText() {
+    const input = document.querySelector('#trace-text-input');
+    if (input) input.value = '';
+    clearTimeout(autoClearTimer);
+    autoClearTimer = null;
+    renderTraceCanvas();
 }
 
 // ── Formula compute + wind-vis pipelines (rebuilt on each formula change) ──────
@@ -595,6 +630,7 @@ const startDir  = 'atan2(cy - y, cx - x)';
 const startWind = 'atan2(y - cy, x - cx) + sin(length(vec2(x-cx,y-cy)) * 0.008) * PI + t';
 let introActive      = true;
 let qrPendingRender  = false;  // QR bitmap ready but waiting for intro to finish
+let isQRBitmap       = false;  // current imageBitmap is the session QR (not user-loaded)
 
 await applyFormulas(startDir, startWind, { reseed: true });
 setTimeout(() => {
@@ -657,6 +693,8 @@ setTimeout(() => {
         // Treat as a loaded image so Clear image removes it and user images replace it.
         // Delay trace render until the intro ends — prevents particles being trapped
         // in the QR pattern during the radial spread-out phase.
+        // Flagged as QR so auto-clear never wipes it.
+        isQRBitmap  = true;
         imageBitmap = await createImageBitmap(qrOffscreen);
         if (introActive) {
             qrPendingRender = true;
@@ -700,6 +738,7 @@ setTimeout(() => {
             const input = document.querySelector('#trace-text-input');
             if (input) input.value = event.data.text;
             renderTraceCanvas();
+            scheduleAutoClear();
         }
     });
 
@@ -730,10 +769,9 @@ const uiEl      = document.querySelector('#ui');
 const monitorEl = document.querySelector('#monitor');
 
 function applyGUIVisibility() {
-    const d = guiVisible ? '' : 'none';
-    uiEl.style.display      = d;
-    monitorEl.style.display = d;
-    gui.domElement.style.display = d;
+    uiEl.style.display           = guiVisible ? 'flex' : 'none';
+    monitorEl.style.display      = guiVisible ? 'flex' : 'none';
+    gui.domElement.style.display = guiVisible ? ''     : 'none';
 }
 
 // ── lil-gui ───────────────────────────────────────────────────────────────────
@@ -783,8 +821,10 @@ fMagnet.add(params, 'imageSize', 0.05, 1.0, 0.01).name('size');
 fMagnet.add(params, 'showImage').name('show image');
 fMagnet.add(params, 'contamMouse').name('mouse eraser');
 fMagnet.add(params, 'contamRadius', 10, 600, 5).name('eraser radius');
+fMagnet.add(params, 'clearDelay', 0, 120, 5).name('auto clear (s)');
 fMagnet.add({ load: () => document.querySelector('#image-input').click() }, 'load').name('Load image…');
 fMagnet.add({ clear: clearMagnetImage }, 'clear').name('Clear image');
+fMagnet.add({ clear: clearTraceText },   'clear').name('Clear text');
 
 gui.add({ restart: () => seedAgents() }, 'restart').name('↺  Restart');
 gui.add(params, 'restFormula').name('⌂  idle').onChange(v => {
@@ -866,7 +906,10 @@ document.querySelector('#image-input').addEventListener('change', e => {
 let traceTextTimer = null;
 document.querySelector('#trace-text-input').addEventListener('input', () => {
     clearTimeout(traceTextTimer);
-    traceTextTimer = setTimeout(renderTraceCanvas, 300);
+    traceTextTimer = setTimeout(() => {
+        renderTraceCanvas();
+        scheduleAutoClear();
+    }, 300);
 });
 
 // ── Hex color → float RGB ─────────────────────────────────────────────────────
