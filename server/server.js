@@ -8,9 +8,12 @@
 //        direct (default) : server forwards 'user-event' straight to the sim room
 //        n8n              : server POSTs to N8N_WEBHOOK_URL; n8n calls /n8n-sim-update
 //   4. /n8n-sim-update — n8n POSTs processed params here; server emits via Socket.IO
+//   5. Collective state — aggregates all spectators' tilt + temperature per room
+//        and emits 'collective-state' to the host simulation every 300 ms
 //
 // Signal path:
 //   remote → socket → server → [n8n →] socket → simulation
+//   server (ticker) → 'collective-state' → simulation
 
 import express           from 'express';
 import { createServer }  from 'node:http';
@@ -54,6 +57,61 @@ app.use(cors({ origin: ORIGINS, methods: ['GET', 'POST'], allowedHeaders: ['Cont
 // Serve the Vite production build (sim + remote page)
 app.use(express.static(path.join(__dirname, '../dist')));
 
+// ── Room state ────────────────────────────────────────────────────────────────
+// Tracks per-room spectator data for collective-state aggregation.
+// Structure: Map<roomId, { hostSocketId, users: Map<socketId, UserState> }>
+// UserState: { pitch, roll, temperature, lastSeen }
+const rooms = new Map();
+
+const USER_TIMEOUT_MS = 15_000; // remove users not seen for 15 s
+
+function getOrCreateRoom(roomId) {
+    if (!rooms.has(roomId)) rooms.set(roomId, { hostSocketId: null, users: new Map() });
+    return rooms.get(roomId);
+}
+
+function updateUserState(roomId, socketId, type, data) {
+    const room = rooms.get(roomId);
+    if (!room) return;
+    let user = room.users.get(socketId);
+    if (!user) {
+        user = { pitch: 0.5, roll: 0.5, temperature: 0.5, lastSeen: Date.now() };
+        room.users.set(socketId, user);
+    }
+    user.lastSeen = Date.now();
+    if (type === 'tilt') {
+        user.pitch       = data.pitch ?? 0.5;
+        user.roll        = data.roll  ?? 0.5;
+    }
+    if (type === 'touch') {
+        user.temperature = data.temp  ?? 0.5;
+    }
+}
+
+// ── Collective-state ticker ───────────────────────────────────────────────────
+// Every 300 ms: prune stale users, compute averages, emit to host simulation.
+setInterval(() => {
+    const now = Date.now();
+    for (const [, room] of rooms) {
+        // Prune users not seen recently
+        for (const [uid, u] of room.users) {
+            if (now - u.lastSeen > USER_TIMEOUT_MS) room.users.delete(uid);
+        }
+        if (!room.hostSocketId || !room.users.size) continue;
+
+        let sp = 0, sr = 0, st = 0;
+        for (const u of room.users.values()) { sp += u.pitch; sr += u.roll; st += u.temperature; }
+        const n = room.users.size;
+
+        io.to(room.hostSocketId).emit('collective-state', {
+            avgPitch:  sp / n,
+            avgRoll:   sr / n,
+            avgTemp:   st / n,
+            userCount: n,
+        });
+    }
+}, 300);
+
 // ── Socket.IO ─────────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
     let assignedRoom = null;
@@ -66,6 +124,8 @@ io.on('connection', (socket) => {
         assignedRoom    = sessionId;
         socket.join(sessionId);
         socket.emit('session-id', sessionId);
+        const room = getOrCreateRoom(sessionId);
+        room.hostSocketId = socket.id;
         console.log('[socket] host registered   room:', sessionId);
     });
 
@@ -73,16 +133,25 @@ io.on('connection', (socket) => {
     // The remote emits 'join-session' with the room UUID from the QR code URL.
     socket.on('join-session', ({ room, spectatorId }) => {
         assignedRoom = room;
+        const roomData = getOrCreateRoom(room);
+        roomData.users.set(socket.id, { pitch: 0.5, roll: 0.5, temperature: 0.5, lastSeen: Date.now() });
         console.log('[socket] remote joined     room:', room, '| spectator:', spectatorId ?? '—');
         socket.emit('joined', { room });
     });
 
     // ── User event from remote ────────────────────────────────────────────────
-    // Route based on RELAY_MODE.
+    // Always update aggregate room state first.
+    // Tilt events are aggregated only (not forwarded individually — the ticker handles that).
+    // All other events are routed per RELAY_MODE.
     socket.on('user-event', ({ type, data }) => {
         const room        = assignedRoom;
         const spectatorId = socket.id;
         if (!room) return console.warn('[socket] user-event without room — ignoring');
+
+        updateUserState(room, socket.id, type, data);
+
+        // Tilt is consumed server-side for aggregation; no individual forwarding needed.
+        if (type === 'tilt') return;
 
         if (RELAY_MODE === 'n8n') {
             // Relay through n8n: POST the event; n8n calls /n8n-sim-update when done.
@@ -99,7 +168,15 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        if (assignedRoom) console.log('[socket] disconnected      room:', assignedRoom);
+        if (!assignedRoom) return;
+        console.log('[socket] disconnected      room:', assignedRoom);
+        const room = rooms.get(assignedRoom);
+        if (room) {
+            room.users.delete(socket.id);
+            if (room.hostSocketId === socket.id) room.hostSocketId = null;
+            // Clean up fully empty rooms
+            if (!room.hostSocketId && !room.users.size) rooms.delete(assignedRoom);
+        }
     });
 });
 

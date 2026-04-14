@@ -277,7 +277,7 @@ const agentBuf = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 const soloUB = device.createBuffer({
-    size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
     size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -738,6 +738,18 @@ setTimeout(() => { introActive = false; }, params.introDelay * 1000);
         catch { /* malformed payload — ignore */ }
     });
 
+    // Collective swarm state — aggregated by the server from all spectators in the room.
+    // Tilt bias: avgPitch/avgRoll are 0-1 (0.5 = phone held flat/neutral).
+    // Temperature: 0 = cold (top of phone screen), 1 = warm (bottom of phone screen).
+    socket.on('collective-state', ({ avgPitch, avgRoll, avgTemp, userCount }) => {
+        const biasStr = params.windStr;                 // scale with current wind strength
+        collectiveBiasX = (avgRoll  - 0.5) * 2 * biasStr;
+        collectiveBiasY = (avgPitch - 0.5) * 2 * biasStr;
+        collectiveTemp  = avgTemp ?? 0.5;
+        if (userCount > 0)
+            console.log(`[swarm] ${userCount} user${userCount > 1 ? 's' : ''} · tilt (${collectiveBiasX.toFixed(2)}, ${collectiveBiasY.toFixed(2)}) · temp ${collectiveTemp.toFixed(2)}`);
+    });
+
     // Direct remote events (RELAY_MODE=direct on server).
     // In n8n mode these never arrive here; sim-params carries the processed result instead.
     socket.on('remote-event', (event) => {
@@ -917,9 +929,28 @@ function hexToF(hex) {
     return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255];
 }
 
+function lerpColor(a, b, t) {
+    return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+}
+
+// ── Collective swarm state (written by 'collective-state' socket events) ───────
+// Smoothed each frame via exponential moving average to avoid jarring jumps.
+let collectiveBiasX   = 0;   // target wind bias X
+let collectiveBiasY   = 0;   // target wind bias Y
+let collectiveTemp    = 0.5; // target temperature [0=cold … 1=warm]
+let smoothBiasX       = 0;   // smoothed
+let smoothBiasY       = 0;
+let smoothTemp        = 0.5;
+
 // ── Uniform writers ───────────────────────────────────────────────────────────
 function writeSoloUB(dt, time) {
-    const ab = new ArrayBuffer(80);
+    // Smooth collective state toward targets
+    const a   = Math.exp(-dt / 0.8); // ~0.8 s smoothing constant
+    smoothBiasX = smoothBiasX * a + collectiveBiasX * (1 - a);
+    smoothBiasY = smoothBiasY * a + collectiveBiasY * (1 - a);
+    smoothTemp  = smoothTemp  * a + collectiveTemp  * (1 - a);
+
+    const ab = new ArrayBuffer(96);
     const u  = new Uint32Array(ab);
     const f  = new Float32Array(ab);
     const { x0, y0, x1, y1 } = getImageRegion();
@@ -943,6 +974,9 @@ function writeSoloUB(dt, time) {
     f[17] = params.alphaThreshold;
     f[18] = params.blackThreshold;
     f[19] = params.vignetteEdge;
+    f[20] = smoothBiasX;
+    f[21] = smoothBiasY;
+    // f[22], f[23] = 0 padding
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
@@ -952,6 +986,17 @@ function writeRenderUB() {
     const f    = new Float32Array(ab);
     const rgb  = hexToF(params.color);
     const srgb = hexToF(params.speedColor);
+
+    // Collective temperature tints the fast (speed) colour by up to 30%.
+    // Cold (0) → deep blue  ·  warm (1) → amber
+    // The user's own speedColor is always the neutral anchor at temp=0.5.
+    const COLD  = [0.05, 0.15, 0.90];
+    const WARM  = [1.00, 0.40, 0.05];
+    const tintTarget = smoothTemp < 0.5
+        ? lerpColor(COLD, srgb, smoothTemp * 2)
+        : lerpColor(srgb, WARM, (smoothTemp - 0.5) * 2);
+    const tinted = lerpColor(srgb, tintTarget, 0.30);
+
     const { x0, y0, x1, y1 } = getImageRegion();
     u[0] = params.agentCount;
     f[1] = canvas.width;
@@ -966,9 +1011,9 @@ function writeRenderUB() {
     f[10] = y0;
     f[11] = x1;
     f[12] = y1;
-    f[13] = srgb[0];
-    f[14] = srgb[1];
-    f[15] = srgb[2];
+    f[13] = tinted[0];
+    f[14] = tinted[1];
+    f[15] = tinted[2];
     f[16] = params.brightness;
     f[17] = params.alphaThreshold;
     f[18] = params.blackThreshold;

@@ -3,7 +3,7 @@
 //   evalDirFormula  — desired heading angle for each particle (radians)
 //   evalWindFormula — wind force direction (radians)
 //
-// SoloParams layout (80 bytes):
+// SoloParams layout (96 bytes):
 //   [0]  agentCount     u32
 //   [4]  canvasW        f32
 //   [8]  canvasH        f32
@@ -24,6 +24,10 @@
 //   [68] alphaThreshold f32   (min image alpha to trigger homing)
 //   [72] blackThreshold f32   (luminance below which pixels are transparent)
 //   [76] vignetteEdge   f32   (edge fade width in UV units)
+//   [80] windBiasX      f32   (collective tilt X — added to formula wind)
+//   [84] windBiasY      f32   (collective tilt Y — added to formula wind)
+//   [88] _p1            f32
+//   [92] _p2            f32
 
 struct SoloParams {
     agentCount:     u32,
@@ -46,6 +50,10 @@ struct SoloParams {
     alphaThreshold: f32,
     blackThreshold: f32,
     vignetteEdge:   f32,
+    windBiasX:      f32,
+    windBiasY:      f32,
+    _p1:            f32,
+    _p2:            f32,
 }
 
 struct Agent {
@@ -105,7 +113,10 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let desired  = vec2<f32>(cos(dirAngle), sin(dirAngle));
 
     let windAngle = evalWindFormula(x, y, t, idx, cx, cy);
-    let wind      = vec2<f32>(cos(windAngle), sin(windAngle)) * params.windStr;
+    // Collective tilt bias is added directly to the formula wind vector.
+    // Both are in the same velocity-per-frame space so the blend is seamless.
+    let wind = vec2<f32>(cos(windAngle), sin(windAngle)) * params.windStr
+             + vec2<f32>(params.windBiasX, params.windBiasY);
 
     // ── Trace layer: image-alpha-driven homing ─────────────────────────────────
     // An agent homes only when the image pixel at its assigned home position

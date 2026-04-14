@@ -1,29 +1,31 @@
 <html>
     <head>
         <meta charset="utf-8">
-        <meta http-equiv="Permissions-Policy"
-            content="accelerometer=*, gyroscope=*, magnetometer=*">
-        <title>Thesis</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+        <meta http-equiv="Permissions-Policy" content="accelerometer=*, gyroscope=*, magnetometer=*">
+        <title>—</title>
     </head>
     <body>
         <script type="module" src="./main.js"></script>
+
+        <!-- Atmospheric colour glow — shifts with temperature and tilt -->
+        <div id="aura"></div>
+
+        <!-- Full-screen gesture surface — touch anywhere -->
+        <div id="gesture-surface"></div>
+
+        <!-- Tilt bubble — moves with phone orientation -->
+        <div id="tilt-ring"><div id="tilt-dot"></div></div>
+
+        <!-- Minimal status bar -->
         <div id="session-info"></div>
-        <div id="interaction">
-            <button id="enable-motion">Enable motion</button>
-            <div class="quick-color-container">
-                <button class="quick-color"/>
-                <button class="quick-color"/>
-                <button class="quick-color"/>
-                <button class="quick-color"/>
-                <button class="quick-color"/>
-                <button class="quick-color"/>
-                <button class="quick-color"/>
-                <button class="quick-color"/>
-                <button class="quick-color"/>
-            </div>
-            <form id="input-form">
-                <input name="text1" type="text"/>
-                <button id="send" type="submit">test me</button>
+        <div id="conn-dot"></div>
+
+        <!-- Bottom controls — motion permission + text input -->
+        <div id="bottom-bar">
+            <button id="motion-btn">move to connect</button>
+            <form id="input-form" autocomplete="off">
+                <input name="text1" type="text" placeholder="write to the swarm…" autocomplete="off" autocorrect="off" spellcheck="false">
             </form>
         </div>
     </body>

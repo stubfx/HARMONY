@@ -1,189 +1,176 @@
 @import "tailwindcss";
 
-@theme {
-    --color-primary: white;
-    --border-radius: 5rem;
-    --blur: 15px;
-    --size: 
+/* ── Reset ───────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+    color: #fff;
+    font-family: ui-monospace, monospace;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
-html, body { 
-    box-sizing: border-box;
-    margin: 0;
-    background-color: #000000;
+/* ── Aura — atmospheric colour gradient ─────────────────────────────────────── */
+/* Tinted by collective temperature; anchor shifts with tilt.                     */
+#aura {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    transition: background 0.6s ease;
+    /* default: neutral cool-dark state */
+    background: radial-gradient(ellipse 120% 60% at 50% 110%, hsl(210,70%,12%) 0%, #000 55%);
 }
 
-textarea:focus, input:focus{
-    outline: none;
+/* ── Gesture surface ─────────────────────────────────────────────────────────── */
+#gesture-surface {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
 }
 
-#renderCanvas {
+/* ── Touch ripple ────────────────────────────────────────────────────────────── */
+.ripple {
+    position: fixed;
+    z-index: 2;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    animation: ripple-out 0.65s ease-out forwards;
+}
+
+@keyframes ripple-out {
+    0%   { width: 0;     height: 0;     opacity: 0.7; border-width: 1.5px; }
+    100% { width: 120px; height: 120px; opacity: 0;   border-width: 0.5px; }
+}
+
+/* ── Tilt ring + bubble ──────────────────────────────────────────────────────── */
+#tilt-ring {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transform: translate(-50%, -50%);
+    z-index: 3;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+}
+
+#tilt-ring.visible { opacity: 1; }
+
+#tilt-dot {
     position: absolute;
-    /* im just gonna ignore the device resolution
-    this will guarantee at least some reliability
-    on different devices */
-    width: 1920px;
-    height: 1080px;
-     top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%); /* centers anchor point */
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    transition: transform 0.15s ease;
 }
 
-#tweaks {
-    position: absolute;
-    display: flex;
-    flex-direction: column;
-    /*align-items: start;*/
-    background: black;
-    z-index: 9999;
-    color: green;
-    padding: 20;
-}
-.info {
-    position: absolute;
-    display: flex;
-    bottom: 0;
-    right: 0;
-    background: black;
-    z-index: 9999;
-    font-size: x-small;
-    color: rgb(255 255 255 / 60%);
-}
-
+/* ── Session info ────────────────────────────────────────────────────────────── */
 #session-info {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    padding: 0.35rem 0.75rem;
-    font-family: monospace;
-    font-size: 0.65rem;
-    color: rgb(255 255 255 / 30%);
-    letter-spacing: 0.04em;
+    top: max(env(safe-area-inset-top), 0.75rem);
+    left: 0.75rem;
+    z-index: 10;
+    font-size: 0.6rem;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.2);
     pointer-events: none;
+    line-height: 1.4;
 }
 
-#saveConfig {
-    display: none;
-    position: absolute;
-    margin: 1rem;
+/* ── Connection dot ──────────────────────────────────────────────────────────── */
+#conn-dot {
+    position: fixed;
+    top: max(env(safe-area-inset-top), 0.75rem);
+    right: 0.75rem;
+    z-index: 10;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    transition: background 0.4s ease, box-shadow 0.4s ease;
 }
 
-#chat-container {
-    position: absolute;
+#conn-dot.connected {
+    background: rgba(255, 255, 255, 0.7);
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.4);
+}
+
+/* ── Bottom bar ──────────────────────────────────────────────────────────────── */
+#bottom-bar {
+    position: fixed;
+    bottom: max(env(safe-area-inset-bottom), 1.5rem);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
     display: flex;
     flex-direction: column;
-    justify-content: center;
     align-items: center;
-    width: 100vw;
-    bottom: 0;
-    padding-bottom: 1rem;
-    left: 0;
-    padding-top: 6rem;
+    gap: 0.6rem;
+    width: min(80vw, 320px);
+}
+
+#motion-btn {
+    font-family: ui-monospace, monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: lowercase;
+    color: rgba(255, 255, 255, 0.35);
     background: transparent;
-    background: linear-gradient(180deg, 
-    rgba(255, 255, 255, 0) 0%, 
-    rgba(0, 0, 0, 0.95) 55%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 2rem;
+    padding: 0.45rem 1.1rem;
+    cursor: pointer;
+    transition: color 0.3s, border-color 0.3s;
+}
+
+#motion-btn:active {
+    color: rgba(255, 255, 255, 0.7);
+    border-color: rgba(255, 255, 255, 0.35);
 }
 
 #input-form {
-    width: 50vw;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    border-radius: 1rem;
-    /* border: 1px solid rgb(255 255 255 / 30%); */
-    font-weight: bold;
-    padding: 1rem;
-    align-items: center;
-    backdrop-filter: blur(15px);
+    width: 100%;
 }
 
-#chat-input {
-    flex-grow: 1;
+#input-form input {
+    width: 100%;
     background: transparent;
-    border: 0;
-    font-size: 16px;
-    color: white;
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.5);
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    padding: 0.5rem 0;
+    text-align: center;
+    outline: none;
+    caret-color: rgba(255, 255, 255, 0.4);
+    transition: border-color 0.3s, color 0.3s;
 }
 
-#interaction {
-    position: absolute;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    width: 100vw;
-    height: 100vh;
+#input-form input::placeholder {
+    color: rgba(255, 255, 255, 0.18);
 }
 
-#interaction input, #interaction button {
-    height: 3rem;
-    padding: 5px 15px;
-    font-weight: bold;
-    border-radius: var(--border-radius);
-    border: 5px solid transparent;
-    margin: 5px;
-    color: white;
-    border: 1px solid rgb(255 255 255 / 10%);
-    /* background: rgb(144 144 144 / 25%); */
-    background: rgb(255 255 255 / 10%);
-    /* backdrop-filter: blur(5px); */
-}
-
-#chat-send, button {
-    height: 3rem;
-    padding: 5px 15px;
-    font-weight: bold;
-    border-radius: var(--border-radius);
-    border: 5px solid transparent;
-    margin: 5px;
-    color: white;
-    border: 1px solid rgb(255 255 255 / 2%);
-    /* background: rgb(144 144 144 / 25%); */
-    background: rgb(255 255 255 / 10%);
-    /* backdrop-filter: blur(5px); */
-}
-
-.img-prompt-container {
-    padding: .5rem;
-    max-width: 50vw;
-    color: rgb(255 255 255 / 80%);
-    font-size: x-small;
-}
-
-button {
-    border: 1px solid rgb(255 255 255 / 20%);
-    background: rgb(255 255 255 / 30%);
-    backdrop-filter: blur(5px);
-    cursor: pointer;
-}
-
-#loader {
-    display: none;
-    border: .2rem solid rgb(255 255 255 / 20%); /* Light grey */
-    border-top: .2rem solid rgb(255 255 255 / 50%); /* Blue */
-    border-radius: 50%;
-    width: 1.2rem;
-    height: 1.2rem;
-    animation: spin 1s linear infinite;
-}
-
-.quick-color-container {
-    display: flex;
-    flex-wrap: wrap;
-    width: 30vw;
-    max-width: 200px;
-    justify-content: center;
-}
-
-.quick-color {
-    width: 50px;
-    height: 50px;
-    /* background-color: red !important; */
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+#input-form input:focus {
+    border-bottom-color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.75);
 }
