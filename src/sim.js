@@ -594,7 +594,7 @@ function restoreQR() {
     imageBitmap = qrBitmap;
     isQRBitmap  = true;
     renderTraceCanvas();
-    console.log('[session] QR restored');
+    applyQRFormulas();
 }
 
 // Pick a fresh random formula pair — called whenever user content replaces the QR.
@@ -606,7 +606,15 @@ function applyRandomFormulas() {
     const wi = document.querySelector('#wind-input');
     if (di) di.value = dir;
     if (wi) wi.value = wind;
-    console.log('[formula] random formulas applied after QR dismissed');
+}
+
+// Apply the fixed ring formula — called whenever the QR becomes the active trace.
+function applyQRFormulas() {
+    applyFormulas(QR_DIR, QR_WIND);
+    const di = document.querySelector('#dir-input');
+    const wi = document.querySelector('#wind-input');
+    if (di) di.value = QR_DIR;
+    if (wi) wi.value = QR_WIND;
 }
 
 // ── Formula compute + wind-vis pipelines (rebuilt on each formula change) ──────
@@ -676,6 +684,15 @@ const rndPick   = arr => arr[Math.floor(Math.random() * arr.length)];
 const startDir  = 'atan2(y-cy,x-cx) + length(vec2(x-cx,y-cy)) * 0.003 + t * 0.5';
 const startWind = 'atan2(y - cy, x - cx) + sin(length(vec2(x-cx,y-cy)) * 0.008) * PI + t';
 
+// ── QR idle formulas ──────────────────────────────────────────────────────────
+// Applied whenever the session QR is the active trace image.
+// Dir:  pure CCW orbital tangent  →  particles circle the centre
+// Wind: radial spring via smoothstep  →  confines particles to a ring
+//       The band [0.5 … 0.7] × min(cx,cy) sets the ring width; centre sits at 0.6×.
+//       Adjust the two multipliers to resize the ring relative to the canvas.
+const QR_DIR  = 'atan2(y-cy, x-cx) + 1.5708';
+const QR_WIND = 'atan2(y-cy, x-cx) + 3.14159 * smoothstep(min(cx,cy)*0.5, min(cx,cy)*0.7, length(vec2(x-cx,y-cy)))';
+
 let introActive      = true;
 let qrPendingRender  = false;  // QR bitmap ready but waiting for intro to finish
 let isQRBitmap       = false;  // current imageBitmap is the session QR (not user-loaded)
@@ -690,6 +707,7 @@ setTimeout(() => {
     if (qrPendingRender) {
         qrPendingRender = false;
         renderTraceCanvas();
+        applyQRFormulas();
     }
 }, params.introDelay * 1000);
 
@@ -754,6 +772,7 @@ setTimeout(() => {
             qrPendingRender = true;
         } else {
             renderTraceCanvas();
+            applyQRFormulas();
         }
     });
 
@@ -957,6 +976,7 @@ windInput.value = startWind;
 // restFormula overrides everything; followFormula / windEnabled guard the rest.
 setInterval(() => {
     if (params.restFormula) return;
+    if (isQRBitmap) return;  // ring formula is fixed while QR is showing
 
     let newDir  = dirInput.value;
     let newWind = windInput.value;
