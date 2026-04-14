@@ -72,6 +72,8 @@ Host browser — simulation display (WebGPU)
     │
     │  'spectator-joined'  ←─── server (fires on each new spectator join)
     │                            → brief directional gust in the particle field
+    │  'spectator-left'   ←─── server (fires when a spectator disconnects)
+    │                            → restores QR when room reaches 0
     │
     │  'collective-state'  ←─── server ticker every 300 ms
     │                            { avgPitch, avgRoll, avgTemp, avgCoherence, userCount }
@@ -88,11 +90,12 @@ Host browser — simulation display (WebGPU)
     ▼
 Display / projection
 
-Spectators  (/remote/?s=<uuid>)
-    │  Socket.IO  'join-session'  →  server
-    │  Socket.IO  'user-event'    →  server routes per RELAY_MODE
-    │                                 tilt events: aggregated only, not forwarded
-    │  Socket.IO  'peer-joined'  ←─  server (brief aura pulse when another spectator joins)
+Spectators  (/remote/?s=<uuid>&max=<n>)
+    │  Socket.IO  'join-session'   →  server
+    │  Socket.IO  'user-event'     →  server routes per RELAY_MODE
+    │                                  tilt events: aggregated only, not forwarded
+    │  Socket.IO  'peer-joined'   ←─  server  { userCount }  — aura pulse + QR threshold check
+    │  Socket.IO  'peer-left'     ←─  server  { userCount }  — QR reappears if count drops below max
     ▼
 Node.js server  (:3000)
     │  direct mode: io.to(room).emit('remote-event', ...)
@@ -111,14 +114,19 @@ Server → Socket.IO 'sim-params' → simulation
 
 1. Simulation connects via Socket.IO and emits `'register-host'`
 2. Server generates a UUID, puts the socket in room `<uuid>`, emits `'session-id'` back
-3. Simulation logs the remote URL to the console and displays a QR code:
+3. Simulation builds the remote URL (`/remote/?s=<uuid>&max=<maxSpectators>`) and displays a QR code:
    - **Small scannable overlay** in the bottom-left UI panel (click to open)
-   - **Large trace image** in the canvas centre — the particle field writes the QR pattern
-4. Spectators scan the QR, open `/remote/?s=<uuid>`, connect via Socket.IO
+   - **Large trace image** in the canvas centre — the particle field writes the QR pattern after the intro delay
+4. Spectators scan the QR, open `/remote/?s=<uuid>&max=<n>`, connect via Socket.IO
 5. Server emits `spectator-joined` to the host — a brief gust fires in the particle field
-6. Server emits `peer-joined` to all other spectators — their aura briefly dims and recovers
+6. Server emits `peer-joined` (with updated `userCount`) to all other spectators — aura pulse; remote QR hides if `userCount ≥ max`
 7. Every 300 ms the server aggregates all spectators' state and emits `collective-state` to the host
-8. Spectator touch/text events are also routed per `RELAY_MODE`
+8. Spectator touch/text events are routed per `RELAY_MODE`; `lastRemoteActivity` timestamp is updated on every event
+9. When a spectator disconnects, server emits `spectator-left` (with `userCount`) to host and `peer-left` to remaining spectators
+10. Simulation restores the QR trace in three ways (whichever fires first):
+    - `spectator-left` arrives with `userCount === 0`
+    - Internal `simSpectatorCount` counter drops to 0 (fallback if server event is missed)
+    - No remote events received for `remoteTimeout` seconds (Session → idle restore QR)
 
 ### RELAY_MODE
 
@@ -153,7 +161,7 @@ All computation runs on the GPU. No Three.js. No WebGL.
 
 | Pass | Shader | Type | Description |
 |------|--------|------|-------------|
-| **Compute** | `compute.wgsl` | Compute | Agent physics: formula steering, wind force + collective tilt bias, drag, speed clamping, edge wrap |
+| **Compute** | `compute.wgsl` | Compute | Agent physics: formula steering, wind force + collective tilt bias, image-trace avoidance (gradient + lookahead), contamination avoidance, speed clamping, edge wrap |
 | **Fade** | `fade.wgsl` | Render | Black fullscreen quad with alpha blend — exponential trail decay each frame |
 | **Particles** | `render.wgsl` | Render | Per-agent quads drawn into offscreen texture; attenuated additive blend; speed-color tinted by collective temperature |
 | **Blit** | `blit.wgsl` | Render | Copy offscreen texture → canvas swap-chain; applies `bgBlackCutoff` to clamp near-zero trail residual to pure black |
@@ -165,22 +173,71 @@ in a persistent GPU storage buffer. The buffer is always allocated at
 `MAX_AGENTS × 32` bytes; `params.agentCount` drives actual dispatch and draw counts
 without reallocation.
 
-The compute uniform buffer (`SoloParams`, 96 bytes) carries two extra fields beyond
-the base physics params: `windBiasX` and `windBiasY` — the smoothed collective tilt
-vector added directly to the formula wind each frame. The coherence multiplier is
-applied to `turnRate` in JavaScript before writing the buffer, so no shader change
-is needed for coherence.
+The compute uniform buffer (`SoloParams`, 96 bytes) carries physics params plus:
+- `windBiasX` / `windBiasY` — smoothed collective tilt vector, added directly to formula wind
+- `avoidForceStr` — multiplier applied to all image-trace avoidance force vectors
+
+The render uniform buffer (`SoloRenderParams`, 80 bytes) carries visual params only.
+
+The coherence multiplier is applied to `turnRate` in JavaScript before writing the compute buffer, so no shader change is needed for coherence.
 
 ---
 
 ## Intro Sequence
 
-On load, agents spawn from screen centre pointing radially outward. For the first
-`introDelay` seconds (default 5 s) the simulation runs in free-drift mode:
+On load, agents are split evenly across the four canvas corners, all pointing inward
+toward the centre (with slightly varied speeds) so the four streams converge. For the
+first `introDelay` seconds (default 10 s) the simulation runs in free-drift mode:
 `followFormula` and `windEnabled` are silently suppressed without mutating the
 GUI values. After the intro window, the active direction and wind formulas engage.
 
+The QR trace image is also held back until the intro ends — loading it immediately
+would trap agents in the QR pattern during the radial spread-out phase.
+
 The intro delay is tunable via the GUI (Motion → intro delay).
+
+---
+
+## QR Code as Idle State
+
+The QR trace acts as a **screensaver**: it is the default state of the canvas and
+returns whenever the room is empty or goes quiet.
+
+### When the QR is shown
+
+- At startup, after the intro delay
+- When the last spectator disconnects (`spectator-left` with `userCount === 0`)
+- When `simSpectatorCount` drops to 0 — an internal fallback counter maintained in case
+  the server `spectator-left` event is lost
+- When no remote events (touch, text) have been received for `remoteTimeout` seconds
+  (configurable in Session GUI; 0 = disabled)
+
+### When the QR is replaced
+
+- A user loads a trace image or types trace text locally
+- A remote spectator sends a text event — the QR is cleared first, then the text trace rendered
+
+The QR bitmap is kept permanently in memory (`qrBitmap`) and restored by `restoreQR()`
+without any network round-trip. The auto-clear timer never applies to the QR.
+
+### Remote page persistent QR
+
+The spectator page (`/remote/`) renders a small always-visible QR in its bottom-right
+corner. This encodes the full page URL (including `?s=` and `?max=`) so another person
+can scan from the phone of someone already connected — useful when the big screen is not
+visible.
+
+The remote QR **fades out automatically** when either condition is met:
+- The user interacts for the first time (touch, tilt, or text submit) — no need to share once you're in
+- `userCount` reported by the server reaches the `maxSpectators` threshold (Session GUI → QR hides at N users)
+
+It **reappears** if `userCount` drops back below the threshold (and the user has not yet interacted).
+
+### Content auto-clear
+
+Any user-loaded content (trace image or trace text) that is not the QR is automatically
+cleared after `clearDelay` seconds (Trace GUI → auto clear, default 20 s, 0 = disabled).
+The timer restarts whenever content changes. The QR is immune to auto-clear.
 
 ---
 
@@ -287,7 +344,7 @@ The HUD is **hidden by default**. Toggle it with:
 | `?gui=true` URL parameter | Open with GUI visible |
 | `Ctrl` key | Toggle all panels on/off at runtime |
 
-The GUI has four folders. See [PARAMETERS.md](PARAMETERS.md) for a full description of every control.
+The GUI has five folders. See [PARAMETERS.md](PARAMETERS.md) for a full description of every control.
 
 ### Motion
 
@@ -336,8 +393,20 @@ The image is never rendered directly — it is felt through collective agent den
 | edge fade | Width of smooth rectangular fade applied to all four image edges |
 | size | Image footprint as fraction of `min(canvasW, canvasH)`; aspect ratio preserved |
 | show image | Grayscale debug overlay of the loaded image |
+| mouse eraser | Treat the mouse cursor as a live contamination point (toggle, default on) |
+| eraser radius | Radius in canvas pixels of each contamination circle |
+| avoid force | Multiplier on all image-trace avoidance forces (0 = no avoidance, higher = stronger push) |
+| auto clear (s) | Seconds before user trace content is automatically cleared; 0 = disabled |
 | Load image… | File picker (any browser-supported image format) |
 | Clear image | Remove trace image; return to formula-only mode |
+| Clear text | Clear the trace text field |
+
+### Session
+
+| Control | Description |
+|---------|-------------|
+| idle restore QR (s) | Seconds of silence from all remotes before QR trace is restored; 0 = disabled |
+| QR hides at N users | Remote page QR fades when `userCount` reaches this threshold (baked into QR URL at generation time) |
 
 ---
 
@@ -502,9 +571,18 @@ Caddy handles TLS automatically via Let's Encrypt and proxies WebSocket upgrade 
 
 ## URL Parameters
 
+**Simulation page (`/`)**
+
 | Parameter | Effect |
 |-----------|--------|
 | `?gui=true` | Start with GUI, monitor, and formula panel visible |
+
+**Remote page (`/remote/`)**
+
+| Parameter | Effect |
+|-----------|--------|
+| `?s=<uuid>` | Session room UUID — required to join a simulation session |
+| `?max=<n>` | Spectator threshold above which the persistent QR on the remote page hides (default 10; baked into the QR URL at session generation time from the Session GUI) |
 
 ---
 
@@ -514,27 +592,34 @@ Caddy handles TLS automatically via Let's Encrypt and proxies WebSocket upgrade 
 thesis-sim/
 ├── src/
 │   ├── sim.js               Main entry point: GPU setup, frame loop, GUI, formula system,
-│   │                        Socket.IO host, collective-state handler, join burst
+│   │                        Socket.IO host, collective-state handler, QR screensaver,
+│   │                        join burst, contamination tracking, auto-clear timer
 │   └── shaders/
-│       ├── compute.wgsl     Agent physics compute shader (SoloParams 96 bytes,
-│       │                    includes windBiasX/Y for collective tilt)
-│       ├── render.wgsl      Per-agent quad rendering (speed→colour blend)
+│       ├── compute.wgsl     Agent physics (SoloParams 96 bytes): formula steering,
+│       │                    wind + collective tilt bias, image-trace avoidance (gradient
+│       │                    + lookahead), contamination circle avoidance
+│       ├── render.wgsl      Per-agent quad rendering (SoloRenderParams 80 bytes):
+│       │                    speed→colour blend; image-coloured homing agents
 │       ├── fade.wgsl        Trail decay — black fullscreen quad with alpha blend
 │       ├── blit.wgsl        Offscreen→canvas copy with black-cutoff clamp
 │       ├── wind-vis.wgsl    Wind arrow debug overlay (evalWindFormula prepended at runtime)
 │       └── image-debug.wgsl Grayscale image region debug overlay
 │
 ├── remote/
-│   ├── index.html           Spectator page (served at /remote/?s=<uuid>)
+│   ├── index.html           Spectator page (served at /remote/?s=<uuid>&max=<n>);
+│   │                        includes persistent #session-qr canvas (bottom-right corner)
 │   ├── main.js              Socket.IO client — tilt, touch (temp+coherence), text events;
-│   │                        aura reflects all three axes; peer-joined pulse
-│   ├── style.css            Dark atmospheric design, ripple animation, tilt indicator
+│   │                        aura reflects all three axes; peer-joined/peer-left for QR
+│   │                        visibility; QR auto-hides on first interaction or full room
+│   ├── style.css            Dark atmospheric design, ripple animation, tilt indicator,
+│   │                        session-qr fade transition
 │   ├── gyro.js              Device orientation helpers (pitch, roll, motion magnitude)
 │   └── motion.js            Motion smoothing
 │
 ├── server/
 │   ├── server.js            Socket.IO host/remote routing; room state aggregation;
-│   │                        collective-state ticker (300 ms); spectator-joined/peer-joined
+│   │                        collective-state ticker (300 ms); spectator-joined/left to host;
+│   │                        peer-joined (with userCount) / peer-left to spectators
 │   └── server-utils.js      File I/O for cached images
 │
 ├── index.html

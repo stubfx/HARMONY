@@ -51,6 +51,8 @@ const params = {
     // Contamination
     contamMouse:   true,  // treat mouse cursor as a contamination point
     contamRadius:  150,   // radius of each contamination circle, in canvas pixels
+    // Avoidance
+    avoidForceStr: 1.0,   // multiplier on image-trace avoidance forces
     // Auto-clear
     clearDelay:    20,    // seconds before auto-clearing user trace content (0 = disabled)
     // Session / QR restore
@@ -62,7 +64,7 @@ const params = {
     followFormula: true,  // false = free drift (wind + magnet only)
     autoDir:       true,  // randomly cycle dir formula every 30 s
     restFormula:   false, // lock both formulas to IDLE_DIR / IDLE_WIND
-    introDelay:    5,     // seconds of free drift before formulas engage
+    introDelay:    10,    // seconds of free drift before formulas engage
 };
 
 const DEFAULT_DIR  = 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI';
@@ -229,15 +231,26 @@ function seedAgents() {
     const cellW  = canvas.width  / gridW;
     const cellH  = canvas.height / gridH;
 
+    // Agents are split evenly across the 4 corners.
+    // Each group's initial velocity points toward canvas centre so the streams converge.
+    const cx = canvas.width  * 0.5;
+    const cy = canvas.height * 0.5;
+    const CORNERS = [
+        [0,             0            ],   // top-left
+        [canvas.width,  0            ],   // top-right
+        [0,             canvas.height],   // bottom-left
+        [canvas.width,  canvas.height],   // bottom-right
+    ];
+
     for (let i = 0; i < count; i++) {
-        const b = i * 8;
-        // Spawn at canvas centre, pointing radially outward
-        data[b]     = canvas.width  * 0.5;          // pos.x
-        data[b + 1] = canvas.height * 0.5;          // pos.y
-        const a = (i / count) * TAU;
-        const s = 0.5 + Math.random() * 1.5;
-        data[b + 2] = Math.cos(a) * s;              // vel.x
-        data[b + 3] = Math.sin(a) * s;              // vel.y
+        const b  = i * 8;
+        const [sx, sy] = CORNERS[i % 4];
+        const a  = Math.atan2(cy - sy, cx - sx);     // angle toward centre
+        const s  = 0.5 + Math.random() * 1.5;
+        data[b]     = sx;                             // pos.x
+        data[b + 1] = sy;                             // pos.y
+        data[b + 2] = Math.cos(a) * s;               // vel.x
+        data[b + 3] = Math.sin(a) * s;               // vel.y
         // Home: centre of this agent's assigned grid cell
         const col  = i % gridW;
         const row  = Math.floor(i / gridW);
@@ -644,7 +657,7 @@ async function applyFormulas(dir, wind, { reseed = false } = {}) {
 }
 
 const rndPick   = arr => arr[Math.floor(Math.random() * arr.length)];
-const startDir  = 'atan2(cy - y, cx - x)';
+const startDir  = 'atan2(y-cy,x-cx) + length(vec2(x-cx,y-cy)) * 0.003 + t * 0.5';
 const startWind = 'atan2(y - cy, x - cx) + sin(length(vec2(x-cx,y-cy)) * 0.008) * PI + t';
 let introActive      = true;
 let qrPendingRender  = false;  // QR bitmap ready but waiting for intro to finish
@@ -856,6 +869,7 @@ fMagnet.add(params, 'imageSize', 0.05, 1.0, 0.01).name('size');
 fMagnet.add(params, 'showImage').name('show image');
 fMagnet.add(params, 'contamMouse').name('mouse eraser');
 fMagnet.add(params, 'contamRadius', 10, 600, 5).name('eraser radius');
+fMagnet.add(params, 'avoidForceStr', 0, 5, 0.05).name('avoid force');
 fMagnet.add(params, 'clearDelay', 0, 120, 5).name('auto clear (s)');
 fMagnet.add({ load: () => document.querySelector('#image-input').click() }, 'load').name('Load image…');
 fMagnet.add({ clear: clearMagnetImage }, 'clear').name('Clear image');
@@ -1055,7 +1069,8 @@ function writeSoloUB(dt, time) {
     f[19] = params.vignetteEdge;
     f[20] = smoothBiasX + burstX;  // collective tilt + join burst
     f[21] = smoothBiasY + burstY;
-    // f[22], f[23] = 0 padding
+    f[22] = params.avoidForceStr;
+    // f[23] = 0 padding
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 

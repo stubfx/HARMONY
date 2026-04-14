@@ -26,7 +26,7 @@
 //   [76] vignetteEdge   f32   (edge fade width in UV units)
 //   [80] windBiasX      f32   (collective tilt X — added to formula wind)
 //   [84] windBiasY      f32   (collective tilt Y — added to formula wind)
-//   [88] _p1            f32
+//   [88] avoidForceStr  f32   (multiplier for all image-trace avoidance forces)
 //   [92] _p2            f32
 
 struct SoloParams {
@@ -52,7 +52,7 @@ struct SoloParams {
     vignetteEdge:   f32,
     windBiasX:      f32,
     windBiasY:      f32,
-    _p1:            f32,
+    avoidForceStr:  f32,
     _p2:            f32,
 }
 
@@ -219,12 +219,14 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             if (posAlpha > 0.0) {
                 // Case A: inside opaque — push toward lower alpha
                 if (gradLen > 0.001) {
-                    vel += -normalize(grad) * params.maxSpeed * posAlpha * params.dt * 60.0;
+                    vel += -normalize(grad) * params.maxSpeed * posAlpha * params.dt * 60.0
+                         * params.avoidForceStr;
                 } else {
                     // Zero gradient (flat uniform fill) — fall back to rect-centre push
                     let away = pos - imgCentre;
                     if (length(away) > 0.001) {
-                        vel += normalize(away) * params.maxSpeed * posAlpha * params.dt * 60.0;
+                        vel += normalize(away) * params.maxSpeed * posAlpha * params.dt * 60.0
+                             * params.avoidForceStr;
                     }
                 }
             } else if (gradLen > 0.001) {
@@ -240,7 +242,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                         if (lookAlpha > params.alphaThreshold) {
                             // Remove the inward velocity component proportionally
                             let strength = smoothstep(params.alphaThreshold, 1.0, lookAlpha);
-                            vel -= gradDir * inwardSpeed * strength;
+                            vel -= gradDir * inwardSpeed * strength * params.avoidForceStr;
                         }
                     }
                 }
