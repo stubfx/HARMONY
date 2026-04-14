@@ -24,9 +24,13 @@
         <!-- Persistent session QR — always visible, bottom-right corner -->
         <canvas id="session-qr"></canvas>
 
-        <!-- Bottom controls — motion permission + text input -->
+        <!-- Full-screen join gate — dismissed after first interaction -->
+        <div id="join-overlay">
+            <button id="join-btn">join the swarm</button>
+        </div>
+
+        <!-- Bottom controls — text input (visible after join) -->
         <div id="bottom-bar">
-            <button id="motion-btn">move to connect</button>
             <form id="input-form" autocomplete="off">
                 <input name="text1" type="text" placeholder="write to the swarm…" autocomplete="off" autocorrect="off" spellcheck="false">
             </form>

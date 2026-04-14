@@ -17,9 +17,8 @@ import QRCode from 'qrcode';
 import { startDeviceTilt, requestMotionOrientationPermission } from './gyro';
 
 // ── Session ───────────────────────────────────────────────────────────────────
-const urlParams      = new URLSearchParams(window.location.search);
-const room           = urlParams.get('s');
-const maxSpectators  = parseInt(urlParams.get('max') ?? '10', 10);
+const urlParams   = new URLSearchParams(window.location.search);
+const room        = urlParams.get('s');
 
 const spectatorId = sessionStorage.getItem('spectator-id') ?? (() => {
     const id = crypto.randomUUID();
@@ -28,15 +27,16 @@ const spectatorId = sessionStorage.getItem('spectator-id') ?? (() => {
 })();
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
-const sessionInfoEl = document.querySelector('#session-info');
-const connDotEl     = document.querySelector('#conn-dot');
-const auraEl        = document.querySelector('#aura');
-const tiltRingEl    = document.querySelector('#tilt-ring');
-const tiltDotEl     = document.querySelector('#tilt-dot');
+const sessionInfoEl  = document.querySelector('#session-info');
+const connDotEl      = document.querySelector('#conn-dot');
+const auraEl         = document.querySelector('#aura');
+const tiltRingEl     = document.querySelector('#tilt-ring');
+const tiltDotEl      = document.querySelector('#tilt-dot');
 const gestureSurface = document.querySelector('#gesture-surface');
-const motionBtn     = document.querySelector('#motion-btn');
-const formEl        = document.querySelector('#input-form');
-const sessionQrEl   = document.querySelector('#session-qr');
+const joinOverlayEl  = document.querySelector('#join-overlay');
+const joinBtnEl      = document.querySelector('#join-btn');
+const formEl         = document.querySelector('#input-form');
+const sessionQrEl    = document.querySelector('#session-qr');
 
 // ── Session info ──────────────────────────────────────────────────────────────
 if (sessionInfoEl) {
@@ -59,10 +59,7 @@ socket.on('connect', () => {
 });
 
 socket.on('joined', ({ userCount } = {}) => {
-    // Initialise peer count from the server's authoritative count (includes self → subtract 1).
-    peerCount = Math.max(0, (userCount ?? 1) - 1);
-    updateQRVisibility();
-    console.log('[remote] joined room:', room, '| peers already here:', peerCount);
+    console.log('[remote] joined room:', room, '| peers already here:', Math.max(0, (userCount ?? 1) - 1));
 });
 
 socket.on('connect_error', () => {
@@ -75,32 +72,9 @@ socket.on('disconnect', () => {
     connDotEl?.classList.remove('connected');
 });
 
-// ── Session QR visibility ─────────────────────────────────────────────────────
-// QR hides permanently once the user interacts (they're in — no need to share).
-// QR also hides when peer count ≥ maxSpectators (room is full enough).
-// It reappears if count drops back below the threshold and no interaction yet.
-let peerCount    = 0;     // count of other spectators in this room
-let hasInteracted = false; // true after first touch / tilt / text — never resets
-
-function updateQRVisibility() {
-    if (!sessionQrEl) return;
-    const shouldHide = hasInteracted || peerCount >= maxSpectators;
-    sessionQrEl.style.opacity = shouldHide ? '0' : '0.18';
-    sessionQrEl.style.pointerEvents = shouldHide ? 'none' : 'none'; // always non-interactive
-}
-
-function markInteracted() {
-    if (hasInteracted) return;
-    hasInteracted = true;
-    updateQRVisibility();
-}
-
-// Another spectator just joined the same session.
-socket.on('peer-joined', ({ userCount } = {}) => {
-    peerCount = (userCount ?? peerCount + 1) - 1; // userCount includes self, peers don't
-    updateQRVisibility();
-
-    // Brief aura pulse to acknowledge a new peer.
+// ── Peer events ───────────────────────────────────────────────────────────────
+// Brief aura pulse when another spectator joins — no QR logic (QR is always visible).
+socket.on('peer-joined', () => {
     if (!auraEl) return;
     auraEl.style.transition = 'background 0s, opacity 0.05s ease';
     auraEl.style.opacity = '0.6';
@@ -108,12 +82,6 @@ socket.on('peer-joined', ({ userCount } = {}) => {
         auraEl.style.transition = 'background 0.6s ease, opacity 0.5s ease';
         auraEl.style.opacity = '1';
     }, 80);
-});
-
-socket.on('peer-left', ({ userCount } = {}) => {
-    // userCount is total remaining (includes self) — same convention as peer-joined.
-    peerCount = Math.max(0, (userCount ?? peerCount + 1) - 1);
-    updateQRVisibility();
 });
 
 function sendEvent(type, data) {
@@ -182,7 +150,6 @@ function handleTouch(e) {
 
 gestureSurface?.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    markInteracted();
     createRipple(e.touches[0].clientX, e.touches[0].clientY);
     handleTouch(e);
 }, { passive: false });
@@ -206,16 +173,16 @@ function createRipple(x, y) {
     el.addEventListener('animationend', () => el.remove(), { once: true });
 }
 
-// ── Motion permission + tilt ──────────────────────────────────────────────────
+// ── Join overlay + motion permission ─────────────────────────────────────────
+// "join the swarm" is the first and only gate.
+// Tapping it requests device-motion permission (required on iOS 13+).
+// Whether permission is granted or denied the overlay is dismissed and the
+// full UI (touch surface + text form) becomes active.
 let motionEnabled = false;
 let tiltThrottle  = null;
 
-motionBtn?.addEventListener('click', async () => {
-    markInteracted();
-    await requestMotionOrientationPermission();
+function startTilt() {
     motionEnabled = true;
-    motionBtn.style.opacity = '0';
-    motionBtn.style.pointerEvents = 'none';
     tiltRingEl?.classList.add('visible');
 
     startDeviceTilt(20, (d) => {
@@ -232,6 +199,20 @@ motionBtn?.addEventListener('click', async () => {
             sendEvent('tilt', { pitch: currentPitch, roll: currentRoll });
         }, 250);
     });
+}
+
+function dismissOverlay() {
+    if (!joinOverlayEl) return;
+    joinOverlayEl.style.opacity = '0';
+    joinOverlayEl.style.pointerEvents = 'none';
+    setTimeout(() => joinOverlayEl.remove(), 650);
+}
+
+joinBtnEl?.addEventListener('click', async () => {
+    // Request permission first — iOS requires a user gesture in the call stack.
+    try { await requestMotionOrientationPermission(); } catch { /* denied or unsupported */ }
+    startTilt();
+    dismissOverlay();
 });
 
 // ── Text form ─────────────────────────────────────────────────────────────────
@@ -239,14 +220,14 @@ formEl?.addEventListener('submit', (e) => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(formEl));
     if (!data.text1?.trim()) return;
-    markInteracted();
     sendEvent('text', { text: data.text1.trim() });
     formEl.reset();
     console.log('[remote] → text', data.text1.trim());
 });
 
 // ── Session QR — always-visible small code in corner ─────────────────────────
-// Renders the current page URL so another device can scan and join the same room.
+// Always shown so any visitor can share the session with others.
+// Hiding logic lives only on the simulation big screen.
 if (sessionQrEl) {
     QRCode.toCanvas(sessionQrEl, window.location.href, {
         width:  72,

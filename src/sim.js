@@ -57,7 +57,7 @@ const params = {
     clearDelay:    20,    // seconds before auto-clearing user trace content (0 = disabled)
     // Session / QR restore
     remoteTimeout:  60,   // seconds of silence from all remotes before QR is restored (0 = disabled)
-    maxSpectators:  10,   // remote QR hides when connected count reaches this threshold
+    maxSpectators:  1,    // sim QR hides when connected count reaches this threshold
     // Weight
     weightSpread: 0.8,    // 0 = all equal; 1 = weights span [0.05 … 1.95]
     // Motion behaviour
@@ -771,12 +771,17 @@ setTimeout(() => {
         collectiveBiasY     = (avgPitch - 0.5) * 2 * biasStr;
         collectiveTemp      = avgTemp      ?? 0.5;
         collectiveCoherence = avgCoherence ?? 0.5;
-        // Mirror to GUI debug panel
+        // Mirror to GUI debug panel (manual refresh — no .listen() RAF loop)
         swarmDebug.users     = userCount ?? 0;
         swarmDebug.pitch     = +(avgPitch     ?? 0.5).toFixed(3);
         swarmDebug.roll      = +(avgRoll      ?? 0.5).toFixed(3);
         swarmDebug.temp      = +(avgTemp      ?? 0.5).toFixed(3);
         swarmDebug.coherence = +(avgCoherence ?? 0.5).toFixed(3);
+        dbgUsers.updateDisplay();
+        dbgPitch.updateDisplay();
+        dbgRoll.updateDisplay();
+        dbgTemp.updateDisplay();
+        dbgCoherence.updateDisplay();
     });
 
     // A spectator joined — fire a brief directional gust into the field.
@@ -904,11 +909,13 @@ fSession.add(params, 'remoteTimeout',  0, 180,  5).name('idle restore QR (s)');
 fSession.add(params, 'maxSpectators',  1,  50,  1).name('QR hides at N users');
 
 const fDebug = gui.addFolder('Debug');
-fDebug.add(swarmDebug, 'users').name('remotes').listen().disable();
-fDebug.add(swarmDebug, 'pitch',     0, 1).name('avg pitch').listen().disable();
-fDebug.add(swarmDebug, 'roll',      0, 1).name('avg roll').listen().disable();
-fDebug.add(swarmDebug, 'temp',      0, 1).name('avg temp').listen().disable();
-fDebug.add(swarmDebug, 'coherence', 0, 1).name('avg coherence').listen().disable();
+// No .listen() — controllers are refreshed manually inside the collective-state
+// socket handler (≤300 ms cadence) so there's no extra RAF loop competing with WebGPU.
+const dbgUsers     = fDebug.add(swarmDebug, 'users').name('remotes').disable();
+const dbgPitch     = fDebug.add(swarmDebug, 'pitch',     0, 1).name('avg pitch').disable();
+const dbgRoll      = fDebug.add(swarmDebug, 'roll',      0, 1).name('avg roll').disable();
+const dbgTemp      = fDebug.add(swarmDebug, 'temp',      0, 1).name('avg temp').disable();
+const dbgCoherence = fDebug.add(swarmDebug, 'coherence', 0, 1).name('avg coherence').disable();
 fDebug.close();
 
 gui.add({ restart: () => seedAgents() }, 'restart').name('↺  Restart');

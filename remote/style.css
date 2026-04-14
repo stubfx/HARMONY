@@ -127,23 +127,36 @@ html, body {
     width: min(80vw, 320px);
 }
 
-#motion-btn {
-    font-family: ui-monospace, monospace;
-    font-size: 0.65rem;
-    letter-spacing: 0.12em;
-    text-transform: lowercase;
-    color: rgba(255, 255, 255, 0.35);
-    background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 2rem;
-    padding: 0.45rem 1.1rem;
-    cursor: pointer;
-    transition: color 0.3s, border-color 0.3s;
+/* ── Join overlay — full-screen gate shown before first interaction ───────────── */
+#join-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    transition: opacity 0.6s ease;
 }
 
-#motion-btn:active {
-    color: rgba(255, 255, 255, 0.7);
-    border-color: rgba(255, 255, 255, 0.35);
+#join-btn {
+    font-family: ui-monospace, monospace;
+    font-size: 0.85rem;
+    letter-spacing: 0.18em;
+    text-transform: lowercase;
+    color: rgba(255, 255, 255, 0.6);
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 2rem;
+    padding: 0.75rem 2.2rem;
+    cursor: pointer;
+    transition: color 0.3s, border-color 0.3s, box-shadow 0.3s;
+}
+
+#join-btn:active {
+    color: rgba(255, 255, 255, 0.95);
+    border-color: rgba(255, 255, 255, 0.55);
+    box-shadow: 0 0 18px rgba(255, 255, 255, 0.08);
 }
 
 #input-form {
