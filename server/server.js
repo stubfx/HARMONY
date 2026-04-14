@@ -140,7 +140,7 @@ io.on('connection', (socket) => {
         // Join a spectator sub-room so peers can be notified of each other's presence
         socket.join(`${room}:spectators`);
         console.log('[socket] remote joined     room:', room, '| spectator:', spectatorId ?? '—');
-        socket.emit('joined', { room });
+        socket.emit('joined', { room, userCount: roomData.users.size });
         // Notify the host simulation — triggers the join burst on the big screen
         if (roomData.hostSocketId) {
             io.to(roomData.hostSocketId).emit('spectator-joined', { userCount: roomData.users.size });
@@ -173,7 +173,6 @@ io.on('connection', (socket) => {
         } else {
             // Direct: forward straight to the simulation in that room.
             io.to(room).emit('remote-event', { type, spectatorId, data, timestamp: Date.now() });
-            console.log('[socket] direct →', room, '|', type, JSON.stringify(data));
         }
     });
 

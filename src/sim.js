@@ -767,12 +767,16 @@ setTimeout(() => {
     // Temperature: 0 = cold (top of phone screen), 1 = warm (bottom of phone screen).
     socket.on('collective-state', ({ avgPitch, avgRoll, avgTemp, avgCoherence, userCount }) => {
         const biasStr = params.windStr;
-        collectiveBiasX   = (avgRoll  - 0.5) * 2 * biasStr;
-        collectiveBiasY   = (avgPitch - 0.5) * 2 * biasStr;
-        collectiveTemp    = avgTemp      ?? 0.5;
+        collectiveBiasX     = (avgRoll  - 0.5) * 2 * biasStr;
+        collectiveBiasY     = (avgPitch - 0.5) * 2 * biasStr;
+        collectiveTemp      = avgTemp      ?? 0.5;
         collectiveCoherence = avgCoherence ?? 0.5;
-        if (userCount > 0)
-            console.log(`[swarm] ${userCount} · tilt (${collectiveBiasX.toFixed(2)}, ${collectiveBiasY.toFixed(2)}) · temp ${collectiveTemp.toFixed(2)} · coherence ${collectiveCoherence.toFixed(2)}`);
+        // Mirror to GUI debug panel
+        swarmDebug.users     = userCount ?? 0;
+        swarmDebug.pitch     = +(avgPitch     ?? 0.5).toFixed(3);
+        swarmDebug.roll      = +(avgRoll      ?? 0.5).toFixed(3);
+        swarmDebug.temp      = +(avgTemp      ?? 0.5).toFixed(3);
+        swarmDebug.coherence = +(avgCoherence ?? 0.5).toFixed(3);
     });
 
     // A spectator joined — fire a brief directional gust into the field.
@@ -782,20 +786,17 @@ setTimeout(() => {
         const angle = Math.random() * Math.PI * 2;
         burstX = Math.cos(angle) * BURST_STRENGTH;
         burstY = Math.sin(angle) * BURST_STRENGTH;
-        console.log(`[swarm] spectator joined — ${userCount} total · burst angle ${(angle * 180 / Math.PI).toFixed(0)}°`);
     });
 
     // A spectator left — decrement internal count and restore QR if room is empty.
     socket.on('spectator-left', ({ userCount }) => {
         simSpectatorCount = userCount ?? Math.max(0, simSpectatorCount - 1);
-        console.log(`[swarm] spectator left — ${simSpectatorCount} remaining`);
         if (simSpectatorCount === 0) restoreQR();
     });
 
     // Direct remote events (RELAY_MODE=direct on server).
     // In n8n mode these never arrive here; sim-params carries the processed result instead.
     socket.on('remote-event', (event) => {
-        console.log('[remote]', event.type, '|', JSON.stringify(event.data), '| from', event.spectatorId);
         // Every remote-event (touch or text) resets the inactivity timer.
         lastRemoteActivity = Date.now();
         if (event.type === 'text' && event.data?.text) {
@@ -843,6 +844,9 @@ function applyGUIVisibility() {
 }
 
 // ── lil-gui ───────────────────────────────────────────────────────────────────
+// Live values mirrored into the GUI debug panel (updated by collective-state events).
+const swarmDebug = { users: 0, pitch: 0.5, roll: 0.5, temp: 0.5, coherence: 0.5 };
+
 const gui = new GUI({ title: 'Wind Particles', width: 260 });
 // Hide immediately to prevent a flash of the panel before applyGUIVisibility() runs.
 if (!guiVisible) gui.domElement.style.display = 'none';
@@ -898,6 +902,14 @@ fMagnet.add({ clear: clearTraceText },   'clear').name('Clear text');
 const fSession = gui.addFolder('Session');
 fSession.add(params, 'remoteTimeout',  0, 180,  5).name('idle restore QR (s)');
 fSession.add(params, 'maxSpectators',  1,  50,  1).name('QR hides at N users');
+
+const fDebug = gui.addFolder('Debug');
+fDebug.add(swarmDebug, 'users').name('remotes').listen().disable();
+fDebug.add(swarmDebug, 'pitch',     0, 1).name('avg pitch').listen().disable();
+fDebug.add(swarmDebug, 'roll',      0, 1).name('avg roll').listen().disable();
+fDebug.add(swarmDebug, 'temp',      0, 1).name('avg temp').listen().disable();
+fDebug.add(swarmDebug, 'coherence', 0, 1).name('avg coherence').listen().disable();
+fDebug.close();
 
 gui.add({ restart: () => seedAgents() }, 'restart').name('↺  Restart');
 gui.add(params, 'restFormula').name('⌂  idle').onChange(v => {
@@ -1027,6 +1039,7 @@ let collectiveBiasX   = 0;   // target wind bias X (from tilt)
 let collectiveBiasY   = 0;   // target wind bias Y (from tilt)
 let collectiveTemp    = 0.5; // target temperature [0=cold … 1=warm] (from touch Y)
 let collectiveCoherence = 0.5; // target coherence [0=chaos … 1=order] (from touch X)
+
 let smoothBiasX       = 0;   // smoothed versions
 let smoothBiasY       = 0;
 let smoothTemp        = 0.5;

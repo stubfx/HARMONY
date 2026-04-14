@@ -58,7 +58,12 @@ socket.on('connect', () => {
     connDotEl?.classList.add('connected');
 });
 
-socket.on('joined', () => console.log('[remote] joined room:', room));
+socket.on('joined', ({ userCount } = {}) => {
+    // Initialise peer count from the server's authoritative count (includes self → subtract 1).
+    peerCount = Math.max(0, (userCount ?? 1) - 1);
+    updateQRVisibility();
+    console.log('[remote] joined room:', room, '| peers already here:', peerCount);
+});
 
 socket.on('connect_error', () => {
     console.warn('[remote] connection failed, retrying…');
@@ -106,7 +111,8 @@ socket.on('peer-joined', ({ userCount } = {}) => {
 });
 
 socket.on('peer-left', ({ userCount } = {}) => {
-    peerCount = Math.max(0, (userCount ?? peerCount - 1));
+    // userCount is total remaining (includes self) — same convention as peer-joined.
+    peerCount = Math.max(0, (userCount ?? peerCount + 1) - 1);
     updateQRVisibility();
 });
 
