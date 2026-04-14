@@ -48,6 +48,9 @@ const params = {
     vignetteEdge:   0.08, // edge fade width in UV units (0 = none, 0.5 = half image)
     imageSize:      0.316, // image size as fraction of min(canvasW, canvasH)
     showImage:    false,
+    // Contamination
+    contamMouse:   true,  // treat mouse cursor as a contamination point
+    contamRadius:  150,   // radius of each contamination circle, in canvas pixels
     // Weight
     weightSpread: 0.8,    // 0 = all equal; 1 = weights span [0.05 … 1.95]
     // Motion behaviour
@@ -202,6 +205,10 @@ const windVisUB = device.createBuffer({
 });
 const imageDebugUB = device.createBuffer({
     size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+});
+// ContamParams: 16-byte header + 10 × vec4<f32> (16 bytes each) = 176 bytes
+const contamUB = device.createBuffer({
+    size: 176, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 
 function seedAgents() {
@@ -535,6 +542,7 @@ function rebuildSimBG() {
             { binding: 0, resource: { buffer: soloUB } },
             { binding: 1, resource: { buffer: agentBuf } },
             { binding: 2, resource: texView },
+            { binding: 3, resource: { buffer: contamUB } },
         ],
     });
 }
@@ -756,6 +764,8 @@ fMagnet.add(params, 'blackThreshold', 0,  0.5, 0.005).name('black cutoff');
 fMagnet.add(params, 'vignetteEdge',   0,  0.5, 0.005).name('edge fade');
 fMagnet.add(params, 'imageSize', 0.05, 1.0, 0.01).name('size');
 fMagnet.add(params, 'showImage').name('show image');
+fMagnet.add(params, 'contamMouse').name('mouse eraser');
+fMagnet.add(params, 'contamRadius', 10, 600, 5).name('eraser radius');
 fMagnet.add({ load: () => document.querySelector('#image-input').click() }, 'load').name('Load image…');
 fMagnet.add({ clear: clearMagnetImage }, 'clear').name('Clear image');
 
@@ -851,6 +861,19 @@ function hexToF(hex) {
 function lerpColor(a, b, t) {
     return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 }
+
+// ── Contamination — mouse tracking ───────────────────────────────────────────
+// Mouse position in canvas pixels (-1 = off-canvas / inactive).
+// Up to 10 contamination points; for now only the mouse is wired up.
+let mouseCanvasX = -1;
+let mouseCanvasY = -1;
+
+canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    mouseCanvasX = (e.clientX - rect.left) * (canvas.width  / rect.width);
+    mouseCanvasY = (e.clientY - rect.top)  * (canvas.height / rect.height);
+});
+canvas.addEventListener('mouseleave', () => { mouseCanvasX = -1; mouseCanvasY = -1; });
 
 // ── Collective swarm state (written by 'collective-state' socket events) ───────
 // Smoothed each frame via exponential moving average to avoid jarring jumps.
@@ -1003,6 +1026,32 @@ function writeImageDebugUB() {
     device.queue.writeBuffer(imageDebugUB, 0, ab);
 }
 
+// Writes ContamParams (176 bytes) — header + up to 10 vec4 points.
+// Points array is sparse: only active entries (count) are used by the shader.
+// For now, slot 0 = mouse cursor when on-canvas; extend here to add more sources.
+function writeContamUB() {
+    const pts = [];
+    if (params.contamMouse &&
+        mouseCanvasX >= 0 && mouseCanvasX <= canvas.width &&
+        mouseCanvasY >= 0 && mouseCanvasY <= canvas.height) {
+        pts.push(mouseCanvasX, mouseCanvasY);
+    }
+    // Future: push additional contamination points here (remote touches, etc.)
+
+    const count  = pts.length / 2;  // each point is 2 floats (x, y)
+    const ab     = new ArrayBuffer(176);
+    const u      = new Uint32Array(ab);
+    const f      = new Float32Array(ab);
+    u[0] = count;
+    f[1] = params.contamRadius;
+    // points start at byte 16 → float index 4; each vec4 = 4 floats (xy used, zw = 0)
+    for (let k = 0; k < count; k++) {
+        f[4 + k * 4]     = pts[k * 2];      // x
+        f[4 + k * 4 + 1] = pts[k * 2 + 1]; // y
+    }
+    device.queue.writeBuffer(contamUB, 0, ab);
+}
+
 // ── Frame loop ────────────────────────────────────────────────────────────────
 const TIME_MULT = 0.001;
 let prevTime  = performance.now() * TIME_MULT;
@@ -1020,6 +1069,7 @@ function frame(ts) {
     writeRenderUB();
     writeFadeUB();
     writeBlitUB();
+    writeContamUB();
 
     const enc = device.createCommandEncoder();
 

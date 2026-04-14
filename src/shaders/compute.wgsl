@@ -64,9 +64,28 @@ struct Agent {
     _pad:   f32,
 }
 
+// ── Contamination — up to 10 circular eraser zones ───────────────────────────
+// Within each circle the trace alpha is zeroed (clean-only — no alpha is added
+// where there was none). Applied after black cutoff and vignette.
+// Free agents within 1.5× radius are pushed outward (soft avoidance field).
+// Layout (176 bytes):
+//   [0]  count   u32  — active points (0 = disabled)
+//   [4]  radius  f32  — circle radius in canvas pixels
+//   [8]  _p0     u32
+//   [12] _p1     u32
+//   [16..175] points  array<vec4<f32>, 10>  — xy = canvas pixel, zw unused
+struct ContamParams {
+    count:  u32,
+    radius: f32,
+    _p0:    u32,
+    _p1:    u32,
+    points: array<vec4<f32>, 10>,
+}
+
 @group(0) @binding(0) var<uniform>             params:   SoloParams;
 @group(0) @binding(1) var<storage, read_write> agents:   array<Agent>;
 @group(0) @binding(2) var                      imageTex: texture_2d<f32>;
+@group(0) @binding(3) var<uniform>             contam:   ContamParams;
 
 const PI:     f32 = 3.14159265358979;
 const TWO_PI: f32 = 6.28318530717959;
@@ -92,6 +111,14 @@ fn imgAlphaAt(canvasPx: vec2<f32>, texDims: vec2<u32>) -> f32 {
     return px.a * vig;
 }
 
+// Returns true when pt falls inside any active contamination circle.
+fn isContaminated(pt: vec2<f32>) -> bool {
+    for (var k = 0u; k < contam.count; k++) {
+        if (length(pt - contam.points[k].xy) <= contam.radius) { return true; }
+    }
+    return false;
+}
+
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let i = gid.x;
@@ -113,24 +140,35 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let desired  = vec2<f32>(cos(dirAngle), sin(dirAngle));
 
     let windAngle = evalWindFormula(x, y, t, idx, cx, cy);
-    // Collective tilt bias is added directly to the formula wind vector.
-    // Both are in the same velocity-per-frame space so the blend is seamless.
+    // Collective tilt bias added directly to formula wind — same velocity space.
     let wind = vec2<f32>(cos(windAngle), sin(windAngle)) * params.windStr
              + vec2<f32>(params.windBiasX, params.windBiasY);
 
     // ── Trace layer: image-alpha-driven homing ─────────────────────────────────
-    // An agent homes only when the image pixel at its assigned home position
-    // has opacity >= alphaThreshold. Below that threshold the agent is free.
-    // Non-homing agents passing through the image are repelled in proportion
-    // to the alpha of the pixel they are currently standing on.
+    // homeInImg true  → agent drives toward its fixed home position (homing mode)
+    // homeInImg false → agent follows formula/wind (free mode)
     var homeInImg = false;
     var posAlpha  = 0.0;
+    var texDims   = vec2<u32>(1u, 1u);
 
     if (params.hasImage != 0u) {
-        let texDims = textureDimensions(imageTex, 0u);
-        let homeAlpha = imgAlphaAt(home, texDims);
-        homeInImg     = homeAlpha >= params.alphaThreshold;
-        posAlpha      = imgAlphaAt(pos, texDims);
+        texDims = textureDimensions(imageTex, 0u);
+        var homeAlpha   = imgAlphaAt(home, texDims);
+        var rawPosAlpha = imgAlphaAt(pos,  texDims);
+
+        // Contamination — clean-only erase within circles.
+        // Opaque pixels (>= threshold) → alpha zeroed. Transparent pixels unchanged.
+        if (contam.count > 0u) {
+            if (isContaminated(home)) {
+                homeAlpha = select(homeAlpha, 0.0, homeAlpha >= params.alphaThreshold);
+            }
+            if (isContaminated(pos)) {
+                rawPosAlpha = select(rawPosAlpha, 0.0, rawPosAlpha >= params.alphaThreshold);
+            }
+        }
+
+        homeInImg = homeAlpha   >= params.alphaThreshold;
+        posAlpha  = rawPosAlpha;
     }
 
     let imgCentre = vec2<f32>(
@@ -139,6 +177,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     );
 
     if (homeInImg) {
+        // ── Homing agent: steer straight toward assigned home pixel ────────────
         let toHome = home - pos;
         let dist   = length(toHome);
         if (dist > 0.5) {
@@ -147,16 +186,81 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             vel = vec2<f32>(0.0, 0.0);
         }
     } else {
+        // ── Free agent: formula steering + wind ───────────────────────────────
         if (params.followFormula != 0u) {
             vel = mix(vel, desired * (params.stepLen * weight), params.turnRate);
         }
         vel += wind * params.dt * 60.0;
 
-        // Repulsion: strength proportional to alpha at the agent's current position.
-        // Opaque areas push hard; transparent areas are ignored.
-        if (posAlpha > 0.0) {
-            let away = normalize(pos - imgCentre);
-            vel += away * params.maxSpeed * posAlpha * params.dt * 60.0;
+        // ── Image trace avoidance ──────────────────────────────────────────────
+        // Replaces the old push-from-centre with content-aware deflection:
+        //
+        //   Case A — already inside opaque area (posAlpha > 0):
+        //     Compute local alpha gradient via 4-sample central differences.
+        //     Push along −∇α (toward lower alpha = toward the nearest boundary gap).
+        //     Fallback to rect-centre push only when gradient is zero (flat uniform fill).
+        //
+        //   Case B — transparent now but heading into opacity (posAlpha = 0):
+        //     Gradient from current pos reveals nearby boundary direction.
+        //     Lookahead confirms opacity at next few steps.
+        //     Remove the inward velocity component — agent slides along the edge.
+        //
+        // Gradient epsilon: 4 canvas pixels — coarse enough to span sub-pixel
+        // boundaries, fine enough not to smear across separate regions.
+        if (params.hasImage != 0u) {
+            let EPS = 4.0;
+            let gx = imgAlphaAt(vec2<f32>(pos.x + EPS, pos.y), texDims)
+                   - imgAlphaAt(vec2<f32>(pos.x - EPS, pos.y), texDims);
+            let gy = imgAlphaAt(vec2<f32>(pos.x, pos.y + EPS), texDims)
+                   - imgAlphaAt(vec2<f32>(pos.x, pos.y - EPS), texDims);
+            let grad    = vec2<f32>(gx, gy);
+            let gradLen = length(grad);
+
+            if (posAlpha > 0.0) {
+                // Case A: inside opaque — push toward lower alpha
+                if (gradLen > 0.001) {
+                    vel += -normalize(grad) * params.maxSpeed * posAlpha * params.dt * 60.0;
+                } else {
+                    // Zero gradient (flat uniform fill) — fall back to rect-centre push
+                    let away = pos - imgCentre;
+                    if (length(away) > 0.001) {
+                        vel += normalize(away) * params.maxSpeed * posAlpha * params.dt * 60.0;
+                    }
+                }
+            } else if (gradLen > 0.001) {
+                // Case B: transparent but near a boundary — check if heading in
+                let velLen = length(vel);
+                if (velLen > 0.001) {
+                    let gradDir     = normalize(grad);
+                    let inwardSpeed = dot(gradDir, vel);
+                    if (inwardSpeed > 0.0) {
+                        // Lookahead: confirm opacity several steps ahead
+                        let futurePos = pos + normalize(vel) * (params.stepLen * 4.0);
+                        let lookAlpha = imgAlphaAt(futurePos, texDims);
+                        if (lookAlpha > params.alphaThreshold) {
+                            // Remove the inward velocity component proportionally
+                            let strength = smoothstep(params.alphaThreshold, 1.0, lookAlpha);
+                            vel -= gradDir * inwardSpeed * strength;
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Contamination circle avoidance ─────────────────────────────────────
+        // Soft outward push within 1.5× contamination radius for all free agents.
+        // Linear falloff: full force at circle centre, zero at the influence edge.
+        // Operates independently of any loaded image — circles always repel.
+        let INFLUENCE = 1.5;
+        for (var k = 0u; k < contam.count; k++) {
+            let cp        = contam.points[k].xy;
+            let diff      = pos - cp;
+            let dist      = length(diff);
+            let influence = contam.radius * INFLUENCE;
+            if (dist < influence && dist > 0.001) {
+                let t = 1.0 - dist / influence;
+                vel += normalize(diff) * t * params.maxSpeed * params.dt * 60.0;
+            }
         }
     }
 
