@@ -593,9 +593,18 @@ async function applyFormulas(dir, wind, { reseed = false } = {}) {
 const rndPick   = arr => arr[Math.floor(Math.random() * arr.length)];
 const startDir  = 'atan2(cy - y, cx - x)';
 const startWind = 'atan2(y - cy, x - cx) + sin(length(vec2(x-cx,y-cy)) * 0.008) * PI + t';
-let introActive = true;
+let introActive      = true;
+let qrPendingRender  = false;  // QR bitmap ready but waiting for intro to finish
+
 await applyFormulas(startDir, startWind, { reseed: true });
-setTimeout(() => { introActive = false; }, params.introDelay * 1000);
+setTimeout(() => {
+    introActive = false;
+    // If the QR session-id arrived during the intro, render it now.
+    if (qrPendingRender) {
+        qrPendingRender = false;
+        renderTraceCanvas();
+    }
+}, params.introDelay * 1000);
 
 // ── Session: Socket.IO connection + QR code ───────────────────────────────────
 // The server assigns a session UUID on socket connect and emits it back as
@@ -645,9 +654,15 @@ setTimeout(() => { introActive = false; }, params.introDelay * 1000);
             width: 512, margin: 2,
             color: { dark: '#ffffffff', light: '#00000000' },
         });
-        // Treat as a loaded image so Clear image removes it and user images replace it
+        // Treat as a loaded image so Clear image removes it and user images replace it.
+        // Delay trace render until the intro ends — prevents particles being trapped
+        // in the QR pattern during the radial spread-out phase.
         imageBitmap = await createImageBitmap(qrOffscreen);
-        renderTraceCanvas();
+        if (introActive) {
+            qrPendingRender = true;
+        } else {
+            renderTraceCanvas();
+        }
     });
 
     socket.on('sim-params', (data) => {
@@ -723,6 +738,8 @@ function applyGUIVisibility() {
 
 // ── lil-gui ───────────────────────────────────────────────────────────────────
 const gui = new GUI({ title: 'Wind Particles', width: 260 });
+// Hide immediately to prevent a flash of the panel before applyGUIVisibility() runs.
+if (!guiVisible) gui.domElement.style.display = 'none';
 
 const fMotion = gui.addFolder('Motion');
 fMotion.add(params, 'agentCount', 1_000, MAX_AGENTS, 1_000)
