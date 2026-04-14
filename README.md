@@ -151,12 +151,14 @@ All collective values are smoothed with an exponential moving average (~0.8 s ti
 
 All computation runs on the GPU. No Three.js. No WebGL.
 
-| Pass | Type | Description |
-|------|------|-------------|
-| **Compute** | Compute | Agent physics: formula steering, wind force + collective tilt bias, drag, speed clamping, edge wrap |
-| **Fade** | Render | Black fullscreen quad with alpha blend — exponential trail decay each frame |
-| **Particles** | Render | Per-agent quads drawn into offscreen texture; attenuated additive blend; speed-color tinted by collective temperature |
-| **Blit** | Render | Copy offscreen texture → canvas swap-chain; applies `bgBlackCutoff` to clamp near-zero trail residual to pure black |
+| Pass | Shader | Type | Description |
+|------|--------|------|-------------|
+| **Compute** | `compute.wgsl` | Compute | Agent physics: formula steering, wind force + collective tilt bias, drag, speed clamping, edge wrap |
+| **Fade** | `fade.wgsl` | Render | Black fullscreen quad with alpha blend — exponential trail decay each frame |
+| **Particles** | `render.wgsl` | Render | Per-agent quads drawn into offscreen texture; attenuated additive blend; speed-color tinted by collective temperature |
+| **Blit** | `blit.wgsl` | Render | Copy offscreen texture → canvas swap-chain; applies `bgBlackCutoff` to clamp near-zero trail residual to pure black |
+| **Wind vis** *(debug)* | `wind-vis.wgsl` | Render | Arrow grid overlay — `evalWindFormula` prepended at pipeline build time, same pattern as `compute.wgsl` |
+| **Image debug** *(debug)* | `image-debug.wgsl` | Render | Grayscale overlay of the loaded image at its current size and position |
 
 Agents are stored as `array<Agent>` (pos.xy, vel.xy, home.xy, weight, _pad — 32 bytes each)
 in a persistent GPU storage buffer. The buffer is always allocated at
@@ -516,7 +518,11 @@ thesis-sim/
 │   └── shaders/
 │       ├── compute.wgsl     Agent physics compute shader (SoloParams 96 bytes,
 │       │                    includes windBiasX/Y for collective tilt)
-│       └── render.wgsl      Per-agent quad rendering (speed→colour blend)
+│       ├── render.wgsl      Per-agent quad rendering (speed→colour blend)
+│       ├── fade.wgsl        Trail decay — black fullscreen quad with alpha blend
+│       ├── blit.wgsl        Offscreen→canvas copy with black-cutoff clamp
+│       ├── wind-vis.wgsl    Wind arrow debug overlay (evalWindFormula prepended at runtime)
+│       └── image-debug.wgsl Grayscale image region debug overlay
 │
 ├── remote/
 │   ├── index.html           Spectator page (served at /remote/?s=<uuid>)

@@ -11,6 +11,10 @@ import QRCode           from 'qrcode';
 import { io as ioConnect } from 'socket.io-client';
 import soloSimTemplate  from './shaders/compute.wgsl?raw';
 import soloRenderWGSL   from './shaders/render.wgsl?raw';
+import fadeWGSL         from './shaders/fade.wgsl?raw';
+import blitWGSL         from './shaders/blit.wgsl?raw';
+import windVisWGSL      from './shaders/wind-vis.wgsl?raw';
+import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const MAX_AGENTS = 1_200_000;
@@ -118,101 +122,6 @@ const PRESETS = [
     { label: 'turbulence',      dir: 'sin(x * 0.009 + sin(y * 0.006 + t)) * TWO_PI',                        wind: 'sin(x * 0.005 + cos(y * 0.006 + t * 0.3)) * TWO_PI' },
     { label: 'radial pulse',    dir: 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI',   wind: 'sin(x * 0.004 - y * 0.003 + t * 0.4) * TWO_PI' },
 ];
-
-// ── Inline micro-shaders ──────────────────────────────────────────────────────
-const FADE_WGSL = `
-struct FP { alpha: f32, _0: u32, _1: u32, _2: u32 }
-@group(0) @binding(0) var<uniform> p: FP;
-struct V { @builtin(position) pos: vec4<f32> }
-@vertex fn vs(@builtin(vertex_index) i: u32) -> V {
-    var pts = array<vec2<f32>,3>(vec2(-1.,3.),vec2(3.,-1.),vec2(-1.,-1.));
-    return V(vec4<f32>(pts[i], 0., 1.));
-}
-@fragment fn fs(v: V) -> @location(0) vec4<f32> { return vec4(0.,0.,0.,p.alpha); }
-`;
-
-const BLIT_WGSL = `
-struct BP { cutoff: f32, _0: u32, _1: u32, _2: u32 }
-@group(0) @binding(0) var<uniform> p: BP;
-@group(0) @binding(1) var s: sampler;
-@group(0) @binding(2) var t: texture_2d<f32>;
-struct V { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> }
-@vertex fn vs(@builtin(vertex_index) i: u32) -> V {
-    var pts = array<vec2<f32>,3>(vec2(-1.,3.),vec2(3.,-1.),vec2(-1.,-1.));
-    var uvs = array<vec2<f32>,3>(vec2(0.,-1.),vec2(2.,1.),vec2(0.,1.));
-    return V(vec4<f32>(pts[i],0.,1.), uvs[i]);
-}
-@fragment fn fs(v: V) -> @location(0) vec4<f32> {
-    let col  = textureSampleLevel(t, s, v.uv, 0.0);
-    let luma = dot(col.rgb, vec3<f32>(0.299, 0.587, 0.114));
-    if (luma < p.cutoff) { return vec4<f32>(0.0, 0.0, 0.0, 1.0); }
-    return col;
-}
-`;
-
-// Wind visualisation: red arrows drawn on the canvas at a ~100px grid.
-const WIND_VIS_WGSL = `
-struct WP { canvasW:f32, canvasH:f32, time:f32, gridStep:f32, arrowLen:f32, gridW:u32, _p0:u32, _p1:u32 }
-@group(0) @binding(0) var<uniform> p: WP;
-struct V { @builtin(position) pos: vec4<f32>, @location(0) bright: f32 }
-const PI:f32 = 3.14159265358979; const TWO_PI:f32 = 6.28318530717959;
-@vertex fn vs(@builtin(vertex_index) vi: u32) -> V {
-    let ai  = vi / 6u;
-    let seg = (vi % 6u) / 2u;
-    let isB = (vi % 2u) == 1u;
-    let gx  = ai % p.gridW;
-    let gy  = ai / p.gridW;
-    let cx  = p.canvasW * 0.5;  let cy = p.canvasH * 0.5;
-    let px  = (f32(gx) + 0.5) * p.gridStep;
-    let py  = (f32(gy) + 0.5) * p.gridStep;
-    let angle = evalWindFormula(px, py, p.time, f32(ai), cx, cy);
-    let dir   = vec2<f32>(cos(angle), sin(angle));
-    let perp  = vec2<f32>(-dir.y, dir.x);
-    let half  = p.arrowLen * 0.5;
-    let tip   = vec2<f32>(px, py) + dir * half;
-    let tail  = vec2<f32>(px, py) - dir * half;
-    let hlen  = p.arrowLen * 0.28;
-    let hwid  = p.arrowLen * 0.16;
-    var pos: vec2<f32>;
-    var bright: f32;
-    if (seg == 0u) {
-        pos = select(tail, tip, isB);  bright = select(0.15, 1.0, isB);
-    } else if (seg == 1u) {
-        pos = select(tip, tip - dir * hlen + perp * hwid, isB);  bright = select(1.0, 0.45, isB);
-    } else {
-        pos = select(tip, tip - dir * hlen - perp * hwid, isB);  bright = select(1.0, 0.45, isB);
-    }
-    let ndc = vec2<f32>(pos.x / p.canvasW * 2.0 - 1.0, -(pos.y / p.canvasH * 2.0 - 1.0));
-    return V(vec4<f32>(ndc, 0.0, 1.0), bright);
-}
-@fragment fn fs(v: V) -> @location(0) vec4<f32> { return vec4<f32>(v.bright, 0.0, 0.0, 1.0); }
-`;
-
-// Image debug: grayscale overlay of the image region with the vignette circle applied.
-// DP layout (32 bytes): canvasW, canvasH, x0, y0, x1, y1, _p0, _p1
-const IMAGE_DEBUG_WGSL = `
-struct DP { canvasW:f32, canvasH:f32, x0:f32, y0:f32, x1:f32, y1:f32, _p0:u32, _p1:u32 }
-@group(0) @binding(0) var<uniform> p: DP;
-@group(0) @binding(1) var s: sampler;
-@group(0) @binding(2) var t: texture_2d<f32>;
-struct V { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> }
-@vertex fn vs(@builtin(vertex_index) i: u32) -> V {
-    var lo = array<vec2<f32>,6>(
-        vec2(0.,0.), vec2(1.,0.), vec2(1.,1.),
-        vec2(0.,0.), vec2(1.,1.), vec2(0.,1.),
-    );
-    let lp  = lo[i];
-    let px  = p.x0 + lp.x * (p.x1 - p.x0);
-    let py  = p.y0 + lp.y * (p.y1 - p.y0);
-    let ndc = vec2<f32>(px / p.canvasW * 2.0 - 1.0, -(py / p.canvasH * 2.0 - 1.0));
-    return V(vec4<f32>(ndc, 0., 1.), lp);
-}
-@fragment fn fs(v: V) -> @location(0) vec4<f32> {
-    let c = textureSampleLevel(t, s, v.uv, 0.0);
-    let luma = dot(c.rgb, vec3<f32>(0.299, 0.587, 0.114));
-    return vec4<f32>(luma, luma, luma, c.a * 0.6);
-}
-`;
 
 // ── Canvas ────────────────────────────────────────────────────────────────────
 const canvas = document.createElement('canvas');
@@ -355,7 +264,7 @@ const imageSampler = device.createSampler({
 });
 
 // Fade: black quad, alpha blend
-const fadeMod = device.createShaderModule({ code: FADE_WGSL });
+const fadeMod = device.createShaderModule({ code: fadeWGSL });
 const fadePipe = device.createRenderPipeline({
     layout: 'auto',
     vertex:   { module: fadeMod, entryPoint: 'vs' },
@@ -407,7 +316,7 @@ const renderPipe = device.createRenderPipeline({
 let renderBG = null;
 
 // Blit: copy offscreen → canvas swap-chain
-const blitMod = device.createShaderModule({ code: BLIT_WGSL });
+const blitMod = device.createShaderModule({ code: blitWGSL });
 const blitPipe = device.createRenderPipeline({
     layout: 'auto',
     vertex:   { module: blitMod, entryPoint: 'vs' },
@@ -419,7 +328,7 @@ const blitPipe = device.createRenderPipeline({
 });
 
 // Image debug: centered 1/4-screen quad, 50% opacity grayscale
-const imageDebugMod = device.createShaderModule({ code: IMAGE_DEBUG_WGSL });
+const imageDebugMod = device.createShaderModule({ code: imageDebugWGSL });
 const imageDebugPipe = device.createRenderPipeline({
     layout: 'auto',
     vertex:   { module: imageDebugMod, entryPoint: 'vs' },
@@ -649,7 +558,7 @@ async function buildSimPipeline(dir, wind) {
     rebuildSimBG();
 
     const windVisMod = device.createShaderModule({
-        code: `fn evalWindFormula(x:f32,y:f32,t:f32,idx:f32,cx:f32,cy:f32)->f32{ return ${wind}; }\n` + WIND_VIS_WGSL,
+        code: `fn evalWindFormula(x:f32,y:f32,t:f32,idx:f32,cx:f32,cy:f32)->f32{ return ${wind}; }\n` + windVisWGSL,
     });
     windVisPipe = device.createRenderPipeline({
         layout: 'auto',
