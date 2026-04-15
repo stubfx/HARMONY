@@ -104,8 +104,21 @@ struct VsOut {
         let inRect = in.homeUV.x >= 0.0 && in.homeUV.x <= 1.0 &&
                      in.homeUV.y >= 0.0 && in.homeUV.y <= 1.0;
         if (inRect) {
-            let uv        = clamp(in.homeUV, vec2<f32>(0.0), vec2<f32>(1.0));
-            let imgSample = textureSampleLevel(imgTex, imgSmp, uv, 0.0);
+            let uv = clamp(in.homeUV, vec2<f32>(0.0), vec2<f32>(1.0));
+
+            // In QR mode use textureLoad (nearest-neighbour) to match the compute shader's
+            // imgAlphaAt exactly — bilinear bleeding across module boundaries causes a
+            // sampler mismatch where compute sees alpha=0 (free) but render sees alpha>0
+            // (white), producing phantom white pixels that never home.
+            var imgSample: vec4<f32>;
+            if (params.qrMode != 0u) {
+                let tdims = textureDimensions(imgTex);
+                let tx    = u32(uv.x * f32(tdims.x - 1u));
+                let ty    = u32(uv.y * f32(tdims.y - 1u));
+                imgSample = textureLoad(imgTex, vec2<u32>(tx, ty), 0);
+            } else {
+                imgSample = textureSampleLevel(imgTex, imgSmp, uv, 0.0);
+            }
 
             // Black cutoff: skip pixels whose luminance is below the threshold.
             let luma = dot(imgSample.rgb, vec3<f32>(0.299, 0.587, 0.114));

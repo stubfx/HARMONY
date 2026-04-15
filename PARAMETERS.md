@@ -87,7 +87,9 @@ When on (and `follow formula` is also on), a scheduler randomly picks a new form
 ### intro delay (s)
 **Range:** 0 – 30 | **Default:** 5.0
 
-At startup, agents spawn from screen centre pointing radially outward. For this many seconds, `follow formula` and wind are silently suppressed (without changing the GUI toggles), letting agents spread across the canvas. After the delay, the active direction and wind formulas engage. Setting this to 0 disables the intro.
+At startup, agents spawn at uniformly random positions across the canvas with fully random headings. For this many seconds, `follow formula` and wind are silently suppressed (without changing the GUI toggles), letting the random initial motion settle before the formulas engage. After the delay, the active direction and wind formulas kick in. Setting this to 0 disables the intro.
+
+The startup direction and wind formulas are also picked at random from the built-in library each time the page loads.
 
 ---
 
@@ -181,6 +183,8 @@ The threshold exists to prevent agents from homing to nearly-invisible edge pixe
 
 > Note: the `black cutoff` check runs before this — a pixel can pass the alpha threshold but still be skipped if its luminance is below the black cutoff.
 
+> **QR mode and the sampler mismatch:** the compute shader samples the trace texture with `textureLoad` (exact nearest-neighbour lookup). The render shader normally uses a bilinear sampler. On a 512 px QR stretched to a large canvas, this causes a disagreement at module boundaries: an agent whose home lands in a transparent gap between two white modules may get `alpha = 0` from the nearest-neighbour lookup (free in compute), but `alpha ≈ 0.3–0.5` from bilinear interpolation (renders white in the fragment shader). The result is phantom white dots that move freely and never home. In QR mode the render shader is switched to the same `textureLoad` path so both shaders agree on the exact pixel value. Adjusting `alphaThreshold` changes the width of this disagreement zone.
+
 ### black cutoff (`blackThreshold`)
 **Range:** 0 – 0.5 | **Default:** 0.05
 
@@ -253,6 +257,7 @@ This creates a calm inward-pull state — useful as a neutral resting state betw
 - Direction auto-cycle only fires when both `follow formula` and `auto-cycle formula` are on
 - Wind auto-cycle only fires when both `enabled` and `auto-cycle formula` are on
 - Both are fully suppressed while `idle` mode is active
+- Neither is suppressed during QR mode — the formula keeps rotating every 30 s while the QR is showing
 
 ---
 
@@ -358,22 +363,48 @@ This gives each spectator private, immediate feedback on what they are sending �
 
 ## QR Code / Session
 
-On startup the simulation connects to the server via Socket.IO and emits `'register-host'`. The server generates a UUID, assigns the socket to that room, and emits `'session-id'` back. The URL is immediately logged to the browser console (`[session] remote URL: ...`), then two QR codes are generated:
+On startup the simulation connects to the server via Socket.IO and emits `'register-host'`. The server generates a UUID, assigns the socket to that room, and emits `'session-id'` back. The URL is logged to the browser console (`[session] remote URL: ...`), then two QR codes are generated **asynchronously** — the simulation continues its intro unaffected while the bitmaps are prepared in the background.
 
 ### Small scannable QR (bottom-left UI panel)
 A 120×120 px standard black-on-white QR code rendered in the formula panel (visible when the GUI is shown). Links to `/remote/?s=<uuid>`. Clicking it opens the spectator page in a new tab. This is the physically scannable one.
 
 ### Large trace QR (canvas centre)
-A 512×512 QR code generated with **white modules on a transparent background** and loaded immediately as the trace image. The trace pipeline treats it like any other image:
-- White pixels (alpha = 1, luminance = 1) → pass `alphaThreshold` → agents home there
-- Transparent pixels (alpha = 0) → ignored → agents drift freely
 
-The particle field collectively writes the QR pattern. Agents whose home positions fall on QR modules converge; the rest roam freely around the shape.
+A 512×512 QR code generated with **white modules on a transparent background**:
+- `dark = #ffffffff` — QR modules are white (alpha = 1, luminance = 1)
+- `light = #00000000` — quiet zone and inter-module gaps are transparent (alpha = 0)
 
-The QR trace is stored as `imageBitmap` in the standard trace state:
-- **Loading a different image** replaces it
-- **Typing in the trace text field** layers text on top of it
-- **Clear image** removes it
+The bitmap is stored internally as `qrBitmap` but **not loaded into the trace layer** until the intro delay has elapsed. This prevents the QR from interfering with the startup spread. Once the intro ends, the bitmap is assigned to `imageBitmap`, `isQRBitmap` is set, and the trace canvas is rendered — at that point QR mode activates.
+
+### QR mode
+
+QR mode is a rendering state, not a physics state. It is active only while the QR is the current trace image (`isQRBitmap = true`). It does not reseed agents and does not change any movement logic — agents continue exactly where they are.
+
+**What changes in QR mode:**
+
+1. **Homing** works through the standard alpha pipeline — agents whose home falls on a white QR module (`alpha ≥ alphaThreshold`) converge there at `homing speed`. Agents assigned to transparent gaps are free.
+
+2. **Fade zone** — the render shader computes the signed distance from each free agent's *current position* to the QR bounding rectangle. Agents are faded to invisible over an 80 px falloff inward from the rect edge, clearing visual noise around the QR so it remains scannable.
+
+3. **No edge vignette** — the normal `vignetteEdge` smoothstep is bypassed in QR mode so the finder-pattern squares in the corners render at full brightness (they would otherwise be faded out at the image boundary and the QR would fail to decode).
+
+4. **Nearest-neighbour sampling** — the render shader switches from bilinear (`textureSampleLevel`) to exact nearest-neighbour (`textureLoad`) for the home-pixel lookup. This matches the compute shader's `imgAlphaAt` function exactly, eliminating a sampler mismatch that would otherwise produce phantom white dots (see the `alphaThreshold` note above).
+
+5. **Formula rotation continues** — the 30-second auto-cycle keeps firing during QR mode; a new random formula is also chosen when QR mode first activates. This keeps the swarm in motion rather than locking into a fixed attractor.
+
+### Stuck pixels in the QR area
+
+A visible side-effect: some particles appear to become stuck inside the transparent gaps of the QR pattern. These are **free agents trapped by the avoidance gradient**, not homing agents. The mechanism:
+
+1. A free agent drifts into a white QR module (posAlpha > 0). The 4-sample alpha gradient points toward lower alpha — toward the nearest transparent gap. The avoidance force pushes the agent into that gap.
+2. Once inside the gap, the agent is surrounded by white modules on multiple sides. The Case B edge avoidance (transparent position, gradient toward opacity) strips the inward velocity component in every direction the formula tries to steer.
+3. The combined formula, wind, and avoidance forces cancel nearly to zero. If `length(vel)` drops below `0.00001`, neither the minSpeed floor nor the maxSpeed clamp applies, and the agent sits still.
+
+This is intentional and left as-is — the trapped pixels contribute to the visual texture of the QR area.
+
+### QR restoration
+
+When all spectators leave or `idle restore QR (s)` seconds pass with no remote activity, `restoreQR()` is called. It re-assigns `qrBitmap` to `imageBitmap`, sets `isQRBitmap`, re-renders the trace canvas, and picks a new random formula. It is a no-op if the QR is already showing or was never generated.
 
 ### Signal routing
 Spectators open `/remote/?s=<uuid>`, connect via Socket.IO, and emit `user-event` messages. The server routes touch/text events based on `RELAY_MODE`:
