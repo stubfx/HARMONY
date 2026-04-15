@@ -231,21 +231,11 @@ function seedAgents() {
     const cellW  = canvas.width  / gridW;
     const cellH  = canvas.height / gridH;
 
-    // Agents are split evenly across the 4 corners.
-    // Each group's initial velocity points toward canvas centre so the streams converge.
-    const cx = canvas.width  * 0.5;
-    const cy = canvas.height * 0.5;
-    const CORNERS = [
-        [0,             0            ],   // top-left
-        [canvas.width,  0            ],   // top-right
-        [0,             canvas.height],   // bottom-left
-        [canvas.width,  canvas.height],   // bottom-right
-    ];
-
     for (let i = 0; i < count; i++) {
         const b  = i * 8;
-        const [sx, sy] = CORNERS[i % 4];
-        const a  = Math.atan2(cy - sy, cx - sx);     // angle toward centre
+        const sx = Math.random() * canvas.width;
+        const sy = Math.random() * canvas.height;
+        const a  = Math.random() * TAU;              // fully random direction
         const s  = 0.5 + Math.random() * 1.5;
         data[b]     = sx;                             // pos.x
         data[b + 1] = sy;                             // pos.y
@@ -980,7 +970,6 @@ windInput.value = startWind;
 // restFormula overrides everything; followFormula / windEnabled guard the rest.
 setInterval(() => {
     if (params.restFormula) return;
-    if (isQRBitmap) return;  // ring formula is fixed while QR is showing
 
     let newDir  = dirInput.value;
     let newWind = windInput.value;
