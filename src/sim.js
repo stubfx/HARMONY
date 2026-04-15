@@ -807,9 +807,7 @@ setTimeout(() => {
         // Reset activity clock so the remoteTimeout inactivity timer starts
         // from when someone actually arrives, not from sim boot.
         lastRemoteActivity = Date.now();
-        const angle = Math.random() * Math.PI * 2;
-        burstX = Math.cos(angle) * BURST_STRENGTH;
-        burstY = Math.sin(angle) * BURST_STRENGTH;
+        burstBrightness = BURST_BRIGHTNESS;
         if (isQRBitmap && simSpectatorCount >= params.maxSpectators) {
             clearMagnetImage();
         }
@@ -1075,12 +1073,11 @@ let smoothTemp        = 0.5;
 let smoothCoherence   = 0.5;
 
 // ── Join burst state ──────────────────────────────────────────────────────────
-// When a spectator joins, a brief directional gust fires into the particle field.
-const BURST_STRENGTH  = 2.0;
-const BURST_DECAY     = 0.88; // per frame — fully dissipated in ~0.5 s at 60 fps
-const BURST_THRESHOLD = 0.01;
-let burstX = 0;
-let burstY = 0;
+// When a spectator joins, a single brightness pulse fires across the field.
+const BURST_BRIGHTNESS = 0.4;  // peak brightness boost added to params.brightness
+const BURST_DECAY      = 0.88; // per frame — fully dissipated in ~0.5 s at 60 fps
+const BURST_THRESHOLD  = 0.001;
+let burstBrightness = 0;
 
 // ── Uniform writers ───────────────────────────────────────────────────────────
 function writeSoloUB(dt, time) {
@@ -1091,11 +1088,9 @@ function writeSoloUB(dt, time) {
     smoothTemp      = smoothTemp      * a + collectiveTemp      * (1 - a);
     smoothCoherence = smoothCoherence * a + collectiveCoherence * (1 - a);
 
-    // Decay join burst exponentially each frame
-    burstX *= BURST_DECAY;
-    burstY *= BURST_DECAY;
-    if (Math.abs(burstX) < BURST_THRESHOLD) burstX = 0;
-    if (Math.abs(burstY) < BURST_THRESHOLD) burstY = 0;
+    // Decay join brightness pulse exponentially each frame
+    burstBrightness *= BURST_DECAY;
+    if (burstBrightness < BURST_THRESHOLD) burstBrightness = 0;
 
     // Coherence multiplier for turnRate:
     //   0.0 (chaos / left)  → 0.08× (agents barely steer, each follows own momentum)
@@ -1129,8 +1124,8 @@ function writeSoloUB(dt, time) {
     f[17] = params.alphaThreshold;
     f[18] = params.blackThreshold;
     f[19] = params.vignetteEdge;
-    f[20] = smoothBiasX + burstX;  // collective tilt + join burst
-    f[21] = smoothBiasY + burstY;
+    f[20] = smoothBiasX;  // collective tilt bias
+    f[21] = smoothBiasY;
     f[22] = params.avoidForceStr;
     u[23] = isQRBitmap ? 1 : 0;  // qrMode — rect-based homing when QR is active
     device.queue.writeBuffer(soloUB, 0, ab);
@@ -1169,7 +1164,7 @@ function writeRenderUB() {
     f[13] = tinted[0];
     f[14] = tinted[1];
     f[15] = tinted[2];
-    f[16] = params.brightness;
+    f[16] = params.brightness + burstBrightness;
     f[17] = params.alphaThreshold;
     f[18] = params.blackThreshold;
     f[19] = params.vignetteEdge;
