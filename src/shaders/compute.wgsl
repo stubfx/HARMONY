@@ -27,7 +27,7 @@
 //   [80] windBiasX      f32   (collective tilt X — added to formula wind)
 //   [84] windBiasY      f32   (collective tilt Y — added to formula wind)
 //   [88] avoidForceStr  f32   (multiplier for all image-trace avoidance forces)
-//   [92] _p2            f32
+//   [92] qrMode         u32   (1 = QR active: home captured by rect, not alpha)
 
 struct SoloParams {
     agentCount:     u32,
@@ -53,7 +53,7 @@ struct SoloParams {
     windBiasX:      f32,
     windBiasY:      f32,
     avoidForceStr:  f32,
-    _p2:            f32,
+    qrMode:         u32,
 }
 
 struct Agent {
@@ -167,7 +167,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             }
         }
 
-        homeInImg = homeAlpha   >= params.alphaThreshold;
+        homeInImg = homeAlpha >= params.alphaThreshold;
         posAlpha  = rawPosAlpha;
     }
 

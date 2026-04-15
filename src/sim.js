@@ -199,7 +199,7 @@ const soloUB = device.createBuffer({
     size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
-    size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 84, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const fadeUB = device.createBuffer({
     size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -263,6 +263,7 @@ function seedAgents() {
     device.queue.writeBuffer(agentBuf, 0, data);
 }
 seedAgents();
+
 
 // ── Static pipelines & resources ──────────────────────────────────────────────
 const screenSmp = device.createSampler({
@@ -594,7 +595,7 @@ function restoreQR() {
     imageBitmap = qrBitmap;
     isQRBitmap  = true;
     renderTraceCanvas();
-    applyQRFormulas();
+    enterQRMode();
 }
 
 // Pick a fresh random formula pair — called whenever user content replaces the QR.
@@ -608,13 +609,17 @@ function applyRandomFormulas() {
     if (wi) wi.value = wind;
 }
 
-// Apply the fixed ring formula — called whenever the QR becomes the active trace.
-function applyQRFormulas() {
-    applyFormulas(QR_DIR, QR_WIND);
+// Enters QR_MODE: picks a fresh random formula but leaves agents exactly where they are.
+// Agents naturally drift into the QR image area and are captured by homing.
+// No reseeding — the simulation continues uninterrupted.
+function enterQRMode() {
+    const dir  = rndPick(DIR_FORMULAS);
+    const wind = rndPick(WIND_FORMULAS);
+    applyFormulas(dir, wind);
     const di = document.querySelector('#dir-input');
     const wi = document.querySelector('#wind-input');
-    if (di) di.value = QR_DIR;
-    if (wi) wi.value = QR_WIND;
+    if (di) di.value = dir;
+    if (wi) wi.value = wind;
 }
 
 // ── Formula compute + wind-vis pipelines (rebuilt on each formula change) ──────
@@ -681,23 +686,22 @@ async function applyFormulas(dir, wind, { reseed = false } = {}) {
 }
 
 const rndPick   = arr => arr[Math.floor(Math.random() * arr.length)];
-const startDir  = 'atan2(y-cy,x-cx) + length(vec2(x-cx,y-cy)) * 0.003 + t * 0.5';
-const startWind = 'atan2(y - cy, x - cx) + sin(length(vec2(x-cx,y-cy)) * 0.008) * PI + t';
+const startDir  = rndPick(DIR_FORMULAS);
+const startWind = rndPick(WIND_FORMULAS);
 
-// ── QR idle formulas ──────────────────────────────────────────────────────────
-// Applied whenever the session QR is the active trace image.
-// Dir:  pure CCW orbital tangent  →  particles circle the centre
-// Wind: radial spring via smoothstep  →  confines particles to a ring
-//       The band [0.5 … 0.7] × min(cx,cy) sets the ring width; centre sits at 0.6×.
-//       Adjust the two multipliers to resize the ring relative to the canvas.
-const QR_DIR  = 'atan2(y-cy, x-cx) + 1.5708';
-const QR_WIND = 'atan2(y-cy, x-cx) + 3.14159 * smoothstep(min(cx,cy)*0.5, min(cx,cy)*0.7, length(vec2(x-cx,y-cy)))';
+// ── QR_MODE entry ─────────────────────────────────────────────────────────────
+// Called whenever the session QR becomes the active trace image.
+// - Picks a random dir+wind formula pair from the standard pools
+// - Scatters all agents to random positions across the canvas
+// - Runs a 5-second intro during which formula steering is suppressed
+// Corner teleportation (any agent outside the QR rectangle → snapped to a corner)
+// is handled in the compute shader via the qrMode uniform flag.
 
 let introActive      = true;
 let qrPendingRender  = false;  // QR bitmap ready but waiting for intro to finish
-let isQRBitmap       = false;  // current imageBitmap is the session QR (not user-loaded)
-let qrBitmap         = null;   // permanent reference to the session QR bitmap
-let simSpectatorCount   = 0;   // local spectator count — synced from server events
+let isQRBitmap         = false; // current imageBitmap is the session QR (not user-loaded)
+let qrBitmap           = null;  // permanent reference to the session QR bitmap
+let simSpectatorCount   = 0;    // local spectator count — synced from server events
 let lastRemoteActivity  = Date.now(); // timestamp of last remote-event (touch or text)
 
 await applyFormulas(startDir, startWind, { reseed: true });
@@ -707,7 +711,7 @@ setTimeout(() => {
     if (qrPendingRender) {
         qrPendingRender = false;
         renderTraceCanvas();
-        applyQRFormulas();
+        enterQRMode();
     }
 }, params.introDelay * 1000);
 
@@ -757,7 +761,7 @@ setTimeout(() => {
         // readable QR pattern (dark on white, standard orientation).
         const qrOffscreen = document.createElement('canvas');
         await QRCode.toCanvas(qrOffscreen, userUrl, {
-            width: 512, margin: 2,
+            width: 512, margin: 0,
             color: { dark: '#00000000', light: '#ffffffff' },
         });
         // Treat as a loaded image so Clear image removes it and user images replace it.
@@ -772,7 +776,7 @@ setTimeout(() => {
             qrPendingRender = true;
         } else {
             renderTraceCanvas();
-            applyQRFormulas();
+            enterQRMode();
         }
     });
 
@@ -1138,12 +1142,12 @@ function writeSoloUB(dt, time) {
     f[20] = smoothBiasX + burstX;  // collective tilt + join burst
     f[21] = smoothBiasY + burstY;
     f[22] = params.avoidForceStr;
-    // f[23] = 0 padding
+    u[23] = isQRBitmap ? 1 : 0;  // qrMode — rect-based homing when QR is active
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
 function writeRenderUB() {
-    const ab   = new ArrayBuffer(80);
+    const ab   = new ArrayBuffer(84);
     const u    = new Uint32Array(ab);
     const f    = new Float32Array(ab);
     const rgb  = hexToF(params.color);
@@ -1179,6 +1183,7 @@ function writeRenderUB() {
     f[17] = params.alphaThreshold;
     f[18] = params.blackThreshold;
     f[19] = params.vignetteEdge;
+    u[20] = isQRBitmap ? 1 : 0;  // qrMode — darken free agents near QR rect
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 
