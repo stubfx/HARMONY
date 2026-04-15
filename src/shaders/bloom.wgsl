@@ -27,7 +27,7 @@ struct BloomParams {
 @group(0) @binding(0) var<uniform> params:    BloomParams;
 @group(0) @binding(1) var          inputSmp:  sampler;
 @group(0) @binding(2) var          inputTex:  texture_2d<f32>;
-@group(0) @binding(3) var          outputTex: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(3) var          outputTex: texture_storage_2d<rgba8unorm, write>;
 
 // ── 9-tap Gaussian weights (normalised, radius = 4) ───────────────────────────
 // w[0]=center, w[1..4]=decreasing
