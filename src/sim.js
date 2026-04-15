@@ -697,9 +697,11 @@ let lastRemoteActivity  = Date.now(); // timestamp of last remote-event (touch o
 await applyFormulas(startDir, startWind, { reseed: true });
 setTimeout(() => {
     introActive = false;
-    // If the QR session-id arrived during the intro, render it now.
+    // If the QR arrived during the intro, show it now (first time imageBitmap/isQRBitmap are set).
     if (qrPendingRender) {
         qrPendingRender = false;
+        imageBitmap = qrBitmap;
+        isQRBitmap  = true;
         renderTraceCanvas();
         enterQRMode();
     }
@@ -759,12 +761,13 @@ setTimeout(() => {
         // in the QR pattern during the radial spread-out phase.
         // Stored permanently in qrBitmap so it can be restored at any time.
         // Flagged as QR so auto-clear never wipes it.
-        qrBitmap    = await createImageBitmap(qrOffscreen);
-        imageBitmap = qrBitmap;
-        isQRBitmap  = true;
+        // Store bitmap; sim state is untouched until the QR is actually shown.
+        qrBitmap = await createImageBitmap(qrOffscreen);
         if (introActive) {
-            qrPendingRender = true;
+            qrPendingRender = true;   // intro callback will set imageBitmap/isQRBitmap
         } else {
+            imageBitmap = qrBitmap;
+            isQRBitmap  = true;
             renderTraceCanvas();
             enterQRMode();
         }
