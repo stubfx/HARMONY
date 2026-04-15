@@ -746,15 +746,13 @@ setTimeout(() => {
             uiQr.addEventListener('click', () => window.open(userUrl, '_blank'));
         }
 
-        // ── Large QR as trace image — inverted: white background, transparent modules
-        // light=#ffffffff fills the quiet zone and inter-module background with white (alpha=1)
-        // so homing agents are attracted to the whole field. The QR modules are transparent
-        // (dark=#00000000, alpha=0) — no agents there — leaving dark gaps that form the
-        // readable QR pattern (dark on white, standard orientation).
+        // ── Large QR as trace image — modules white (opaque), background transparent.
+        // dark=#ffffffff → QR modules are white (alpha=1) — homing agents fill them.
+        // light=#00000000 → quiet zone and gaps are transparent — no agents there.
         const qrOffscreen = document.createElement('canvas');
         await QRCode.toCanvas(qrOffscreen, userUrl, {
             width: 512, margin: 0,
-            color: { dark: '#00000000', light: '#ffffffff' },
+            color: { dark: '#ffffffff', light: '#00000000' },
         });
         // Treat as a loaded image so Clear image removes it and user images replace it.
         // Delay trace render until the intro ends — prevents particles being trapped
