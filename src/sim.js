@@ -910,7 +910,11 @@ await applyFormulas(startDir, startWind, { reseed: true });
 // Only numeric/boolean keys present in the payload are applied;
 // if formulas are included they re-trigger pipeline compilation.
 function applySimParams(data) {
-    const { dir, wind, ...rest } = data;
+    const { dir, wind, restart, clearTrace, showQR, ...rest } = data;
+    if (restart)              seedAgents();
+    if (clearTrace)           { clearMagnetImage(); clearTraceText(); }
+    if (showQR === true)      restoreQR();
+    if (showQR === false)     clearMagnetImage();
     Object.entries(rest).forEach(([k, v]) => {
         if (k in params) params[k] = v;
     });

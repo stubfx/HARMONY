@@ -15,6 +15,7 @@ export default defineConfig({
             input: {
                 main:   path.resolve(__dirname, 'index.html'),
                 remote: path.resolve(__dirname, 'remote/index.html'),
+                admin:  path.resolve(__dirname, 'admin/index.html'),
             },
         },
     },
@@ -27,6 +28,7 @@ export default defineConfig({
             // Socket.IO connects directly to Express (no proxy) — see sim.js / remote/main.js.
             '/rndImage':       'http://localhost:3000',
             '/n8n-sim-update': 'http://localhost:3000',
+            '/admin-auth':     'http://localhost:3000',
         },
     },
 });

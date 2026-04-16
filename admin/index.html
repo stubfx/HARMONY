@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+    <title>Sim Admin</title>
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+    <!-- Password gate -->
+    <div id="auth-gate">
+        <div class="auth-inner">
+            <p class="auth-title">admin</p>
+            <form id="auth-form">
+                <input id="password-input" type="password" placeholder="password" autocomplete="current-password">
+                <button type="submit">enter</button>
+                <p id="auth-error">wrong password</p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Admin UI -->
+    <div id="admin-ui" class="hidden">
+        <header id="topbar">
+            <span class="topbar-title">sim admin</span>
+            <div class="topbar-right">
+                <span id="session-label"></span>
+                <div id="conn-dot"></div>
+            </div>
+        </header>
+        <main id="controls"></main>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+</body>
+</html>

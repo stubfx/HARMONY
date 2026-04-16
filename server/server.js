@@ -40,8 +40,10 @@ const VITE_PORT   = process.env.VITE_PORT ?? 5173;
 //   'n8n'    — event is POSTed to N8N_WEBHOOK_URL; n8n processes and calls /n8n-sim-update
 const RELAY_MODE    = process.env.RELAY_MODE    ?? 'direct';
 const N8N_HOOK_URL  = process.env.N8N_WEBHOOK_URL ?? 'http://localhost:5678/webhook/user-event';
+const ADMIN_PASS    = process.env.ADMIN_PASSWORD ?? '';
 
 console.log(`[server] relay mode: ${RELAY_MODE}`);
+if (!ADMIN_PASS) console.warn('[server] ADMIN_PASSWORD not set — /admin will be inaccessible');
 
 const ORIGINS = [
     'https://stubfx.io',
@@ -56,6 +58,18 @@ app.use(cors({ origin: ORIGINS, methods: ['GET', 'POST'], allowedHeaders: ['Cont
 
 // Serve the Vite production build (sim + remote page)
 app.use(express.static(path.join(__dirname, '../dist')));
+
+// ── Admin tokens ─────────────────────────────────────────────────────────────
+// Short-lived UUIDs issued by /admin-auth. Stored in memory; expire after 24 h.
+// Each authenticated admin socket has its token stored in the closure so it
+// doesn't need to re-send it with every event.
+const adminTokens = new Map(); // token → expiry (ms timestamp)
+
+// Prune expired tokens hourly
+setInterval(() => {
+    const now = Date.now();
+    for (const [t, exp] of adminTokens) if (now > exp) adminTokens.delete(t);
+}, 60 * 60 * 1000);
 
 // ── Room state ────────────────────────────────────────────────────────────────
 // Tracks per-room spectator data for collective-state aggregation.
@@ -114,6 +128,18 @@ setInterval(() => {
     }
 }, 300);
 
+// ── Admin auth endpoint ───────────────────────────────────────────────────────
+app.post('/admin-auth', (req, res) => {
+    const { password } = req.body ?? {};
+    if (!ADMIN_PASS || password !== ADMIN_PASS) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const token = randomUUID();
+    adminTokens.set(token, Date.now() + 24 * 60 * 60 * 1000); // 24 h
+    console.log('[admin] token issued');
+    res.json({ token });
+});
+
 // ── Socket.IO ─────────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
     let assignedRoom = null;
@@ -129,6 +155,41 @@ io.on('connection', (socket) => {
         const room = getOrCreateRoom(sessionId);
         room.hostSocketId = socket.id;
         console.log('[socket] host registered   room:', sessionId);
+    });
+
+    // ── Admin controller ──────────────────────────────────────────────────────
+    // Admin sockets join a room without counting as spectators and can push
+    // sim-params directly to the host.
+    let adminAuthorized = false;
+    let adminToken      = null;
+
+    socket.on('register-admin', ({ room: targetRoom, token }) => {
+        const expiry = adminTokens.get(token);
+        if (!expiry || Date.now() > expiry) {
+            socket.emit('admin-auth-error', { error: 'Invalid or expired token' });
+            console.warn('[admin] rejected — bad token');
+            return;
+        }
+        adminAuthorized = true;
+        adminToken      = token;
+        assignedRoom    = targetRoom;
+        socket.join(targetRoom);
+        socket.emit('admin-registered', { room: targetRoom });
+        console.log('[socket] admin registered  room:', targetRoom);
+    });
+
+    socket.on('admin-sim-params', (params) => {
+        if (!adminAuthorized) return;
+        // Re-validate token hasn't expired
+        const expiry = adminTokens.get(adminToken);
+        if (!expiry || Date.now() > expiry) {
+            adminAuthorized = false;
+            socket.emit('admin-auth-error', { error: 'Token expired' });
+            return;
+        }
+        const roomData = rooms.get(assignedRoom);
+        if (!roomData?.hostSocketId) return;
+        io.to(roomData.hostSocketId).emit('sim-params', params);
     });
 
     // ── Remote device (spectator) ─────────────────────────────────────────────
@@ -235,6 +296,7 @@ function sendPage(distFile, req, res) {
     });
 }
 app.get('/remote/{*path}', (req, res) => sendPage('remote/index.html', req, res));
+app.get('/admin/{*path}',  (req, res) => sendPage('admin/index.html',  req, res));
 app.get('/{*path}',        (req, res) => sendPage('index.html',        req, res));
 
 server.listen(port, () => console.log(`[server] :${port}`));
