@@ -30,6 +30,7 @@
 //   [92] qrMode         u32   (1 = QR active: home captured by rect, not alpha)
 //   [96] hasAvoidMap    u32   (1 = avoidance map active)
 //   [100] avoidMapScale f32   (map covers this fraction of canvas, centered)
+//   [104] bounceEdges   u32   (1 = reflect at canvas edges, 0 = wrap)
 
 struct SoloParams {
     agentCount:     u32,
@@ -58,6 +59,7 @@ struct SoloParams {
     qrMode:         u32,
     hasAvoidMap:    u32,
     avoidMapScale:  f32,
+    bounceEdges:    u32,
 }
 
 struct Agent {
@@ -335,8 +337,17 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     if (spd < params.minSpeed && spd > 0.00001) { vel = vel * (params.minSpeed / spd); }
 
     var np = pos + vel * params.dt * 60.0;
-    np.x = ((np.x % params.canvasW) + params.canvasW) % params.canvasW;
-    np.y = ((np.y % params.canvasH) + params.canvasH) % params.canvasH;
+    if (params.bounceEdges != 0u) {
+        if (np.x < 0.0)              { np.x =  -np.x;                      vel.x =  abs(vel.x); }
+        else if (np.x > params.canvasW) { np.x = 2.0 * params.canvasW - np.x; vel.x = -abs(vel.x); }
+        if (np.y < 0.0)              { np.y =  -np.y;                      vel.y =  abs(vel.y); }
+        else if (np.y > params.canvasH) { np.y = 2.0 * params.canvasH - np.y; vel.y = -abs(vel.y); }
+        np.x = clamp(np.x, 0.0, params.canvasW);
+        np.y = clamp(np.y, 0.0, params.canvasH);
+    } else {
+        np.x = ((np.x % params.canvasW) + params.canvasW) % params.canvasW;
+        np.y = ((np.y % params.canvasH) + params.canvasH) % params.canvasH;
+    }
 
     agents[i].pos = np;
     agents[i].vel = vel;

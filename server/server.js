@@ -1,18 +1,17 @@
 // ─── Backend Server ───────────────────────────────────────────────────────────
 // Responsibilities (intentionally minimal):
 //   1. Serve production build (dist/)
-//   2. Socket.IO — two socket roles:
+//   2. Socket.IO — three socket roles:
 //        host  : the simulation display; gets a UUID session room on 'register-host'
 //        remote: spectator devices; join with a room ID and emit user events
-//   3. Event routing — controlled by RELAY_MODE env var:
-//        direct (default) : server forwards 'user-event' straight to the sim room
-//        n8n              : server POSTs to N8N_WEBHOOK_URL; n8n calls /n8n-sim-update
-//   4. /n8n-sim-update — n8n POSTs processed params here; server emits via Socket.IO
-//   5. Collective state — aggregates all spectators' tilt + temperature per room
+//        admin : authenticated controller; sends sim-params to the host
+//   3. Event routing — server always forwards 'user-event' straight to the sim as
+//        'remote-event'. The sim calls n8n directly if VITE_N8N_WEBHOOK_URL is set.
+//   4. Collective state — aggregates all spectators' tilt + temperature per room
 //        and emits 'collective-state' to the host simulation every 300 ms
 //
 // Signal path:
-//   remote → socket → server → [n8n →] socket → simulation
+//   remote → socket → server → socket → simulation [→ n8n → simulation]
 //   server (ticker) → 'collective-state' → simulation
 
 import express           from 'express';
@@ -35,14 +34,8 @@ const port        = process.env.PORT ?? 3000;
 const isDev       = process.env.NODE_ENV === 'development';
 const VITE_PORT   = process.env.VITE_PORT ?? 5173;
 
-// RELAY_MODE controls how user events from remote devices are forwarded.
-//   'direct' — event goes straight to the sim socket in the same room (default)
-//   'n8n'    — event is POSTed to N8N_WEBHOOK_URL; n8n processes and calls /n8n-sim-update
-const RELAY_MODE    = process.env.RELAY_MODE    ?? 'direct';
-const N8N_HOOK_URL  = process.env.N8N_WEBHOOK_URL ?? 'http://localhost:5678/webhook/user-event';
-const ADMIN_PASS    = process.env.ADMIN_PASSWORD ?? '';
+const ADMIN_PASS = process.env.ADMIN_PASSWORD ?? '';
 
-console.log(`[server] relay mode: ${RELAY_MODE}`);
 if (!ADMIN_PASS) console.warn('[server] ADMIN_PASSWORD not set — /admin will be inaccessible');
 
 const ORIGINS = [
@@ -213,7 +206,8 @@ io.on('connection', (socket) => {
     // ── User event from remote ────────────────────────────────────────────────
     // Always update aggregate room state first.
     // Tilt events are aggregated only (not forwarded individually — the ticker handles that).
-    // All other events are routed per RELAY_MODE.
+    // All other events are forwarded straight to the simulation as 'remote-event'.
+    // If VITE_N8N_WEBHOOK_URL is set the sim will call n8n directly on receipt.
     socket.on('user-event', ({ type, data }) => {
         const room        = assignedRoom;
         const spectatorId = socket.id;
@@ -224,17 +218,7 @@ io.on('connection', (socket) => {
         // Tilt is consumed server-side for aggregation; no individual forwarding needed.
         if (type === 'tilt') return;
 
-        if (RELAY_MODE === 'n8n') {
-            // Relay through n8n: POST the event; n8n calls /n8n-sim-update when done.
-            fetch(N8N_HOOK_URL, {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ type, room, spectatorId, data, timestamp: Date.now() }),
-            }).catch(err => console.error('[n8n relay]', err.message));
-        } else {
-            // Direct: forward straight to the simulation in that room.
-            io.to(room).emit('remote-event', { type, spectatorId, data, timestamp: Date.now() });
-        }
+        io.to(room).emit('remote-event', { type, spectatorId, data, timestamp: Date.now() });
     });
 
     socket.on('disconnect', () => {
@@ -260,17 +244,6 @@ io.on('connection', (socket) => {
             if (!room.hostSocketId && !room.users.size) rooms.delete(assignedRoom);
         }
     });
-});
-
-// ── n8n callback ──────────────────────────────────────────────────────────────
-// n8n ends its workflow with an HTTP Request node POSTing here.
-// Expected body: { "room": "<session-id>", "simulation": { ...params } }
-app.post('/n8n-sim-update', (req, res) => {
-    const { room, ...result } = req.body;
-    const sockets = io.sockets.adapter.rooms.get(room);
-    if (!sockets?.size) { console.warn('[socket] no client for room', room); return res.sendStatus(404); }
-    io.to(room).emit('sim-params', result);
-    res.sendStatus(200);
 });
 
 // ── Utility endpoints ─────────────────────────────────────────────────────────

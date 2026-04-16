@@ -26,9 +26,8 @@ export default defineConfig({
         // In prod these are same-origin — no proxy needed.
         proxy: {
             // Socket.IO connects directly to Express (no proxy) — see sim.js / remote/main.js.
-            '/rndImage':       'http://localhost:3000',
-            '/n8n-sim-update': 'http://localhost:3000',
-            '/admin-auth':     'http://localhost:3000',
+            '/rndImage':   'http://localhost:3000',
+            '/admin-auth': 'http://localhost:3000',
         },
     },
 });

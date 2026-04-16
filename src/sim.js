@@ -64,13 +64,13 @@ const params = {
     // Motion behaviour
     followFormula: true,  // false = free drift (wind + magnet only)
     autoDir:       true,  // randomly cycle dir formula every 30 s
-    restFormula:   false, // lock both formulas to IDLE_DIR / IDLE_WIND
+    bounceEdges:   false, // reflect agents at canvas edges instead of wrapping
 };
 
 const DEFAULT_DIR  = 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI';
 const DEFAULT_WIND = 'sin(x * 0.004 - y * 0.003 + t * 0.4) * TWO_PI';
 
-// Idle formulas — applied when params.restFormula is on
+// Idle formulas (kept for reference; not applied automatically)
 const IDLE_DIR  = 'atan2(cy - y, cx - x)';
 const IDLE_WIND = 'atan2(y - cy, x - cx) + sin(length(vec2(x-cx,y-cy)) * 0.008) * PI + t';
 
@@ -196,7 +196,7 @@ const agentBuf = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 const soloUB = device.createBuffer({
-    size: 104, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
     size: 84, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -542,15 +542,16 @@ function scheduleAutoClear() {
         autoClearTimer = null;
         const input = document.querySelector('#trace-text-input');
         if (input) input.value = '';
-        if (!isQRBitmap) imageBitmap = null;
+        if (simState.qrStatus !== 'SHOW') imageBitmap = null;
         renderTraceCanvas();
         console.log('[trace] auto-cleared after', params.clearDelay, 's');
     }, params.clearDelay * 1000);
 }
 
 async function loadMagnetImage(file) {
-    const wasQR = isQRBitmap;
-    isQRBitmap  = false;
+    const wasQR        = simState.qrStatus === 'SHOW';
+    simState.qrStatus  = 'HIDE';
+    updateStateDisplay();
     imageBitmap = await createImageBitmap(file, { colorSpaceConversion: 'none' });
     renderTraceCanvas();
     scheduleAutoClear();
@@ -558,8 +559,9 @@ async function loadMagnetImage(file) {
 }
 
 function clearMagnetImage() {
-    const wasQR = isQRBitmap;
-    isQRBitmap = false;
+    const wasQR       = simState.qrStatus === 'SHOW';
+    simState.qrStatus = 'HIDE';
+    updateStateDisplay();
     imageBitmap = null;
     clearTimeout(autoClearTimer);
     autoClearTimer = null;
@@ -579,13 +581,14 @@ function clearTraceText() {
 // Called when all spectators leave or the inactivity timeout fires.
 // No-op if QR is already showing or hasn't been generated yet.
 function restoreQR() {
-    if (isQRBitmap || !qrBitmap) return;
+    if (simState.qrStatus === 'SHOW' || !qrBitmap) return;
     const input = document.querySelector('#trace-text-input');
     if (input) input.value = '';
     clearTimeout(autoClearTimer);
     autoClearTimer = null;
-    imageBitmap = qrBitmap;
-    isQRBitmap  = true;
+    imageBitmap       = qrBitmap;
+    simState.qrStatus = 'SHOW';
+    updateStateDisplay();
     renderTraceCanvas();
     pickRandomFormulas();
 }
@@ -672,10 +675,59 @@ const rndPick   = arr => arr[Math.floor(Math.random() * arr.length)];
 const startDir  = rndPick(DIR_FORMULAS);
 const startWind = rndPick(WIND_FORMULAS);
 
-let isQRBitmap = false; // current imageBitmap is the session QR (not user-loaded)
+// ── Simulation state machine ──────────────────────────────────────────────────
+// qrStatus: 'SHOW' — QR code is the active trace image (vignetteEdge=0, qrMode on)
+//           'HIDE' — trace layer is user content or empty
+// status:   'NORMAL' — formula steering + wind active, auto-cycling runs
+//           'IDLE'   — no formula, no wind; particles drift freely on momentum
+const simState = { qrStatus: 'HIDE', status: 'NORMAL' };
+
+let stateCtrl   = null;  // lil-gui controller — set after gui is created
+let qrStateCtrl = null;
+
+function updateStateDisplay() {
+    stateCtrl?.updateDisplay();
+    qrStateCtrl?.updateDisplay();
+}
+
 let qrBitmap           = null;  // permanent reference to the session QR bitmap
-let simSpectatorCount   = 0;    // local spectator count — synced from server events
-let lastRemoteActivity  = Date.now(); // timestamp of last remote-event (touch or text)
+let sessionRoom        = null;  // UUID assigned by server — needed for n8n payload
+let simSpectatorCount  = 0;     // local spectator count — synced from server events
+let lastRemoteActivity = Date.now(); // timestamp of last remote-event (touch or text)
+
+// ── n8n direct integration ────────────────────────────────────────────────────
+// If VITE_N8N_WEBHOOK_URL is set the sim calls n8n directly on each remote-event
+// and applies the JSON response via applySimParams(). An in-flight guard prevents
+// queuing — if a call is already running the new event is skipped. A 5 s timeout
+// clears the guard if n8n is slow or unreachable.
+const N8N_URL        = import.meta.env.VITE_N8N_WEBHOOK_URL ?? '';
+const N8N_TIMEOUT_MS = 5_000;
+let   n8nInFlight    = false;
+
+async function callN8n(event) {
+    if (!N8N_URL || n8nInFlight) return;
+    n8nInFlight = true;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), N8N_TIMEOUT_MS);
+    try {
+        const res = await fetch(N8N_URL, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ ...event, room: sessionRoom }),
+            signal:  controller.signal,
+        });
+        clearTimeout(timer);
+        if (res.ok) {
+            const data = await res.json();
+            if (data && typeof data === 'object') applySimParams(data);
+        }
+    } catch (err) {
+        clearTimeout(timer);
+        if (err.name !== 'AbortError') console.warn('[n8n]', err.message);
+    } finally {
+        n8nInFlight = false;
+    }
+}
 
 await applyFormulas(startDir, startWind, { reseed: true });
 
@@ -683,7 +735,7 @@ await applyFormulas(startDir, startWind, { reseed: true });
 // The server assigns a session UUID on socket connect and emits it back as
 // 'session-id'. The sim renders a QR code pointing to /remote/?s=<id> as both
 // a small scannable overlay and a large trace image in the canvas centre.
-// n8n posts processed params to the server, which forwards them via 'sim-params'.
+// If VITE_N8N_WEBHOOK_URL is set, the sim calls n8n directly on each remote-event.
 {
     // In dev, Vite runs on a different port from Express, so connect directly to Express.
     // In production, use VITE_SOCKET_URL (the Caddy-fronted public origin) so Socket.IO
@@ -698,6 +750,7 @@ await applyFormulas(startDir, startWind, { reseed: true });
     socket.emit('register-host');
 
     socket.on('session-id', async (sessionId) => {
+        sessionRoom = sessionId;
         // Extract only the origin from VITE_USER_URL (strips any stale path like /m_src/).
         // Falls back to the page's own origin in dev when no env var is set.
         const envUrl  = import.meta.env.VITE_USER_URL;
@@ -731,9 +784,10 @@ await applyFormulas(startDir, startWind, { reseed: true });
         // in the QR pattern during the radial spread-out phase.
         // Stored permanently in qrBitmap so it can be restored at any time.
         // Flagged as QR so auto-clear never wipes it.
-        qrBitmap    = await createImageBitmap(qrOffscreen);
-        imageBitmap = qrBitmap;
-        isQRBitmap  = true;
+        qrBitmap          = await createImageBitmap(qrOffscreen);
+        imageBitmap       = qrBitmap;
+        simState.qrStatus = 'SHOW';
+        updateStateDisplay();
         renderTraceCanvas();
         pickRandomFormulas();
     });
@@ -775,7 +829,7 @@ await applyFormulas(startDir, startWind, { reseed: true });
         // from when someone actually arrives, not from sim boot.
         lastRemoteActivity = Date.now();
         burstBrightness = BURST_BRIGHTNESS;
-        if (isQRBitmap && simSpectatorCount >= params.maxSpectators) {
+        if (simState.qrStatus === 'SHOW' && simSpectatorCount >= params.maxSpectators) {
             clearMagnetImage();
         }
     });
@@ -786,21 +840,24 @@ await applyFormulas(startDir, startWind, { reseed: true });
         if (simSpectatorCount === 0) restoreQR();
     });
 
-    // Direct remote events (RELAY_MODE=direct on server).
-    // In n8n mode these never arrive here; sim-params carries the processed result instead.
+    // Remote events forwarded from spectator devices.
+    // Text events: if n8n is configured they are routed there — n8n processes the
+    // text and returns what to apply (traceText, formulas, status, etc.) via
+    // applySimParams(). Without n8n the text is applied directly to the trace layer.
+    // All other events (touch, etc.) are always applied locally; callN8n also fires
+    // for every event so n8n can react to touches too if the workflow handles them.
     socket.on('remote-event', (event) => {
-        // Every remote-event (touch or text) resets the inactivity timer.
         lastRemoteActivity = Date.now();
-        if (event.type === 'text' && event.data?.text) {
-            // Text content replaces the QR if it is currently showing.
-            const wasQR = isQRBitmap;
-            if (isQRBitmap) { imageBitmap = null; isQRBitmap = false; }
+        if (event.type === 'text' && event.data?.text && !N8N_URL) {
+            const wasQR = simState.qrStatus === 'SHOW';
+            if (wasQR) { imageBitmap = null; simState.qrStatus = 'HIDE'; updateStateDisplay(); }
             const input = document.querySelector('#trace-text-input');
             if (input) input.value = event.data.text;
             renderTraceCanvas();
             scheduleAutoClear();
             if (wasQR) pickRandomFormulas();
         }
+        callN8n(event);
     });
 
     socket.on('connect_error', () => console.warn('[socket] connection failed, will retry…'));
@@ -810,15 +867,19 @@ await applyFormulas(startDir, startWind, { reseed: true });
 // Only numeric/boolean keys present in the payload are applied;
 // if formulas are included they re-trigger pipeline compilation.
 function applySimParams(data) {
-    const { dir, wind, restart, clearTrace, showQR, traceText, clearText, ...rest } = data;
+    const { dir, wind, restart, clearTrace, showQR, traceText, clearText, status, ...rest } = data;
+    if (status === 'NORMAL' || status === 'IDLE') {
+        simState.status = status;
+        updateStateDisplay();
+    }
     if (restart)              seedAgents();
     if (clearTrace)           { clearMagnetImage(); clearTraceText(); }
     if (showQR === true)      restoreQR();
     if (showQR === false)     clearMagnetImage();
     if (clearText)            clearTraceText();
     if (traceText !== undefined) {
-        const wasQR = isQRBitmap;
-        if (isQRBitmap) { imageBitmap = null; isQRBitmap = false; }
+        const wasQR = simState.qrStatus === 'SHOW';
+        if (wasQR) { imageBitmap = null; simState.qrStatus = 'HIDE'; updateStateDisplay(); }
         const input = document.querySelector('#trace-text-input');
         if (input) input.value = traceText;
         renderTraceCanvas();
@@ -869,6 +930,7 @@ fMotion.add(params, 'weightSpread',   0, 1, 0.01).name('weight spread')
     .onChange(() => seedAgents());
 fMotion.add(params, 'followFormula').name('follow formula');
 fMotion.add(params, 'autoDir').name('auto-cycle formula');
+fMotion.add(params, 'bounceEdges').name('bounce edges');
 
 const fWind = gui.addFolder('Wind');
 const windStrCtrl = fWind.add(params, 'windStr', 0, 2, 0.01).name('strength');
@@ -925,12 +987,10 @@ const dbgCoherence = fDebug.add(swarmDebug, 'coherence', 0, 1).name('avg coheren
 fDebug.close();
 
 gui.add({ restart: () => seedAgents() }, 'restart').name('↺  Restart');
-gui.add(params, 'restFormula').name('⌂  idle').onChange(v => {
-    if (!v) return;
-    dirInput.value  = IDLE_DIR;
-    windInput.value = IDLE_WIND;
-    applyFormulas(IDLE_DIR, IDLE_WIND);
-});
+
+// ── State machine display ─────────────────────────────────────────────────────
+stateCtrl   = gui.add(simState, 'status',   ['NORMAL', 'IDLE']).name('status');
+qrStateCtrl = gui.add(simState, 'qrStatus').name('qr').disable();
 
 fMotion.open();
 fWind.open();
@@ -952,9 +1012,9 @@ windInput.value = startWind;
 
 // ── Auto formula cycle — random pick every 30 s ───────────────────────────────
 // Each flag is checked independently; both can fire in the same tick.
-// restFormula overrides everything; followFormula / windEnabled guard the rest.
+// STATUS=IDLE suspends cycling; followFormula / windEnabled guard the rest.
 setInterval(() => {
-    if (params.restFormula) return;
+    if (simState.status !== 'NORMAL') return;
 
     let newDir  = dirInput.value;
     let newWind = windInput.value;
@@ -978,7 +1038,7 @@ setInterval(() => {
 //   1. Inactivity — no remote events for params.remoteTimeout seconds (0 = disabled)
 //   2. Empty room — simSpectatorCount dropped to 0 but spectator-left was missed
 setInterval(() => {
-    if (isQRBitmap || !qrBitmap) return;
+    if (simState.qrStatus === 'SHOW' || !qrBitmap) return;
     const now = Date.now();
     if (params.remoteTimeout > 0 && now - lastRemoteActivity > params.remoteTimeout * 1000) {
         restoreQR(); return;
@@ -1114,7 +1174,7 @@ function writeSoloUB(dt, time) {
         ? 0.08 + smoothCoherence * 2 * 0.92   // 0.08 → 1.0
         : 1.0  + (smoothCoherence - 0.5) * 4; // 1.0  → 3.0
 
-    const ab = new ArrayBuffer(104);
+    const ab = new ArrayBuffer(112);
     const u  = new Uint32Array(ab);
     const f  = new Float32Array(ab);
     const { x0, y0, x1, y1 } = getImageRegion();
@@ -1124,7 +1184,8 @@ function writeSoloUB(dt, time) {
     f[3] = params.stepLen;
     f[4] = dt;
     f[5] = time;
-    f[6] = params.windEnabled ? params.windStr : 0.0;
+    const isIdle = simState.status === 'IDLE';
+    f[6] = isIdle ? 0.0 : (params.windEnabled ? params.windStr : 0.0);
     f[7] = params.turnRate * coherenceMult;  // coherence scales how sharply agents follow the formula
     f[8] = params.maxSpeed;
     f[9] = params.minSpeed;
@@ -1134,16 +1195,18 @@ function writeSoloUB(dt, time) {
     f[13] = y0;
     f[14] = x1;
     f[15] = y1;
-    u[16] = params.followFormula ? 1 : 0;
+    u[16] = (!isIdle && params.followFormula) ? 1 : 0;
     f[17] = params.alphaThreshold;
     f[18] = params.blackThreshold;
-    f[19] = isQRBitmap ? 0 : params.vignetteEdge;
+    const isQR = simState.qrStatus === 'SHOW';
+    f[19] = isQR ? 0 : params.vignetteEdge;
     f[20] = smoothBiasX;  // collective tilt bias
     f[21] = smoothBiasY;
     f[22] = params.avoidForceStr;
-    u[23] = isQRBitmap ? 1 : 0;  // qrMode — rect-based homing when QR is active
+    u[23] = isQR ? 1 : 0;  // qrMode — rect-based homing when QR is active
     u[24] = hasAvoidMap ? 1 : 0;
     f[25] = params.avoidMapScale;
+    u[26] = params.bounceEdges ? 1 : 0;
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
@@ -1183,8 +1246,8 @@ function writeRenderUB() {
     f[16] = params.brightness + burstBrightness;
     f[17] = params.alphaThreshold;
     f[18] = params.blackThreshold;
-    f[19] = isQRBitmap ? 0 : params.vignetteEdge;
-    u[20] = isQRBitmap ? 1 : 0;  // qrMode — darken free agents near QR rect
+    f[19] = simState.qrStatus === 'SHOW' ? 0 : params.vignetteEdge;
+    u[20] = simState.qrStatus === 'SHOW' ? 1 : 0;  // qrMode — darken free agents near QR rect
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 
