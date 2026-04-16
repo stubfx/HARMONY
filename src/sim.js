@@ -470,20 +470,40 @@ function renderTraceCanvas() {
     }
 
     // ── 1. Determine composite canvas dimensions ──────────────────────────────
-    // Image size is used as base; text-only auto-sizes from a reference height.
+    // Image size is used as base; text-only wraps to screen width (capped at GPU limit).
+    const MAX_DIM = device.limits.maxTextureDimension2D;
     let cw, ch;
+    let wrappedLines = null; // only populated for the text-only word-wrap path
+
     if (imageBitmap) {
-        cw = imageBitmap.width;
-        ch = imageBitmap.height;
+        cw = Math.min(imageBitmap.width,  MAX_DIM);
+        ch = Math.min(imageBitmap.height, MAX_DIM);
     } else {
-        // Text only: derive canvas width from measured text width at reference height
-        const refH    = 256;
-        const refSize = Math.round(refH * 0.72);
-        const tmp     = document.createElement('canvas').getContext('2d');
-        tmp.font      = `bold ${refSize}px sans-serif`;
-        const tw      = tmp.measureText(text).width;
-        cw = Math.max(Math.ceil(tw * 1.14), 64);
-        ch = refH;
+        // Text only: fix width to screen width, wrap words, auto-height from line count.
+        // Deriving width from measureText would exceed maxTextureDimension2D for long strings.
+        cw = Math.min(canvas.width, MAX_DIM);
+        const fontSize = Math.round(cw * 0.06);
+        const tmp      = document.createElement('canvas').getContext('2d');
+        tmp.font       = `bold ${fontSize}px sans-serif`;
+        const availW   = cw * 0.92;
+
+        const words = text.split(' ');
+        const lines = [];
+        let line = '';
+        for (const word of words) {
+            const test = line ? line + ' ' + word : word;
+            if (tmp.measureText(test).width > availW && line) {
+                lines.push(line);
+                line = word;
+            } else {
+                line = test;
+            }
+        }
+        if (line) lines.push(line);
+
+        const lineH = Math.round(fontSize * 1.4);
+        ch = Math.min(Math.max(lines.length * lineH + lineH, 64), MAX_DIM);
+        wrappedLines = { lines, fontSize, lineH };
     }
 
     // ── 2. Paint the composite canvas ─────────────────────────────────────────
@@ -496,20 +516,30 @@ function renderTraceCanvas() {
     // Layer 1: image (if loaded)
     if (imageBitmap) ctx.drawImage(imageBitmap, 0, 0, cw, ch);
 
-    // Layer 2: text on top, white fill, auto-fitted to canvas width
+    // Layer 2: text on top, white fill
     if (hasText) {
-        let fontSize = ch * 0.72;
-        ctx.font = `bold ${Math.round(fontSize)}px sans-serif`;
-        const measured = ctx.measureText(text).width;
-        const maxW     = cw * 0.92;
-        if (measured > maxW) {
-            fontSize = fontSize * (maxW / measured);
-            ctx.font = `bold ${Math.round(fontSize)}px sans-serif`;
-        }
         ctx.fillStyle    = 'white';
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(text, cw / 2, ch / 2);
+
+        if (wrappedLines) {
+            // Multi-line text-only mode
+            const { lines, fontSize, lineH } = wrappedLines;
+            ctx.font = `bold ${fontSize}px sans-serif`;
+            const startY = (ch - lines.length * lineH) / 2 + lineH / 2;
+            lines.forEach((ln, i) => ctx.fillText(ln, cw / 2, startY + i * lineH));
+        } else {
+            // Single line over an image — scale font down if wider than canvas
+            let fontSize = ch * 0.72;
+            ctx.font = `bold ${Math.round(fontSize)}px sans-serif`;
+            const measured = ctx.measureText(text).width;
+            const maxW     = cw * 0.92;
+            if (measured > maxW) {
+                fontSize = fontSize * (maxW / measured);
+                ctx.font = `bold ${Math.round(fontSize)}px sans-serif`;
+            }
+            ctx.fillText(text, cw / 2, ch / 2);
+        }
     }
 
     // ── 3. Upload composite to GPU ────────────────────────────────────────────
