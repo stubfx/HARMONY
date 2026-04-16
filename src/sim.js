@@ -59,6 +59,7 @@ const params = {
     // Session / QR restore
     remoteTimeout:  60,   // seconds of silence from all remotes before QR is restored (0 = disabled)
     maxSpectators:  1,    // sim QR hides when connected count reaches this threshold
+    n8nTestMode:    false, // true = /webhook-test/sim-event, false = /webhook/sim-event
     // Weight
     weightSpread: 0.8,    // 0 = all equal; 1 = weights span [0.05 … 1.95]
     // Motion behaviour
@@ -696,21 +697,22 @@ let simSpectatorCount  = 0;     // local spectator count — synced from server 
 let lastRemoteActivity = Date.now(); // timestamp of last remote-event (touch or text)
 
 // ── n8n direct integration ────────────────────────────────────────────────────
-// If VITE_N8N_WEBHOOK_URL is set the sim calls n8n directly on each remote-event
-// and applies the JSON response via applySimParams(). An in-flight guard prevents
-// queuing — if a call is already running the new event is skipped. A 5 s timeout
-// clears the guard if n8n is slow or unreachable.
-const N8N_URL        = import.meta.env.VITE_N8N_WEBHOOK_URL ?? '';
+// VITE_N8N_BASE_URL is the bare n8n origin (e.g. http://localhost:5678).
+// The sim appends /webhook/sim-event or /webhook-test/sim-event based on
+// params.n8nTestMode. An in-flight guard prevents queuing — if a call is already
+// running the new event is skipped. A 5 s timeout clears the guard if n8n is slow.
+const N8N_BASE       = (import.meta.env.VITE_N8N_BASE_URL ?? '').replace(/\/$/, '');
 const N8N_TIMEOUT_MS = 5_000;
 let   n8nInFlight    = false;
 
 async function callN8n(event) {
-    if (!N8N_URL || n8nInFlight) return;
+    if (!N8N_BASE || n8nInFlight) return;
     n8nInFlight = true;
+    const path = params.n8nTestMode ? '/webhook-test/sim-event' : '/webhook/sim-event';
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), N8N_TIMEOUT_MS);
     try {
-        const res = await fetch(N8N_URL, {
+        const res = await fetch(N8N_BASE + path, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ ...event, room: sessionRoom }),
@@ -735,7 +737,7 @@ await applyFormulas(startDir, startWind, { reseed: true });
 // The server assigns a session UUID on socket connect and emits it back as
 // 'session-id'. The sim renders a QR code pointing to /remote/?s=<id> as both
 // a small scannable overlay and a large trace image in the canvas centre.
-// If VITE_N8N_WEBHOOK_URL is set, the sim calls n8n directly on each remote-event.
+// If VITE_N8N_BASE_URL is set, the sim calls n8n directly on each remote-event.
 {
     // In dev, Vite runs on a different port from Express, so connect directly to Express.
     // In production, use VITE_SOCKET_URL (the Caddy-fronted public origin) so Socket.IO
@@ -848,7 +850,7 @@ await applyFormulas(startDir, startWind, { reseed: true });
     // for every event so n8n can react to touches too if the workflow handles them.
     socket.on('remote-event', (event) => {
         lastRemoteActivity = Date.now();
-        if (event.type === 'text' && event.data?.text && !N8N_URL) {
+        if (event.type === 'text' && event.data?.text && !N8N_BASE) {
             const wasQR = simState.qrStatus === 'SHOW';
             if (wasQR) { imageBitmap = null; simState.qrStatus = 'HIDE'; updateStateDisplay(); }
             const input = document.querySelector('#trace-text-input');
@@ -975,6 +977,7 @@ fAvoid.add({ clear: clearAvoidMap }, 'clear').name('Clear map');
 const fSession = gui.addFolder('Session');
 fSession.add(params, 'remoteTimeout',  0, 180,  5).name('idle restore QR (s)');
 fSession.add(params, 'maxSpectators',  1,  50,  1).name('QR hides at N users');
+fSession.add(params, 'n8nTestMode').name('n8n test mode');
 
 const fDebug = gui.addFolder('Debug');
 // No .listen() — controllers are refreshed manually inside the collective-state
