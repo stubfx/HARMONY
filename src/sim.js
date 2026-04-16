@@ -52,7 +52,8 @@ const params = {
     contamMouse:   true,  // treat mouse cursor as a contamination point
     contamRadius:  150,   // radius of each contamination circle, in canvas pixels
     // Avoidance
-    avoidForceStr: 1.0,   // multiplier on image-trace avoidance forces
+    avoidForceStr:   1.0, // multiplier on image-trace avoidance forces
+    avoidMapScale:   1.0, // avoidance map coverage as fraction of canvas (1.0 = full)
     // Auto-clear
     clearDelay:    20,    // seconds before auto-clearing user trace content (0 = disabled)
     // Session / QR restore
@@ -195,7 +196,7 @@ const agentBuf = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 const soloUB = device.createBuffer({
-    size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 104, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
     size: 84, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -273,6 +274,11 @@ device.queue.writeTexture(
 const placeholderTexView = placeholderTex.createView();
 
 const imageSampler = screenSmp;  // same settings — reuse
+
+// ── Avoidance map state ───────────────────────────────────────────────────────
+let avoidMapTex     = null;
+let avoidMapTexView = null;
+let hasAvoidMap     = false;
 
 // Fade: black quad, alpha blend
 const fadeMod = device.createShaderModule({ code: fadeWGSL });
@@ -605,7 +611,8 @@ let windVisBG   = null;
 
 function rebuildSimBG() {
     if (!simPipe) return;
-    const texView = (hasImage && imageTexView) ? imageTexView : placeholderTexView;
+    const texView      = (hasImage    && imageTexView)    ? imageTexView    : placeholderTexView;
+    const avoidMapView = (hasAvoidMap && avoidMapTexView) ? avoidMapTexView : placeholderTexView;
     simBG = device.createBindGroup({
         layout: simPipe.getBindGroupLayout(0),
         entries: [
@@ -613,6 +620,7 @@ function rebuildSimBG() {
             { binding: 1, resource: { buffer: agentBuf } },
             { binding: 2, resource: texView },
             { binding: 3, resource: { buffer: contamUB } },
+            { binding: 4, resource: avoidMapView },
         ],
     });
 }
@@ -897,6 +905,11 @@ fMagnet.add({ load: () => document.querySelector('#image-input').click() }, 'loa
 fMagnet.add({ clear: clearMagnetImage }, 'clear').name('Clear image');
 fMagnet.add({ clear: clearTraceText },   'clear').name('Clear text');
 
+const fAvoid = gui.addFolder('Avoidance map');
+fAvoid.add(params, 'avoidMapScale', 0.05, 1.0, 0.01).name('scale');
+fAvoid.add({ load: () => document.querySelector('#avoid-map-input').click() }, 'load').name('Load map…');
+fAvoid.add({ clear: clearAvoidMap }, 'clear').name('Clear map');
+
 const fSession = gui.addFolder('Session');
 fSession.add(params, 'remoteTimeout',  0, 180,  5).name('idle restore QR (s)');
 fSession.add(params, 'maxSpectators',  1,  50,  1).name('QR hides at N users');
@@ -998,6 +1011,34 @@ document.querySelector('#image-input').addEventListener('change', e => {
     e.target.value = '';
 });
 
+// ── Avoidance map upload ──────────────────────────────────────────────────────
+async function loadAvoidMap(file) {
+    const bmp = await createImageBitmap(file, { colorSpaceConversion: 'none' });
+    if (avoidMapTex) avoidMapTex.destroy();
+    avoidMapTex = device.createTexture({
+        size:   [bmp.width, bmp.height],
+        format: 'rgba8unorm',
+        usage:  GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    device.queue.copyExternalImageToTexture({ source: bmp }, { texture: avoidMapTex }, [bmp.width, bmp.height]);
+    avoidMapTexView = avoidMapTex.createView();
+    hasAvoidMap     = true;
+    rebuildSimBG();
+}
+
+function clearAvoidMap() {
+    if (avoidMapTex) { avoidMapTex.destroy(); avoidMapTex = null; }
+    avoidMapTexView = null;
+    hasAvoidMap     = false;
+    rebuildSimBG();
+}
+
+document.querySelector('#avoid-map-input').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) loadAvoidMap(file);
+    e.target.value = '';
+});
+
 // ── Trace text input ──────────────────────────────────────────────────────────
 // Debounced: re-composites and uploads the trace texture 300 ms after the user
 // stops typing. The text is drawn as white glyphs on top of any loaded image.
@@ -1073,7 +1114,7 @@ function writeSoloUB(dt, time) {
         ? 0.08 + smoothCoherence * 2 * 0.92   // 0.08 → 1.0
         : 1.0  + (smoothCoherence - 0.5) * 4; // 1.0  → 3.0
 
-    const ab = new ArrayBuffer(96);
+    const ab = new ArrayBuffer(104);
     const u  = new Uint32Array(ab);
     const f  = new Float32Array(ab);
     const { x0, y0, x1, y1 } = getImageRegion();
@@ -1101,6 +1142,8 @@ function writeSoloUB(dt, time) {
     f[21] = smoothBiasY;
     f[22] = params.avoidForceStr;
     u[23] = isQRBitmap ? 1 : 0;  // qrMode — rect-based homing when QR is active
+    u[24] = hasAvoidMap ? 1 : 0;
+    f[25] = params.avoidMapScale;
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
