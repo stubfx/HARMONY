@@ -38,7 +38,7 @@ const params = {
     trailDecay:     0.04,
     bgBlackCutoff:  0.05, // luminance below which trail pixels are clamped to 0 at display time
     pointSize:      2.0,
-    color:       '#000000',
+    color:       '#1a0099',
     speedColor:  '#ff4400',   // color approached at max speed
     brightness:  0.06,        // per-particle alpha; prevents additive saturation to white
     // Magnet
