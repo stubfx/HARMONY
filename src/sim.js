@@ -15,8 +15,6 @@ import fadeWGSL         from './shaders/fade.wgsl?raw';
 import blitWGSL         from './shaders/blit.wgsl?raw';
 import windVisWGSL      from './shaders/wind-vis.wgsl?raw';
 import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
-import glareWGSL        from './shaders/glare.wgsl?raw';
-import bloomWGSL        from './shaders/bloom.wgsl?raw';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const MAX_AGENTS = 1_200_000;
@@ -66,11 +64,6 @@ const params = {
     followFormula: true,  // false = free drift (wind + magnet only)
     autoDir:       true,  // randomly cycle dir formula every 30 s
     restFormula:   false, // lock both formulas to IDLE_DIR / IDLE_WIND
-    // Bloom
-    glareIntensity:  0.8,  // composite intensity (0 = off)
-    bloomThreshold:  0.1,  // luminance threshold for bright-pass extraction
-    bloomRadius:     4,    // blur kernel half-width (4 → 9-tap Gaussian)
-    glareColor:      '#ffffff',
 };
 
 const DEFAULT_DIR  = 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI';
@@ -363,106 +356,6 @@ const imageDebugPipe = device.createRenderPipeline({
     primitive: { topology: 'triangle-list' },
 });
 
-// Bloom composite: samples the blurred bloom texture and blends it additively over the canvas
-const glareMod  = device.createShaderModule({ code: glareWGSL });
-const glarePipe = device.createRenderPipeline({
-    layout: 'auto',
-    vertex:   { module: glareMod, entryPoint: 'vs' },
-    fragment: {
-        module: glareMod, entryPoint: 'fs',
-        targets: [{
-            format: canvasFormat,
-            blend: {
-                // Additive: glare only adds light, never darkens what's below.
-                color: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' },
-                alpha: { srcFactor: 'one',       dstFactor: 'one', operation: 'add' },
-            },
-        }],
-    },
-    primitive: { topology: 'triangle-list' },
-});
-const glareUB = device.createBuffer({
-    size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-});
-// glareBG depends on the bloom texture — created in rebuildBloomTextures()
-let glareBG = null;
-
-// ── Bloom compute pipelines ───────────────────────────────────────────────────
-const bloomMod      = device.createShaderModule({ code: bloomWGSL });
-const bloomDownPipe = device.createComputePipeline({
-    layout: 'auto', compute: { module: bloomMod, entryPoint: 'downsample' },
-});
-const bloomBlurPipe = device.createComputePipeline({
-    layout: 'auto', compute: { module: bloomMod, entryPoint: 'blur' },
-});
-// Three separate UBs — one per dispatch — so params don't overwrite each other
-// before the GPU executes them (all writeBuffers are batched before submit).
-const bloomDownUB  = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-const bloomBlurHUB = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-const bloomBlurVUB = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-let bloomATex = null, bloomAView = null;
-let bloomBTex = null, bloomBView = null;
-let bloomDownBG = null, bloomBlurHBG = null, bloomBlurVBG = null;
-
-// ── Bloom textures (half-res, rebuilt on resize) ───────────────────────────────
-// bloomA: downsample output / blur V input-output (final blurred bloom)
-// bloomB: blur H output / blur V input (intermediate ping-pong buffer)
-function rebuildBloomTextures() {
-    if (bloomATex) bloomATex.destroy();
-    if (bloomBTex) bloomBTex.destroy();
-
-    const bw = Math.max(1, Math.ceil(canvas.width  / 2));
-    const bh = Math.max(1, Math.ceil(canvas.height / 2));
-    const bloomUsage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING;
-
-    bloomATex  = device.createTexture({ size: [bw, bh], format: 'rgba8unorm', usage: bloomUsage });
-    bloomAView = bloomATex.createView();
-    bloomBTex  = device.createTexture({ size: [bw, bh], format: 'rgba8unorm', usage: bloomUsage });
-    bloomBView = bloomBTex.createView();
-
-    // Downsample: reads offscreen (full-res) → writes bloomA (half-res)
-    bloomDownBG = device.createBindGroup({
-        layout: bloomDownPipe.getBindGroupLayout(0),
-        entries: [
-            { binding: 0, resource: { buffer: bloomDownUB } },
-            { binding: 1, resource: screenSmp },
-            { binding: 2, resource: offscreenView },
-            { binding: 3, resource: bloomAView },
-        ],
-    });
-
-    // Blur H: reads bloomA → writes bloomB
-    bloomBlurHBG = device.createBindGroup({
-        layout: bloomBlurPipe.getBindGroupLayout(0),
-        entries: [
-            { binding: 0, resource: { buffer: bloomBlurHUB } },
-            { binding: 1, resource: screenSmp },
-            { binding: 2, resource: bloomAView },
-            { binding: 3, resource: bloomBView },
-        ],
-    });
-
-    // Blur V: reads bloomB → writes bloomA (final bloom result)
-    bloomBlurVBG = device.createBindGroup({
-        layout: bloomBlurPipe.getBindGroupLayout(0),
-        entries: [
-            { binding: 0, resource: { buffer: bloomBlurVUB } },
-            { binding: 1, resource: screenSmp },
-            { binding: 2, resource: bloomBView },
-            { binding: 3, resource: bloomAView },
-        ],
-    });
-
-    // Glare composite: reads bloomA and overlays it additively on the canvas
-    glareBG = device.createBindGroup({
-        layout: glarePipe.getBindGroupLayout(0),
-        entries: [
-            { binding: 0, resource: { buffer: glareUB } },
-            { binding: 1, resource: screenSmp },
-            { binding: 2, resource: bloomAView },
-        ],
-    });
-}
 
 // ── Offscreen texture (rebuilt on resize) ─────────────────────────────────────
 let offscreenTex  = null;
@@ -494,7 +387,6 @@ function rebuildOffscreen() {
     });
     rp.end();
     device.queue.submit([enc.finish()]);
-    rebuildBloomTextures();
 }
 rebuildOffscreen();
 
@@ -910,11 +802,21 @@ await applyFormulas(startDir, startWind, { reseed: true });
 // Only numeric/boolean keys present in the payload are applied;
 // if formulas are included they re-trigger pipeline compilation.
 function applySimParams(data) {
-    const { dir, wind, restart, clearTrace, showQR, ...rest } = data;
+    const { dir, wind, restart, clearTrace, showQR, traceText, clearText, ...rest } = data;
     if (restart)              seedAgents();
     if (clearTrace)           { clearMagnetImage(); clearTraceText(); }
     if (showQR === true)      restoreQR();
     if (showQR === false)     clearMagnetImage();
+    if (clearText)            clearTraceText();
+    if (traceText !== undefined) {
+        const wasQR = isQRBitmap;
+        if (isQRBitmap) { imageBitmap = null; isQRBitmap = false; }
+        const input = document.querySelector('#trace-text-input');
+        if (input) input.value = traceText;
+        renderTraceCanvas();
+        scheduleAutoClear();
+        if (wasQR) pickRandomFormulas();
+    }
     Object.entries(rest).forEach(([k, v]) => {
         if (k in params) params[k] = v;
     });
@@ -979,11 +881,6 @@ fVis.addColor(params, 'color').name('base color');
 fVis.addColor(params, 'speedColor').name('fast color');
 fVis.add(params, 'brightness', 0.01, 0.5, 0.005).name('brightness');
 
-const fGlare = gui.addFolder('Bloom / Glare');
-fGlare.add(params, 'glareIntensity',  0,    2,   0.01).name('intensity');
-fGlare.add(params, 'bloomThreshold',  0,    1,   0.01).name('threshold');
-fGlare.add(params, 'bloomRadius',     1,    4,   1   ).name('radius (taps)');
-fGlare.addColor(params, 'glareColor').name('color');
 
 const fMagnet = gui.addFolder('Trace');
 fMagnet.add(params, 'magnetStr',      0, 20,  0.1 ).name('homing speed');
@@ -1248,67 +1145,6 @@ function writeRenderUB() {
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 
-function writeGlareUB() {
-    // ── Reactivity ────────────────────────────────────────────────────────────
-    // 1. Temperature tint: cold-white (cool) → base color (neutral) → warm-white (warm)
-    const base = hexToF(params.glareColor);
-    const COLD = [0.85, 0.90, 1.00];
-    const WARM = [1.00, 0.92, 0.80];
-    const [r, g, b] = smoothTemp < 0.5
-        ? lerpColor(COLD, base, smoothTemp * 2)
-        : lerpColor(base, WARM, (smoothTemp - 0.5) * 2);
-
-    // 2. Spectator count: scale 1.0× (empty) → 1.5× (full room)
-    const spectatorScale = 1.0 + 0.5 * Math.min(simSpectatorCount / Math.max(params.maxSpectators, 1), 1.0);
-
-    // 3. Join pulse: piggyback on burstBrightness (already decayed each frame)
-    const effectiveIntensity = params.glareIntensity * spectatorScale
-                             + burstBrightness * 0.5;
-
-    // BloomCompositeParams: colorR, colorG, colorB, intensity (16 bytes)
-    const ab = new ArrayBuffer(16);
-    const f  = new Float32Array(ab);
-    f[0] = r;
-    f[1] = g;
-    f[2] = b;
-    f[3] = effectiveIntensity;
-    device.queue.writeBuffer(glareUB, 0, ab);
-}
-
-function writeBloomUBs() {
-    const cw = canvas.width, ch = canvas.height;
-    const bw = Math.max(1, Math.ceil(cw / 2));
-    const bh = Math.max(1, Math.ceil(ch / 2));
-    const r  = Math.min(params.bloomRadius, 4);
-
-    // Downsample: full-res input → half-res bloomA
-    const abDown = new ArrayBuffer(32);
-    const fdDown = new Float32Array(abDown);
-    const udDown = new Uint32Array(abDown);
-    udDown[0] = cw; udDown[1] = ch; udDown[2] = bw; udDown[3] = bh;
-    fdDown[4] = params.bloomThreshold; fdDown[5] = params.glareIntensity;
-    udDown[6] = 1;  // horizontal (unused in downsample)
-    udDown[7] = r;
-    device.queue.writeBuffer(bloomDownUB, 0, abDown);
-
-    // Blur H: bloomA → bloomB (horizontal)
-    const abH = new ArrayBuffer(32);
-    const fdH = new Float32Array(abH);
-    const udH = new Uint32Array(abH);
-    udH[0] = bw; udH[1] = bh; udH[2] = bw; udH[3] = bh;
-    fdH[4] = params.bloomThreshold; fdH[5] = params.glareIntensity;
-    udH[6] = 1; udH[7] = r;
-    device.queue.writeBuffer(bloomBlurHUB, 0, abH);
-
-    // Blur V: bloomB → bloomA (vertical)
-    const abV = new ArrayBuffer(32);
-    const fdV = new Float32Array(abV);
-    const udV = new Uint32Array(abV);
-    udV[0] = bw; udV[1] = bh; udV[2] = bw; udV[3] = bh;
-    fdV[4] = params.bloomThreshold; fdV[5] = params.glareIntensity;
-    udV[6] = 0; udV[7] = r;
-    device.queue.writeBuffer(bloomBlurVUB, 0, abV);
-}
 
 function writeFadeUB() {
     const ab = new ArrayBuffer(16);
@@ -1390,8 +1226,6 @@ function frame(ts) {
 
     writeSoloUB(dt, now);
     writeRenderUB();
-    writeGlareUB();
-    if (params.glareIntensity > 0 && glareBG && !isQRBitmap) writeBloomUBs();
     writeFadeUB();
     writeBlitUB();
     writeContamUB();
@@ -1423,33 +1257,6 @@ function frame(ts) {
     }
     rp.end();
 
-    // Bloom: downsample → blur H → blur V (result in bloomA), skipped during QR.
-    // Three separate compute passes ensure texture cache coherency between stages —
-    // WebGPU does not guarantee cross-dispatch visibility within a single pass.
-    if (params.glareIntensity > 0 && glareBG && !isQRBitmap) {
-        const bw = Math.max(1, Math.ceil(canvas.width  / 2));
-        const bh = Math.max(1, Math.ceil(canvas.height / 2));
-        const wx = Math.ceil(bw / 8), wy = Math.ceil(bh / 8);
-
-        const cpDown = enc.beginComputePass();
-        cpDown.setPipeline(bloomDownPipe);
-        cpDown.setBindGroup(0, bloomDownBG);
-        cpDown.dispatchWorkgroups(wx, wy);
-        cpDown.end();
-
-        const cpH = enc.beginComputePass();
-        cpH.setPipeline(bloomBlurPipe);
-        cpH.setBindGroup(0, bloomBlurHBG);
-        cpH.dispatchWorkgroups(wx, wy);
-        cpH.end();
-
-        const cpV = enc.beginComputePass();
-        cpV.setPipeline(bloomBlurPipe);
-        cpV.setBindGroup(0, bloomBlurVBG);
-        cpV.dispatchWorkgroups(wx, wy);
-        cpV.end();
-    }
-
     const visStep  = Math.round(100 * window.devicePixelRatio);
     const visGridW = Math.ceil(canvas.width  / visStep) + 1;
     const visGridH = Math.ceil(canvas.height / visStep) + 1;
@@ -1475,11 +1282,6 @@ function frame(ts) {
         bp.setPipeline(imageDebugPipe);
         bp.setBindGroup(0, imageDebugBG);
         bp.draw(6);   // 2-triangle quad covering the image region
-    }
-    if (params.glareIntensity > 0 && glareBG && !isQRBitmap) {
-        bp.setPipeline(glarePipe);
-        bp.setBindGroup(0, glareBG);
-        bp.draw(6);
     }
     bp.end();
 

@@ -125,7 +125,9 @@ function buildUI() {
     const resetBtn = document.createElement('button');
     resetBtn.className   = 'btn-big btn-reset';
     resetBtn.textContent = '↺  restart agents';
-    resetBtn.addEventListener('click', () => send({ restart: true }));
+    resetBtn.addEventListener('click', () => {
+        if (window.confirm('Restart all agents?')) send({ restart: true });
+    });
     controlsEl.appendChild(resetBtn);
 
     // ── QR toggle ─────────────────────────────────────────────────────────────
@@ -136,7 +138,10 @@ function buildUI() {
     }
     updateQRBtn();
     qrBtn.addEventListener('click', () => {
-        qrVisible = !qrVisible;
+        const next = !qrVisible;
+        const msg  = next ? 'Show QR code?' : 'Hide QR code?';
+        if (!window.confirm(msg)) return;
+        qrVisible = next;
         send({ showQR: qrVisible });
         updateQRBtn();
     });
@@ -164,6 +169,19 @@ function buildUI() {
     colorBlock.appendChild(colorInput);
     controlsEl.appendChild(colorBlock);
 
+    const speedColorBlock = document.createElement('div');
+    speedColorBlock.className = 'color-block';
+    const speedColorLbl = document.createElement('span');
+    speedColorLbl.className   = 'ctrl-label';
+    speedColorLbl.textContent = 'Speed color';
+    const speedColorInput = document.createElement('input');
+    speedColorInput.type  = 'color';
+    speedColorInput.value = '#ffffff';
+    speedColorInput.addEventListener('input', () => queue('speedColor', speedColorInput.value));
+    speedColorBlock.appendChild(speedColorLbl);
+    speedColorBlock.appendChild(speedColorInput);
+    controlsEl.appendChild(speedColorBlock);
+
     // ── Speed + Turn rate ─────────────────────────────────────────────────────
     controlsEl.appendChild(mkLabel('Motion'));
     const motionBlock = document.createElement('div');
@@ -190,6 +208,42 @@ function buildUI() {
         grid.appendChild(btn);
     });
     controlsEl.appendChild(grid);
+
+    // ── Trace text ────────────────────────────────────────────────────────────
+    controlsEl.appendChild(mkLabel('Trace text'));
+    const textBlock = document.createElement('div');
+    textBlock.className = 'ctrl-block';
+
+    const textInput = document.createElement('textarea');
+    textInput.className   = 'trace-textarea';
+    textInput.placeholder = 'type text to send…';
+    textInput.rows        = 3;
+    textBlock.appendChild(textInput);
+
+    const textBtnRow = document.createElement('div');
+    textBtnRow.className = 'text-btn-row';
+
+    const sendTextBtn = document.createElement('button');
+    sendTextBtn.className   = 'btn-text-send';
+    sendTextBtn.textContent = '→  send';
+    sendTextBtn.addEventListener('click', () => {
+        const val = textInput.value.trim();
+        if (!val) return;
+        send({ traceText: val });
+    });
+
+    const clearTextBtn = document.createElement('button');
+    clearTextBtn.className   = 'btn-text-clear';
+    clearTextBtn.textContent = '✕  clear text';
+    clearTextBtn.addEventListener('click', () => {
+        textInput.value = '';
+        send({ clearText: true });
+    });
+
+    textBtnRow.appendChild(sendTextBtn);
+    textBtnRow.appendChild(clearTextBtn);
+    textBlock.appendChild(textBtnRow);
+    controlsEl.appendChild(textBlock);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
