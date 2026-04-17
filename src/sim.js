@@ -66,6 +66,7 @@ const params = {
     followFormula: true,  // false = free drift (wind + magnet only)
     autoDir:       true,  // randomly cycle dir formula every 30 s
     bounceEdges:   false, // reflect agents at canvas edges instead of wrapping
+    useDeltaTime:  true,  // false = fixed 1/60 s timestep (no frame-spike compensation)
 };
 
 const DEFAULT_DIR  = 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI';
@@ -963,6 +964,7 @@ fMotion.add(params, 'weightSpread',   0, 1, 0.01).name('weight spread')
 fMotion.add(params, 'followFormula').name('follow formula');
 fMotion.add(params, 'autoDir').name('auto-cycle formula');
 fMotion.add(params, 'bounceEdges').name('bounce edges');
+fMotion.add(params, 'useDeltaTime').name('delta time');
 
 const fWind = gui.addFolder('Wind');
 const windStrCtrl = fWind.add(params, 'windStr', 0, 2, 0.01).name('strength');
@@ -1359,9 +1361,10 @@ let fpsLast   = performance.now();
 function frame(ts) {
     requestAnimationFrame(frame);
 
-    const now = ts * TIME_MULT;
-    const dt  = Math.min(Math.max(now - prevTime, TIME_MULT), 0.05);
-    prevTime  = now;
+    const now    = ts * TIME_MULT;
+    const rawDt  = Math.min(Math.max(now - prevTime, TIME_MULT), 0.05);
+    const dt     = params.useDeltaTime ? rawDt : (1 / 60);
+    prevTime     = now;
 
     writeSoloUB(dt, now);
     writeRenderUB();
