@@ -59,7 +59,8 @@ const params = {
     // Session / QR restore
     remoteTimeout:  60,   // seconds of silence from all remotes before QR is restored (0 = disabled)
     maxSpectators:  1,    // sim QR hides when connected count reaches this threshold
-    n8nTestMode:    false, // true = /webhook-test/sim-event, false = /webhook/sim-event
+    n8nTestMode:       false, // true = /webhook-test/sim-event, false = /webhook/sim-event
+    heartbeatInterval: 20,   // seconds between periodic param snapshots sent to n8n (0 = off)
     // Weight
     weightSpread: 0.8,    // 0 = all equal; 1 = weights span [0.05 … 1.95]
     // Motion behaviour
@@ -734,7 +735,8 @@ let lastRemoteActivity = Date.now(); // timestamp of last remote-event (touch or
 // running the new event is skipped. A 5 s timeout clears the guard if n8n is slow.
 const N8N_BASE       = (import.meta.env.VITE_N8N_BASE_URL ?? '').replace(/\/$/, '');
 const N8N_TIMEOUT_MS = 5_000;
-let   n8nInFlight    = false;
+let   n8nInFlight          = false;
+let   n8nHeartbeatInFlight = false;
 
 async function callN8n(event) {
     if (!N8N_BASE || n8nInFlight) return;
@@ -761,6 +763,45 @@ async function callN8n(event) {
         n8nInFlight = false;
     }
 }
+
+// Periodic heartbeat — sends the full params snapshot to n8n every
+// params.heartbeatInterval seconds. Response is handled identically to sim-event.
+// Has its own in-flight guard so it never blocks user-triggered events.
+async function callN8nHeartbeat() {
+    if (!N8N_BASE || n8nHeartbeatInFlight) return;
+    n8nHeartbeatInFlight = true;
+    const path = params.n8nTestMode ? '/webhook-test/heartbeat' : '/webhook/heartbeat';
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), N8N_TIMEOUT_MS);
+    try {
+        const res = await fetch(N8N_BASE + path, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ type: 'heartbeat', room: sessionRoom, params: { ...params } }),
+            signal:  controller.signal,
+        });
+        clearTimeout(timer);
+        if (res.ok) {
+            const data = await res.json();
+            if (data && typeof data === 'object') applySimParams(data);
+        }
+    } catch (err) {
+        clearTimeout(timer);
+        if (err.name !== 'AbortError') console.warn('[n8n heartbeat]', err.message);
+    } finally {
+        n8nHeartbeatInFlight = false;
+    }
+}
+
+let heartbeatTimer = null;
+function restartHeartbeat() {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+    if (N8N_BASE && params.heartbeatInterval > 0) {
+        heartbeatTimer = setInterval(callN8nHeartbeat, params.heartbeatInterval * 1000);
+    }
+}
+restartHeartbeat();
 
 await applyFormulas(startDir, startWind, { reseed: true });
 
@@ -1010,6 +1051,7 @@ const fSession = gui.addFolder('Session');
 fSession.add(params, 'remoteTimeout',  0, 180,  5).name('idle restore QR (s)');
 fSession.add(params, 'maxSpectators',  1,  50,  1).name('QR hides at N users');
 fSession.add(params, 'n8nTestMode').name('n8n test mode');
+fSession.add(params, 'heartbeatInterval', 0, 120, 5).name('heartbeat (s)').onChange(() => restartHeartbeat());
 
 const fDebug = gui.addFolder('Debug');
 // No .listen() — controllers are refreshed manually inside the collective-state
