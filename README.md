@@ -79,35 +79,26 @@ Host browser — simulation display (WebGPU)
     │                            { avgPitch, avgRoll, avgTemp, avgCoherence, userCount }
     │                            → wind bias, turnRate scale, speed-color tint
     │
-    │                     ┌─────────────────────────────────────────────┐
-    │                     │  RELAY_MODE=direct (default)                │
-    │  'remote-event'  ←──┤  server forwards touch/text events here     │
-    │                     └─────────────────────────────────────────────┘
-    │                     ┌─────────────────────────────────────────────┐
-    │  'sim-params'   ←───┤  RELAY_MODE=n8n                            │
-    │                     │  server → n8n → /n8n-sim-update → sim       │
-    │                     └─────────────────────────────────────────────┘
+    │  'remote-event'  ←──── server (always direct — tilt aggregated only)
+    │
+    │  HTTPS POST /webhook/sim-event  ──→  n8n  (on every remote-event, if VITE_N8N_BASE_URL set)
+    │  ←── JSON response ─────────────────────  applySimParams()
+    │
+    │  HTTPS POST /webhook/heartbeat  ──→  n8n  (every heartbeatInterval seconds)
+    │  ←── JSON response ─────────────────────  applySimParams()
     ▼
 Display / projection
 
 Spectators  (/remote/?s=<uuid>)
     │  Socket.IO  'join-session'   →  server
-    │  Socket.IO  'user-event'     →  server routes per RELAY_MODE
-    │                                  tilt events: aggregated only, not forwarded
+    │  Socket.IO  'user-event'     →  server → 'remote-event' → simulation (tilt aggregated only)
     │  Socket.IO  'peer-joined'   ←─  server  { userCount }  — aura pulse + QR threshold check
     │  Socket.IO  'peer-left'     ←─  server  { userCount }  — QR reappears if count drops below max
     ▼
 Node.js server  (:3000)
-    │  direct mode: io.to(room).emit('remote-event', ...)
-    │  n8n mode:    HTTP POST → n8n webhook
-    │  always:      updates room state (pitch, roll, temperature, coherence per user)
-    │  ticker:      emits 'collective-state' to host every 300 ms
-    ▼
-[n8n workflow  (:5678)]      ← only in RELAY_MODE=n8n
-    │  AI processing → parameter generation
-    │  HTTP POST /n8n-sim-update
-    ▼
-Server → Socket.IO 'sim-params' → simulation
+    │  always: io.to(room).emit('remote-event', ...)  — tilt events aggregated only, not forwarded
+    │  always: updates room state (pitch, roll, temperature, coherence per user)
+    │  ticker: emits 'collective-state' to host every 300 ms
 ```
 
 ### Session lifecycle
@@ -121,23 +112,12 @@ Server → Socket.IO 'sim-params' → simulation
 5. Server emits `spectator-joined` to the host — a brief gust fires in the particle field
 6. Server emits `peer-joined` (with updated `userCount`) to all other spectators — aura pulse; remote QR hides if `userCount ≥ maxSpectators` (configured in Session GUI)
 7. Every 300 ms the server aggregates all spectators' state and emits `collective-state` to the host
-8. Spectator touch/text events are routed per `RELAY_MODE`; `lastRemoteActivity` timestamp is updated on every event
+8. Spectator touch/text events are forwarded directly as `remote-event`; `lastRemoteActivity` timestamp is updated on every event
 9. When a spectator disconnects, server emits `spectator-left` (with `userCount`) to host and `peer-left` to remaining spectators
 10. Simulation restores the QR trace in three ways (whichever fires first):
     - `spectator-left` arrives with `userCount === 0`
     - Internal `simSpectatorCount` counter drops to 0 (fallback if server event is missed)
     - No remote events received for `remoteTimeout` seconds (Session → idle restore QR)
-
-### RELAY_MODE
-
-Set `RELAY_MODE` in `.env` to control how spectator touch/text events are processed:
-
-| Value | Path | Use when |
-|-------|------|----------|
-| `direct` | remote → server → simulation | Testing, no AI processing needed |
-| `n8n` | remote → server → n8n → simulation | Full performance with AI parameter generation |
-
-Tilt events are **always** consumed server-side for aggregation regardless of `RELAY_MODE` — they are never forwarded individually to the simulation.
 
 ### Collective state aggregation
 
@@ -161,7 +141,7 @@ All computation runs on the GPU. No Three.js. No WebGL.
 
 | Pass | Shader | Type | Description |
 |------|--------|------|-------------|
-| **Compute** | `compute.wgsl` | Compute | Agent physics: formula steering, wind force + collective tilt bias, image-trace avoidance (gradient + lookahead), contamination avoidance, speed clamping, edge wrap |
+| **Compute** | `compute.wgsl` | Compute | Agent physics (SoloParams 112 bytes): formula steering, wind force + collective tilt bias, image-trace avoidance (gradient + lookahead), contamination circle avoidance, avoidance map (binding 4), edge bounce/wrap |
 | **Fade** | `fade.wgsl` | Render | Black fullscreen quad with alpha blend — exponential trail decay each frame |
 | **Particles** | `render.wgsl` | Render | Per-agent quads drawn into offscreen texture; attenuated additive blend; speed-color tinted by collective temperature |
 | **Blit** | `blit.wgsl` | Render | Copy offscreen texture → canvas swap-chain; applies `bgBlackCutoff` to clamp near-zero trail residual to pure black |
@@ -173,7 +153,7 @@ in a persistent GPU storage buffer. The buffer is always allocated at
 `MAX_AGENTS × 32` bytes; `params.agentCount` drives actual dispatch and draw counts
 without reallocation.
 
-The compute uniform buffer (`SoloParams`, 96 bytes) carries physics params plus:
+The compute uniform buffer (`SoloParams`, 112 bytes) carries physics params plus:
 - `windBiasX` / `windBiasY` — smoothed collective tilt vector, added directly to formula wind
 - `avoidForceStr` — multiplier applied to all image-trace avoidance force vectors
 
@@ -359,6 +339,8 @@ The GUI has five folders. See [PARAMETERS.md](PARAMETERS.md) for a full descript
 | follow formula | Enable/disable direction formula steering |
 | auto-cycle formula | Randomly switch direction formula every ~30 s |
 | intro delay (s) | Free-drift seconds at startup before formulas engage |
+| bounce edges | Reflect agents off canvas edges instead of wrapping; default off |
+| delta time | When on, each frame uses the actual elapsed time (frame-rate independent speed but sensitive to browser spikes). When off, uses a fixed 1/60 s step (perfectly smooth but slower than real-time below 60 fps). Default on. |
 
 ### Wind
 
@@ -401,12 +383,24 @@ The image is never rendered directly — it is felt through collective agent den
 | Clear image | Remove trace image; return to formula-only mode |
 | Clear text | Clear the trace text field |
 
+### Avoidance map
+
+An invisible grayscale mask that repels free agents. White areas push agents away; black areas are transparent to them. The mask has its own scale independent of the trace image.
+
+| Control | Description |
+|---------|-------------|
+| scale | Coverage as a fraction of the canvas (1.0 = full canvas); the map is always centered |
+| Load map… | File picker — any browser-supported image (grayscale PNG recommended) |
+| Clear map | Remove the active avoidance map |
+
 ### Session
 
 | Control | Description |
 |---------|-------------|
 | idle restore QR (s) | Seconds of silence from all remotes before QR trace is restored; 0 = disabled |
-| QR hides at N users | Remote page QR fades when `userCount` reaches this threshold (baked into QR URL at generation time) |
+| QR hides at N users | Remote page QR fades when `userCount` reaches this threshold |
+| n8n test mode | When on, calls `/webhook-test/` paths instead of `/webhook/`; no rebuild needed |
+| heartbeat (s) | Seconds between periodic full-params snapshots sent to n8n `/webhook/heartbeat`; 0 = disabled |
 
 ---
 
@@ -453,7 +447,7 @@ Starts three processes concurrently:
 
 | Process | Port | Description |
 |---------|------|-------------|
-| Vite | 5173 | Dev server with HMR; proxies `/rndImage` and `/n8n-sim-update` to Express |
+| Vite | 5173 | Dev server with HMR; proxies `/rndImage` and `/admin-auth` to Express |
 | Express | 3000 | Socket.IO session assignment, n8n relay, static assets; HTML page requests redirect to Vite |
 | n8n | 5678 | Workflow automation |
 
@@ -504,36 +498,69 @@ caddy run
 
 ---
 
-## n8n Workflow Contract
+## n8n Integration
 
-Only relevant when `RELAY_MODE=n8n`. The server POSTs user events to `N8N_WEBHOOK_URL`:
+The simulation calls n8n directly from the browser via HTTPS fetch. No server relay is involved. Set `VITE_N8N_BASE_URL` in `.env` to your n8n origin (baked into the bundle at build time).
 
-```json
-{ "type": "text", "room": "session-UUID", "spectatorId": "socket-id", "data": { "text": "user prompt" }, "timestamp": 1234567890 }
-```
+### Endpoints
 
-n8n processes the event and must POST back to `SERVER_CALLBACK_URL` (default `http://localhost:3000/n8n-sim-update`):
+| Event | Path | Trigger |
+|-------|------|---------|
+| User event | `/webhook/sim-event` (or `/webhook-test/sim-event` in test mode) | Every `remote-event` received from a spectator |
+| Heartbeat | `/webhook/heartbeat` (or `/webhook-test/heartbeat` in test mode) | Every `heartbeatInterval` seconds (default 20 s) |
+
+The **n8n test mode** toggle in the GUI switches between production and test paths without requiring a rebuild.
+
+### sim-event payload
 
 ```json
 {
+  "type": "text",
   "room": "session-UUID",
-  "simulation": {
-    "stepLen":      2.0,
-    "turnRate":     0.04,
-    "maxSpeed":     5.0,
-    "windStr":      0.3,
-    "trailDecay":   0.055,
-    "pointSize":    2.0,
-    "color":        "#0000ff",
-    "speedColor":   "#ff4400",
-    "brightness":   0.08,
-    "dirFormula":   "atan2(cy - y, cx - x)",
-    "windFormula":  "sin(x * 0.004 + t) * PI"
+  "spectatorId": "socket-id",
+  "data": { "text": "user prompt" },
+  "timestamp": 1234567890
+}
+```
+
+### heartbeat payload
+
+```json
+{
+  "type": "heartbeat",
+  "room": "session-UUID",
+  "params": {
+    "agentCount": 1200000,
+    "stepLen": 2.0,
+    "turnRate": 0.04,
+    "windStr": 0.2,
+    "...": "all current simulation params"
   }
 }
 ```
 
-The server emits `'sim-params'` to the simulation socket. Only the fields you include are applied; unrecognised keys are ignored.
+### Response format (`applySimParams`)
+
+Both endpoints consume the same response format. Return a JSON object with any combination of the following keys — unrecognised keys are ignored:
+
+| Key | Type | Effect |
+|-----|------|--------|
+| `traceText` | `string` | Render this string as the particle trace attractor (replaces QR if active) |
+| `clearText` | `bool` | Clear the current trace text |
+| `clearTrace` | `bool` | Clear trace image and text |
+| `showQR` | `bool` | `true` = restore QR; `false` = clear trace image |
+| `avoidMap` | `string \| null` | Load a new avoidance map from a base64 data URL or HTTPS URL; `null` clears it |
+| `restart` | `bool` | Re-seed all agents |
+| `status` | `"NORMAL" \| "IDLE"` | Set simulation state (`IDLE` suspends formula steering and wind) |
+| `dir` | `string` | New direction formula (WGSL expression returning radians) |
+| `wind` | `string` | New wind formula (WGSL expression returning radians) |
+| any `params` key | number/bool | Overwrite the matching simulation parameter live |
+
+Example minimal response:
+
+```json
+{ "traceText": "Hello world", "status": "NORMAL" }
+```
 
 ---
 
@@ -544,11 +571,10 @@ The server emits `'sim-params'` to the simulation socket. Only the fields you in
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3000` | Express server port |
+| `ADMIN_PASSWORD` | — | Password for the `/admin` panel; leave blank to disable |
 | `VITE_PORT` | `5173` | Vite dev server port — Express redirects HTML requests here in dev |
 | `VITE_SERVER_PORT` | `3000` | Express port exposed to browser clients for direct Socket.IO connection in dev |
-| `RELAY_MODE` | `direct` | `direct` or `n8n` — controls spectator event routing |
-| `N8N_WEBHOOK_URL` | `http://localhost:5678/webhook/user-event` | n8n webhook (RELAY_MODE=n8n only) |
-| `SERVER_CALLBACK_URL` | `http://localhost:3000/n8n-sim-update` | URL n8n POSTs results back to |
+| `VITE_N8N_BASE_URL` | — | Base URL of your n8n instance (no trailing slash). The sim appends `/webhook/sim-event` or `/webhook/heartbeat`. Leave blank to disable n8n. Baked at build time — requires rebuild to change. |
 | `VITE_USER_URL` | `http://localhost:3000` | Origin used to build the QR code URL (`$VITE_USER_URL/remote/?s=<uuid>`) |
 | `VITE_SOCKET_URL` | — | Socket.IO server origin used by browser clients **in production**. Set to your public API domain (e.g. `https://api.stubfx.io`). In dev this is ignored — clients always connect directly to Express. Falls back to `'/'` (page origin) if unset. |
 | `SERVER_ASSETS_DIR` | `prev-images` | Directory for cached random images |
@@ -616,10 +642,15 @@ thesis-sim/
 │   ├── gyro.js              Device orientation helpers (pitch, roll, motion magnitude)
 │   └── motion.js            Motion smoothing
 │
+├── admin/
+│   ├── index.html           Admin controller panel (password-protected)
+│   ├── main.js              GUI controls: sim params, restart, QR toggle, trace text send/clear
+│   └── style.css
+│
 ├── server/
-│   ├── server.js            Socket.IO host/remote routing; room state aggregation;
-│   │                        collective-state ticker (300 ms); spectator-joined/left to host;
-│   │                        peer-joined (with userCount) / peer-left to spectators
+│   ├── server.js            Socket.IO host/remote/admin routing; room state aggregation;
+│   │                        collective-state ticker (300 ms); always-direct remote-event relay (no n8n relay);
+│   │                        spectator-joined/left to host; peer-joined/peer-left to spectators
 │   └── server-utils.js      File I/O for cached images
 │
 ├── index.html

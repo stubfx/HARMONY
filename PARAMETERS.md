@@ -20,7 +20,7 @@ The texture is rebuilt 300 ms after the last keystroke (debounced). There is no 
 
 ### Sizing and font
 
-- **Text only** (no image loaded): the canvas is auto-sized to fit the text. A reference height of 256 px is used; the font is set to 72% of that height, and the canvas width is derived from the measured text width with 14% padding. The aspect ratio is then preserved by the normal `size` control in the Trace GUI folder.
+- **Text only** (no image loaded): the canvas width is fixed to the screen width (capped at the GPU's `maxTextureDimension2D` limit). Text is word-wrapped across multiple lines; font size is approximately 6% of the canvas width. Canvas height grows with the number of lines. This prevents arbitrarily wide textures when long strings are received (e.g. from n8n).
 - **Text + image**: the canvas is the same pixel dimensions as the loaded image. The text is drawn on top at auto-fitted size (starting at 72% of the image height, scaled down if the text would overflow 92% of the image width).
 
 The font is always **bold sans-serif**. The fill is always **white** (RGB 1,1,1), so agents homing to text glyphs are rendered bright white — unless a loaded image provides color underneath, in which case the image RGB shows through.
@@ -90,6 +90,21 @@ When on (and `follow formula` is also on), a scheduler randomly picks a new form
 At startup, agents spawn at uniformly random positions across the canvas with fully random headings. For this many seconds, `follow formula` and wind are silently suppressed (without changing the GUI toggles), letting the random initial motion settle before the formulas engage. After the delay, the active direction and wind formulas kick in. Setting this to 0 disables the intro.
 
 The startup direction and wind formulas are also picked at random from the built-in library each time the page loads.
+
+### bounce edges
+**Default:** off
+
+When on, agents reflect off the canvas edges (velocity component perpendicular to the edge is reversed). When off (default), agents wrap to the opposite edge. Bouncing can reduce visual clumping at edges but creates distinct reflection patterns that look different from wrap-around motion.
+
+### delta time (`useDeltaTime`)
+**Default:** on
+
+Controls whether each frame uses the actual elapsed wall-clock time as the physics timestep.
+
+- **On**: `dt` = real elapsed time (clamped between 1 ms and 50 ms). Agents maintain consistent average speed regardless of frame rate, but a browser scheduling spike (GC, texture upload, tab switching) produces one enlarged step that looks like a brief lurch.
+- **Off**: `dt` = fixed 1/60 s every frame. Motion is perfectly smooth but agents run slower than real-time when the frame rate drops below 60 fps.
+
+Toggle off to diagnose whether visual twitching is caused by frame-spike compensation.
 
 ---
 
@@ -217,6 +232,39 @@ Removes the loaded image. If trace text is currently entered, the text trace rem
 
 ---
 
+## Avoidance map
+
+An invisible grayscale mask uploaded from the GUI (Avoidance map → Load map…) or delivered via n8n. White areas repel free agents; black areas are transparent. Homing agents (those whose home is on an opaque trace pixel) are unaffected.
+
+### How it works
+
+The avoidance map is uploaded as an `rgba8unorm` GPU texture at shader binding 4. Each frame the compute shader samples the red channel at each free agent's canvas position. A 4-sample central-difference gradient is computed:
+
+- **Inside a white zone** (sample > 0.05): push along the negative gradient (toward lower values / toward the nearest black area). Mirrors the image-trace avoidance logic.
+- **Near an edge** (transparent position but gradient > 0): if the agent is heading toward a white zone, the inward velocity component is stripped proportionally (lookahead check 4 steps ahead).
+
+The force magnitude uses the same `avoid force` multiplier as image-trace avoidance.
+
+### scale (`avoidMapScale`)
+**Range:** 0.05 – 1.0 | **Default:** 1.0
+
+The map is always centered on the canvas. This value controls what fraction of the canvas it covers. At 1.0 the map spans the full canvas. At 0.5 it occupies the central half.
+
+### Delivering via n8n
+
+The `applySimParams` response accepts an `avoidMap` key:
+
+```json
+{ "avoidMap": "data:image/png;base64,iVBORw0KGgo..." }
+```
+
+Supported formats:
+- **Base64 data URL** (`data:image/...;base64,...`) — self-contained in the JSON
+- **HTTPS URL** (`https://...`) — sim fetches the image directly
+- **`null`** — clears the active avoidance map
+
+---
+
 ## Formula System
 
 Both the direction and wind fields are WGSL expressions entered as text. They are compiled into the compute shader at runtime. The return value must be an **angle in radians**.
@@ -331,7 +379,7 @@ The transition is smooth. A crowd touching left and right simultaneously average
 
 **Phone gesture:** type in the bottom input field and submit.
 **Data sent:** `text` string, forwarded directly to the simulation as a `remote-event`.
-**Effect:** the text is rendered as white glyphs on a transparent canvas and uploaded as the trace image — the same pipeline as a locally typed trace text. The last received text wins. See the *Trace Text* section above for full compositing details.
+**Effect:** if `VITE_N8N_BASE_URL` is set, the text is forwarded to n8n via `callN8n()` — n8n processes it and responds with what to apply (e.g. `traceText`, formulas, `status`). If n8n is not configured, the text is applied directly as the trace attractor. The last received text wins.
 
 ---
 
@@ -407,15 +455,39 @@ This is intentional and left as-is — the trapped pixels contribute to the visu
 When all spectators leave or `idle restore QR (s)` seconds pass with no remote activity, `restoreQR()` is called. It re-assigns `qrBitmap` to `imageBitmap`, sets `isQRBitmap`, re-renders the trace canvas, and picks a new random formula. It is a no-op if the QR is already showing or was never generated.
 
 ### Signal routing
-Spectators open `/remote/?s=<uuid>`, connect via Socket.IO, and emit `user-event` messages. The server routes touch/text events based on `RELAY_MODE`:
-- `direct` — event arrives at the simulation as a `'remote-event'`
-- `n8n` — event is POSTed to the n8n webhook; n8n processes it and sends `'sim-params'` back
+Spectators connect via Socket.IO and emit `user-event` messages. The server always forwards touch/text events directly to the simulation as `'remote-event'`. Tilt events are consumed server-side for aggregation and never forwarded individually.
 
-Tilt events are never forwarded to the simulation individually — they are aggregated server-side into the periodic `collective-state` emission.
+If `VITE_N8N_BASE_URL` is set, the simulation calls n8n directly (browser HTTPS fetch) on every `remote-event`. The server is not involved in the n8n round-trip. Text events are only applied locally (without n8n) when `VITE_N8N_BASE_URL` is blank.
 
 Each new spectator connection fires a `spectator-joined` event to the host, producing a brief visible gust in the particle field. See *Remote / Swarm Inputs — Join burst* above.
 
 The session UUID is stable for the lifetime of the page. A socket disconnect/reconnect generates a new UUID and a new QR.
+
+---
+
+## Session
+
+### idle restore QR (s) (`remoteTimeout`)
+**Range:** 0 – 180 | **Default:** 60
+
+Seconds of silence from all remote devices before the QR trace is automatically restored. Resets whenever any `remote-event` is received. Set to 0 to disable.
+
+### QR hides at N users (`maxSpectators`)
+**Range:** 1 – 50 | **Default:** 1
+
+The remote page's persistent QR code fades when the connected spectator count reaches this threshold. This value is baked into the QR URL at generation time — changing it mid-session requires the QR to be regenerated (restart the simulation).
+
+### n8n test mode (`n8nTestMode`)
+**Default:** off
+
+When on, all n8n calls use `/webhook-test/` paths instead of `/webhook/`. This lets you use the n8n test-trigger for a workflow without activating it in production. Does not require a rebuild — toggled live in the GUI.
+
+### heartbeat (s) (`heartbeatInterval`)
+**Range:** 0 – 120 | **Default:** 20
+
+Seconds between periodic snapshots of all simulation parameters sent to n8n at `/webhook/heartbeat` (or `/webhook-test/heartbeat` in test mode). The full `params` object is included in the body alongside `type: "heartbeat"` and the session room UUID. Set to 0 to disable.
+
+The response is handled identically to `sim-event` — any recognised keys are applied via `applySimParams`. Use this for AI-driven ambient parameter drift between user interactions.
 
 ---
 
