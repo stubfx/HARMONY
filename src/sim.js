@@ -941,12 +941,14 @@ await applyFormulas(startDir, startWind, { reseed: true });
 // Only numeric/boolean keys present in the payload are applied;
 // if formulas are included they re-trigger pipeline compilation.
 function applySimParams(data) {
-    const { dir, wind, restart, clearTrace, showQR, traceText, clearText, status, ...rest } = data;
+    const { dir, wind, restart, clearTrace, showQR, traceText, clearText, status, avoidMap, ...rest } = data;
     if (status === 'NORMAL' || status === 'IDLE') {
         simState.status = status;
         updateStateDisplay();
     }
     if (restart)              seedAgents();
+    if (avoidMap === null)    clearAvoidMap();
+    else if (typeof avoidMap === 'string') loadAvoidMap(avoidMap);
     if (clearTrace)           { clearMagnetImage(); clearTraceText(); }
     if (showQR === true)      restoreQR();
     if (showQR === false)     clearMagnetImage();
@@ -1149,8 +1151,15 @@ document.querySelector('#image-input').addEventListener('change', e => {
 });
 
 // ── Avoidance map upload ──────────────────────────────────────────────────────
-async function loadAvoidMap(file) {
-    const bmp = await createImageBitmap(file, { colorSpaceConversion: 'none' });
+async function loadAvoidMap(source) {
+    let bmp;
+    if (typeof source === 'string') {
+        const res  = await fetch(source);
+        const blob = await res.blob();
+        bmp = await createImageBitmap(blob, { colorSpaceConversion: 'none' });
+    } else {
+        bmp = await createImageBitmap(source, { colorSpaceConversion: 'none' });
+    }
     if (avoidMapTex) avoidMapTex.destroy();
     avoidMapTex = device.createTexture({
         size:   [bmp.width, bmp.height],
