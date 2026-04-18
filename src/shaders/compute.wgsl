@@ -31,8 +31,9 @@
 //   [96] hasAvoidMap    u32   (1 = avoidance map active)
 //   [100] avoidMapScale f32   (map covers this fraction of canvas, centered)
 //   [104] bounceEdges   u32   (1 = reflect at canvas edges, 0 = wrap)
-//   [108] probeLen      f32   (primed-spot probe cast distance in canvas pixels)
-//   [112] probeForceStr f32   (steering force multiplier when probe hits a primed pixel)
+//   [108] probeLen        f32   (primed-spot probe cast distance in canvas pixels)
+//   [112] probeForceStr   f32   (steering force multiplier when probe hits a primed pixel)
+//   [116] respawnOnCollide u32  (1 = teleport to a corner instead of steering on probe hit)
 
 struct SoloParams {
     agentCount:     u32,
@@ -61,9 +62,10 @@ struct SoloParams {
     qrMode:         u32,
     hasAvoidMap:    u32,
     avoidMapScale:  f32,
-    bounceEdges:    u32,
-    probeLen:       f32,
-    probeForceStr:  f32,
+    bounceEdges:      u32,
+    probeLen:         f32,
+    probeForceStr:    f32,
+    respawnOnCollide: u32,
 }
 
 struct Agent {
@@ -308,21 +310,33 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                 let probePos   = pos + normalize(vel) * params.probeLen;
                 let probeAlpha = imgAlphaAt(probePos, texDims);
                 if (probeAlpha >= params.alphaThreshold) {
-                    let EPS  = 4.0;
-                    let pgx  = imgAlphaAt(vec2<f32>(probePos.x + EPS, probePos.y), texDims)
-                             - imgAlphaAt(vec2<f32>(probePos.x - EPS, probePos.y), texDims);
-                    let pgy  = imgAlphaAt(vec2<f32>(probePos.x, probePos.y + EPS), texDims)
-                             - imgAlphaAt(vec2<f32>(probePos.x, probePos.y - EPS), texDims);
-                    let pGrad    = vec2<f32>(pgx, pgy);
-                    let pGradLen = length(pGrad);
-                    if (pGradLen > 0.001) {
-                        vel += -normalize(pGrad) * params.maxSpeed * params.probeForceStr
-                             * params.dt * 60.0;
+                    if (params.respawnOnCollide != 0u) {
+                        // Teleport to one of the 4 corners based on agent index
+                        let corner = i % 4u;
+                        var cp = vec2<f32>(0.0, 0.0);
+                        if      (corner == 1u) { cp = vec2<f32>(params.canvasW, 0.0          ); }
+                        else if (corner == 2u) { cp = vec2<f32>(0.0,           params.canvasH); }
+                        else if (corner == 3u) { cp = vec2<f32>(params.canvasW, params.canvasH); }
+                        agents[i].pos = cp;
+                        agents[i].vel = vec2<f32>(0.0, 0.0);
+                        return;
                     } else {
-                        let away = pos - imgCentre;
-                        if (length(away) > 0.001) {
-                            vel += normalize(away) * params.maxSpeed * params.probeForceStr
+                        let EPS  = 4.0;
+                        let pgx  = imgAlphaAt(vec2<f32>(probePos.x + EPS, probePos.y), texDims)
+                                 - imgAlphaAt(vec2<f32>(probePos.x - EPS, probePos.y), texDims);
+                        let pgy  = imgAlphaAt(vec2<f32>(probePos.x, probePos.y + EPS), texDims)
+                                 - imgAlphaAt(vec2<f32>(probePos.x, probePos.y - EPS), texDims);
+                        let pGrad    = vec2<f32>(pgx, pgy);
+                        let pGradLen = length(pGrad);
+                        if (pGradLen > 0.001) {
+                            vel += -normalize(pGrad) * params.maxSpeed * params.probeForceStr
                                  * params.dt * 60.0;
+                        } else {
+                            let away = pos - imgCentre;
+                            if (length(away) > 0.001) {
+                                vel += normalize(away) * params.maxSpeed * params.probeForceStr
+                                     * params.dt * 60.0;
+                            }
                         }
                     }
                 }
