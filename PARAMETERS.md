@@ -231,14 +231,41 @@ Opens a file picker. Any browser-supported image format (PNG, JPEG, WebP, etc.) 
 Removes the loaded image. If trace text is currently entered, the text trace remains active (the composite is re-rendered with text only). If no text is present, agents return to formula-only mode immediately.
 
 ### probe distance (`probeLen`)
-**Range:** 5 – 300 | **Default:** 60
+**Range:** 5 – 300 | **Default:** 150
 
 Distance in canvas pixels that free agents cast a probe ahead of themselves along their current velocity. If the probe lands on a **primed** pixel — any trace pixel with alpha ≥ `alphaThreshold`, meaning an agent is homing there — a steering force redirects the free agent away before it reaches that area. Shorter values give less reaction time; longer values cause earlier, wider detours.
 
 ### probe force (`probeForceStr`)
-**Range:** 0 – 5 | **Default:** 1.0
+**Range:** 0 – 200 | **Default:** 100
 
-Strength of the steering force when a probe hits a primed pixel. The force direction is the negative alpha gradient at the probe point — pushing the agent toward the nearest gap in the trace. At 0 the probe is disabled. Higher values cause sharper detours; lower values produce gentle course corrections.
+Strength of the steering force when a probe hits a primed pixel. The force direction is the negative alpha gradient at the probe point — pushing the agent toward the nearest gap in the trace. At 0 the probe is disabled. Higher values cause sharper detours; lower values produce gentle course corrections. Has no effect when `respawn on collide` is enabled (the agent teleports instead of steering).
+
+### respawn on collide (`respawnOnCollide`)
+**Default:** off
+
+When enabled, a free agent whose probe hits a primed pixel is immediately **teleported to a random position on the canvas perimeter** rather than receiving a steering force. The agent's velocity is reset to zero at the new position; normal formula and wind forces resume on the next frame, so it re-enters the field from the edge.
+
+#### How the respawn position is chosen
+
+The entire canvas border — top, right, bottom, left edges, in that order — is treated as a single unwrapped line of length `2 × (canvasW + canvasH)`. A pseudo-random scalar in `[0, perimeter)` is computed each collision using a fast integer hash (Murmur3 finalizer) seeded by the agent's index XOR-ed with a quantised timestamp (`floor(time × 137)`). The timestamp component ensures the same agent lands at a different position on each successive collision rather than cycling back to a fixed spot.
+
+The four edges map to contiguous segments of this line:
+
+| Segment | Edge | Position |
+|---------|------|----------|
+| `[0, canvasW)` | Top | `(t, 0)` |
+| `[canvasW, canvasW + canvasH)` | Right | `(canvasW, t − canvasW)` |
+| `[canvasW + canvasH, 2·canvasW + canvasH)` | Bottom | `(t − canvasW − canvasH, canvasH)` |
+| `[2·canvasW + canvasH, perimeter)` | Left | `(0, t − 2·canvasW − canvasH)` |
+
+Each edge receives collision traffic proportional to its pixel length, so on a 16:9 canvas the top and bottom edges each receive roughly twice as many respawns as the left and right edges.
+
+#### Interaction with other parameters
+
+- **`probe distance`** still controls how far ahead the agent looks. A longer probe increases the chance of a collision hit and therefore the respawn rate.
+- **`probe force`** has no effect while respawn is on — the steering path is never taken.
+- **`bounceEdges`** affects what happens after the respawn: with wrapping (default) an agent placed exactly on the right edge (`x = canvasW`) wraps to `x = 0` on the next step. This is visually imperceptible since the velocity is zero at respawn.
+- **Homing agents are unaffected** — the probe and respawn only run in the free-agent branch.
 
 ---
 

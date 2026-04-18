@@ -103,6 +103,16 @@ struct ContamParams {
 const PI:     f32 = 3.14159265358979;
 const TWO_PI: f32 = 6.28318530717959;
 
+// Integer hash → uniform float in [0, 1). Used for pseudo-random edge respawn.
+// Based on the Murmur3 finalizer — cheap, no texture lookup required.
+fn hash(n: u32) -> f32 {
+    var x = n;
+    x = x ^ (x >> 16u);
+    x = x * 0x45d9f3bu;
+    x = x ^ (x >> 16u);
+    return f32(x) * (1.0 / 4294967296.0);
+}
+
 // Sample effective image alpha at a canvas-pixel position.
 // Applies black cutoff (luminance) and rectangular edge fade.
 // Returns 0 if outside the image rect or below cutoffs.
@@ -311,12 +321,26 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                 let probeAlpha = imgAlphaAt(probePos, texDims);
                 if (probeAlpha >= params.alphaThreshold) {
                     if (params.respawnOnCollide != 0u) {
-                        // Teleport to one of the 4 corners based on agent index
-                        let corner = i % 4u;
-                        var cp = vec2<f32>(0.0, 0.0);
-                        if      (corner == 1u) { cp = vec2<f32>(params.canvasW, 0.0          ); }
-                        else if (corner == 2u) { cp = vec2<f32>(0.0,           params.canvasH); }
-                        else if (corner == 3u) { cp = vec2<f32>(params.canvasW, params.canvasH); }
+                        // Teleport to a pseudo-random position on the canvas perimeter.
+                        // Seed mixes agent index with quantised time so each collision
+                        // produces a different destination even for the same agent.
+                        let rng   = hash(i ^ (u32(params.time * 137.0) + 1u));
+                        let perim = 2.0 * (params.canvasW + params.canvasH);
+                        let t     = rng * perim;
+                        var cp    = vec2<f32>(0.0, 0.0);
+                        if (t < params.canvasW) {
+                            // Top edge
+                            cp = vec2<f32>(t, 0.0);
+                        } else if (t < params.canvasW + params.canvasH) {
+                            // Right edge
+                            cp = vec2<f32>(params.canvasW, t - params.canvasW);
+                        } else if (t < 2.0 * params.canvasW + params.canvasH) {
+                            // Bottom edge
+                            cp = vec2<f32>(t - params.canvasW - params.canvasH, params.canvasH);
+                        } else {
+                            // Left edge
+                            cp = vec2<f32>(0.0, t - 2.0 * params.canvasW - params.canvasH);
+                        }
                         agents[i].pos = cp;
                         agents[i].vel = vec2<f32>(0.0, 0.0);
                         return;
