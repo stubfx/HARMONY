@@ -54,6 +54,9 @@ const params = {
     // Avoidance
     avoidForceStr:   1.0, // multiplier on image-trace avoidance forces
     avoidMapScale:   1.0, // avoidance map coverage as fraction of canvas (1.0 = full)
+    // Primed-spot probe (free agents only)
+    probeLen:       60.0, // probe cast distance in canvas pixels
+    probeForceStr:   1.0, // steering force multiplier when probe hits a primed pixel
     // Auto-clear
     clearDelay:    20,    // seconds before auto-clearing user trace content (0 = disabled)
     // Session / QR restore
@@ -199,7 +202,7 @@ const agentBuf = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 const soloUB = device.createBuffer({
-    size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
     size: 84, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -1040,6 +1043,8 @@ fMagnet.add(params, 'showImage').name('show image');
 fMagnet.add(params, 'contamMouse').name('mouse eraser');
 fMagnet.add(params, 'contamRadius', 10, 600, 5).name('eraser radius');
 fMagnet.add(params, 'avoidForceStr', 0, 5, 0.05).name('avoid force');
+fMagnet.add(params, 'probeLen',      5, 300, 1   ).name('probe distance');
+fMagnet.add(params, 'probeForceStr', 0, 5,   0.05).name('probe force');
 fMagnet.add(params, 'clearDelay', 0, 120, 5).name('auto clear (s)');
 fMagnet.add({ load: () => document.querySelector('#image-input').click() }, 'load').name('Load image…');
 fMagnet.add({ clear: clearMagnetImage }, 'clear').name('Clear image');
@@ -1261,7 +1266,7 @@ function writeSoloUB(dt, time) {
         ? 0.08 + smoothCoherence * 2 * 0.92   // 0.08 → 1.0
         : 1.0  + (smoothCoherence - 0.5) * 4; // 1.0  → 3.0
 
-    const ab = new ArrayBuffer(112);
+    const ab = new ArrayBuffer(128);
     const u  = new Uint32Array(ab);
     const f  = new Float32Array(ab);
     const { x0, y0, x1, y1 } = getImageRegion();
@@ -1294,6 +1299,8 @@ function writeSoloUB(dt, time) {
     u[24] = hasAvoidMap ? 1 : 0;
     f[25] = params.avoidMapScale;
     u[26] = params.bounceEdges ? 1 : 0;
+    f[27] = params.probeLen;
+    f[28] = params.probeForceStr;
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 

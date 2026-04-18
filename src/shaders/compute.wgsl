@@ -3,7 +3,7 @@
 //   evalDirFormula  — desired heading angle for each particle (radians)
 //   evalWindFormula — wind force direction (radians)
 //
-// SoloParams layout (104 bytes):
+// SoloParams layout (128 bytes):
 //   [0]  agentCount     u32
 //   [4]  canvasW        f32
 //   [8]  canvasH        f32
@@ -31,6 +31,8 @@
 //   [96] hasAvoidMap    u32   (1 = avoidance map active)
 //   [100] avoidMapScale f32   (map covers this fraction of canvas, centered)
 //   [104] bounceEdges   u32   (1 = reflect at canvas edges, 0 = wrap)
+//   [108] probeLen      f32   (primed-spot probe cast distance in canvas pixels)
+//   [112] probeForceStr f32   (steering force multiplier when probe hits a primed pixel)
 
 struct SoloParams {
     agentCount:     u32,
@@ -60,6 +62,8 @@ struct SoloParams {
     hasAvoidMap:    u32,
     avoidMapScale:  f32,
     bounceEdges:    u32,
+    probeLen:       f32,
+    probeForceStr:  f32,
 }
 
 struct Agent {
@@ -290,6 +294,38 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             if (dist < influence && dist > 0.001) {
                 let t = 1.0 - dist / influence;
                 vel += normalize(diff) * t * params.maxSpeed * params.dt * 60.0;
+            }
+        }
+
+        // ── Primed-spot probe ─────────────────────────────────────────────────
+        // Cast a probe ahead along the agent's current velocity. If it lands on
+        // a primed pixel (imgAlpha >= alphaThreshold, meaning another agent is
+        // homing there), steer away using the local alpha gradient at the probe.
+        // Only fires when the image is active and probeForceStr > 0.
+        if (params.hasImage != 0u && params.probeForceStr > 0.001 && params.probeLen > 0.1) {
+            let velLen = length(vel);
+            if (velLen > 0.001) {
+                let probePos   = pos + normalize(vel) * params.probeLen;
+                let probeAlpha = imgAlphaAt(probePos, texDims);
+                if (probeAlpha >= params.alphaThreshold) {
+                    let EPS  = 4.0;
+                    let pgx  = imgAlphaAt(vec2<f32>(probePos.x + EPS, probePos.y), texDims)
+                             - imgAlphaAt(vec2<f32>(probePos.x - EPS, probePos.y), texDims);
+                    let pgy  = imgAlphaAt(vec2<f32>(probePos.x, probePos.y + EPS), texDims)
+                             - imgAlphaAt(vec2<f32>(probePos.x, probePos.y - EPS), texDims);
+                    let pGrad    = vec2<f32>(pgx, pgy);
+                    let pGradLen = length(pGrad);
+                    if (pGradLen > 0.001) {
+                        vel += -normalize(pGrad) * params.maxSpeed * params.probeForceStr
+                             * params.dt * 60.0;
+                    } else {
+                        let away = pos - imgCentre;
+                        if (length(away) > 0.001) {
+                            vel += normalize(away) * params.maxSpeed * params.probeForceStr
+                                 * params.dt * 60.0;
+                        }
+                    }
+                }
             }
         }
 

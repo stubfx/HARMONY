@@ -230,6 +230,16 @@ Opens a file picker. Any browser-supported image format (PNG, JPEG, WebP, etc.) 
 ### Clear image
 Removes the loaded image. If trace text is currently entered, the text trace remains active (the composite is re-rendered with text only). If no text is present, agents return to formula-only mode immediately.
 
+### probe distance (`probeLen`)
+**Range:** 5 – 300 | **Default:** 60
+
+Distance in canvas pixels that free agents cast a probe ahead of themselves along their current velocity. If the probe lands on a **primed** pixel — any trace pixel with alpha ≥ `alphaThreshold`, meaning an agent is homing there — a steering force redirects the free agent away before it reaches that area. Shorter values give less reaction time; longer values cause earlier, wider detours.
+
+### probe force (`probeForceStr`)
+**Range:** 0 – 5 | **Default:** 1.0
+
+Strength of the steering force when a probe hits a primed pixel. The force direction is the negative alpha gradient at the probe point — pushing the agent toward the nearest gap in the trace. At 0 the probe is disabled. Higher values cause sharper detours; lower values produce gentle course corrections.
+
 ---
 
 ## Avoidance map
