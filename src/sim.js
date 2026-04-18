@@ -1044,7 +1044,7 @@ fMagnet.add(params, 'contamMouse').name('mouse eraser');
 fMagnet.add(params, 'contamRadius', 10, 600, 5).name('eraser radius');
 fMagnet.add(params, 'avoidForceStr', 0, 5, 0.05).name('avoid force');
 fMagnet.add(params, 'probeLen',      5, 300, 1   ).name('probe distance');
-fMagnet.add(params, 'probeForceStr', 0, 5,   0.05).name('probe force');
+fMagnet.add(params, 'probeForceStr', 0, 50,  0.5 ).name('probe force');
 fMagnet.add(params, 'clearDelay', 0, 120, 5).name('auto clear (s)');
 fMagnet.add({ load: () => document.querySelector('#image-input').click() }, 'load').name('Load image…');
 fMagnet.add({ clear: clearMagnetImage }, 'clear').name('Clear image');
