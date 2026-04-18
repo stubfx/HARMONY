@@ -807,7 +807,7 @@ await applyFormulas(startDir, startWind, { reseed: true });
 
 // ── Session: Socket.IO connection + QR code ───────────────────────────────────
 // The server assigns a session UUID on socket connect and emits it back as
-// 'session-id'. The sim renders a QR code pointing to /remote/?s=<id> as both
+// 'session-id'. The sim renders a QR code pointing to $VITE_USER_URL/?s=<id> as both
 // a small scannable overlay and a large trace image in the canvas centre.
 // If VITE_N8N_BASE_URL is set, the sim calls n8n directly on each remote-event.
 {
@@ -825,11 +825,11 @@ await applyFormulas(startDir, startWind, { reseed: true });
 
     socket.on('session-id', async (sessionId) => {
         sessionRoom = sessionId;
-        // Extract only the origin from VITE_USER_URL (strips any stale path like /m_src/).
+        // Use VITE_USER_URL as-is (Caddy handles the /remote redirect internally).
         // Falls back to the page's own origin in dev when no env var is set.
-        const envUrl  = import.meta.env.VITE_USER_URL;
-        const base    = envUrl ? new URL(envUrl).origin : window.location.origin;
-        const userUrl = `${base}/remote/?s=${sessionId}`;
+        const envUrl  = (import.meta.env.VITE_USER_URL ?? '').replace(/\/$/, '');
+        const base    = envUrl || window.location.origin;
+        const userUrl = `${base}/?s=${sessionId}`;
 
         console.log('[session] remote URL:', userUrl);
 
@@ -908,10 +908,11 @@ await applyFormulas(startDir, startWind, { reseed: true });
         }
     });
 
-    // A spectator left — decrement internal count and restore QR if room is empty.
+    // A spectator left — decrement internal count.
+    // QR restoration is handled exclusively by the ticker so the remoteTimeout
+    // delay is always respected, even when the last spectator disconnects.
     socket.on('spectator-left', ({ userCount }) => {
         simSpectatorCount = userCount ?? Math.max(0, simSpectatorCount - 1);
-        if (simSpectatorCount === 0) restoreQR();
     });
 
     // Remote events forwarded from spectator devices.
@@ -1112,17 +1113,17 @@ setInterval(() => {
     if (changed) applyFormulas(newDir, newWind);
 }, 30_000);
 
-// ── QR restore fallback ticker ────────────────────────────────────────────────
-// Runs every 5 s. Two independent triggers:
-//   1. Inactivity — no remote events for params.remoteTimeout seconds (0 = disabled)
-//   2. Empty room — simSpectatorCount dropped to 0 but spectator-left was missed
+// ── QR restore ticker ─────────────────────────────────────────────────────────
+// Single authority for QR restoration — runs every 5 s.
+// Restores the QR when remoteTimeout seconds have elapsed since the last
+// remote-event, regardless of whether the room is empty or just quiet.
+// The simSpectatorCount === 0 case is covered naturally: if no one is
+// connected no remote-events arrive, so lastRemoteActivity ages out.
+// remoteTimeout = 0 disables automatic restoration entirely.
 setInterval(() => {
     if (simState.qrStatus === 'SHOW' || !qrBitmap) return;
-    const now = Date.now();
-    if (params.remoteTimeout > 0 && now - lastRemoteActivity > params.remoteTimeout * 1000) {
-        restoreQR(); return;
-    }
-    if (simSpectatorCount <= 0) restoreQR();
+    if (params.remoteTimeout <= 0) return;
+    if (Date.now() - lastRemoteActivity > params.remoteTimeout * 1000) restoreQR();
 }, 5_000);
 
 function apply() { applyFormulas(dirInput.value, windInput.value); }
