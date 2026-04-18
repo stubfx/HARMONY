@@ -68,6 +68,10 @@ const params = {
     autoDir:       true,  // randomly cycle dir formula every 30 s
     bounceEdges:   false, // reflect agents at canvas edges instead of wrapping
     useDeltaTime:  true,  // false = fixed 1/60 s timestep (no frame-spike compensation)
+    // Text positioning
+    textX:        0.5,   // horizontal centre of trace text on canvas (0=left, 1=right)
+    textY:        0.5,   // vertical centre of trace text on canvas (0=top, 1=bottom)
+    textBlobSize: 1.5,   // avoidance blob size multiplier relative to text region
 };
 
 const DEFAULT_DIR  = 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI';
@@ -169,8 +173,9 @@ function updateMonitor(fps) {
 // ── Image region: centered, preserves image aspect ratio ─────────────────────
 // imageSize scales the image so its longer side = imageSize × min(canvasW, canvasH).
 function getImageRegion() {
-    const cx     = canvas.width  / 2;
-    const cy     = canvas.height / 2;
+    const textOnly = !imageBitmap;
+    const cx = canvas.width  * (textOnly ? params.textX : 0.5);
+    const cy = canvas.height * (textOnly ? params.textY : 0.5);
     const refDim = Math.min(canvas.width, canvas.height) * params.imageSize;
     const aspect = imageNaturalW / imageNaturalH;
     let hw, hh;
@@ -282,6 +287,8 @@ const imageSampler = screenSmp;  // same settings — reuse
 let avoidMapTex     = null;
 let avoidMapTexView = null;
 let hasAvoidMap     = false;
+let avoidMapBitmap  = null; // source bitmap retained for recompositing with text blob
+let avoidCanvas     = null; // canvas-resolution composite for CPU-side painting
 
 // Fade: black quad, alpha blend
 const fadeMod = device.createShaderModule({ code: fadeWGSL });
@@ -402,6 +409,7 @@ rebuildOffscreen();
 window.addEventListener('resize', () => {
     setSize();
     rebuildOffscreen();
+    rebuildAvoidTex();
     seedAgents();
 });
 
@@ -468,6 +476,7 @@ function renderTraceCanvas() {
         rebuildSimBG();
         rebuildRenderBG();
         rebuildImageDebugBG();
+        rebuildAvoidTex();
         return;
     }
 
@@ -559,6 +568,7 @@ function renderTraceCanvas() {
     rebuildSimBG();
     rebuildRenderBG();
     rebuildImageDebugBG();
+    rebuildAvoidTex();
 }
 
 // ── Auto-clear timer ──────────────────────────────────────────────────────────
@@ -1041,12 +1051,15 @@ fMagnet.add(params, 'contamMouse').name('mouse eraser');
 fMagnet.add(params, 'contamRadius', 10, 600, 5).name('eraser radius');
 fMagnet.add(params, 'avoidForceStr', 0, 5, 0.05).name('avoid force');
 fMagnet.add(params, 'clearDelay', 0, 120, 5).name('auto clear (s)');
+fMagnet.add(params, 'textX', 0, 1, 0.01).name('text pos X').onChange(() => rebuildAvoidTex());
+fMagnet.add(params, 'textY', 0, 1, 0.01).name('text pos Y').onChange(() => rebuildAvoidTex());
 fMagnet.add({ load: () => document.querySelector('#image-input').click() }, 'load').name('Load image…');
 fMagnet.add({ clear: clearMagnetImage }, 'clear').name('Clear image');
 fMagnet.add({ clear: clearTraceText },   'clear').name('Clear text');
 
 const fAvoid = gui.addFolder('Avoidance map');
-fAvoid.add(params, 'avoidMapScale', 0.05, 1.0, 0.01).name('scale');
+fAvoid.add(params, 'avoidMapScale', 0.05, 2.0, 0.01).name('scale');
+fAvoid.add(params, 'textBlobSize',  0.5,  5.0, 0.1).name('blob size').onChange(() => rebuildAvoidTex());
 fAvoid.add({ load: () => document.querySelector('#avoid-map-input').click() }, 'load').name('Load map…');
 fAvoid.add({ clear: clearAvoidMap }, 'clear').name('Clear map');
 
@@ -1151,7 +1164,72 @@ document.querySelector('#image-input').addEventListener('change', e => {
     e.target.value = '';
 });
 
-// ── Avoidance map upload ──────────────────────────────────────────────────────
+// ── Avoidance map compositing ─────────────────────────────────────────────────
+// The GPU avoidance texture is always rebuilt from two CPU layers:
+//   1. avoidMapBitmap — user-uploaded image, cover-fit in JS
+//   2. Text blob      — blurred white ellipse centred on the trace text region
+// Both layers share one canvas-resolution texture (binding 4) so no shader
+// change is needed. Rebuilt once per source change, not every frame.
+function rebuildAvoidTex() {
+    const text    = document.querySelector('#trace-text-input')?.value.trim() ?? '';
+    const hasText = text.length > 0;
+
+    if (!avoidMapBitmap && !hasText) {
+        if (avoidMapTex) { avoidMapTex.destroy(); avoidMapTex = null; }
+        avoidMapTexView = null;
+        hasAvoidMap     = false;
+        rebuildSimBG();
+        return;
+    }
+
+    const W = canvas.width;
+    const H = canvas.height;
+    if (!avoidCanvas) avoidCanvas = document.createElement('canvas');
+    avoidCanvas.width  = W;
+    avoidCanvas.height = H;
+    const ctx = avoidCanvas.getContext('2d');
+    ctx.clearRect(0, 0, W, H);
+
+    // Layer 1: user avoidance map, cover-fit
+    if (avoidMapBitmap) {
+        const scale = Math.max(W / avoidMapBitmap.width, H / avoidMapBitmap.height);
+        const sw = avoidMapBitmap.width  * scale;
+        const sh = avoidMapBitmap.height * scale;
+        ctx.drawImage(avoidMapBitmap, (W - sw) / 2, (H - sh) / 2, sw, sh);
+    }
+
+    // Layer 2: blurred white ellipse centred on the rendered text region
+    if (hasText) {
+        const region = getImageRegion();
+        const rW     = region.x1 - region.x0;
+        const rH     = region.y1 - region.y0;
+        const blobCx = (region.x0 + region.x1) / 2;
+        const blobCy = (region.y0 + region.y1) / 2;
+        const blobW  = rW * params.textBlobSize;
+        const blobH  = rH * params.textBlobSize;
+        const blurPx = Math.round(Math.min(blobW, blobH) * 0.35);
+
+        ctx.save();
+        ctx.filter    = `blur(${blurPx}px)`;
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.ellipse(blobCx, blobCy, blobW / 2, blobH / 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    if (avoidMapTex) avoidMapTex.destroy();
+    avoidMapTex = device.createTexture({
+        size:   [W, H],
+        format: 'rgba8unorm',
+        usage:  GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    device.queue.copyExternalImageToTexture({ source: avoidCanvas }, { texture: avoidMapTex }, [W, H]);
+    avoidMapTexView = avoidMapTex.createView();
+    hasAvoidMap     = true;
+    rebuildSimBG();
+}
+
 async function loadAvoidMap(source) {
     let bmp;
     if (typeof source === 'string') {
@@ -1161,23 +1239,13 @@ async function loadAvoidMap(source) {
     } else {
         bmp = await createImageBitmap(source, { colorSpaceConversion: 'none' });
     }
-    if (avoidMapTex) avoidMapTex.destroy();
-    avoidMapTex = device.createTexture({
-        size:   [bmp.width, bmp.height],
-        format: 'rgba8unorm',
-        usage:  GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-    });
-    device.queue.copyExternalImageToTexture({ source: bmp }, { texture: avoidMapTex }, [bmp.width, bmp.height]);
-    avoidMapTexView = avoidMapTex.createView();
-    hasAvoidMap     = true;
-    rebuildSimBG();
+    avoidMapBitmap = bmp;
+    rebuildAvoidTex();
 }
 
 function clearAvoidMap() {
-    if (avoidMapTex) { avoidMapTex.destroy(); avoidMapTex = null; }
-    avoidMapTexView = null;
-    hasAvoidMap     = false;
-    rebuildSimBG();
+    avoidMapBitmap = null;
+    rebuildAvoidTex();
 }
 
 document.querySelector('#avoid-map-input').addEventListener('change', e => {
