@@ -9,10 +9,14 @@
 //        'remote-event'. The sim calls n8n directly if VITE_N8N_WEBHOOK_URL is set.
 //   4. Collective state — aggregates all spectators' tilt + temperature per room
 //        and emits 'collective-state' to the host simulation every 300 ms
+//   5. Spectator presence — calls n8n /webhook/spectator on every join and leave,
+//        forwarding the response as 'sim-params' to the host. The server is the
+//        authoritative source for connection counts; the sim never tracks them.
 //
 // Signal path:
 //   remote → socket → server → socket → simulation [→ n8n → simulation]
 //   server (ticker) → 'collective-state' → simulation
+//   server (join/leave) → n8n /spectator → 'sim-params' → simulation
 
 import express           from 'express';
 import { createServer }  from 'node:http';
@@ -35,8 +39,10 @@ const isDev       = process.env.NODE_ENV === 'development';
 const VITE_PORT   = process.env.VITE_PORT ?? 5173;
 
 const ADMIN_PASS = process.env.ADMIN_PASSWORD ?? '';
+const N8N_BASE   = (process.env.VITE_N8N_BASE_URL ?? '').replace(/\/$/, '');
 
 if (!ADMIN_PASS) console.warn('[server] ADMIN_PASSWORD not set — /admin will be inaccessible');
+if (!N8N_BASE)   console.warn('[server] N8N_BASE_URL not set — spectator presence will not call n8n');
 
 const ORIGINS = [
     'https://stubfx.io',
@@ -53,27 +59,31 @@ app.use(cors({ origin: ORIGINS, methods: ['GET', 'POST'], allowedHeaders: ['Cont
 app.use(express.static(path.join(__dirname, '../dist')));
 
 // ── Admin tokens ─────────────────────────────────────────────────────────────
-// Short-lived UUIDs issued by /admin-auth. Stored in memory; expire after 24 h.
-// Each authenticated admin socket has its token stored in the closure so it
-// doesn't need to re-send it with every event.
 const adminTokens = new Map(); // token → expiry (ms timestamp)
 
-// Prune expired tokens hourly
 setInterval(() => {
     const now = Date.now();
     for (const [t, exp] of adminTokens) if (now > exp) adminTokens.delete(t);
 }, 60 * 60 * 1000);
 
 // ── Room state ────────────────────────────────────────────────────────────────
-// Tracks per-room spectator data for collective-state aggregation.
-// Structure: Map<roomId, { hostSocketId, users: Map<socketId, UserState> }>
-// UserState: { pitch, roll, temperature, lastSeen }
+// connections: Map<socketId, spectatorId> — authoritative connected-user count,
+//              never pruned; entries removed only on socket disconnect.
+// users:       Map<socketId, UserState>   — tilt/touch aggregation; pruned on inactivity.
+// n8nTestMode: mirrors the host sim's n8nTestMode param so server calls the right endpoint.
 const rooms = new Map();
 
-const USER_TIMEOUT_MS = 15_000; // remove users not seen for 15 s
+const USER_TIMEOUT_MS = 15_000;
 
 function getOrCreateRoom(roomId) {
-    if (!rooms.has(roomId)) rooms.set(roomId, { hostSocketId: null, users: new Map() });
+    if (!rooms.has(roomId)) {
+        rooms.set(roomId, {
+            hostSocketId: null,
+            connections:  new Map(), // socketId → spectatorId
+            users:        new Map(), // socketId → UserState
+            n8nTestMode:  false,
+        });
+    }
     return rooms.get(roomId);
 }
 
@@ -87,36 +97,70 @@ function updateUserState(roomId, socketId, type, data) {
     }
     user.lastSeen = Date.now();
     if (type === 'tilt') {
-        user.pitch     = data.pitch ?? 0.5;
-        user.roll      = data.roll  ?? 0.5;
+        user.pitch = data.pitch ?? 0.5;
+        user.roll  = data.roll  ?? 0.5;
     }
     if (type === 'touch') {
         user.temperature = data.temp ?? 0.5;
-        user.coherence   = data.x   ?? 0.5; // X axis → coherence (left=chaos, right=order)
+        user.coherence   = data.x   ?? 0.5;
+    }
+}
+
+// ── n8n spectator presence ────────────────────────────────────────────────────
+// Called on every join and leave. Response is forwarded as 'sim-params' to the
+// host so n8n can react (show/hide QR, adjust params, etc.) with full context.
+const N8N_TIMEOUT_MS = 5_000;
+
+async function callN8nSpectator(roomId, type, spectatorId, userCount, testMode) {
+    if (!N8N_BASE) return;
+    const endpoint = testMode ? '/webhook-test/spectator' : '/webhook/spectator';
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), N8N_TIMEOUT_MS);
+    try {
+        const res = await fetch(N8N_BASE + endpoint, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ type, room: roomId, spectatorId, userCount }),
+            signal:  controller.signal,
+        });
+        clearTimeout(timer);
+        if (res.ok) {
+            const data = await res.json();
+            if (data && typeof data === 'object') {
+                const room = rooms.get(roomId);
+                if (room?.hostSocketId) io.to(room.hostSocketId).emit('sim-params', data);
+            }
+        }
+    } catch (err) {
+        clearTimeout(timer);
+        if (err.name !== 'AbortError') console.warn('[n8n spectator]', err.message);
     }
 }
 
 // ── Collective-state ticker ───────────────────────────────────────────────────
 // Every 300 ms: prune stale users, compute averages, emit to host simulation.
+// userCount reflects actual socket connections (room.connections), not active tilt senders.
 setInterval(() => {
     const now = Date.now();
     for (const [, room] of rooms) {
-        // Prune users not seen recently
         for (const [uid, u] of room.users) {
             if (now - u.lastSeen > USER_TIMEOUT_MS) room.users.delete(uid);
         }
-        if (!room.hostSocketId || !room.users.size) continue;
+        if (!room.hostSocketId || !room.connections.size) continue;
 
         let sp = 0, sr = 0, st = 0, sc = 0;
-        for (const u of room.users.values()) { sp += u.pitch; sr += u.roll; st += u.temperature; sc += u.coherence; }
-        const n = room.users.size;
+        const activeUsers = [...room.users.values()];
+        const n = activeUsers.length;
+        if (n > 0) {
+            for (const u of activeUsers) { sp += u.pitch; sr += u.roll; st += u.temperature; sc += u.coherence; }
+        }
 
         io.to(room.hostSocketId).emit('collective-state', {
-            avgPitch:     sp / n,
-            avgRoll:      sr / n,
-            avgTemp:      st / n,
-            avgCoherence: sc / n,
-            userCount:    n,
+            avgPitch:     n > 0 ? sp / n : 0.5,
+            avgRoll:      n > 0 ? sr / n : 0.5,
+            avgTemp:      n > 0 ? st / n : 0.5,
+            avgCoherence: n > 0 ? sc / n : 0.5,
+            userCount:    room.connections.size,
         });
     }
 }, 300);
@@ -128,7 +172,7 @@ app.post('/admin-auth', (req, res) => {
         return res.status(401).json({ error: 'Unauthorized' });
     }
     const token = randomUUID();
-    adminTokens.set(token, Date.now() + 24 * 60 * 60 * 1000); // 24 h
+    adminTokens.set(token, Date.now() + 24 * 60 * 60 * 1000);
     console.log('[admin] token issued');
     res.json({ token });
 });
@@ -138,21 +182,27 @@ io.on('connection', (socket) => {
     let assignedRoom = null;
 
     // ── Host (simulation display) ─────────────────────────────────────────────
-    // The sim emits 'register-host' immediately on connect.
-    // The server generates a UUID session room and emits it back.
-    socket.on('register-host', () => {
+    socket.on('register-host', ({ testMode } = {}) => {
         const sessionId = randomUUID();
         assignedRoom    = sessionId;
         socket.join(sessionId);
         socket.emit('session-id', sessionId);
         const room = getOrCreateRoom(sessionId);
         room.hostSocketId = socket.id;
-        console.log('[socket] host registered   room:', sessionId);
+        room.n8nTestMode  = !!testMode;
+        console.log('[socket] host registered   room:', sessionId, '| testMode:', !!testMode);
+    });
+
+    // Syncs the host sim's n8nTestMode toggle so the server calls the right endpoint.
+    socket.on('set-n8n-test-mode', (testMode) => {
+        const room = assignedRoom ? rooms.get(assignedRoom) : null;
+        if (room && room.hostSocketId === socket.id) {
+            room.n8nTestMode = !!testMode;
+            console.log('[socket] n8nTestMode →', !!testMode, '  room:', assignedRoom);
+        }
     });
 
     // ── Admin controller ──────────────────────────────────────────────────────
-    // Admin sockets join a room without counting as spectators and can push
-    // sim-params directly to the host.
     let adminAuthorized = false;
     let adminToken      = null;
 
@@ -173,7 +223,6 @@ io.on('connection', (socket) => {
 
     socket.on('admin-sim-params', (params) => {
         if (!adminAuthorized) return;
-        // Re-validate token hasn't expired
         const expiry = adminTokens.get(adminToken);
         if (!expiry || Date.now() > expiry) {
             adminAuthorized = false;
@@ -186,28 +235,28 @@ io.on('connection', (socket) => {
     });
 
     // ── Remote device (spectator) ─────────────────────────────────────────────
-    // The remote emits 'join-session' with the room UUID from the QR code URL.
     socket.on('join-session', ({ room, spectatorId }) => {
-        assignedRoom = room;
-        const roomData = getOrCreateRoom(room);
+        assignedRoom    = room;
+        const roomData  = getOrCreateRoom(room);
+        const sid       = spectatorId ?? socket.id;
+
         roomData.users.set(socket.id, { pitch: 0.5, roll: 0.5, temperature: 0.5, coherence: 0.5, lastSeen: Date.now() });
-        // Join a spectator sub-room so peers can be notified of each other's presence
+        roomData.connections.set(socket.id, sid);
         socket.join(`${room}:spectators`);
-        console.log('[socket] remote joined     room:', room, '| spectator:', spectatorId ?? '—');
-        socket.emit('joined', { room, userCount: roomData.users.size });
-        // Notify the host simulation — triggers the join burst on the big screen
+
+        const userCount = roomData.connections.size;
+        console.log('[socket] remote joined     room:', room, '| spectator:', sid, '| total:', userCount);
+
+        socket.emit('joined', { room, userCount });
         if (roomData.hostSocketId) {
-            io.to(roomData.hostSocketId).emit('spectator-joined', { userCount: roomData.users.size });
+            io.to(roomData.hostSocketId).emit('spectator-joined', { userCount });
         }
-        // Notify all other spectators in the room — brief pulse + updated count
-        socket.to(`${room}:spectators`).emit('peer-joined', { userCount: roomData.users.size });
+        socket.to(`${room}:spectators`).emit('peer-joined', { userCount });
+
+        callN8nSpectator(room, 'spectator-joined', sid, userCount, roomData.n8nTestMode);
     });
 
     // ── User event from remote ────────────────────────────────────────────────
-    // Always update aggregate room state first.
-    // Tilt events are aggregated only (not forwarded individually — the ticker handles that).
-    // All other events are forwarded straight to the simulation as 'remote-event'.
-    // If VITE_N8N_WEBHOOK_URL is set the sim will call n8n directly on receipt.
     socket.on('user-event', ({ type, data }) => {
         const room        = assignedRoom;
         const spectatorId = socket.id;
@@ -215,7 +264,6 @@ io.on('connection', (socket) => {
 
         updateUserState(room, socket.id, type, data);
 
-        // Tilt is consumed server-side for aggregation; no individual forwarding needed.
         if (type === 'tilt') return;
 
         io.to(room).emit('remote-event', { type, spectatorId, data, timestamp: Date.now() });
@@ -226,22 +274,27 @@ io.on('connection', (socket) => {
         console.log('[socket] disconnected      room:', assignedRoom);
         const room = rooms.get(assignedRoom);
         if (room) {
-            const isHost = room.hostSocketId === socket.id;
+            const isHost      = room.hostSocketId === socket.id;
+            const spectatorId = room.connections.get(socket.id);
             room.users.delete(socket.id);
+            room.connections.delete(socket.id);
+
             if (isHost) {
                 room.hostSocketId = null;
             } else {
-                const remaining = room.users.size;
-                // Notify the host simulation — used to restore QR when room empties.
+                const remaining = room.connections.size;
                 if (room.hostSocketId) {
                     io.to(room.hostSocketId).emit('spectator-left', { userCount: remaining });
                 }
-                // Notify remaining spectators — used to show QR again if count drops below threshold.
                 io.to(`${assignedRoom}:spectators`).emit('peer-left', { userCount: remaining });
                 console.log('[socket] spectator left    room:', assignedRoom, '| remaining:', remaining);
+
+                if (spectatorId !== undefined) {
+                    callN8nSpectator(assignedRoom, 'spectator-left', spectatorId, remaining, room.n8nTestMode);
+                }
             }
-            // Clean up fully empty rooms
-            if (!room.hostSocketId && !room.users.size) rooms.delete(assignedRoom);
+
+            if (!room.hostSocketId && !room.connections.size) rooms.delete(assignedRoom);
         }
     });
 });
@@ -257,12 +310,7 @@ app.post('/rndImage', async (_req, res) => {
 });
 
 // ── Page fallbacks ────────────────────────────────────────────────────────────
-// Two Vite entry points, each routed to its own HTML file.
-// In dev: redirect to the Vite dev server (which handles HMR and module imports).
-// In prod: express.static handles /assets/* and exact file matches; these
-// catch-alls cover client-side navigation (query strings, unknown sub-paths, etc.).
 function sendPage(distFile, req, res) {
-    // In dev, redirect to the Vite dev server preserving the full URL (path + query).
     if (isDev) return res.redirect(`http://localhost:${VITE_PORT}${req.originalUrl}`);
     res.sendFile(path.join(__dirname, '../dist', distFile), (err) => {
         if (err) res.status(503).send('Build not found — run `npm run build` first.');

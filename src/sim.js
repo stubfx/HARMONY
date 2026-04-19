@@ -773,7 +773,6 @@ function updateStateDisplay() {
 
 let qrBitmap           = null;  // permanent reference to the session QR bitmap
 let sessionRoom        = null;  // UUID assigned by server — needed for n8n payload
-let simSpectatorCount  = 0;     // local spectator count — synced from server events
 let lastRemoteActivity = Date.now(); // timestamp of last remote-event (touch or text)
 
 // ── n8n direct integration ────────────────────────────────────────────────────
@@ -826,12 +825,11 @@ async function callN8nHeartbeat() {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({
-                type:       'heartbeat',
-                room:       sessionRoom,
-                spectators: simSpectatorCount,
-                status:     simState.status,
-                qrStatus:   simState.qrStatus,
-                params:     { ...params },
+                type:     'heartbeat',
+                room:     sessionRoom,
+                status:   simState.status,
+                qrStatus: simState.qrStatus,
+                params:   { ...params },
             }),
             signal:  controller.signal,
         });
@@ -865,6 +863,8 @@ await applyFormulas(startDir, startWind, { reseed: true });
 // 'session-id'. The sim renders a QR code pointing to $VITE_USER_URL/?s=<id> as both
 // a small scannable overlay and a large trace image in the canvas centre.
 // If VITE_N8N_BASE_URL is set, the sim calls n8n directly on each remote-event.
+// socket is declared here so the GUI's n8nTestMode onChange can reach it.
+let socket;
 {
     // In dev, Vite runs on a different port from Express, so connect directly to Express.
     // In production, use VITE_SOCKET_URL (the Caddy-fronted public origin) so Socket.IO
@@ -872,11 +872,11 @@ await applyFormulas(startDir, startWind, { reseed: true });
     const socketUrl = import.meta.env.DEV
         ? `http://localhost:${import.meta.env.VITE_SERVER_PORT ?? 3000}`
         : (import.meta.env.VITE_SOCKET_URL || '/');
-    const socket = ioConnect(socketUrl, { reconnectionDelay: 2000 });
+    socket = ioConnect(socketUrl, { reconnectionDelay: 2000 });
 
     // Identify this socket as the host simulation so the server can distinguish
     // it from remote spectator sockets and assign a UUID session room.
-    socket.emit('register-host');
+    socket.emit('register-host', { testMode: params.n8nTestMode });
 
     socket.on('session-id', async (sessionId) => {
         sessionRoom = sessionId;
@@ -939,26 +939,11 @@ await applyFormulas(startDir, startWind, { reseed: true });
         dbgCoherence.updateDisplay();
     });
 
-    // A spectator joined — fire a brief directional gust into the field.
-    // Random angle each time so every join feels distinct.
-    // Once the connected count reaches maxSpectators the QR is dismissed
-    // (clearMagnetImage also applies a random formula so the sim breathes).
-    socket.on('spectator-joined', ({ userCount }) => {
-        simSpectatorCount = userCount ?? simSpectatorCount + 1;
-        // Reset activity clock so the remoteTimeout inactivity timer starts
-        // from when someone actually arrives, not from sim boot.
+    // A spectator joined — fire a brief brightness burst into the field.
+    // Count and QR threshold logic is handled by n8n via the /spectator webhook.
+    socket.on('spectator-joined', () => {
         lastRemoteActivity = Date.now();
-        burstBrightness = BURST_BRIGHTNESS;
-        if (simState.qrStatus === 'SHOW' && simSpectatorCount >= params.maxSpectators) {
-            clearMagnetImage();
-        }
-    });
-
-    // A spectator left — decrement internal count.
-    // QR restoration is handled exclusively by the ticker so the remoteTimeout
-    // delay is always respected, even when the last spectator disconnects.
-    socket.on('spectator-left', ({ userCount }) => {
-        simSpectatorCount = userCount ?? Math.max(0, simSpectatorCount - 1);
+        burstBrightness    = BURST_BRIGHTNESS;
     });
 
     // Remote events forwarded from spectator devices.
@@ -1106,7 +1091,7 @@ const fSession = gui.addFolder('Session');
 fSession.add(params, 'qrFadeZone').name('QR fade zone');
 fSession.add(params, 'remoteTimeout',  0, 180,  5).name('idle restore QR (s)');
 fSession.add(params, 'maxSpectators',  1,  50,  1).name('QR hides at N users');
-fSession.add(params, 'n8nTestMode').name('n8n test mode');
+fSession.add(params, 'n8nTestMode').name('n8n test mode').onChange(v => socket.emit('set-n8n-test-mode', v));
 fSession.add(params, 'heartbeatInterval', 0, 120, 5).name('heartbeat (s)').onChange(() => restartHeartbeat());
 
 const fDebug = gui.addFolder('Debug');

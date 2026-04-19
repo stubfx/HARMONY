@@ -1,11 +1,60 @@
-# n8n Heartbeat Control Reference
+# n8n Control Reference
 
-The simulation sends a `POST` to `/webhook/heartbeat` every `heartbeatInterval` seconds.
-Whatever JSON the webhook returns is parsed and passed directly to `applySimParams()`.
+Two webhook paths receive data from the simulation system. Both return a JSON object that is applied directly as sim params via `applySimParams()`.
 
 ---
 
-## Named action flags
+## `/webhook/spectator` — Spectator presence (server → n8n)
+
+Called by the **server** (not the sim) whenever a spectator socket connects or disconnects. This is the authoritative source for user counts — the sim never tracks them itself.
+
+### Payload
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | `"spectator-joined"` \| `"spectator-left"` | Event type |
+| `room` | `string` | Session room UUID |
+| `spectatorId` | `string` | Persistent UUID from the remote device (survives page refresh within the same browser session) |
+| `userCount` | `number` | Total connected spectators after this event |
+
+### Example
+
+```json
+{ "type": "spectator-joined", "room": "uuid", "spectatorId": "uuid", "userCount": 2 }
+{ "type": "spectator-left",   "room": "uuid", "spectatorId": "uuid", "userCount": 1 }
+```
+
+### Response
+
+Return any sim params to push to the host immediately. The server forwards the response as a `sim-params` socket event. Typical use: show/hide QR, adjust params when the room fills or empties.
+
+```json
+{ "showQR": false, "status": "NORMAL" }
+```
+
+---
+
+## `/webhook/heartbeat` — Periodic sim snapshot (sim → n8n)
+
+The sim sends this every `heartbeatInterval` seconds (default: 5 s). Use it to keep n8n in sync with the current state and to push changes back proactively.
+
+### Payload
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | `"heartbeat"` | Always `"heartbeat"` |
+| `room` | `string` | Session room UUID |
+| `status` | `"NORMAL"` \| `"IDLE"` | Current simulation state |
+| `qrStatus` | `"SHOW"` \| `"HIDE"` | Whether the QR code is the active magnet image |
+| `params` | `object` | Full snapshot of all current sim params (see below) |
+
+### Response
+
+Same as `/spectator` — any JSON keys are applied via `applySimParams()`.
+
+---
+
+## Named action flags (response only)
 
 These keys trigger immediate side-effects and are **not** stored in `params`.
 
@@ -23,10 +72,9 @@ These keys trigger immediate side-effects and are **not** stored in `params`.
 
 ---
 
-## Params overrides
+## Params overrides (response only)
 
 Any key matching a property in the `params` object is written directly and takes effect on the next frame.
-All numeric and boolean values are accepted.
 
 ### Motion
 
@@ -90,7 +138,7 @@ All numeric and boolean values are accepted.
 | `contamPush` | `false` | bool | When true, agents near the eraser circle are pushed outward. When false, the eraser only clears the trace alpha without disturbing velocities. |
 | `contamRadius` | `150` | px | Radius of each contamination circle in canvas pixels. |
 
-### Agent probe (free-agent avoidance of primed slots)
+### Agent probe
 
 | Key | Default | Range | Description |
 |-----|---------|-------|-------------|
@@ -109,26 +157,20 @@ All numeric and boolean values are accepted.
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `maxSpectators` | `1` | If connected spectator count reaches this value, the QR code is cleared automatically. |
 | `qrFadeZone` | `false` | Fades free agents near the QR rect to keep it scannable. |
 | `remoteTimeout` | `0` | Seconds of silence from all remotes before the QR is restored. `0` = disabled. |
 | `clearDelay` | `0` | Seconds before auto-clearing user-submitted trace content. `0` = disabled. |
 | `heartbeatInterval` | `5` | Seconds between heartbeat calls. `0` = off. |
-| `n8nTestMode` | `false` | Routes to `/webhook-test/` endpoints instead of `/webhook/` for n8n test mode. |
+| `n8nTestMode` | `false` | Routes all n8n calls (sim and server) to `/webhook-test/` endpoints. Server follows automatically via socket sync. |
 
 ---
 
-## Example response payload
+## Test mode
 
-```json
-{
-  "status":    "NORMAL",
-  "showQR":    true,
-  "magnetStr": 8.0,
-  "brightness": 0.08,
-  "windStr":   0.5,
-  "qrFadeZone": true
-}
-```
+Toggle `n8n test mode` in the Session GUI panel. The sim immediately emits `set-n8n-test-mode` to the server so both the sim's own HTTP calls and the server's spectator calls switch endpoints in sync.
 
-Only include keys you want to change — all others retain their current values.
+| Production | Test |
+|-----------|------|
+| `/webhook/heartbeat` | `/webhook-test/heartbeat` |
+| `/webhook/spectator` | `/webhook-test/spectator` |
+| `/webhook/sim-event` | `/webhook-test/sim-event` |
