@@ -24,10 +24,10 @@
 //   [36] imgY1          f32
 //   [40] alphaThreshold f32
 //   [44] blackThreshold f32
-//   [48] _p0            u32
-//   [52] _p1            u32
-//   [56] _p2            u32
-//   [60] _p3            u32
+//   [48] vignetteEdge   f32   (matches SoloParams — 0 in QR mode)
+//   [52] _p0            u32
+//   [56] _p1            u32
+//   [60] _p2            u32
 
 struct AgentShadowParams {
     canvasW:        f32,
@@ -42,10 +42,10 @@ struct AgentShadowParams {
     imgY1:          f32,
     alphaThreshold: f32,
     blackThreshold: f32,
+    vignetteEdge:   f32,
     _p0:            u32,
     _p1:            u32,
     _p2:            u32,
-    _p3:            u32,
 }
 
 struct Agent {
@@ -85,15 +85,21 @@ struct VsOut {
     );
 
     // An agent is homing when its home pixel is primed — inside the image rect
-    // and with luma >= blackThreshold and alpha >= alphaThreshold.
+    // and passing the SAME vignette-weighted alpha check as imgAlphaAt() in compute.wgsl:
+    //   luma >= blackThreshold  AND  s.a × vig >= alphaThreshold
+    // Using raw s.a without vig would cast shadows for edge-zone "limbo" agents that
+    // compute considers free, breaking the render/shadow/compute consistency.
     var isHoming = 0.0;
     if (p.hasImage != 0u &&
         homeUV.x >= 0.0 && homeUV.x <= 1.0 &&
         homeUV.y >= 0.0 && homeUV.y <= 1.0) {
-        let uv   = clamp(homeUV, vec2<f32>(0.0), vec2<f32>(1.0));
-        let s    = textureSampleLevel(imgTex, imgSmp, uv, 0.0);
-        let luma = dot(s.rgb, vec3<f32>(0.299, 0.587, 0.114));
-        if (luma >= p.blackThreshold && s.a >= p.alphaThreshold) {
+        let uv       = clamp(homeUV, vec2<f32>(0.0), vec2<f32>(1.0));
+        let s        = textureSampleLevel(imgTex, imgSmp, uv, 0.0);
+        let luma     = dot(s.rgb, vec3<f32>(0.299, 0.587, 0.114));
+        let distEdge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
+        let vig      = smoothstep(0.0, max(p.vignetteEdge, 0.0001), distEdge);
+        let effAlpha = s.a * vig;
+        if (luma >= p.blackThreshold && effAlpha >= p.alphaThreshold) {
             isHoming = 1.0;
         }
     }

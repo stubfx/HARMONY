@@ -1438,6 +1438,7 @@ function writeAgentShadowUB() {
     f[9]  = y1;
     f[10] = params.alphaThreshold;
     f[11] = params.blackThreshold;
+    f[12] = simState.qrStatus === 'SHOW' ? 0 : params.vignetteEdge;
     device.queue.writeBuffer(agentShadowUB, 0, ab);
 }
 

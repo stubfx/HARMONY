@@ -175,6 +175,8 @@ The color agents approach as their speed reaches `max speed`. The two colors are
 
 The alpha of each rendered particle quad. Because particle blending is additive (`src-alpha / one`), lower values allow many particles to overlap without saturating to white — the accumulation is gradual. Raising this makes individual particles more visible but causes bright spots to blow out quickly in dense areas. This is the primary control for managing visual density vs. saturation.
 
+> **Homing agents are unaffected by this slider.** Agents whose home pixel is primed always render at the full alpha of the image pixel they're assigned to (multiplied only by the edge vignette). This ensures the collective image they form reads at full intended intensity regardless of how dim free agents are set.
+
 ---
 
 ## Trace
@@ -198,6 +200,8 @@ The threshold exists to prevent agents from homing to nearly-invisible edge pixe
 
 > Note: the `black cutoff` check runs before this — a pixel can pass the alpha threshold but still be skipped if its luminance is below the black cutoff.
 
+> Note: the effective alpha used for this check is `imgSample.a × vignetteEdgeFactor`. Edge pixels whose raw alpha meets the threshold but whose vignette-weighted alpha does not are treated as free agents consistently in the compute shader, the render shader, and the agent shadow shader. Without this alignment they would enter a "limbo" state — free in physics but displayed with image colour and casting shadows.
+
 > **QR mode and the sampler mismatch:** the compute shader samples the trace texture with `textureLoad` (exact nearest-neighbour lookup). The render shader normally uses a bilinear sampler. On a 512 px QR stretched to a large canvas, this causes a disagreement at module boundaries: an agent whose home lands in a transparent gap between two white modules may get `alpha = 0` from the nearest-neighbour lookup (free in compute), but `alpha ≈ 0.3–0.5` from bilinear interpolation (renders white in the fragment shader). The result is phantom white dots that move freely and never home. In QR mode the render shader is switched to the same `textureLoad` path so both shaders agree on the exact pixel value. Adjusting `alphaThreshold` changes the width of this disagreement zone.
 
 ### black cutoff (`blackThreshold`)
@@ -212,7 +216,13 @@ This is primarily useful for images without a proper alpha channel (JPEGs, photo
 
 Fades the outer edges of the image rect with a smooth rectangular vignette. The value is the width of the fade band in UV units (0–1 across the image). At 0, no fade is applied and the image has a hard edge. At 0.1, the outermost 10% of each edge fades to transparent. At 0.5, the fade extends to the centre from all sides.
 
-The fade is computed as `smoothstep(0, vignetteEdge, distanceFromNearestEdge)` and affects both the rendered image color (alpha is multiplied by the fade factor) and the homing signal (effective alpha used by the compute shader is also multiplied).
+The fade factor is `vig = smoothstep(0, vignetteEdge, distanceFromNearestEdge)` and is applied consistently across all three passes that evaluate whether an agent is homing:
+
+- **Compute** (`imgAlphaAt`): returns `px.a × vig`; the homing gate is `effAlpha >= alphaThreshold`
+- **Render** (fragment shader): checks `imgSample.a × vig >= alphaThreshold` before rendering image colour
+- **Agent shadow** (vertex shader): checks `s.a × vig >= alphaThreshold` before casting a shadow splat
+
+All three use the same formula so they always agree on which agents are homing. Without this alignment, edge-zone agents could end up in a "limbo" state — physically free in the compute shader but still rendered with image colour or casting shadows.
 
 ### size (`imageSize`)
 **Range:** 0.05 – 1.0 | **Default:** 0.316
@@ -266,6 +276,39 @@ Each edge receives collision traffic proportional to its pixel length, so on a 1
 - **`probe force`** has no effect while respawn is on — the steering path is never taken.
 - **`bounceEdges`** affects what happens after the respawn: with wrapping (default) an agent placed exactly on the right edge (`x = canvasW`) wraps to `x = 0` on the next step. This is visually imperceptible since the velocity is zero at respawn.
 - **Homing agents are unaffected** — the probe and respawn only run in the free-agent branch.
+
+---
+
+### shadow strength (`agentShadowStr`)
+**Range:** 0 – 1 | **Default:** 0.20 | **Step:** 0.005
+
+Peak opacity of the dark splat each homing agent casts beneath itself every frame. The splat is a radial gradient — fully black at the agent's centre, fading smoothly to transparent at the edge (`shadow radius`). This value sets the maximum alpha at the centre. At 0 no shadow is cast. Because many homing agents overlap in the same regions, their splats accumulate — use low values (0.05–0.30) to avoid over-darkening the field.
+
+### shadow radius (`agentShadowRadius`)
+**Range:** 0 – 300 | **Default:** 10 | **Step:** 0.5
+
+Half-radius of each homing agent's shadow splat in canvas pixels. Each homing agent renders a quad of side `2 × radius` centred on its current position. The fragment shader applies `1 − smoothstep(0, radius, dist)` so the darkness falls off from full at the centre to zero at `radius` pixels away. Small values (5–20) produce tight, precise shadows that closely follow individual particles; large values (80–200) spread a broad dark haze across the entire trace area.
+
+> **Performance note:** shadow rendering dispatches `agentCount × 6` vertices (one quad per agent). Non-homing agents are culled at the vertex stage (degenerate point placed outside clip space, generating zero fragments), so fragment work scales only with the number of homing agents and their covered area. Very large radii on dense simulations will still increase fragment throughput — reduce radius or agent count if frame rate drops.
+
+#### How the shadow pass works
+
+Shadow rendering is a dedicated render sub-pass inside the offscreen render pass, positioned between the trail fade and the particle draw. The pipeline:
+
+1. **Vertex shader** reads `agents[agentId].home`, computes its image UV, samples the trace texture with `textureSampleLevel`, and applies the same vignette-weighted alpha check used by the compute and render shaders (`luma ≥ blackThreshold AND s.a × vig ≥ alphaThreshold`). If the agent is homing, the vertex places the quad centred on `agents[agentId].pos`; if not, all 6 vertices degenerate to a single out-of-clip-space point.
+
+2. **Fragment shader** computes the canvas-pixel distance from the fragment to the agent centre (using `@builtin(position).xy` against the agent's stored canvas position) and outputs `vec4(0, 0, 0, falloff × shadowStr)`.
+
+3. **Blend mode** is standard alpha compositing (`src-alpha / one-minus-src-alpha`) so the shadow physically darkens the trail texture underneath, unlike the additive particle blend.
+
+Because homing agents are drawn on top of the trail (with additive blend) in the subsequent particle pass, their rendered quads always appear above the shadow, giving the trace a sense of depth: dark halo behind, bright particle on top.
+
+---
+
+### auto clear (s) (`clearDelay`)
+**Range:** 0 – 120 | **Default:** 20
+
+Seconds after which user-added trace content (text or loaded image) is automatically removed. The timer starts whenever new content appears and resets whenever new content arrives. Set to 0 to disable. The session QR code is considered system content and is never auto-cleared — it can only be removed by a spectator joining (which hides it) or explicitly calling `clearMagnetImage`.
 
 ---
 
