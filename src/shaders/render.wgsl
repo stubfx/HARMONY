@@ -126,7 +126,7 @@ struct VsOut {
                 // Edge fade — skipped in QR mode so finder-pattern corners stay at full brightness.
                 let distEdge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
                 let vig      = select(smoothstep(0.0, max(params.vignetteEdge, 0.0001), distEdge), 1.0, params.qrMode != 0u);
-                return vec4<f32>(imgSample.rgb, params.brightness * imgSample.a * vig);
+                return vec4<f32>(imgSample.rgb, imgSample.a * vig);
             }
         }
     }
