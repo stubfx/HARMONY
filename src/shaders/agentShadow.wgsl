@@ -40,8 +40,18 @@ struct Agent {
     primed: f32,   // 1.0 = homing, 0.0 = free — written by compute each frame
 }
 
+// Mirrors ContamParams in compute.wgsl — same 176-byte layout.
+struct ContamParams {
+    count:  u32,
+    radius: f32,
+    push:   u32,
+    _p0:    u32,
+    points: array<vec4<f32>, 10>,
+}
+
 @group(0) @binding(0) var<uniform>       p:      AgentShadowParams;
 @group(0) @binding(1) var<storage, read> agents: array<Agent>;
+@group(0) @binding(2) var<uniform>       contam: ContamParams;
 
 struct VsOut {
     @builtin(position) clipPos:  vec4<f32>,
@@ -59,7 +69,19 @@ struct VsOut {
     );
 
     let agent    = agents[agentId];
-    let isHoming = agent.primed;   // read flag written by compute — no texture lookup needed
+    var isHoming = agent.primed;   // read flag written by compute — no texture lookup needed
+
+    // Suppress shadow when the agent's current position is inside an eraser circle.
+    // compute already zeroes primed for agents whose HOME is contaminated; this covers
+    // agents that are passing through the eraser area while homing elsewhere.
+    if (isHoming > 0.5 && contam.count > 0u) {
+        for (var k = 0u; k < contam.count; k++) {
+            if (length(agent.pos - contam.points[k].xy) <= contam.radius) {
+                isHoming = 0.0;
+                break;
+            }
+        }
+    }
 
     let ndc = vec2<f32>(
          agent.pos.x / p.canvasW * 2.0 - 1.0,

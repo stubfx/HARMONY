@@ -487,6 +487,7 @@ function rebuildAgentShadowBG() {
         entries: [
             { binding: 0, resource: { buffer: agentShadowUB } },
             { binding: 1, resource: { buffer: agentBuf } },
+            { binding: 2, resource: { buffer: contamUB } },
         ],
     });
 }
