@@ -50,7 +50,8 @@ const params = {
     imageSize:      0.316, // image size as fraction of min(canvasW, canvasH)
     showImage:    false,
     // Contamination
-    contamMouse:   true,  // treat mouse cursor as a contamination point
+    contamMouse:   false, // treat mouse cursor as a contamination point
+    contamPush:    true,  // push free agents outward from the eraser circle
     contamRadius:  150,   // radius of each contamination circle, in canvas pixels
     // Agent shadow
     agentShadowStr:    0.20, // peak opacity of each homing-agent shadow splat (0–1)
@@ -1083,6 +1084,7 @@ fMagnet.add(params, 'vignetteEdge',   0,  0.5, 0.005).name('edge fade');
 fMagnet.add(params, 'imageSize', 0.05, 1.0, 0.01).name('size');
 fMagnet.add(params, 'showImage').name('show image');
 fMagnet.add(params, 'contamMouse').name('mouse eraser');
+fMagnet.add(params, 'contamPush').name('eraser push');
 fMagnet.add(params, 'contamRadius', 10, 600, 5).name('eraser radius');
 fMagnet.add(params, 'agentShadowStr',    0,   1,   0.005).name('shadow strength');
 fMagnet.add(params, 'agentShadowRadius', 0, 300,   0.5 ).name('shadow radius');
@@ -1461,6 +1463,7 @@ function writeContamUB() {
     const f      = new Float32Array(ab);
     u[0] = count;
     f[1] = params.contamRadius;
+    u[2] = params.contamPush ? 1 : 0;
     // points start at byte 16 → float index 4; each vec4 = 4 floats (xy used, zw = 0)
     for (let k = 0; k < count; k++) {
         f[4 + k * 4]     = pts[k * 2];      // x

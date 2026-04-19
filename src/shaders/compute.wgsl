@@ -79,18 +79,18 @@ struct Agent {
 // ── Contamination — up to 10 circular eraser zones ───────────────────────────
 // Within each circle the trace alpha is zeroed (clean-only — no alpha is added
 // where there was none). Applied after black cutoff and vignette.
-// Free agents within 1.5× radius are pushed outward (soft avoidance field).
+// Free agents within 1.5× radius are pushed outward when push != 0.
 // Layout (176 bytes):
 //   [0]  count   u32  — active points (0 = disabled)
 //   [4]  radius  f32  — circle radius in canvas pixels
-//   [8]  _p0     u32
-//   [12] _p1     u32
+//   [8]  push    u32  — 1 = push free agents outward, 0 = erase only
+//   [12] _p0     u32
 //   [16..175] points  array<vec4<f32>, 10>  — xy = canvas pixel, zw unused
 struct ContamParams {
     count:  u32,
     radius: f32,
+    push:   u32,
     _p0:    u32,
-    _p1:    u32,
     points: array<vec4<f32>, 10>,
 }
 
@@ -296,16 +296,18 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         // ── Contamination circle avoidance ─────────────────────────────────────
         // Soft outward push within 1.5× contamination radius for all free agents.
         // Linear falloff: full force at circle centre, zero at the influence edge.
-        // Operates independently of any loaded image — circles always repel.
-        let INFLUENCE = 1.5;
-        for (var k = 0u; k < contam.count; k++) {
-            let cp        = contam.points[k].xy;
-            let diff      = pos - cp;
-            let dist      = length(diff);
-            let influence = contam.radius * INFLUENCE;
-            if (dist < influence && dist > 0.001) {
-                let t = 1.0 - dist / influence;
-                vel += normalize(diff) * t * params.maxSpeed * params.dt * 60.0;
+        // Gated by contam.push — erase-only mode leaves agent velocity untouched.
+        if (contam.push != 0u) {
+            let INFLUENCE = 1.5;
+            for (var k = 0u; k < contam.count; k++) {
+                let cp        = contam.points[k].xy;
+                let diff      = pos - cp;
+                let dist      = length(diff);
+                let influence = contam.radius * INFLUENCE;
+                if (dist < influence && dist > 0.001) {
+                    let t = 1.0 - dist / influence;
+                    vel += normalize(diff) * t * params.maxSpeed * params.dt * 60.0;
+                }
             }
         }
 
