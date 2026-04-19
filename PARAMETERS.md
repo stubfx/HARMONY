@@ -605,14 +605,24 @@ Seconds between periodic snapshots sent to n8n at `/webhook/heartbeat` (or `/web
 **Payload:**
 ```json
 {
-  "type": "heartbeat",
-  "room": "<session-uuid>",
+  "type":       "heartbeat",
+  "room":       "<session-uuid>",
   "spectators": 3,
-  "params": { ...all current params... }
+  "status":     "NORMAL",
+  "qrStatus":   "HIDE",
+  "params":     { ...all current tunable params... }
 }
 ```
 
-`room` is the session UUID assigned at socket connect. `spectators` is the live connected-device count synced from the server. The response is handled identically to `sim-event` — any recognised keys are applied via `applySimParams`. This is the primary channel through which n8n drives all content lifecycle: trace images, QR show/hide, formula changes, and parameter adjustments.
+| Field | Description |
+|-------|-------------|
+| `room` | Session UUID assigned at socket connect — stable for the page lifetime |
+| `spectators` | Live connected-device count synced from the server |
+| `status` | Simulation state machine: `"NORMAL"` or `"IDLE"` |
+| `qrStatus` | QR visibility: `"SHOW"` or `"HIDE"` |
+| `params` | Full snapshot of every tunable parameter in the GUI |
+
+The response is handled identically to `sim-event` — any recognised keys are applied via `applySimParams`. This is the primary channel through which n8n drives all content lifecycle: QR show/hide, trace images, formula changes, and parameter adjustments.
 
 ---
 

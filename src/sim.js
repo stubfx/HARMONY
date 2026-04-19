@@ -51,7 +51,7 @@ const params = {
     showImage:    false,
     // Contamination
     contamMouse:   false, // treat mouse cursor as a contamination point
-    contamPush:    true,  // push free agents outward from the eraser circle
+    contamPush:    false, // push free agents outward from the eraser circle
     contamRadius:  150,   // radius of each contamination circle, in canvas pixels
     // Agent shadow
     agentShadowStr:    0.20, // peak opacity of each homing-agent shadow splat (0–1)
@@ -825,7 +825,14 @@ async function callN8nHeartbeat() {
         const res = await fetch(N8N_BASE + path, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ type: 'heartbeat', room: sessionRoom, spectators: simSpectatorCount, params: { ...params } }),
+            body:    JSON.stringify({
+                type:       'heartbeat',
+                room:       sessionRoom,
+                spectators: simSpectatorCount,
+                status:     simState.status,
+                qrStatus:   simState.qrStatus,
+                params:     { ...params },
+            }),
             signal:  controller.signal,
         });
         clearTimeout(timer);
@@ -893,7 +900,8 @@ await applyFormulas(startDir, startWind, { reseed: true });
             uiQr.addEventListener('click', () => window.open(userUrl, '_blank'));
         }
 
-        // ── Large QR as trace image — modules white (opaque), background transparent.
+        // ── Large QR bitmap — pre-rendered and stored, not shown yet.
+        // Activation is driven by n8n via heartbeat response { showQR: true }.
         // dark=#ffffffff → QR modules are white (alpha=1) — homing agents fill them.
         // light=#00000000 → quiet zone and gaps are transparent — no agents there.
         const qrOffscreen = document.createElement('canvas');
@@ -901,17 +909,7 @@ await applyFormulas(startDir, startWind, { reseed: true });
             width: 512, margin: 0,
             color: { dark: '#ffffffff', light: '#00000000' },
         });
-        // Treat as a loaded image so Clear image removes it and user images replace it.
-        // Delay trace render until the intro ends — prevents particles being trapped
-        // in the QR pattern during the radial spread-out phase.
-        // Stored permanently in qrBitmap so it can be restored at any time.
-        // Flagged as QR so auto-clear never wipes it.
-        qrBitmap          = await createImageBitmap(qrOffscreen);
-        imageBitmap       = qrBitmap;
-        simState.qrStatus = 'SHOW';
-        updateStateDisplay();
-        renderTraceCanvas();
-        pickRandomFormulas();
+        qrBitmap = await createImageBitmap(qrOffscreen);
     });
 
     socket.on('sim-params', (data) => {
