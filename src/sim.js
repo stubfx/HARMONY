@@ -15,7 +15,7 @@ import fadeWGSL         from './shaders/fade.wgsl?raw';
 import blitWGSL         from './shaders/blit.wgsl?raw';
 import windVisWGSL      from './shaders/wind-vis.wgsl?raw';
 import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
-import traceShadowWGSL  from './shaders/traceShadow.wgsl?raw';
+import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const MAX_AGENTS = 1_200_000;
@@ -52,9 +52,9 @@ const params = {
     // Contamination
     contamMouse:   true,  // treat mouse cursor as a contamination point
     contamRadius:  150,   // radius of each contamination circle, in canvas pixels
-    // Trace shadow
-    traceShadowStr:    0.92, // opacity of the black shadow behind trace content (0–1)
-    traceShadowRadius: 20,   // blur spread in canvas pixels
+    // Agent shadow
+    agentShadowStr:    0.30, // peak opacity of each homing-agent shadow splat (0–1)
+    agentShadowRadius: 60,   // splat half-radius in canvas pixels
     // Avoidance
     avoidForceStr:   1.0, // multiplier on image-trace avoidance forces
     avoidMapScale:   1.0, // avoidance map coverage as fraction of canvas (1.0 = full)
@@ -355,16 +355,16 @@ const blitPipe = device.createRenderPipeline({
     primitive: { topology: 'triangle-list' },
 });
 
-// Trace shadow: black blurred overlay on offscreen texture behind trace content
-const traceShadowUB = device.createBuffer({
-    size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+// Agent shadow: per-homing-agent soft dark splat blended onto offscreen texture
+const agentShadowUB = device.createBuffer({
+    size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
-const traceShadowMod  = device.createShaderModule({ code: traceShadowWGSL });
-const traceShadowPipe = device.createRenderPipeline({
+const agentShadowMod  = device.createShaderModule({ code: agentShadowWGSL });
+const agentShadowPipe = device.createRenderPipeline({
     layout: 'auto',
-    vertex:   { module: traceShadowMod, entryPoint: 'vs' },
+    vertex:   { module: agentShadowMod, entryPoint: 'vs' },
     fragment: {
-        module: traceShadowMod, entryPoint: 'fs',
+        module: agentShadowMod, entryPoint: 'fs',
         targets: [{
             format: 'rgba8unorm',
             blend: {
@@ -375,7 +375,7 @@ const traceShadowPipe = device.createRenderPipeline({
     },
     primitive: { topology: 'triangle-list' },
 });
-let traceShadowBG = null;
+let agentShadowBG = null;
 
 // Image debug: centered 1/4-screen quad, 50% opacity grayscale
 const imageDebugMod = device.createShaderModule({ code: imageDebugWGSL });
@@ -433,7 +433,7 @@ window.addEventListener('resize', () => {
     setSize();
     rebuildOffscreen();
     renderTraceCanvas();
-    rebuildTraceShadowBG();
+    rebuildAgentShadowBG();
     seedAgents();
 });
 
@@ -466,6 +466,7 @@ function rebuildRenderBG() {
     });
 }
 rebuildRenderBG();
+rebuildAgentShadowBG();
 
 function rebuildImageDebugBG() {
     if (!hasImage || !imageTexView) { imageDebugBG = null; return; }
@@ -479,14 +480,15 @@ function rebuildImageDebugBG() {
     });
 }
 
-function rebuildTraceShadowBG() {
+function rebuildAgentShadowBG() {
     const texView = (hasImage && imageTexView) ? imageTexView : placeholderTexView;
-    traceShadowBG = device.createBindGroup({
-        layout: traceShadowPipe.getBindGroupLayout(0),
+    agentShadowBG = device.createBindGroup({
+        layout: agentShadowPipe.getBindGroupLayout(0),
         entries: [
-            { binding: 0, resource: { buffer: traceShadowUB } },
-            { binding: 1, resource: screenSmp },
-            { binding: 2, resource: texView },
+            { binding: 0, resource: { buffer: agentShadowUB } },
+            { binding: 1, resource: { buffer: agentBuf } },
+            { binding: 2, resource: imageSampler },
+            { binding: 3, resource: texView },
         ],
     });
 }
@@ -512,7 +514,7 @@ function renderTraceCanvas() {
         rebuildSimBG();
         rebuildRenderBG();
         rebuildImageDebugBG();
-        rebuildTraceShadowBG();
+        rebuildAgentShadowBG();
         return;
     }
 
@@ -604,7 +606,7 @@ function renderTraceCanvas() {
     rebuildSimBG();
     rebuildRenderBG();
     rebuildImageDebugBG();
-    rebuildTraceShadowBG();
+    rebuildAgentShadowBG();
 }
 
 // ── Auto-clear timer ──────────────────────────────────────────────────────────
@@ -1085,8 +1087,8 @@ fMagnet.add(params, 'imageSize', 0.05, 1.0, 0.01).name('size');
 fMagnet.add(params, 'showImage').name('show image');
 fMagnet.add(params, 'contamMouse').name('mouse eraser');
 fMagnet.add(params, 'contamRadius', 10, 600, 5).name('eraser radius');
-fMagnet.add(params, 'traceShadowStr',    0,   1,   0.01).name('shadow strength');
-fMagnet.add(params, 'traceShadowRadius', 0, 100,   1   ).name('shadow radius');
+fMagnet.add(params, 'agentShadowStr',    0,   1,   0.01).name('shadow strength');
+fMagnet.add(params, 'agentShadowRadius', 0, 300,   1   ).name('shadow radius');
 fMagnet.add(params, 'avoidForceStr', 0, 5, 0.05).name('avoid force');
 fMagnet.add(params, 'probeLen',      5, 300, 1   ).name('probe distance');
 fMagnet.add(params, 'probeForceStr',    0, 200, 1   ).name('probe force');
@@ -1419,22 +1421,24 @@ function writeWindVisUB(time, gridW) {
     device.queue.writeBuffer(windVisUB, 0, ab);
 }
 
-function writeTraceShadowUB() {
+function writeAgentShadowUB() {
     const { x0, y0, x1, y1 } = getImageRegion();
-    const ab = new ArrayBuffer(48);
+    const ab = new ArrayBuffer(64);
     const f  = new Float32Array(ab);
     const u  = new Uint32Array(ab);
-    f[0] = canvas.width;
-    f[1] = canvas.height;
-    f[2] = x0;
-    f[3] = y0;
-    f[4] = x1;
-    f[5] = y1;
-    f[6] = params.traceShadowStr;
-    f[7] = params.traceShadowRadius;
-    u[8] = hasImage ? 1 : 0;
-    f[9] = params.blackThreshold;
-    device.queue.writeBuffer(traceShadowUB, 0, ab);
+    f[0]  = canvas.width;
+    f[1]  = canvas.height;
+    u[2]  = params.agentCount;
+    f[3]  = params.agentShadowRadius;
+    f[4]  = params.agentShadowStr;
+    u[5]  = hasImage ? 1 : 0;
+    f[6]  = x0;
+    f[7]  = y0;
+    f[8]  = x1;
+    f[9]  = y1;
+    f[10] = params.alphaThreshold;
+    f[11] = params.blackThreshold;
+    device.queue.writeBuffer(agentShadowUB, 0, ab);
 }
 
 function writeImageDebugUB() {
@@ -1495,7 +1499,7 @@ function frame(ts) {
     writeFadeUB();
     writeBlitUB();
     writeContamUB();
-    writeTraceShadowUB();
+    writeAgentShadowUB();
 
     const enc = device.createCommandEncoder();
 
@@ -1517,10 +1521,10 @@ function frame(ts) {
     rp.setPipeline(fadePipe);
     rp.setBindGroup(0, fadeBG);
     rp.draw(3);
-    if (hasImage && traceShadowBG) {
-        rp.setPipeline(traceShadowPipe);
-        rp.setBindGroup(0, traceShadowBG);
-        rp.draw(3);
+    if (hasImage && agentShadowBG) {
+        rp.setPipeline(agentShadowPipe);
+        rp.setBindGroup(0, agentShadowBG);
+        rp.draw(params.agentCount * 6);
     }
     if (renderBG) {
         rp.setPipeline(renderPipe);
