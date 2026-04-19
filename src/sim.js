@@ -53,8 +53,8 @@ const params = {
     contamMouse:   true,  // treat mouse cursor as a contamination point
     contamRadius:  150,   // radius of each contamination circle, in canvas pixels
     // Agent shadow
-    agentShadowStr:    0.30, // peak opacity of each homing-agent shadow splat (0–1)
-    agentShadowRadius: 60,   // splat half-radius in canvas pixels
+    agentShadowStr:    0.20, // peak opacity of each homing-agent shadow splat (0–1)
+    agentShadowRadius: 10,   // splat half-radius in canvas pixels
     // Avoidance
     avoidForceStr:   1.0, // multiplier on image-trace avoidance forces
     avoidMapScale:   1.0, // avoidance map coverage as fraction of canvas (1.0 = full)
@@ -1087,8 +1087,8 @@ fMagnet.add(params, 'imageSize', 0.05, 1.0, 0.01).name('size');
 fMagnet.add(params, 'showImage').name('show image');
 fMagnet.add(params, 'contamMouse').name('mouse eraser');
 fMagnet.add(params, 'contamRadius', 10, 600, 5).name('eraser radius');
-fMagnet.add(params, 'agentShadowStr',    0,   1,   0.01).name('shadow strength');
-fMagnet.add(params, 'agentShadowRadius', 0, 300,   1   ).name('shadow radius');
+fMagnet.add(params, 'agentShadowStr',    0,   1,   0.005).name('shadow strength');
+fMagnet.add(params, 'agentShadowRadius', 0, 300,   0.5 ).name('shadow radius');
 fMagnet.add(params, 'avoidForceStr', 0, 5, 0.05).name('avoid force');
 fMagnet.add(params, 'probeLen',      5, 300, 1   ).name('probe distance');
 fMagnet.add(params, 'probeForceStr',    0, 200, 1   ).name('probe force');
