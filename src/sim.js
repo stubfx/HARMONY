@@ -64,13 +64,13 @@ const params = {
     probeForceStr:     100.0, // steering force multiplier when probe hits a primed pixel
     respawnOnCollide:  false, // teleport to a random edge position instead of steering on probe hit
     // Auto-clear
-    clearDelay:    20,    // seconds before auto-clearing user trace content (0 = disabled)
+    clearDelay:    0,     // seconds before auto-clearing user trace content (0 = disabled)
     // Session / QR restore
-    remoteTimeout:  60,   // seconds of silence from all remotes before QR is restored (0 = disabled)
+    remoteTimeout:  0,    // seconds of silence from all remotes before QR is restored (0 = disabled)
     maxSpectators:  1,    // sim QR hides when connected count reaches this threshold
     qrFadeZone:     false, // fade free agents near the QR rect to keep it scannable
     n8nTestMode:       false, // true = /webhook-test/sim-event, false = /webhook/sim-event
-    heartbeatInterval: 20,   // seconds between periodic param snapshots sent to n8n (0 = off)
+    heartbeatInterval: 5,    // seconds between periodic param snapshots sent to n8n (0 = off)
     // Weight
     weightSpread: 0.8,    // 0 = all equal; 1 = weights span [0.05 … 1.95]
     // Motion behaviour
@@ -825,7 +825,7 @@ async function callN8nHeartbeat() {
         const res = await fetch(N8N_BASE + path, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ type: 'heartbeat', room: sessionRoom, params: { ...params } }),
+            body:    JSON.stringify({ type: 'heartbeat', room: sessionRoom, spectators: simSpectatorCount, params: { ...params } }),
             signal:  controller.signal,
         });
         clearTimeout(timer);

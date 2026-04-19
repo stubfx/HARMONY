@@ -311,9 +311,9 @@ Because homing agents are drawn on top of the trail (with additive blend) in the
 ---
 
 ### auto clear (s) (`clearDelay`)
-**Range:** 0 – 120 | **Default:** 20
+**Range:** 0 – 120 | **Default:** 0 (disabled)
 
-Seconds after which user-added trace content (text or loaded image) is automatically removed. The timer starts whenever new content appears and resets whenever new content arrives. Set to 0 to disable. The session QR code is considered system content and is never auto-cleared — it can only be removed by a spectator joining (which hides it) or explicitly calling `clearMagnetImage`.
+Seconds after which user-added trace content (text or loaded image) is automatically removed. The timer starts whenever new content appears and resets whenever new content arrives. Set to 0 to disable. All content lifecycle — show, hide, QR, trace — is intended to be driven by the n8n backend via heartbeat responses. The session QR code is considered system content and is never auto-cleared.
 
 ---
 
@@ -583,9 +583,9 @@ The session UUID is stable for the lifetime of the page. A socket disconnect/rec
 When on and QR mode is active, free agents near the QR rectangle are faded toward invisible over an 80 canvas-pixel falloff from the rect edge. This suppresses visual noise around the code to help phone cameras get a clean scan. When off, free agents render at full brightness everywhere — the QR modules are still formed correctly by homing agents, but the surrounding particle field is not cleared. Has no effect outside QR mode.
 
 ### idle restore QR (s) (`remoteTimeout`)
-**Range:** 0 – 180 | **Default:** 60
+**Range:** 0 – 180 | **Default:** 0 (disabled)
 
-Seconds of silence from all remote devices before the QR trace is automatically restored. Resets whenever any `remote-event` is received. Set to 0 to disable.
+Seconds of silence from all remote devices before the QR trace is automatically restored. Resets whenever any `remote-event` is received. Set to 0 to disable. QR show/hide is intended to be orchestrated by n8n via heartbeat responses (`showQR: true/false`).
 
 ### QR hides at N users (`maxSpectators`)
 **Range:** 1 – 50 | **Default:** 1
@@ -598,11 +598,21 @@ The remote page's persistent QR code fades when the connected spectator count re
 When on, all n8n calls use `/webhook-test/` paths instead of `/webhook/`. This lets you use the n8n test-trigger for a workflow without activating it in production. Does not require a rebuild — toggled live in the GUI.
 
 ### heartbeat (s) (`heartbeatInterval`)
-**Range:** 0 – 120 | **Default:** 20
+**Range:** 0 – 120 | **Default:** 5
 
-Seconds between periodic snapshots of all simulation parameters sent to n8n at `/webhook/heartbeat` (or `/webhook-test/heartbeat` in test mode). The full `params` object is included in the body alongside `type: "heartbeat"` and the session room UUID. Set to 0 to disable.
+Seconds between periodic snapshots sent to n8n at `/webhook/heartbeat` (or `/webhook-test/heartbeat` in test mode). Set to 0 to disable.
 
-The response is handled identically to `sim-event` — any recognised keys are applied via `applySimParams`. Use this for AI-driven ambient parameter drift between user interactions.
+**Payload:**
+```json
+{
+  "type": "heartbeat",
+  "room": "<session-uuid>",
+  "spectators": 3,
+  "params": { ...all current params... }
+}
+```
+
+`room` is the session UUID assigned at socket connect. `spectators` is the live connected-device count synced from the server. The response is handled identically to `sim-event` — any recognised keys are applied via `applySimParams`. This is the primary channel through which n8n drives all content lifecycle: trace images, QR show/hide, formula changes, and parameter adjustments.
 
 ---
 
