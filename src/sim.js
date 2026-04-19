@@ -15,6 +15,7 @@ import fadeWGSL         from './shaders/fade.wgsl?raw';
 import blitWGSL         from './shaders/blit.wgsl?raw';
 import windVisWGSL      from './shaders/wind-vis.wgsl?raw';
 import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
+import traceShadowWGSL  from './shaders/traceShadow.wgsl?raw';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const MAX_AGENTS = 1_200_000;
@@ -51,6 +52,9 @@ const params = {
     // Contamination
     contamMouse:   true,  // treat mouse cursor as a contamination point
     contamRadius:  150,   // radius of each contamination circle, in canvas pixels
+    // Trace shadow
+    traceShadowStr:    0.92, // opacity of the black shadow behind trace content (0–1)
+    traceShadowRadius: 20,   // blur spread in canvas pixels
     // Avoidance
     avoidForceStr:   1.0, // multiplier on image-trace avoidance forces
     avoidMapScale:   1.0, // avoidance map coverage as fraction of canvas (1.0 = full)
@@ -351,6 +355,28 @@ const blitPipe = device.createRenderPipeline({
     primitive: { topology: 'triangle-list' },
 });
 
+// Trace shadow: black blurred overlay on offscreen texture behind trace content
+const traceShadowUB = device.createBuffer({
+    size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+});
+const traceShadowMod  = device.createShaderModule({ code: traceShadowWGSL });
+const traceShadowPipe = device.createRenderPipeline({
+    layout: 'auto',
+    vertex:   { module: traceShadowMod, entryPoint: 'vs' },
+    fragment: {
+        module: traceShadowMod, entryPoint: 'fs',
+        targets: [{
+            format: 'rgba8unorm',
+            blend: {
+                color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+                alpha: { srcFactor: 'one',        dstFactor: 'one-minus-src-alpha', operation: 'add' },
+            },
+        }],
+    },
+    primitive: { topology: 'triangle-list' },
+});
+let traceShadowBG = null;
+
 // Image debug: centered 1/4-screen quad, 50% opacity grayscale
 const imageDebugMod = device.createShaderModule({ code: imageDebugWGSL });
 const imageDebugPipe = device.createRenderPipeline({
@@ -406,6 +432,8 @@ rebuildOffscreen();
 window.addEventListener('resize', () => {
     setSize();
     rebuildOffscreen();
+    renderTraceCanvas();
+    rebuildTraceShadowBG();
     seedAgents();
 });
 
@@ -451,6 +479,18 @@ function rebuildImageDebugBG() {
     });
 }
 
+function rebuildTraceShadowBG() {
+    const texView = (hasImage && imageTexView) ? imageTexView : placeholderTexView;
+    traceShadowBG = device.createBindGroup({
+        layout: traceShadowPipe.getBindGroupLayout(0),
+        entries: [
+            { binding: 0, resource: { buffer: traceShadowUB } },
+            { binding: 1, resource: screenSmp },
+            { binding: 2, resource: texView },
+        ],
+    });
+}
+
 // ── Trace canvas compositor ───────────────────────────────────────────────────
 // Composites imageBitmap (if any) + trace text (if any) onto a single 2D canvas,
 // then uploads the result to the GPU as the trace texture.
@@ -472,6 +512,7 @@ function renderTraceCanvas() {
         rebuildSimBG();
         rebuildRenderBG();
         rebuildImageDebugBG();
+        rebuildTraceShadowBG();
         return;
     }
 
@@ -563,6 +604,7 @@ function renderTraceCanvas() {
     rebuildSimBG();
     rebuildRenderBG();
     rebuildImageDebugBG();
+    rebuildTraceShadowBG();
 }
 
 // ── Auto-clear timer ──────────────────────────────────────────────────────────
@@ -1043,6 +1085,8 @@ fMagnet.add(params, 'imageSize', 0.05, 1.0, 0.01).name('size');
 fMagnet.add(params, 'showImage').name('show image');
 fMagnet.add(params, 'contamMouse').name('mouse eraser');
 fMagnet.add(params, 'contamRadius', 10, 600, 5).name('eraser radius');
+fMagnet.add(params, 'traceShadowStr',    0,   1,   0.01).name('shadow strength');
+fMagnet.add(params, 'traceShadowRadius', 0, 100,   1   ).name('shadow radius');
 fMagnet.add(params, 'avoidForceStr', 0, 5, 0.05).name('avoid force');
 fMagnet.add(params, 'probeLen',      5, 300, 1   ).name('probe distance');
 fMagnet.add(params, 'probeForceStr',    0, 200, 1   ).name('probe force');
@@ -1375,6 +1419,24 @@ function writeWindVisUB(time, gridW) {
     device.queue.writeBuffer(windVisUB, 0, ab);
 }
 
+function writeTraceShadowUB() {
+    const { x0, y0, x1, y1 } = getImageRegion();
+    const ab = new ArrayBuffer(48);
+    const f  = new Float32Array(ab);
+    const u  = new Uint32Array(ab);
+    f[0] = canvas.width;
+    f[1] = canvas.height;
+    f[2] = x0;
+    f[3] = y0;
+    f[4] = x1;
+    f[5] = y1;
+    f[6] = params.traceShadowStr;
+    f[7] = params.traceShadowRadius;
+    u[8] = hasImage ? 1 : 0;
+    f[9] = params.blackThreshold;
+    device.queue.writeBuffer(traceShadowUB, 0, ab);
+}
+
 function writeImageDebugUB() {
     const { x0, y0, x1, y1 } = getImageRegion();
     const ab = new ArrayBuffer(32);
@@ -1433,6 +1495,7 @@ function frame(ts) {
     writeFadeUB();
     writeBlitUB();
     writeContamUB();
+    writeTraceShadowUB();
 
     const enc = device.createCommandEncoder();
 
@@ -1454,6 +1517,11 @@ function frame(ts) {
     rp.setPipeline(fadePipe);
     rp.setBindGroup(0, fadeBG);
     rp.draw(3);
+    if (hasImage && traceShadowBG) {
+        rp.setPipeline(traceShadowPipe);
+        rp.setBindGroup(0, traceShadowBG);
+        rp.draw(3);
+    }
     if (renderBG) {
         rp.setPipeline(renderPipe);
         rp.setBindGroup(0, renderBG);
