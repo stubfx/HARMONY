@@ -216,13 +216,15 @@ This is primarily useful for images without a proper alpha channel (JPEGs, photo
 
 Fades the outer edges of the image rect with a smooth rectangular vignette. The value is the width of the fade band in UV units (0–1 across the image). At 0, no fade is applied and the image has a hard edge. At 0.1, the outermost 10% of each edge fades to transparent. At 0.5, the fade extends to the centre from all sides.
 
-The fade factor is `vig = smoothstep(0, vignetteEdge, distanceFromNearestEdge)` and is applied consistently across all three passes that evaluate whether an agent is homing:
+The fade factor is `vig = smoothstep(0, vignetteEdge, distanceFromNearestEdge)` and is applied in the compute shader's `imgAlphaAt()` function: it returns `px.a × vig`, and the homing gate is `effAlpha >= alphaThreshold`.
 
-- **Compute** (`imgAlphaAt`): returns `px.a × vig`; the homing gate is `effAlpha >= alphaThreshold`
-- **Render** (fragment shader): checks `imgSample.a × vig >= alphaThreshold` before rendering image colour
-- **Agent shadow** (vertex shader): checks `s.a × vig >= alphaThreshold` before casting a shadow splat
+#### Single source of truth for homing status
 
-All three use the same formula so they always agree on which agents are homing. Without this alignment, edge-zone agents could end up in a "limbo" state — physically free in the compute shader but still rendered with image colour or casting shadows.
+The compute shader writes `agent.primed = 1.0` (homing) or `0.0` (free) into each agent's buffer slot every frame after evaluating the full primed check (luma, vignette-weighted alpha, contamination). Both the render shader and the agent shadow shader read this flag directly rather than independently re-sampling the texture. This guarantees perfect consistency across all three passes:
+
+- No bilinear vs. nearest-neighbour mismatch (the sampler type difference no longer affects the homing decision)
+- Edge-zone agents cannot end up in a "limbo" state (physically free in compute but rendering as homing in the visual passes)
+- The primed check runs exactly once per agent per frame regardless of how many visual passes are active
 
 ### size (`imageSize`)
 **Range:** 0.05 – 1.0 | **Default:** 0.316
@@ -295,7 +297,7 @@ Half-radius of each homing agent's shadow splat in canvas pixels. Each homing ag
 
 Shadow rendering is a dedicated render sub-pass inside the offscreen render pass, positioned between the trail fade and the particle draw. The pipeline:
 
-1. **Vertex shader** reads `agents[agentId].home`, computes its image UV, samples the trace texture with `textureSampleLevel`, and applies the same vignette-weighted alpha check used by the compute and render shaders (`luma ≥ blackThreshold AND s.a × vig ≥ alphaThreshold`). If the agent is homing, the vertex places the quad centred on `agents[agentId].pos`; if not, all 6 vertices degenerate to a single out-of-clip-space point.
+1. **Vertex shader** reads `agents[agentId].primed` — the flag written by the compute shader each frame. No texture sampling is needed; the homing decision is already made. If `primed = 1.0`, the vertex places the quad centred on `agents[agentId].pos`; if `primed = 0.0`, all 6 vertices degenerate to a single out-of-clip-space point generating zero fragments.
 
 2. **Fragment shader** computes the canvas-pixel distance from the fragment to the agent centre (using `@builtin(position).xy` against the agent's stored canvas position) and outputs `vec4(0, 0, 0, falloff × shadowStr)`.
 

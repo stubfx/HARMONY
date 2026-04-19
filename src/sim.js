@@ -203,7 +203,7 @@ ctx.configure({ device, format: canvasFormat, alphaMode: 'opaque' });
 
 // ── Persistent GPU buffers ────────────────────────────────────────────────────
 const agentBuf = device.createBuffer({
-    size: MAX_AGENTS * 32,    // [pos.xy, vel.xy, home.xy, weight, _pad] = 8 × f32 = 32 bytes
+    size: MAX_AGENTS * 32,    // [pos.xy, vel.xy, home.xy, weight, primed] = 8 × f32 = 32 bytes
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 const soloUB = device.createBuffer({
@@ -259,7 +259,7 @@ function seedAgents() {
         data[b + 5] = (row + 0.5) * cellH;          // home.y
         // Weight
         data[b + 6] = Math.max(0.05, 1.0 + (Math.random() * 2 - 1) * params.weightSpread);
-        data[b + 7] = 0;                             // _pad
+        data[b + 7] = 0;                             // primed — compute writes this each frame
     }
     device.queue.writeBuffer(agentBuf, 0, data);
 }
@@ -357,7 +357,7 @@ const blitPipe = device.createRenderPipeline({
 
 // Agent shadow: per-homing-agent soft dark splat blended onto offscreen texture
 const agentShadowUB = device.createBuffer({
-    size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const agentShadowMod  = device.createShaderModule({ code: agentShadowWGSL });
 const agentShadowPipe = device.createRenderPipeline({
@@ -481,14 +481,11 @@ function rebuildImageDebugBG() {
 }
 
 function rebuildAgentShadowBG() {
-    const texView = (hasImage && imageTexView) ? imageTexView : placeholderTexView;
     agentShadowBG = device.createBindGroup({
         layout: agentShadowPipe.getBindGroupLayout(0),
         entries: [
             { binding: 0, resource: { buffer: agentShadowUB } },
             { binding: 1, resource: { buffer: agentBuf } },
-            { binding: 2, resource: imageSampler },
-            { binding: 3, resource: texView },
         ],
     });
 }
@@ -1422,23 +1419,14 @@ function writeWindVisUB(time, gridW) {
 }
 
 function writeAgentShadowUB() {
-    const { x0, y0, x1, y1 } = getImageRegion();
-    const ab = new ArrayBuffer(64);
+    const ab = new ArrayBuffer(32);
     const f  = new Float32Array(ab);
     const u  = new Uint32Array(ab);
-    f[0]  = canvas.width;
-    f[1]  = canvas.height;
-    u[2]  = params.agentCount;
-    f[3]  = params.agentShadowRadius;
-    f[4]  = params.agentShadowStr;
-    u[5]  = hasImage ? 1 : 0;
-    f[6]  = x0;
-    f[7]  = y0;
-    f[8]  = x1;
-    f[9]  = y1;
-    f[10] = params.alphaThreshold;
-    f[11] = params.blackThreshold;
-    f[12] = simState.qrStatus === 'SHOW' ? 0 : params.vignetteEdge;
+    f[0] = canvas.width;
+    f[1] = canvas.height;
+    f[2] = params.agentShadowRadius;
+    f[3] = params.agentShadowStr;
+    u[4] = hasImage ? 1 : 0;
     device.queue.writeBuffer(agentShadowUB, 0, ab);
 }
 

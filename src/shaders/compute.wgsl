@@ -73,7 +73,7 @@ struct Agent {
     vel:    vec2<f32>,
     home:   vec2<f32>,
     weight: f32,
-    _pad:   f32,
+    primed: f32,   // 1.0 = homing (home pixel passes threshold), 0.0 = free; written each frame
 }
 
 // ── Contamination — up to 10 circular eraser zones ───────────────────────────
@@ -341,8 +341,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                             // Left edge
                             cp = vec2<f32>(0.0, t - 2.0 * params.canvasW - params.canvasH);
                         }
-                        agents[i].pos = cp;
-                        agents[i].vel = vec2<f32>(0.0, 0.0);
+                        agents[i].pos    = cp;
+                        agents[i].vel    = vec2<f32>(0.0, 0.0);
+                        agents[i].primed = 0.0;
                         return;
                     } else {
                         let EPS  = 4.0;
@@ -430,6 +431,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         np.y = ((np.y % params.canvasH) + params.canvasH) % params.canvasH;
     }
 
-    agents[i].pos = np;
-    agents[i].vel = vel;
+    agents[i].pos    = np;
+    agents[i].vel    = vel;
+    agents[i].primed = select(0.0, 1.0, homeInImg);
 }
