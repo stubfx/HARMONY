@@ -68,7 +68,7 @@ const params = {
     // Session / QR restore
     remoteTimeout:  60,   // seconds of silence from all remotes before QR is restored (0 = disabled)
     maxSpectators:  1,    // sim QR hides when connected count reaches this threshold
-    qrFadeZone:     true, // fade free agents near the QR rect to keep it scannable
+    qrFadeZone:     false, // fade free agents near the QR rect to keep it scannable
     n8nTestMode:       false, // true = /webhook-test/sim-event, false = /webhook/sim-event
     heartbeatInterval: 20,   // seconds between periodic param snapshots sent to n8n (0 = off)
     // Weight

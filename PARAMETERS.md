@@ -84,13 +84,6 @@ When on, agents steer toward the direction formula output each frame. When off, 
 
 When on (and `follow formula` is also on), a scheduler randomly picks a new formula from the built-in direction library every ~30 seconds. The formula changes smoothly — agents steer toward the new direction without any discontinuity.
 
-### intro delay (s)
-**Range:** 0 – 30 | **Default:** 5.0
-
-At startup, agents spawn at uniformly random positions across the canvas with fully random headings. For this many seconds, `follow formula` and wind are silently suppressed (without changing the GUI toggles), letting the random initial motion settle before the formulas engage. After the delay, the active direction and wind formulas kick in. Setting this to 0 disables the intro.
-
-The startup direction and wind formulas are also picked at random from the built-in library each time the page loads.
-
 ### bounce edges
 **Default:** off
 
@@ -226,6 +219,16 @@ The compute shader writes `agent.primed = 1.0` (homing) or `0.0` (free) into eac
 - Edge-zone agents cannot end up in a "limbo" state (physically free in compute but rendering as homing in the visual passes)
 - The primed check runs exactly once per agent per frame regardless of how many visual passes are active
 
+### avoid force (`avoidForceStr`)
+**Range:** 0 – 5 | **Default:** 1.0
+
+Multiplier applied to all image-trace avoidance forces that act on free agents. Two avoidance mechanisms share this value:
+
+- **Inside an opaque area**: the agent is pushed along the negative alpha gradient (toward the nearest transparent gap). Force = `maxSpeed × posAlpha × avoidForceStr`.
+- **Near an opaque boundary**: the inward velocity component is stripped proportionally when a lookahead detects opacity ahead. Strip strength = `avoidForceStr`.
+
+The avoidance map uses the same multiplier. At 0, avoidance is disabled and free agents pass freely through trace content. At 5, avoidance is very aggressive and agents barely enter opaque regions.
+
 ### size (`imageSize`)
 **Range:** 0.05 – 1.0 | **Default:** 0.316
 
@@ -311,6 +314,31 @@ Because homing agents are drawn on top of the trail (with additive blend) in the
 **Range:** 0 – 120 | **Default:** 20
 
 Seconds after which user-added trace content (text or loaded image) is automatically removed. The timer starts whenever new content appears and resets whenever new content arrives. Set to 0 to disable. The session QR code is considered system content and is never auto-cleared — it can only be removed by a spectator joining (which hides it) or explicitly calling `clearMagnetImage`.
+
+---
+
+## Mouse Eraser
+
+A circular contamination zone that follows the cursor and actively clears the trace layer in real time.
+
+### mouse eraser (`contamMouse`)
+**Default:** off
+
+When on, the mouse cursor acts as a live eraser centred on the cursor position each frame. Three effects fire simultaneously inside the circle:
+
+1. **Trace alpha zeroed** — any homing agent whose home position falls inside the circle has its effective home alpha forced to zero, temporarily releasing it from homing. It becomes a free agent following formula and wind until the cursor moves away (the underlying GPU texture is not modified — this is a per-frame override in the compute shader).
+2. **Shadow suppressed** — homing agents whose *current position* is inside the circle are culled from the shadow pass that frame, so the dark splat doesn't linger under the cursor.
+3. **Free agents pushed outward** (when `eraser push` is on) — see below.
+
+### eraser push (`contamPush`)
+**Default:** on
+
+When on and the mouse eraser is active, free agents within 1.5× the eraser radius are pushed away from the cursor with a linear force falloff (full at the cursor centre, zero at the influence boundary). When off the cursor only erases trace alpha and shadows — agent velocities are untouched, so free agents drift through the erased zone normally.
+
+### eraser radius (`contamRadius`)
+**Range:** 10 – 600 | **Default:** 150
+
+Radius of the cursor eraser circle in canvas pixels. The erase zone matches this value exactly; the push influence zone extends to 1.5× this radius when `eraser push` is on.
 
 ---
 
@@ -514,7 +542,7 @@ QR mode is a rendering state, not a physics state. It is active only while the Q
 
 1. **Homing** works through the standard alpha pipeline — agents whose home falls on a white QR module (`alpha ≥ alphaThreshold`) converge there at `homing speed`. Agents assigned to transparent gaps are free.
 
-2. **Fade zone** — the render shader computes the signed distance from each free agent's *current position* to the QR bounding rectangle. Agents are faded to invisible over an 80 px falloff inward from the rect edge, clearing visual noise around the QR so it remains scannable.
+2. **Fade zone** *(optional, controlled by `QR fade zone` in Session)* — the render shader computes the signed distance from each free agent's *current position* to the QR bounding rectangle. Agents are faded to invisible over an 80 px falloff inward from the rect edge, clearing visual noise around the QR so it remains scannable. Disabled by default.
 
 3. **No edge vignette** — the normal `vignetteEdge` smoothstep is bypassed in QR mode so the finder-pattern squares in the corners render at full brightness (they would otherwise be faded out at the image boundary and the QR would fail to decode).
 
@@ -548,6 +576,11 @@ The session UUID is stable for the lifetime of the page. A socket disconnect/rec
 ---
 
 ## Session
+
+### QR fade zone (`qrFadeZone`)
+**Default:** off
+
+When on and QR mode is active, free agents near the QR rectangle are faded toward invisible over an 80 canvas-pixel falloff from the rect edge. This suppresses visual noise around the code to help phone cameras get a clean scan. When off, free agents render at full brightness everywhere — the QR modules are still formed correctly by homing agents, but the surrounding particle field is not cleared. Has no effect outside QR mode.
 
 ### idle restore QR (s) (`remoteTimeout`)
 **Range:** 0 – 180 | **Default:** 60
