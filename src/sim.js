@@ -68,6 +68,7 @@ const params = {
     // Session / QR restore
     remoteTimeout:  60,   // seconds of silence from all remotes before QR is restored (0 = disabled)
     maxSpectators:  1,    // sim QR hides when connected count reaches this threshold
+    qrFadeZone:     true, // fade free agents near the QR rect to keep it scannable
     n8nTestMode:       false, // true = /webhook-test/sim-event, false = /webhook/sim-event
     heartbeatInterval: 20,   // seconds between periodic param snapshots sent to n8n (0 = off)
     // Weight
@@ -211,7 +212,7 @@ const soloUB = device.createBuffer({
     size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
-    size: 84, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 88, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const fadeUB = device.createBuffer({
     size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -1104,6 +1105,7 @@ fAvoid.add({ load: () => document.querySelector('#avoid-map-input').click() }, '
 fAvoid.add({ clear: clearAvoidMap }, 'clear').name('Clear map');
 
 const fSession = gui.addFolder('Session');
+fSession.add(params, 'qrFadeZone').name('QR fade zone');
 fSession.add(params, 'remoteTimeout',  0, 180,  5).name('idle restore QR (s)');
 fSession.add(params, 'maxSpectators',  1,  50,  1).name('QR hides at N users');
 fSession.add(params, 'n8nTestMode').name('n8n test mode');
@@ -1390,7 +1392,8 @@ function writeRenderUB() {
     f[17] = params.alphaThreshold;
     f[18] = params.blackThreshold;
     f[19] = simState.qrStatus === 'SHOW' ? 0 : params.vignetteEdge;
-    u[20] = simState.qrStatus === 'SHOW' ? 1 : 0;  // qrMode — darken free agents near QR rect
+    u[20] = simState.qrStatus === 'SHOW' ? 1 : 0;
+    u[21] = params.qrFadeZone ? 1 : 0;
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 

@@ -1,5 +1,5 @@
 // ─── Solo Particle Render Shader ──────────────────────────────────────────────
-// SoloRenderParams layout (84 bytes):
+// SoloRenderParams layout (88 bytes):
 //   [0]  agentCount     u32
 //   [4]  canvasW        f32
 //   [8]  canvasH        f32
@@ -20,7 +20,8 @@
 //   [68] alphaThreshold f32
 //   [72] blackThreshold f32
 //   [76] vignetteEdge   f32
-//   [80] qrMode         u32   (1 = QR active: fade free agents near the QR rect)
+//   [80] qrMode         u32   (1 = QR active)
+//   [84] qrFadeZone     u32   (1 = fade free agents near the QR rect)
 
 struct SoloRenderParams {
     agentCount:     u32,
@@ -44,6 +45,7 @@ struct SoloRenderParams {
     blackThreshold: f32,
     vignetteEdge:   f32,
     qrMode:         u32,
+    qrFadeZone:     u32,
 }
 
 struct Agent {
@@ -124,9 +126,9 @@ struct VsOut {
         let vig      = select(smoothstep(0.0, max(params.vignetteEdge, 0.0001), distEdge), 1.0, params.qrMode != 0u);
         return vec4<f32>(imgSample.rgb, imgSample.a * vig);
     }
-    // QR mode: free agents (home outside QR rect) darken as they approach the QR area.
+    // QR mode: optionally fade free agents near the QR rect to keep it scannable.
     // Signed distance to the rect edge → smoothstep over 80px falloff.
-    if (params.qrMode != 0u) {
+    if (params.qrMode != 0u && params.qrFadeZone != 0u) {
         let dx   = max(max(params.imgX0 - in.agentPos.x, in.agentPos.x - params.imgX1), 0.0);
         let dy   = max(max(params.imgY0 - in.agentPos.y, in.agentPos.y - params.imgY1), 0.0);
         let dist = length(vec2<f32>(dx, dy));
