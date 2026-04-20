@@ -946,12 +946,16 @@ let socket;
         burstBrightness    = BURST_BRIGHTNESS;
     });
 
-    // Remote events forwarded from spectator devices.
-    // Text events: if n8n is configured they are routed there — n8n processes the
-    // text and returns what to apply (traceText, formulas, status, etc.) via
-    // applySimParams(). Without n8n the text is applied directly to the trace layer.
-    // All other events (touch, etc.) are always applied locally; callN8n also fires
-    // for every event so n8n can react to touches too if the workflow handles them.
+    // ── Remote event registry ─────────────────────────────────────────────────
+    // Single source of truth for all event types emitted by spectator devices.
+    // sendToN8n: whether this event type is forwarded to n8n via callN8n().
+    // Note: 'tilt' is consumed server-side for collective-state and never arrives here.
+    const REMOTE_EVENTS = {
+        touch:    { sendToN8n: false },
+        rotation: { sendToN8n: false },
+        text:     { sendToN8n: true  },
+    };
+
     socket.on('remote-event', (event) => {
         lastRemoteActivity = Date.now();
         if (event.type === 'text' && event.data?.text && !N8N_BASE) {
@@ -963,7 +967,7 @@ let socket;
             scheduleAutoClear();
             if (wasQR) pickRandomFormulas();
         }
-        callN8n(event);
+        if (REMOTE_EVENTS[event.type]?.sendToN8n) callN8n(event);
     });
 
     socket.on('connect_error', () => console.warn('[socket] connection failed, will retry…'));
