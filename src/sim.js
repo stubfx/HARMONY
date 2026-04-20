@@ -199,6 +199,15 @@ device.addEventListener('uncapturederror', e => {
     showError(e.error.message);
 });
 
+// WebGPU device loss (Vulkan driver crash, GPU reset, etc.).
+// The RAF loop cannot recover from this — reload the page to get a fresh device.
+let deviceLost = false;
+device.lost.then(({ reason, message }) => {
+    deviceLost = true;
+    console.error('[WebGPU] device lost:', reason, message);
+    setTimeout(() => location.reload(), 3000);
+});
+
 const canvasFormat = navigator.gpu.getPreferredCanvasFormat();
 const ctx = canvas.getContext('webgpu');
 ctx.configure({ device, format: canvasFormat, alphaMode: 'opaque' });
@@ -1470,6 +1479,7 @@ let fpsFrames = 0;
 let fpsLast   = performance.now();
 
 function frame(ts) {
+    if (deviceLost) return;
     requestAnimationFrame(frame);
 
     const now    = ts * TIME_MULT;
