@@ -66,6 +66,7 @@ These keys trigger immediate side-effects and are **not** stored in `params`.
 | `clearTrace` | `true` | Clears the magnet image AND the text trace layer. |
 | `clearText` | `true` | Clears only the text trace layer, leaving any QR/image untouched. |
 | `traceText` | `string` | Renders a text string onto the trace canvas and makes it the active magnet image. Replaces QR if one was visible. |
+| `traceImage` | `string` (URL) | Fetches an image from the given URL and uses it as the magnet image. Replaces QR or text if visible. Supports any format the browser can decode (PNG, JPEG, WebP, etc.). |
 | `dir` | `string` | Sets the direction formula (WGSL math expression in `x, y, t, cx, cy, PI, TWO_PI`). Applied immediately. |
 | `wind` | `string` | Sets the wind formula (same variable set as `dir`). Applied immediately. |
 | `avoidMap` | `string` \| `null` | URL of an image to use as the avoidance map. `null` clears the current map. |

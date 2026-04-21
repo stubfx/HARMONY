@@ -648,6 +648,22 @@ async function loadMagnetImage(file) {
     if (wasQR) pickRandomFormulas();
 }
 
+async function loadTraceImageFromUrl(url) {
+    try {
+        const res  = await fetch(url);
+        const blob = await res.blob();
+        const wasQR       = simState.qrStatus === 'SHOW';
+        simState.qrStatus = 'HIDE';
+        updateStateDisplay();
+        imageBitmap = await createImageBitmap(blob, { colorSpaceConversion: 'none' });
+        renderTraceCanvas();
+        scheduleAutoClear();
+        if (wasQR) pickRandomFormulas();
+    } catch (err) {
+        console.warn('[traceImage] failed to load:', url, err.message);
+    }
+}
+
 function clearMagnetImage() {
     const wasQR       = simState.qrStatus === 'SHOW';
     simState.qrStatus = 'HIDE';
@@ -986,7 +1002,7 @@ let socket;
 // Only numeric/boolean keys present in the payload are applied;
 // if formulas are included they re-trigger pipeline compilation.
 function applySimParams(data) {
-    const { dir, wind, restart, clearTrace, showQR, traceText, clearText, status, avoidMap, ...rest } = data;
+    const { dir, wind, restart, clearTrace, showQR, traceText, clearText, traceImage, status, avoidMap, ...rest } = data;
     if (status === 'NORMAL' || status === 'IDLE') {
         simState.status = status;
         updateStateDisplay();
@@ -994,9 +1010,10 @@ function applySimParams(data) {
     if (restart)              seedAgents();
     if (avoidMap === null)    clearAvoidMap();
     else if (typeof avoidMap === 'string') loadAvoidMap(avoidMap);
-    if (clearTrace)           { clearMagnetImage(); clearTraceText(); }
-    if (showQR === true)      restoreQR();
-    if (showQR === false)     clearMagnetImage();
+    if (clearTrace)                    { clearMagnetImage(); clearTraceText(); }
+    if (showQR === true)               restoreQR();
+    if (showQR === false)              clearMagnetImage();
+    if (typeof traceImage === 'string') loadTraceImageFromUrl(traceImage);
     if (clearText)            clearTraceText();
     if (traceText !== undefined) {
         const wasQR = simState.qrStatus === 'SHOW';
