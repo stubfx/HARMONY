@@ -404,7 +404,8 @@ const agentShadowDensityPipe = device.createRenderPipeline({
     },
     primitive: { topology: 'triangle-list' },
 });
-let agentShadowBG = null;
+let agentShadowBG        = null;
+let agentShadowDensityBG = null;
 
 // Image debug: centered 1/4-screen quad, 50% opacity grayscale
 const imageDebugMod = device.createShaderModule({ code: imageDebugWGSL });
@@ -448,7 +449,6 @@ function rebuildOffscreen() {
         usage:  GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     });
     shadowDensityView = shadowDensityTex.createView();
-    rebuildSimBG();
 
     blitBG = device.createBindGroup({
         layout: blitPipe.getBindGroupLayout(0),
@@ -473,8 +473,10 @@ rebuildOffscreen();
 window.addEventListener('resize', () => {
     setSize();
     rebuildOffscreen();
+    rebuildSimBG();
     renderTraceCanvas();
     rebuildAgentShadowBG();
+    rebuildAgentShadowDensityBG();
     seedAgents();
 });
 
@@ -508,6 +510,7 @@ function rebuildRenderBG() {
 }
 rebuildRenderBG();
 rebuildAgentShadowBG();
+rebuildAgentShadowDensityBG();
 
 function rebuildImageDebugBG() {
     if (!hasImage || !imageTexView) { imageDebugBG = null; return; }
@@ -524,6 +527,17 @@ function rebuildImageDebugBG() {
 function rebuildAgentShadowBG() {
     agentShadowBG = device.createBindGroup({
         layout: agentShadowPipe.getBindGroupLayout(0),
+        entries: [
+            { binding: 0, resource: { buffer: agentShadowUB } },
+            { binding: 1, resource: { buffer: agentBuf } },
+            { binding: 2, resource: { buffer: contamUB } },
+        ],
+    });
+}
+
+function rebuildAgentShadowDensityBG() {
+    agentShadowDensityBG = device.createBindGroup({
+        layout: agentShadowDensityPipe.getBindGroupLayout(0),
         entries: [
             { binding: 0, resource: { buffer: agentShadowUB } },
             { binding: 1, resource: { buffer: agentBuf } },
@@ -554,6 +568,7 @@ function renderTraceCanvas() {
         rebuildRenderBG();
         rebuildImageDebugBG();
         rebuildAgentShadowBG();
+        rebuildAgentShadowDensityBG();
         return;
     }
 
@@ -646,6 +661,7 @@ function renderTraceCanvas() {
     rebuildRenderBG();
     rebuildImageDebugBG();
     rebuildAgentShadowBG();
+    rebuildAgentShadowDensityBG();
 }
 
 // ── Auto-clear timer ──────────────────────────────────────────────────────────
@@ -1567,7 +1583,7 @@ function frame(ts) {
     // Shadow density pass: clear to black, render bright additive splats per homing agent.
     // Result is read by compute.wgsl binding 5 on the *next* frame (same-frame read is fine
     // because the density pass runs after compute, and compute runs first next frame).
-    if (hasImage && agentShadowBG && shadowDensityView) {
+    if (hasImage && agentShadowDensityBG && shadowDensityView) {
         const dp = enc.beginRenderPass({
             colorAttachments: [{
                 view: shadowDensityView,
@@ -1575,7 +1591,7 @@ function frame(ts) {
             }],
         });
         dp.setPipeline(agentShadowDensityPipe);
-        dp.setBindGroup(0, agentShadowBG);
+        dp.setBindGroup(0, agentShadowDensityBG);
         dp.draw(params.agentCount * 6);
         dp.end();
     }
