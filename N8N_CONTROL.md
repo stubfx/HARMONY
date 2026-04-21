@@ -145,9 +145,9 @@ Any key matching a property in the `params` object is written directly and takes
 
 | Key | Default | Range | Description |
 |-----|---------|-------|-------------|
-| `probeLen` | `150.0` | px | How far ahead a free agent probes for primed (homing) pixels. |
-| `probeForceStr` | `100.0` | multiplier | Steering force applied when the probe hits a primed pixel. |
-| `respawnOnCollide` | `false` | bool | When true, probe hits teleport the agent to a random edge position instead of steering. |
+| `probeLen` | `150.0` | px | How far ahead a free agent probes for shadow density. |
+| `probeForceStr` | `100.0` | multiplier | Base steering force; scaled continuously by sampled shadow density (stronger overlap = stronger avoidance). |
+| `respawnOnCollide` | `false` | bool | When true, high-density probe hits (density > 0.3) teleport the agent to a random edge instead of steering. |
 
 ### Avoidance map
 

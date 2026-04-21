@@ -94,11 +94,12 @@ struct ContamParams {
     points: array<vec4<f32>, 10>,
 }
 
-@group(0) @binding(0) var<uniform>             params:      SoloParams;
-@group(0) @binding(1) var<storage, read_write> agents:      array<Agent>;
-@group(0) @binding(2) var                      imageTex:    texture_2d<f32>;
-@group(0) @binding(3) var<uniform>             contam:      ContamParams;
-@group(0) @binding(4) var                      avoidMapTex: texture_2d<f32>;
+@group(0) @binding(0) var<uniform>             params:           SoloParams;
+@group(0) @binding(1) var<storage, read_write> agents:           array<Agent>;
+@group(0) @binding(2) var                      imageTex:         texture_2d<f32>;
+@group(0) @binding(3) var<uniform>             contam:           ContamParams;
+@group(0) @binding(4) var                      avoidMapTex:      texture_2d<f32>;
+@group(0) @binding(5) var                      shadowDensityTex: texture_2d<f32>;
 
 const PI:     f32 = 3.14159265358979;
 const TWO_PI: f32 = 6.28318530717959;
@@ -153,6 +154,18 @@ fn avoidMapStrAt(canvasPx: vec2<f32>) -> f32 {
     let tx = u32(clamp(uv.x, 0.0, 1.0) * f32(dims.x - 1u));
     let ty = u32(clamp(uv.y, 0.0, 1.0) * f32(dims.y - 1u));
     return textureLoad(avoidMapTex, vec2<u32>(tx, ty), 0u).r;
+}
+
+// Sample shadow density at a canvas-pixel position.
+// Returns luminance [0, 1] of the shadow density texture — cleared to black each
+// frame and filled additively by the shadow density pass. 0 = no shadow, 1 = saturated
+// overlap of many homing agents. Used by the probe to scale avoidance force.
+fn shadowDensityAt(canvasPx: vec2<f32>) -> f32 {
+    let dims = textureDimensions(shadowDensityTex, 0u);
+    let tx   = u32(clamp(canvasPx.x / params.canvasW, 0.0, 1.0) * f32(dims.x - 1u));
+    let ty   = u32(clamp(canvasPx.y / params.canvasH, 0.0, 1.0) * f32(dims.y - 1u));
+    let px   = textureLoad(shadowDensityTex, vec2<u32>(tx, ty), 0u);
+    return dot(px.rgb, vec3<f32>(0.299, 0.587, 0.114));
 }
 
 // Returns true when pt falls inside any active contamination circle.
@@ -311,36 +324,30 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             }
         }
 
-        // ── Primed-spot probe ─────────────────────────────────────────────────
-        // Cast a probe ahead along the agent's current velocity. If it lands on
-        // a primed pixel (imgAlpha >= alphaThreshold, meaning another agent is
-        // homing there), steer away using the local alpha gradient at the probe.
-        // Only fires when the image is active and probeForceStr > 0.
+        // ── Shadow density probe ──────────────────────────────────────────────
+        // Cast a probe ahead along current velocity and sample the shadow density
+        // texture (cleared to black each frame, filled additively by homing agents).
+        // Brightness = density of overlapping shadows = deterrent strength.
+        // Force scales continuously with density: denser swarm → stronger push.
+        // respawnOnCollide triggers only when density exceeds 0.3 (solid shadow).
         if (params.hasImage != 0u && params.probeForceStr > 0.001 && params.probeLen > 0.1) {
             let velLen = length(vel);
             if (velLen > 0.001) {
-                let probePos   = pos + normalize(vel) * params.probeLen;
-                let probeAlpha = imgAlphaAt(probePos, texDims);
-                if (probeAlpha >= params.alphaThreshold) {
-                    if (params.respawnOnCollide != 0u) {
-                        // Teleport to a pseudo-random position on the canvas perimeter.
-                        // Seed mixes agent index with quantised time so each collision
-                        // produces a different destination even for the same agent.
+                let probePos     = pos + normalize(vel) * params.probeLen;
+                let probeDensity = shadowDensityAt(probePos);
+                if (probeDensity > 0.005) {
+                    if (params.respawnOnCollide != 0u && probeDensity > 0.3) {
                         let rng   = hash(i ^ (u32(params.time * 137.0) + 1u));
                         let perim = 2.0 * (params.canvasW + params.canvasH);
                         let t     = rng * perim;
                         var cp    = vec2<f32>(0.0, 0.0);
                         if (t < params.canvasW) {
-                            // Top edge
                             cp = vec2<f32>(t, 0.0);
                         } else if (t < params.canvasW + params.canvasH) {
-                            // Right edge
                             cp = vec2<f32>(params.canvasW, t - params.canvasW);
                         } else if (t < 2.0 * params.canvasW + params.canvasH) {
-                            // Bottom edge
                             cp = vec2<f32>(t - params.canvasW - params.canvasH, params.canvasH);
                         } else {
-                            // Left edge
                             cp = vec2<f32>(0.0, t - 2.0 * params.canvasW - params.canvasH);
                         }
                         agents[i].pos    = cp;
@@ -348,21 +355,24 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                         agents[i].primed = 0.0;
                         return;
                     } else {
+                        // Gradient of shadow density at probe point — steer away from
+                        // denser regions. Force magnitude scales with probeDensity so
+                        // a lone agent barely deflects, a packed cluster strongly repels.
                         let EPS  = 4.0;
-                        let pgx  = imgAlphaAt(vec2<f32>(probePos.x + EPS, probePos.y), texDims)
-                                 - imgAlphaAt(vec2<f32>(probePos.x - EPS, probePos.y), texDims);
-                        let pgy  = imgAlphaAt(vec2<f32>(probePos.x, probePos.y + EPS), texDims)
-                                 - imgAlphaAt(vec2<f32>(probePos.x, probePos.y - EPS), texDims);
+                        let pgx  = shadowDensityAt(vec2<f32>(probePos.x + EPS, probePos.y))
+                                 - shadowDensityAt(vec2<f32>(probePos.x - EPS, probePos.y));
+                        let pgy  = shadowDensityAt(vec2<f32>(probePos.x, probePos.y + EPS))
+                                 - shadowDensityAt(vec2<f32>(probePos.x, probePos.y - EPS));
                         let pGrad    = vec2<f32>(pgx, pgy);
                         let pGradLen = length(pGrad);
                         if (pGradLen > 0.001) {
                             vel += -normalize(pGrad) * params.maxSpeed * params.probeForceStr
-                                 * params.dt * 60.0;
+                                 * probeDensity * params.dt * 60.0;
                         } else {
                             let away = pos - imgCentre;
                             if (length(away) > 0.001) {
                                 vel += normalize(away) * params.maxSpeed * params.probeForceStr
-                                     * params.dt * 60.0;
+                                     * probeDensity * params.dt * 60.0;
                             }
                         }
                     }

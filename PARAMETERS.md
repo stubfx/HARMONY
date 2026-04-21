@@ -248,17 +248,17 @@ Removes the loaded image. If trace text is currently entered, the text trace rem
 ### probe distance (`probeLen`)
 **Range:** 5 – 300 | **Default:** 150
 
-Distance in canvas pixels that free agents cast a probe ahead of themselves along their current velocity. If the probe lands on a **primed** pixel — any trace pixel with alpha ≥ `alphaThreshold`, meaning an agent is homing there — a steering force redirects the free agent away before it reaches that area. Shorter values give less reaction time; longer values cause earlier, wider detours.
+Distance in canvas pixels that free agents cast a probe ahead of themselves along their current velocity. The probe samples the **shadow density texture** — a separate greyscale texture filled each frame with additive shadow splats from all homing agents. Brighter pixels mean more homing agents are converging there. Free agents steer away from the detected density. Shorter values give less reaction time; longer values cause earlier, wider detours.
 
 ### probe force (`probeForceStr`)
 **Range:** 0 – 200 | **Default:** 100
 
-Strength of the steering force when a probe hits a primed pixel. The force direction is the negative alpha gradient at the probe point — pushing the agent toward the nearest gap in the trace. At 0 the probe is disabled. Higher values cause sharper detours; lower values produce gentle course corrections. Has no effect when `respawn on collide` is enabled (the agent teleports instead of steering).
+Base strength of the steering force when a probe detects shadow density. The actual force applied is `probeForceStr × probeDensity`, so a lone agent barely deflects a passing free agent while a packed cluster causes a strong avoidance response. The steering direction follows the negative shadow density gradient — pushing the free agent toward the nearest gap. At 0 the probe is effectively disabled.
 
 ### respawn on collide (`respawnOnCollide`)
 **Default:** off
 
-When enabled, a free agent whose probe hits a primed pixel is immediately **teleported to a random position on the canvas perimeter** rather than receiving a steering force. The agent's velocity is reset to zero at the new position; normal formula and wind forces resume on the next frame, so it re-enters the field from the edge.
+When enabled, a free agent whose probe detects shadow density above 0.3 is immediately **teleported to a random position on the canvas perimeter** rather than receiving a steering force. The agent's velocity is reset to zero at the new position; normal formula and wind forces resume on the next frame, so it re-enters the field from the edge.
 
 #### How the respawn position is chosen
 

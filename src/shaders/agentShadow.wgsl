@@ -116,3 +116,15 @@ struct VsOut {
     let falloff = 1.0 - smoothstep(0.0, p.shadowRadius, dist);
     return vec4<f32>(0.0, 0.0, 0.0, falloff * p.shadowStr * in.proximityT);
 }
+
+// Density pass — renders bright greyscale shadow into the shadow density texture.
+// Cleared to black each frame; additive blend makes overlapping agents accumulate.
+// Brightness = shadow strength at each fragment; compute probe reads this as a
+// continuous deterrent signal (brighter = denser swarm = stronger avoidance).
+@fragment fn fs_density(in: VsOut) -> @location(0) vec4<f32> {
+    if (in.isHoming < 0.5) { return vec4<f32>(0.0); }
+    let dist    = length(in.clipPos.xy - in.agentPos);
+    let falloff = 1.0 - smoothstep(0.0, p.shadowRadius, dist);
+    let v       = falloff * p.shadowStr * in.proximityT;
+    return vec4<f32>(v, v, v, 1.0);
+}

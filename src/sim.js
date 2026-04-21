@@ -389,6 +389,21 @@ const agentShadowPipe = device.createRenderPipeline({
     },
     primitive: { topology: 'triangle-list' },
 });
+const agentShadowDensityPipe = device.createRenderPipeline({
+    layout: 'auto',
+    vertex:   { module: agentShadowMod, entryPoint: 'vs' },
+    fragment: {
+        module: agentShadowMod, entryPoint: 'fs_density',
+        targets: [{
+            format: 'rgba8unorm',
+            blend: {
+                color: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
+                alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
+            },
+        }],
+    },
+    primitive: { topology: 'triangle-list' },
+});
 let agentShadowBG = null;
 
 // Image debug: centered 1/4-screen quad, 50% opacity grayscale
@@ -411,9 +426,11 @@ const imageDebugPipe = device.createRenderPipeline({
 
 
 // ── Offscreen texture (rebuilt on resize) ─────────────────────────────────────
-let offscreenTex  = null;
-let offscreenView = null;
-let blitBG        = null;
+let offscreenTex       = null;
+let offscreenView      = null;
+let blitBG             = null;
+let shadowDensityTex   = null;
+let shadowDensityView  = null;
 
 function rebuildOffscreen() {
     if (offscreenTex) offscreenTex.destroy();
@@ -423,6 +440,16 @@ function rebuildOffscreen() {
         usage:  GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     });
     offscreenView = offscreenTex.createView();
+
+    if (shadowDensityTex) shadowDensityTex.destroy();
+    shadowDensityTex = device.createTexture({
+        size:   [canvas.width, canvas.height],
+        format: 'rgba8unorm',
+        usage:  GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    });
+    shadowDensityView = shadowDensityTex.createView();
+    rebuildSimBG();
+
     blitBG = device.createBindGroup({
         layout: blitPipe.getBindGroupLayout(0),
         entries: [
@@ -723,8 +750,9 @@ let windVisBG   = null;
 
 function rebuildSimBG() {
     if (!simPipe) return;
-    const texView      = (hasImage    && imageTexView)    ? imageTexView    : placeholderTexView;
-    const avoidMapView = (hasAvoidMap && avoidMapTexView) ? avoidMapTexView : placeholderTexView;
+    const texView           = (hasImage    && imageTexView)    ? imageTexView    : placeholderTexView;
+    const avoidMapView      = (hasAvoidMap && avoidMapTexView) ? avoidMapTexView : placeholderTexView;
+    const shadowDensityRes  = shadowDensityView ?? placeholderTexView;
     simBG = device.createBindGroup({
         layout: simPipe.getBindGroupLayout(0),
         entries: [
@@ -733,6 +761,7 @@ function rebuildSimBG() {
             { binding: 2, resource: texView },
             { binding: 3, resource: { buffer: contamUB } },
             { binding: 4, resource: avoidMapView },
+            { binding: 5, resource: shadowDensityRes },
         ],
     });
 }
@@ -1533,6 +1562,22 @@ function frame(ts) {
         cp.setBindGroup(0, simBG);
         cp.dispatchWorkgroups(Math.ceil(params.agentCount / 64));
         cp.end();
+    }
+
+    // Shadow density pass: clear to black, render bright additive splats per homing agent.
+    // Result is read by compute.wgsl binding 5 on the *next* frame (same-frame read is fine
+    // because the density pass runs after compute, and compute runs first next frame).
+    if (hasImage && agentShadowBG && shadowDensityView) {
+        const dp = enc.beginRenderPass({
+            colorAttachments: [{
+                view: shadowDensityView,
+                loadOp: 'clear', clearValue: { r: 0, g: 0, b: 0, a: 0 }, storeOp: 'store',
+            }],
+        });
+        dp.setPipeline(agentShadowDensityPipe);
+        dp.setBindGroup(0, agentShadowBG);
+        dp.draw(params.agentCount * 6);
+        dp.end();
     }
 
     // Offscreen: fade old trail + draw new particles
