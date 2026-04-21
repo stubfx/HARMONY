@@ -202,9 +202,10 @@ Authorization: Bearer <N8N_SECRET>
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `text` | `string` | Text shown in the centred notification on the remote device. Auto-dismisses after 5 s. |
+| `text` | `string` | Text shown as a top notification on the remote device. Slides in, auto-dismisses after 5 s. |
+| `color` | `string` \| `null` | CSS color string (hex, hsl, etc.) that overrides the aura base color on the device. Persists across messages until overridden. Send `null` or `""` to reset to the temperature-driven color. |
 
-Additional fields in `data` are passed through and available for future interface types.
+Fields are independent — you can send `color` without `text` (silent aura shift), `text` without `color` (notification only), or both together. Additional fields are passed through for future interface types.
 
 ### Examples
 
@@ -238,7 +239,12 @@ Error responses: `400` missing room, `401` bad token, `404` room or spectator no
 
 ### Remote device behaviour
 
-The `device-message` socket event is received by the spectator's browser. The `data.text` field is rendered in a centred translucent notification that fades in immediately and auto-dismisses after 5 seconds. Consecutive messages restart the timer. The notification does not block touch interaction.
+The `device-message` socket event is received by the spectator's browser.
+
+- **`data.text`** — rendered in a pill-shaped notification anchored to the top of the screen. Slides in from above, auto-dismisses after 5 s. Consecutive messages restart the timer. Does not block touch interaction.
+- **`data.color`** — immediately updates the aura background color, overriding the temperature-driven hue. The tilt anchor and coherence shape still respond to the device. Persists until the next push. Send `null` to restore temperature-driven color.
+
+The text input on the remote is hidden by default and revealed by a double-tap on the gesture surface. After submitting text it collapses automatically.
 
 ---
 

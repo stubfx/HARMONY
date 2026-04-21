@@ -16,15 +16,30 @@ html, body {
 }
 
 /* ── Aura — atmospheric colour gradient ─────────────────────────────────────── */
-/* Tinted by collective temperature; anchor shifts with tilt.                     */
+/* Tinted by temperature and tilt; base color overridable via n8n device-message. */
 #aura {
     position: fixed;
     inset: 0;
     z-index: 0;
     pointer-events: none;
     transition: background 0.6s ease;
-    /* default: neutral cool-dark state */
     background: radial-gradient(ellipse 120% 60% at 50% 110%, hsl(210,70%,12%) 0%, #000 55%);
+}
+
+/* ── Breathing pulse — subtle idle life ─────────────────────────────────────── */
+/* A slow radial swell at very low opacity, always animating.                     */
+#breath {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse 55% 35% at 50% 50%, rgba(255,255,255,0.04) 0%, transparent 70%);
+    animation: breathe 5s ease-in-out infinite;
+}
+
+@keyframes breathe {
+    0%, 100% { opacity: 0.4; transform: scale(1); }
+    50%       { opacity: 1;   transform: scale(1.12); }
 }
 
 /* ── Gesture surface ─────────────────────────────────────────────────────────── */
@@ -82,15 +97,46 @@ html, body {
     transition: transform 0.15s ease;
 }
 
+/* ── Device message — push notification from n8n ────────────────────────────── */
+/* Anchored to the top of the screen; slides in from above on arrival.            */
+#device-message {
+    position: fixed;
+    top: max(env(safe-area-inset-top), 1.5rem);
+    left: 50%;
+    transform: translateX(-50%) translateY(-8px);
+    z-index: 25;
+    max-width: min(72vw, 280px);
+    padding: 0.55rem 1.2rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 2rem;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-align: center;
+    line-height: 1.5;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+#device-message.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
 /* ── Session info ────────────────────────────────────────────────────────────── */
 #session-info {
     position: fixed;
-    top: max(env(safe-area-inset-top), 0.75rem);
+    bottom: max(env(safe-area-inset-bottom), 0.75rem);
     left: 0.75rem;
     z-index: 10;
     font-size: 0.6rem;
     letter-spacing: 0.05em;
-    color: rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.12);
     pointer-events: none;
     line-height: 1.4;
 }
@@ -113,18 +159,27 @@ html, body {
     box-shadow: 0 0 6px rgba(255, 255, 255, 0.4);
 }
 
-/* ── Bottom bar ──────────────────────────────────────────────────────────────── */
+/* ── Bottom bar — text input, hidden until double-tap ───────────────────────── */
 #bottom-bar {
     position: fixed;
     bottom: max(env(safe-area-inset-bottom), 1.5rem);
     left: 50%;
-    transform: translateX(-50%);
+    transform: translateX(-50%) translateY(calc(100% + 2rem));
     z-index: 10;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 0.6rem;
     width: min(80vw, 320px);
+    opacity: 0;
+    transition: transform 0.4s ease, opacity 0.4s ease;
+    pointer-events: none;
+}
+
+#bottom-bar.visible {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    pointer-events: auto;
 }
 
 /* ── Join overlay — full-screen gate shown before first interaction ───────────── */
@@ -186,42 +241,4 @@ html, body {
 #input-form input:focus {
     border-bottom-color: rgba(255, 255, 255, 0.3);
     color: rgba(255, 255, 255, 0.75);
-}
-
-/* ── Device message — push notification from n8n ────────────────────────────── */
-#device-message {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 25;
-    max-width: min(72vw, 280px);
-    padding: 0.9rem 1.4rem;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 0.5rem;
-    color: rgba(255, 255, 255, 0.75);
-    font-size: 0.8rem;
-    letter-spacing: 0.06em;
-    text-align: center;
-    line-height: 1.5;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.4s ease;
-}
-
-#device-message.visible { opacity: 1; }
-
-/* ── Session QR — persistent share code ─────────────────────────────────────── */
-#session-qr {
-    position: fixed;
-    bottom: max(env(safe-area-inset-bottom), 1.5rem);
-    right: 0.85rem;
-    z-index: 20;
-    width: 48px;
-    height: 48px;
-    opacity: 0.18;
-    pointer-events: none;
-    image-rendering: pixelated;
-    transition: opacity 0.6s ease;
 }

@@ -11,28 +11,28 @@
         <!-- Atmospheric colour glow — shifts with temperature and tilt -->
         <div id="aura"></div>
 
-        <!-- Full-screen gesture surface — touch anywhere -->
+        <!-- Slow idle breathing pulse — always on, subtle -->
+        <div id="breath"></div>
+
+        <!-- Full-screen gesture surface — touch anywhere, double-tap to write -->
         <div id="gesture-surface"></div>
 
         <!-- Tilt bubble — moves with phone orientation -->
         <div id="tilt-ring"><div id="tilt-dot"></div></div>
 
+        <!-- Push notification from n8n — fades in at top, dismissed automatically -->
+        <div id="device-message" aria-live="polite"></div>
+
         <!-- Minimal status bar -->
         <div id="session-info"></div>
         <div id="conn-dot"></div>
-
-        <!-- Persistent session QR — always visible, bottom-right corner -->
-        <canvas id="session-qr"></canvas>
-
-        <!-- Push notification from n8n — fades in/out, dismissed automatically -->
-        <div id="device-message" aria-live="polite"></div>
 
         <!-- Full-screen join gate — dismissed after first interaction -->
         <div id="join-overlay">
             <button id="join-btn">join the swarm</button>
         </div>
 
-        <!-- Bottom controls — text input (visible after join) -->
+        <!-- Text input — hidden by default, revealed by double-tapping the surface -->
         <div id="bottom-bar">
             <form id="input-form" autocomplete="off">
                 <input name="text1" type="text" placeholder="write to the swarm…" autocomplete="off" autocorrect="off" spellcheck="false">

@@ -9,14 +9,17 @@
 // Touch and text events are forwarded directly to the simulation.
 //
 // n8n can push messages back to this device via POST /spectator-push on the server.
-// The 'device-message' socket event renders arbitrary text in a centred notification.
+// The 'device-message' socket event can carry:
+//   text  — shown as a top notification, auto-dismissed after 5 s
+//   color — CSS color string that overrides the aura base color (null to reset)
+//
+// Text input is hidden by default; double-tap the gesture surface to reveal/hide it.
 //
 // Signal path (outbound): this page → socket → server → [n8n →] socket → simulation
 // Signal path (inbound):  n8n → POST /spectator-push → server → socket → this page
 
 import './style.css';
 import { io as ioConnect } from 'socket.io-client';
-import QRCode from 'qrcode';
 import { startDeviceTilt, requestMotionOrientationPermission } from './gyro';
 
 // ── Session ───────────────────────────────────────────────────────────────────
@@ -39,7 +42,7 @@ const gestureSurface = document.querySelector('#gesture-surface');
 const joinOverlayEl  = document.querySelector('#join-overlay');
 const joinBtnEl      = document.querySelector('#join-btn');
 const formEl         = document.querySelector('#input-form');
-const sessionQrEl    = document.querySelector('#session-qr');
+const bottomBarEl    = document.querySelector('#bottom-bar');
 const deviceMsgEl    = document.querySelector('#device-message');
 
 // ── Session info ──────────────────────────────────────────────────────────────
@@ -77,12 +80,18 @@ socket.on('disconnect', () => {
 });
 
 // ── Device message (push from n8n) ────────────────────────────────────────────
-// Received when n8n calls POST /spectator-push on the server targeting this device.
-// data.text is shown in a centred notification that auto-dismisses after 5 s.
-// Any other fields in data are available here for future interaction types.
+// data.text  — notification text shown at the top, auto-dismissed after 5 s
+// data.color — CSS color string for the aura base; persists until overridden.
+//              Send null or empty string to reset to temperature-driven color.
 let deviceMsgTimer = null;
+let pushedColor    = null;
 
 socket.on('device-message', (data) => {
+    if ('color' in (data ?? {})) {
+        pushedColor = data.color || null;
+        updateAura();
+    }
+
     const text = data?.text ?? '';
     if (!deviceMsgEl || !text) return;
 
@@ -101,7 +110,7 @@ socket.on('device-message', (data) => {
 });
 
 // ── Peer events ───────────────────────────────────────────────────────────────
-// Brief aura pulse when another spectator joins — no QR logic (QR is always visible).
+// Brief aura pulse when another spectator joins.
 socket.on('peer-joined', () => {
     if (!auraEl) return;
     auraEl.style.transition = 'background 0s, opacity 0.05s ease';
@@ -122,6 +131,8 @@ function sendEvent(type, data) {
 //   Y (temperature) → hue shift: cold blue (top) → warm amber (bottom)
 //   tilt            → anchor point: the glow leans with the phone
 //   X (coherence)   → gradient tightness: diffuse (left/chaos) → focused (right/order)
+// If n8n pushes a color via device-message, it overrides the temperature-driven hue
+// and persists until a new push clears it (data.color = null).
 let currentTemp      = 0.5;
 let currentRoll      = 0.5;
 let currentPitch     = 0.5;
@@ -129,18 +140,22 @@ let currentCoherence = 0.5;
 
 function updateAura() {
     if (!auraEl) return;
-    // Hue: 215 (cold blue) → 32 (warm amber)
-    const h  = 215 + (32 - 215) * currentTemp;
-    const s  = 60 + 25 * currentTemp;
-    const l  = 9  + 10 * currentTemp;
     // Anchor follows tilt
     const ax = 50 + (currentRoll  - 0.5) * 60;
     const ay = 50 + (currentPitch - 0.5) * 60;
     // Coherence: diffuse wide ellipse (chaos) → tight narrow ellipse (order)
     const ew = 190 - currentCoherence * 110;  // 190% → 80%
     const eh = 110 - currentCoherence * 70;   // 110% → 40%
+    // Center color: pushed by n8n or computed from temperature
+    const centerColor = pushedColor ?? (() => {
+        // Hue: 215 (cold blue) → 32 (warm amber)
+        const h = 215 + (32 - 215) * currentTemp;
+        const s = 60 + 25 * currentTemp;
+        const l = 9  + 10 * currentTemp;
+        return `hsl(${h},${s}%,${l}%)`;
+    })();
     auraEl.style.background =
-        `radial-gradient(ellipse ${ew}% ${eh}% at ${ax}% ${ay}%, hsl(${h},${s}%,${l}%) 0%, #000 60%)`;
+        `radial-gradient(ellipse ${ew}% ${eh}% at ${ax}% ${ay}%, ${centerColor} 0%, #000 60%)`;
 }
 updateAura();
 
@@ -157,7 +172,10 @@ function updateTiltDot(roll, pitch) {
 // The whole screen is the instrument surface.
 // X + Y → normalized spatial position.
 // Y → temperature: finger near top = cold (0), near bottom = warm (1).
+// Double-tap → toggle text input visibility.
 let touchThrottle = null;
+let lastTapTime   = 0;
+let formVisible   = false;
 
 function handleTouch(e) {
     const touch = e.touches[0];
@@ -178,6 +196,18 @@ function handleTouch(e) {
 
 gestureSurface?.addEventListener('touchstart', (e) => {
     e.preventDefault();
+
+    // Double-tap detection: two taps within 280 ms toggle the text input
+    const now = Date.now();
+    if (now - lastTapTime < 280) {
+        formVisible = !formVisible;
+        bottomBarEl?.classList.toggle('visible', formVisible);
+        if (formVisible) formEl?.querySelector('input')?.focus();
+        lastTapTime = 0; // reset so triple-tap doesn't re-trigger
+    } else {
+        lastTapTime = now;
+    }
+
     createRipple(e.touches[0].clientX, e.touches[0].clientY);
     handleTouch(e);
 }, { passive: false });
@@ -244,22 +274,15 @@ joinBtnEl?.addEventListener('click', async () => {
 });
 
 // ── Text form ─────────────────────────────────────────────────────────────────
+// Hidden by default; revealed by double-tapping the gesture surface.
+// Collapses automatically after submission.
 formEl?.addEventListener('submit', (e) => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(formEl));
     if (!data.text1?.trim()) return;
     sendEvent('text', { text: data.text1.trim() });
     formEl.reset();
+    formVisible = false;
+    bottomBarEl?.classList.remove('visible');
     console.log('[remote] → text', data.text1.trim());
 });
-
-// ── Session QR — always-visible small code in corner ─────────────────────────
-// Always shown so any visitor can share the session with others.
-// Hiding logic lives only on the simulation big screen.
-if (sessionQrEl) {
-    QRCode.toCanvas(sessionQrEl, window.location.href, {
-        width:  72,
-        margin: 1,
-        color:  { dark: '#ffffff', light: '#00000000' },
-    }).catch(err => console.warn('[remote] QR render failed:', err));
-}
