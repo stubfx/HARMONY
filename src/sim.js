@@ -1027,6 +1027,10 @@ function applySimParams(data) {
     Object.entries(rest).forEach(([k, v]) => {
         if (k in params) params[k] = v;
     });
+    if ('heartbeatInterval' in rest) restartHeartbeat();
+    if ('n8nTestMode'       in rest) socket.emit('set-n8n-test-mode', params.n8nTestMode);
+    if ('agentCount'        in rest || 'weightSpread' in rest) seedAgents();
+    if ('renderScale'       in rest) { setSize(); rebuildOffscreen(); seedAgents(); }
     gui.controllersRecursive().forEach(c => c.updateDisplay());
     if (dir !== undefined || wind !== undefined) {
         const newDir  = dir  ?? dirInput.value;
