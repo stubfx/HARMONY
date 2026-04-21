@@ -56,6 +56,9 @@ const params = {
     // Agent shadow
     agentShadowStr:    0.20, // peak opacity of each homing-agent shadow splat (0–1)
     agentShadowRadius: 10,   // splat half-radius in canvas pixels
+    // Homing proximity fade
+    homingProximityRange: 300, // canvas px — distance over which homing agents fade in
+    homingMinAlpha:       0.1, // minimum alpha for a homing agent at max distance (0–1)
     // Avoidance
     avoidForceStr:   1.0, // multiplier on image-trace avoidance forces
     avoidMapScale:   1.0, // avoidance map coverage as fraction of canvas (1.0 = full)
@@ -221,7 +224,7 @@ const soloUB = device.createBuffer({
     size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
-    size: 88, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const fadeUB = device.createBuffer({
     size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -1107,6 +1110,8 @@ fMagnet.add(params, 'contamPush').name('eraser push');
 fMagnet.add(params, 'contamRadius', 10, 600, 5).name('eraser radius');
 fMagnet.add(params, 'agentShadowStr',    0,   1,   0.005).name('shadow strength');
 fMagnet.add(params, 'agentShadowRadius', 0, 300,   0.5 ).name('shadow radius');
+fMagnet.add(params, 'homingProximityRange', 0, 2000, 10).name('proximity range (px)');
+fMagnet.add(params, 'homingMinAlpha',       0, 1,  0.01).name('proximity min alpha');
 fMagnet.add(params, 'avoidForceStr', 0, 5, 0.05).name('avoid force');
 fMagnet.add(params, 'probeLen',      5, 300, 1   ).name('probe distance');
 fMagnet.add(params, 'probeForceStr',    0, 200, 1   ).name('probe force');
@@ -1373,7 +1378,7 @@ function writeSoloUB(dt, time) {
 }
 
 function writeRenderUB() {
-    const ab   = new ArrayBuffer(84);
+    const ab   = new ArrayBuffer(96);
     const u    = new Uint32Array(ab);
     const f    = new Float32Array(ab);
     const rgb  = hexToF(params.color);
@@ -1411,6 +1416,8 @@ function writeRenderUB() {
     f[19] = simState.qrStatus === 'SHOW' ? 0 : params.vignetteEdge;
     u[20] = simState.qrStatus === 'SHOW' ? 1 : 0;
     u[21] = params.qrFadeZone ? 1 : 0;
+    f[22] = params.homingProximityRange;
+    f[23] = params.homingMinAlpha;
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 
@@ -1450,6 +1457,8 @@ function writeAgentShadowUB() {
     f[2] = params.agentShadowRadius;
     f[3] = params.agentShadowStr;
     u[4] = hasImage ? 1 : 0;
+    f[5] = params.homingProximityRange;
+    f[6] = params.homingMinAlpha;
     device.queue.writeBuffer(agentShadowUB, 0, ab);
 }
 

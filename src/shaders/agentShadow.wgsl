@@ -9,27 +9,28 @@
 //
 // Each homing agent renders a quad of side 2×shadowRadius canvas pixels centred on
 // its current position. The fragment outputs black at (1 − smoothstep(dist/radius))
-// × shadowStr, blended with src-alpha / one-minus-src-alpha to darken the trail.
+// × shadowStr × proximityT, blended with src-alpha / one-minus-src-alpha to darken
+// the trail. Shadow strengthens as the agent closes in on its home pixel.
 //
 // AgentShadowParams layout (32 bytes):
-//   [0]  canvasW      f32
-//   [4]  canvasH      f32
-//   [8]  shadowRadius f32   (quad half-extent in canvas pixels)
-//   [12] shadowStr    f32   (peak shadow opacity, 0–1)
-//   [16] hasImage     u32
-//   [20] _p0          u32
-//   [24] _p1          u32
-//   [28] _p2          u32
+//   [0]  canvasW              f32
+//   [4]  canvasH              f32
+//   [8]  shadowRadius         f32   (quad half-extent in canvas pixels)
+//   [12] shadowStr            f32   (peak shadow opacity, 0–1)
+//   [16] hasImage             u32
+//   [20] homingProximityRange f32   (canvas px over which shadow fades in)
+//   [24] homingMinAlpha       f32   (minimum shadow alpha at max distance)
+//   [28] _p2                  u32
 
 struct AgentShadowParams {
-    canvasW:      f32,
-    canvasH:      f32,
-    shadowRadius: f32,
-    shadowStr:    f32,
-    hasImage:     u32,
-    _p0:          u32,
-    _p1:          u32,
-    _p2:          u32,
+    canvasW:              f32,
+    canvasH:              f32,
+    shadowRadius:         f32,
+    shadowStr:            f32,
+    hasImage:             u32,
+    homingProximityRange: f32,
+    homingMinAlpha:       f32,
+    _p2:                  u32,
 }
 
 struct Agent {
@@ -54,9 +55,10 @@ struct ContamParams {
 @group(0) @binding(2) var<uniform>       contam: ContamParams;
 
 struct VsOut {
-    @builtin(position) clipPos:  vec4<f32>,
-    @location(0)       agentPos: vec2<f32>,   // agent centre in canvas pixels
-    @location(1)       isHoming: f32,
+    @builtin(position) clipPos:    vec4<f32>,
+    @location(0)       agentPos:   vec2<f32>,  // agent centre in canvas pixels
+    @location(1)       isHoming:   f32,
+    @location(2)       proximityT: f32,         // 0 = far from home, 1 = at home
 }
 
 @vertex fn vs(@builtin(vertex_index) vi: u32) -> VsOut {
@@ -83,6 +85,11 @@ struct VsOut {
         }
     }
 
+    // Proximity factor: shadow strengthens as the agent closes in on its home pixel.
+    let distToHome = length(agent.pos - agent.home);
+    let rawT       = 1.0 - clamp(distToHome / max(p.homingProximityRange, 1.0), 0.0, 1.0);
+    let proximityT = mix(p.homingMinAlpha, 1.0, rawT);
+
     let ndc = vec2<f32>(
          agent.pos.x / p.canvasW * 2.0 - 1.0,
         -(agent.pos.y / p.canvasH * 2.0 - 1.0),
@@ -98,7 +105,7 @@ struct VsOut {
         clipPos = vec4<f32>(10.0, 10.0, 0.0, 1.0);
     }
 
-    return VsOut(clipPos, agent.pos, isHoming);
+    return VsOut(clipPos, agent.pos, isHoming, proximityT);
 }
 
 @fragment fn fs(in: VsOut) -> @location(0) vec4<f32> {
@@ -107,5 +114,5 @@ struct VsOut {
     // matching the canvas-pixel space of agent.pos — distance is in canvas pixels.
     let dist    = length(in.clipPos.xy - in.agentPos);
     let falloff = 1.0 - smoothstep(0.0, p.shadowRadius, dist);
-    return vec4<f32>(0.0, 0.0, 0.0, falloff * p.shadowStr);
+    return vec4<f32>(0.0, 0.0, 0.0, falloff * p.shadowStr * in.proximityT);
 }

@@ -124,12 +124,14 @@ Any key matching a property in the `params` object is written directly and takes
 | `vignetteEdge` | `0.08` | `0 – 0.5` | UV-space width of the soft edge fade applied to the magnet image. `0` = no fade. |
 | `showImage` | `false` | bool | Renders a debug overlay of the raw magnet image. |
 
-### Agent shadow
+### Agent shadow & proximity fade
 
 | Key | Default | Range | Description |
 |-----|---------|-------|-------------|
 | `agentShadowStr` | `0.20` | `0 – 1` | Peak opacity of each homing-agent shadow splat. |
 | `agentShadowRadius` | `10` | px | Splat half-radius in canvas pixels. Larger = softer, wider shadow. |
+| `homingProximityRange` | `300` | px | Distance over which a homing agent fades from `homingMinAlpha` to full visibility. Set to `0` to disable. |
+| `homingMinAlpha` | `0.1` | `0 – 1` | Minimum alpha for a homing agent at max distance. Applies to both particle and shadow. `1` disables the fade. |
 
 ### Mouse eraser (contamination)
 

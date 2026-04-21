@@ -302,11 +302,27 @@ Shadow rendering is a dedicated render sub-pass inside the offscreen render pass
 
 1. **Vertex shader** reads `agents[agentId].primed` — the flag written by the compute shader each frame. No texture sampling is needed; the homing decision is already made. If `primed = 1.0`, the vertex places the quad centred on `agents[agentId].pos`; if `primed = 0.0`, all 6 vertices degenerate to a single out-of-clip-space point generating zero fragments.
 
-2. **Fragment shader** computes the canvas-pixel distance from the fragment to the agent centre (using `@builtin(position).xy` against the agent's stored canvas position) and outputs `vec4(0, 0, 0, falloff × shadowStr)`.
+2. **Fragment shader** computes the canvas-pixel distance from the fragment to the agent centre (using `@builtin(position).xy` against the agent's stored canvas position) and outputs `vec4(0, 0, 0, falloff × shadowStr × proximityT)`.
 
 3. **Blend mode** is standard alpha compositing (`src-alpha / one-minus-src-alpha`) so the shadow physically darkens the trail texture underneath, unlike the additive particle blend.
 
 Because homing agents are drawn on top of the trail (with additive blend) in the subsequent particle pass, their rendered quads always appear above the shadow, giving the trace a sense of depth: dark halo behind, bright particle on top.
+
+---
+
+### proximity range (`homingProximityRange`)
+**Range:** 0 – 2000 | **Default:** 300 | **Step:** 10
+
+Canvas pixel distance over which a homing agent fades from `proximity min alpha` to fully visible. An agent that just became homing and is 300+ px from its home position renders at minimum alpha; as it closes in, both its rendered color and its shadow increase in opacity, reaching full strength at distance 0 (exactly at home). This makes the image form gradually and visually from the arriving swarm rather than popping in at full brightness.
+
+Set to 0 to disable the fade entirely (all homing agents render at full opacity immediately).
+
+### proximity min alpha (`homingMinAlpha`)
+**Range:** 0 – 1 | **Default:** 0.1 | **Step:** 0.01
+
+The minimum alpha applied to a homing agent that is at or beyond `proximity range` from its home. At 0 agents are invisible when they start homing and gradually appear as they arrive. At 1 all homing agents are always fully visible regardless of distance (equivalent to disabling the proximity fade). Values around 0.05–0.15 give a natural emergence effect without agents fully disappearing when the image changes.
+
+This multiplier applies to both the rendered particle alpha and the shadow alpha, keeping the two visually consistent.
 
 ---
 

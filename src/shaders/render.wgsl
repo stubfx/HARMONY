@@ -1,51 +1,55 @@
 // ─── Solo Particle Render Shader ──────────────────────────────────────────────
-// SoloRenderParams layout (88 bytes):
-//   [0]  agentCount     u32
-//   [4]  canvasW        f32
-//   [8]  canvasH        f32
-//   [12] pointSize      f32
-//   [16] colorR         f32
-//   [20] colorG         f32
-//   [24] colorB         f32
-//   [28] maxSpeed       f32
-//   [32] hasImage       u32
-//   [36] imgX0          f32
-//   [40] imgY0          f32
-//   [44] imgX1          f32
-//   [48] imgY1          f32
-//   [52] speedColorR    f32
-//   [56] speedColorG    f32
-//   [60] speedColorB    f32
-//   [64] brightness     f32
-//   [68] alphaThreshold f32
-//   [72] blackThreshold f32
-//   [76] vignetteEdge   f32
-//   [80] qrMode         u32   (1 = QR active)
-//   [84] qrFadeZone     u32   (1 = fade free agents near the QR rect)
+// SoloRenderParams layout (96 bytes):
+//   [0]  agentCount          u32
+//   [4]  canvasW             f32
+//   [8]  canvasH             f32
+//   [12] pointSize           f32
+//   [16] colorR              f32
+//   [20] colorG              f32
+//   [24] colorB              f32
+//   [28] maxSpeed            f32
+//   [32] hasImage            u32
+//   [36] imgX0               f32
+//   [40] imgY0               f32
+//   [44] imgX1               f32
+//   [48] imgY1               f32
+//   [52] speedColorR         f32
+//   [56] speedColorG         f32
+//   [60] speedColorB         f32
+//   [64] brightness          f32
+//   [68] alphaThreshold      f32
+//   [72] blackThreshold      f32
+//   [76] vignetteEdge        f32
+//   [80] qrMode              u32   (1 = QR active)
+//   [84] qrFadeZone          u32   (1 = fade free agents near the QR rect)
+//   [88] homingProximityRange f32  (canvas px over which homing agents fade in)
+//   [92] homingMinAlpha       f32  (minimum alpha for a homing agent at max distance)
 
 struct SoloRenderParams {
-    agentCount:     u32,
-    canvasW:        f32,
-    canvasH:        f32,
-    pointSize:      f32,
-    colorR:         f32,
-    colorG:         f32,
-    colorB:         f32,
-    maxSpeed:       f32,
-    hasImage:       u32,
-    imgX0:          f32,
-    imgY0:          f32,
-    imgX1:          f32,
-    imgY1:          f32,
-    speedColorR:    f32,
-    speedColorG:    f32,
-    speedColorB:    f32,
-    brightness:     f32,
-    alphaThreshold: f32,
-    blackThreshold: f32,
-    vignetteEdge:   f32,
-    qrMode:         u32,
-    qrFadeZone:     u32,
+    agentCount:           u32,
+    canvasW:              f32,
+    canvasH:              f32,
+    pointSize:            f32,
+    colorR:               f32,
+    colorG:               f32,
+    colorB:               f32,
+    maxSpeed:             f32,
+    hasImage:             u32,
+    imgX0:                f32,
+    imgY0:                f32,
+    imgX1:                f32,
+    imgY1:                f32,
+    speedColorR:          f32,
+    speedColorG:          f32,
+    speedColorB:          f32,
+    brightness:           f32,
+    alphaThreshold:       f32,
+    blackThreshold:       f32,
+    vignetteEdge:         f32,
+    qrMode:               u32,
+    qrFadeZone:           u32,
+    homingProximityRange: f32,
+    homingMinAlpha:       f32,
 }
 
 struct Agent {
@@ -62,12 +66,13 @@ struct Agent {
 @group(0) @binding(3) var               imgTex: texture_2d<f32>;
 
 struct VsOut {
-    @builtin(position) pos:      vec4<f32>,
-    @location(0)       color:    vec3<f32>,
-    @location(1)       agentPos: vec2<f32>,
-    @location(2)       bright:   f32,
-    @location(3)       homeUV:   vec2<f32>,
-    @location(4)       primed:   f32,
+    @builtin(position) pos:        vec4<f32>,
+    @location(0)       color:      vec3<f32>,
+    @location(1)       agentPos:   vec2<f32>,
+    @location(2)       bright:     f32,
+    @location(3)       homeUV:     vec2<f32>,
+    @location(4)       primed:     f32,
+    @location(5)       proximityT: f32,  // 0 = far from home, 1 = at home
 }
 
 @vertex fn vs(@builtin(vertex_index) vi: u32) -> VsOut {
@@ -99,7 +104,13 @@ struct VsOut {
         (agent.home.y - params.imgY0) / (params.imgY1 - params.imgY0),
     );
 
-    return VsOut(vec4<f32>(finalNdc, 0.0, 1.0), color, agent.pos, t, homeUV, agent.primed);
+    // Proximity factor: 1.0 when agent is at its home pixel, homingMinAlpha when
+    // at or beyond homingProximityRange. Only meaningful for homing agents.
+    let distToHome = length(agent.pos - agent.home);
+    let rawT       = 1.0 - clamp(distToHome / max(params.homingProximityRange, 1.0), 0.0, 1.0);
+    let proximityT = mix(params.homingMinAlpha, 1.0, rawT);
+
+    return VsOut(vec4<f32>(finalNdc, 0.0, 1.0), color, agent.pos, t, homeUV, agent.primed, proximityT);
 }
 
 @fragment fn fs(in: VsOut) -> @location(0) vec4<f32> {
@@ -122,9 +133,10 @@ struct VsOut {
         }
 
         // Vignette for output alpha — purely visual, the primed gate already accounts for it.
+        // Proximity factor fades the agent in as it closes in on its home pixel.
         let distEdge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
         let vig      = select(smoothstep(0.0, max(params.vignetteEdge, 0.0001), distEdge), 1.0, params.qrMode != 0u);
-        return vec4<f32>(imgSample.rgb, imgSample.a * vig);
+        return vec4<f32>(imgSample.rgb, imgSample.a * vig * in.proximityT);
     }
     // QR mode: optionally fade free agents near the QR rect to keep it scannable.
     // Signed distance to the rect edge → smoothstep over 80px falloff.
