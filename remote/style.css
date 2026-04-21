@@ -188,6 +188,30 @@ html, body {
     color: rgba(255, 255, 255, 0.75);
 }
 
+/* ── Device message — push notification from n8n ────────────────────────────── */
+#device-message {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 25;
+    max-width: min(72vw, 280px);
+    padding: 0.9rem 1.4rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.5rem;
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 0.8rem;
+    letter-spacing: 0.06em;
+    text-align: center;
+    line-height: 1.5;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+}
+
+#device-message.visible { opacity: 1; }
+
 /* ── Session QR — persistent share code ─────────────────────────────────────── */
 #session-qr {
     position: fixed;

@@ -8,8 +8,11 @@
 // Tilt events are consumed server-side and aggregated into a collective wind bias.
 // Touch and text events are forwarded directly to the simulation.
 //
-// Signal path:
-//   this page → socket → server → [n8n →] socket → simulation
+// n8n can push messages back to this device via POST /spectator-push on the server.
+// The 'device-message' socket event renders arbitrary text in a centred notification.
+//
+// Signal path (outbound): this page → socket → server → [n8n →] socket → simulation
+// Signal path (inbound):  n8n → POST /spectator-push → server → socket → this page
 
 import './style.css';
 import { io as ioConnect } from 'socket.io-client';
@@ -37,6 +40,7 @@ const joinOverlayEl  = document.querySelector('#join-overlay');
 const joinBtnEl      = document.querySelector('#join-btn');
 const formEl         = document.querySelector('#input-form');
 const sessionQrEl    = document.querySelector('#session-qr');
+const deviceMsgEl    = document.querySelector('#device-message');
 
 // ── Session info ──────────────────────────────────────────────────────────────
 if (sessionInfoEl) {
@@ -70,6 +74,30 @@ socket.on('connect_error', () => {
 socket.on('disconnect', () => {
     console.warn('[remote] disconnected');
     connDotEl?.classList.remove('connected');
+});
+
+// ── Device message (push from n8n) ────────────────────────────────────────────
+// Received when n8n calls POST /spectator-push on the server targeting this device.
+// data.text is shown in a centred notification that auto-dismisses after 5 s.
+// Any other fields in data are available here for future interaction types.
+let deviceMsgTimer = null;
+
+socket.on('device-message', (data) => {
+    const text = data?.text ?? '';
+    if (!deviceMsgEl || !text) return;
+
+    if (deviceMsgTimer) {
+        clearTimeout(deviceMsgTimer);
+        deviceMsgTimer = null;
+    }
+
+    deviceMsgEl.textContent = text;
+    deviceMsgEl.classList.add('visible');
+
+    deviceMsgTimer = setTimeout(() => {
+        deviceMsgEl.classList.remove('visible');
+        deviceMsgTimer = null;
+    }, 5000);
 });
 
 // ── Peer events ───────────────────────────────────────────────────────────────

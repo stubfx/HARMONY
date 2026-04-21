@@ -12,11 +12,15 @@
 //   5. Spectator presence — calls n8n /webhook/spectator on every join and leave,
 //        forwarding the response as 'sim-params' to the host. The server is the
 //        authoritative source for connection counts; the sim never tracks them.
+//   6. Device push — POST /spectator-push lets n8n send a 'device-message' event
+//        to a specific spectator (by spectatorId) or broadcast to all in a room.
+//        Authenticated via Bearer token (N8N_SECRET env var).
 //
 // Signal path:
 //   remote → socket → server → socket → simulation [→ n8n → simulation]
 //   server (ticker) → 'collective-state' → simulation
 //   server (join/leave) → n8n /spectator → 'sim-params' → simulation
+//   n8n → POST /spectator-push → server → socket → remote device
 
 import express           from 'express';
 import { createServer }  from 'node:http';
@@ -40,9 +44,11 @@ const VITE_PORT   = process.env.VITE_PORT ?? 5173;
 
 const ADMIN_PASS = process.env.ADMIN_PASSWORD ?? '';
 const N8N_BASE   = (process.env.VITE_N8N_BASE_URL ?? '').replace(/\/$/, '');
+const N8N_SECRET = process.env.N8N_SECRET ?? '';
 
-if (!ADMIN_PASS) console.warn('[server] ADMIN_PASSWORD not set — /admin will be inaccessible');
-if (!N8N_BASE)   console.warn('[server] N8N_BASE_URL not set — spectator presence will not call n8n');
+if (!ADMIN_PASS)  console.warn('[server] ADMIN_PASSWORD not set — /admin will be inaccessible');
+if (!N8N_BASE)    console.warn('[server] N8N_BASE_URL not set — spectator presence will not call n8n');
+if (!N8N_SECRET)  console.warn('[server] N8N_SECRET not set — /spectator-push is unauthenticated');
 
 const ORIGINS = [
     'https://stubfx.io',
@@ -69,6 +75,7 @@ setInterval(() => {
 // ── Room state ────────────────────────────────────────────────────────────────
 // connections: Map<socketId, spectatorId> — authoritative connected-user count,
 //              never pruned; entries removed only on socket disconnect.
+// spectators:  Map<spectatorId, socketId> — reverse index for O(1) push by spectatorId.
 // users:       Map<socketId, UserState>   — tilt/touch aggregation; pruned on inactivity.
 // n8nTestMode: mirrors the host sim's n8nTestMode param so server calls the right endpoint.
 const rooms = new Map();
@@ -79,8 +86,9 @@ function getOrCreateRoom(roomId) {
     if (!rooms.has(roomId)) {
         rooms.set(roomId, {
             hostSocketId: null,
-            connections:  new Map(), // socketId → spectatorId
-            users:        new Map(), // socketId → UserState
+            connections:  new Map(), // socketId  → spectatorId
+            spectators:   new Map(), // spectatorId → socketId  (reverse index for push)
+            users:        new Map(), // socketId  → UserState
             n8nTestMode:  false,
         });
     }
@@ -242,6 +250,7 @@ io.on('connection', (socket) => {
 
         roomData.users.set(socket.id, { pitch: 0.5, roll: 0.5, temperature: 0.5, coherence: 0.5, lastSeen: Date.now() });
         roomData.connections.set(socket.id, sid);
+        roomData.spectators.set(sid, socket.id);
         socket.join(`${room}:spectators`);
 
         const userCount = roomData.connections.size;
@@ -278,6 +287,7 @@ io.on('connection', (socket) => {
             const spectatorId = room.connections.get(socket.id);
             room.users.delete(socket.id);
             room.connections.delete(socket.id);
+            if (spectatorId !== undefined) room.spectators.delete(spectatorId);
 
             if (isHost) {
                 room.hostSocketId = null;
@@ -297,6 +307,52 @@ io.on('connection', (socket) => {
             if (!room.hostSocketId && !room.connections.size) rooms.delete(assignedRoom);
         }
     });
+});
+
+// ── Device push endpoint ──────────────────────────────────────────────────────
+// Called by n8n to push a 'device-message' event to one spectator or all
+// spectators in a room. Authenticated with Bearer token (N8N_SECRET env var).
+//
+// POST /spectator-push
+// Authorization: Bearer <N8N_SECRET>
+// Body:
+//   room        string  — target room UUID (required)
+//   spectatorId string  — target spectator UUID; omit to broadcast to all in room
+//   data        object  — arbitrary payload forwarded verbatim as the socket event
+//
+// Response:
+//   { delivered: true, target: "specific", spectatorId }  — sent to one socket
+//   { delivered: true, target: "broadcast", count: N }    — sent to whole room
+//   404  { error: "room not found" }
+//   404  { error: "spectator not connected" }
+//   401  { error: "Unauthorized" }
+app.post('/spectator-push', (req, res) => {
+    if (N8N_SECRET) {
+        const [scheme, token] = (req.headers.authorization ?? '').split(' ');
+        if (scheme !== 'Bearer' || token !== N8N_SECRET) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+    }
+
+    const { room: roomId, spectatorId, data } = req.body ?? {};
+    if (!roomId) return res.status(400).json({ error: 'room is required' });
+
+    const room = rooms.get(roomId);
+    if (!room) return res.status(404).json({ error: 'room not found' });
+
+    const payload = data ?? {};
+
+    if (spectatorId) {
+        const socketId = room.spectators.get(spectatorId);
+        if (!socketId) return res.status(404).json({ error: 'spectator not connected' });
+        io.to(socketId).emit('device-message', payload);
+        console.log('[push] → spectator', spectatorId.slice(0, 8), '  room:', roomId);
+        return res.json({ delivered: true, target: 'specific', spectatorId });
+    }
+
+    io.to(`${roomId}:spectators`).emit('device-message', payload);
+    console.log('[push] → all spectators  room:', roomId, '| count:', room.connections.size);
+    return res.json({ delivered: true, target: 'broadcast', count: room.connections.size });
 });
 
 // ── Utility endpoints ─────────────────────────────────────────────────────────

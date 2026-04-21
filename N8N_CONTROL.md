@@ -1,6 +1,8 @@
 # n8n Control Reference
 
-Two webhook paths receive data from the simulation system. Both return a JSON object that is applied directly as sim params via `applySimParams()`.
+Two webhook paths receive data from the simulation system (sim → n8n). Both return a JSON object that is applied directly as sim params via `applySimParams()`.
+
+n8n can also push data **back to individual remote devices** using the server's `/spectator-push` endpoint (n8n → server → remote).
 
 ---
 
@@ -165,6 +167,78 @@ Any key matching a property in the `params` object is written directly and takes
 | `clearDelay` | `0` | Seconds before auto-clearing user-submitted trace content. `0` = disabled. |
 | `heartbeatInterval` | `5` | Seconds between heartbeat calls. `0` = off. |
 | `n8nTestMode` | `false` | Routes all n8n calls (sim and server) to `/webhook-test/` endpoints. Server follows automatically via socket sync. |
+
+---
+
+## `/spectator-push` — Push to remote device (n8n → server)
+
+Called by **n8n** (not the sim) to push a `device-message` socket event to one or all spectators in a room. This is the correct path for showing device-specific UI — prompts, feedback, per-user instructions — without polling.
+
+### Authentication
+
+Set `N8N_SECRET` in the server's `.env`. The request must include:
+
+```
+Authorization: Bearer <N8N_SECRET>
+```
+
+If `N8N_SECRET` is unset the endpoint is unauthenticated (development only).
+
+### Request
+
+```
+POST https://<your-domain>/spectator-push
+Content-Type: application/json
+Authorization: Bearer <N8N_SECRET>
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `room` | `string` | Room UUID (required) |
+| `spectatorId` | `string` | Target spectator UUID. **Omit to broadcast to all spectators in the room.** |
+| `data` | `object` | Payload forwarded verbatim as the socket event (see below) |
+
+### `data` fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `text` | `string` | Text shown in the centred notification on the remote device. Auto-dismisses after 5 s. |
+
+Additional fields in `data` are passed through and available for future interface types.
+
+### Examples
+
+**Push a prompt to one spectator:**
+
+```json
+{
+  "room": "uuid",
+  "spectatorId": "uuid",
+  "data": { "text": "you are the attractor" }
+}
+```
+
+**Broadcast to all spectators in the room:**
+
+```json
+{
+  "room": "uuid",
+  "data": { "text": "the swarm is listening" }
+}
+```
+
+### Response
+
+```json
+{ "delivered": true, "target": "specific", "spectatorId": "uuid" }
+{ "delivered": true, "target": "broadcast", "count": 4 }
+```
+
+Error responses: `400` missing room, `401` bad token, `404` room or spectator not found.
+
+### Remote device behaviour
+
+The `device-message` socket event is received by the spectator's browser. The `data.text` field is rendered in a centred translucent notification that fades in immediately and auto-dismisses after 5 seconds. Consecutive messages restart the timer. The notification does not block touch interaction.
 
 ---
 
