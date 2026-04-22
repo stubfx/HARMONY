@@ -218,20 +218,17 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let desired  = vec2<f32>(cos(dirAngle), sin(dirAngle));
 
     let windAngle = evalWindFormula(x, y, t, idx, cx, cy);
-    // When spectators are connected each partition's tilt is the sole wind source —
-    // the formula wind is bypassed entirely so tilt feels direct and uncontested.
-    // When no spectators, formula wind + collective bias applies as normal.
-    var wind: vec2<f32>;
+    // Per-spectator tilt overrides the collective bias when spectators are connected.
+    // Each agent is assigned to a spectator partition: agentIndex % spectatorCount.
+    var windBias = vec2f(params.windBiasX, params.windBiasY);
     if (params.spectatorCount > 0u) {
         let slot = spectatorSlots[i % params.spectatorCount];
-        wind = vec2f(
+        windBias = vec2f(
             (slot.tiltX - 0.5) * 2.0 * params.windStr,
             (slot.tiltY - 0.5) * 2.0 * params.windStr,
         );
-    } else {
-        let windBias = vec2f(params.windBiasX, params.windBiasY);
-        wind = vec2<f32>(cos(windAngle), sin(windAngle)) * params.windStr + windBias;
     }
+    let wind = vec2<f32>(cos(windAngle), sin(windAngle)) * params.windStr + windBias;
 
     // ── Trace layer: image-alpha-driven homing ─────────────────────────────────
     // homeInImg true  → agent drives toward its fixed home position (homing mode)
