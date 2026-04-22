@@ -54,9 +54,10 @@ const params = {
     // Trace canvas
     traceScale:   0.5,   // trace canvas resolution relative to main canvas (perf control)
     // QR placement on trace canvas
-    qrSize:       0.18,  // QR size as fraction of min(traceW, traceH)
-    qrX:          0.88,  // QR center X in screen-space 0–1 (0=left, 1=right)
-    qrY:          0.88,  // QR center Y in screen-space 0–1 (0=top,  1=bottom)
+    qrSize:       0.18,   // QR size as fraction of min(traceW, traceH)
+    qrMargin:     0.02,  // uniform margin from the aligned edge, as fraction of min(traceW, traceH)
+    qrAlignX:     'right',  // 'left' | 'right'
+    qrAlignY:     'bottom', // 'top'  | 'bottom'
     // Contamination
     contamMouse:   false, // treat mouse cursor as a contamination point
     contamPush:    false, // push free agents outward from the eraser circle
@@ -597,15 +598,7 @@ function renderTraceCanvas() {
     const ctx = traceCanvas.getContext('2d');
     ctx.clearRect(0, 0, tcW, tcH);
 
-    // Layer 0: QR — corner position, always drawn beneath user content
-    if (showQR) {
-        const size = params.qrSize * minDim;
-        const cx   = params.qrX * tcW;
-        const cy   = params.qrY * tcH;
-        ctx.drawImage(qrBitmap, cx - size / 2, cy - size / 2, size, size);
-    }
-
-    // Layer 1: user image — positioned at (imageX, imageY)
+    // Layer 0: user image — positioned at (imageX, imageY)
     if (imageBitmap) {
         const refDim = params.imageSize * minDim;
         const aspect = imageBitmap.width / imageBitmap.height;
@@ -655,6 +648,15 @@ function renderTraceCanvas() {
         }
     }
 
+    // Topmost layer: QR — always drawn last so it is never obscured by user content
+    if (showQR) {
+        const size   = params.qrSize   * minDim;
+        const margin = params.qrMargin * minDim + size / 2;
+        const cx = params.qrAlignX === 'left'   ? margin       : tcW - margin;
+        const cy = params.qrAlignY === 'top'    ? margin       : tcH - margin;
+        ctx.drawImage(qrBitmap, cx - size / 2, cy - size / 2, size, size);
+    }
+
     // ── 3. Upload composite to GPU ────────────────────────────────────────────
     imageNaturalW = tcW;
     imageNaturalH = tcH;
@@ -688,33 +690,25 @@ function scheduleAutoClear() {
         autoClearTimer = null;
         const input = document.querySelector('#trace-text-input');
         if (input) input.value = '';
-        if (simState.qrStatus !== 'SHOW') imageBitmap = null;
+        imageBitmap = null;
         renderTraceCanvas();
         console.log('[trace] auto-cleared after', params.clearDelay, 's');
     }, params.clearDelay * 1000);
 }
 
 async function loadMagnetImage(file) {
-    const wasQR        = simState.qrStatus === 'SHOW';
-    simState.qrStatus  = 'HIDE';
-    updateStateDisplay();
     imageBitmap = await createImageBitmap(file, { colorSpaceConversion: 'none' });
     renderTraceCanvas();
     scheduleAutoClear();
-    if (wasQR) pickRandomFormulas();
 }
 
 async function loadTraceImageFromUrl(url) {
     try {
         const res  = await fetch(url);
         const blob = await res.blob();
-        const wasQR       = simState.qrStatus === 'SHOW';
-        simState.qrStatus = 'HIDE';
-        updateStateDisplay();
         imageBitmap = await createImageBitmap(blob, { colorSpaceConversion: 'none' });
         renderTraceCanvas();
         scheduleAutoClear();
-        if (wasQR) pickRandomFormulas();
     } catch (err) {
         console.warn('[traceImage] failed to load:', url, err.message);
     }
@@ -837,8 +831,9 @@ const startDir  = rndPick(DIR_FORMULAS);
 const startWind = rndPick(WIND_FORMULAS);
 
 // ── Simulation state machine ──────────────────────────────────────────────────
-// qrStatus: 'SHOW' — QR code is the active trace image (vignetteEdge=0, qrMode on)
-//           'HIDE' — trace layer is user content or empty
+/// qrStatus: 'SHOW' — QR is drawn as the topmost layer on the trace canvas.
+//                    Independent of user content — both can be visible simultaneously.
+//           'HIDE' — QR layer is skipped; only user content (image/text) is drawn.
 // status:   'NORMAL' — formula steering + wind active, auto-cycling runs
 //           'IDLE'   — no formula, no wind; particles drift freely on momentum
 const simState = { qrStatus: 'HIDE', status: 'NORMAL' };
@@ -1039,13 +1034,10 @@ let socket;
     socket.on('remote-event', (event) => {
         lastRemoteActivity = Date.now();
         if (event.type === 'text' && event.data?.text && !N8N_BASE) {
-            const wasQR = simState.qrStatus === 'SHOW';
-            if (wasQR) { imageBitmap = null; simState.qrStatus = 'HIDE'; updateStateDisplay(); }
             const input = document.querySelector('#trace-text-input');
             if (input) input.value = event.data.text;
             renderTraceCanvas();
             scheduleAutoClear();
-            if (wasQR) pickRandomFormulas();
         }
         if (REMOTE_EVENTS[event.type]?.sendToN8n) callN8n(event);
     });
@@ -1071,13 +1063,10 @@ function applySimParams(data) {
     if (typeof traceImage === 'string') loadTraceImageFromUrl(traceImage);
     if (clearText)            clearTraceText();
     if (traceText !== undefined) {
-        const wasQR = simState.qrStatus === 'SHOW';
-        if (wasQR) { imageBitmap = null; simState.qrStatus = 'HIDE'; updateStateDisplay(); }
         const input = document.querySelector('#trace-text-input');
         if (input) input.value = traceText;
         renderTraceCanvas();
         scheduleAutoClear();
-        if (wasQR) pickRandomFormulas();
     }
     Object.entries(rest).forEach(([k, v]) => {
         if (k in params) params[k] = v;
@@ -1086,8 +1075,9 @@ function applySimParams(data) {
     if ('n8nTestMode'       in rest) socket.emit('set-n8n-test-mode', params.n8nTestMode);
     if ('agentCount'        in rest || 'weightSpread' in rest) seedAgents();
     if ('renderScale'       in rest) { setSize(); rebuildOffscreen(); seedAgents(); }
-    if ('traceScale' in rest || 'qrX' in rest || 'qrY' in rest || 'qrSize' in rest ||
-        'imageX'     in rest || 'imageY' in rest || 'imageSize' in rest) renderTraceCanvas();
+    if ('traceScale' in rest || 'qrSize'   in rest || 'qrMargin' in rest ||
+        'qrAlignX'   in rest || 'qrAlignY' in rest ||
+        'imageX'     in rest || 'imageY'   in rest || 'imageSize' in rest) renderTraceCanvas();
     gui.controllersRecursive().forEach(c => c.updateDisplay());
     if (dir !== undefined || wind !== undefined) {
         const newDir  = dir  ?? dirInput.value;
@@ -1179,9 +1169,10 @@ const fContent = gui.addFolder('Content placement');
 fContent.add(params, 'imageSize', 0.05, 1.0, 0.01).name('content size').onChange(renderTraceCanvas);
 fContent.add(params, 'imageX',    0,    1,   0.01).name('content X').onChange(renderTraceCanvas);
 fContent.add(params, 'imageY',    0,    1,   0.01).name('content Y').onChange(renderTraceCanvas);
-fContent.add(params, 'qrSize',   0.05,  0.5, 0.01).name('QR size').onChange(renderTraceCanvas);
-fContent.add(params, 'qrX',      0,     1,   0.01).name('QR X').onChange(renderTraceCanvas);
-fContent.add(params, 'qrY',      0,     1,   0.01).name('QR Y').onChange(renderTraceCanvas);
+fContent.add(params, 'qrSize',   0.05, 0.5,  0.01).name('QR size').onChange(renderTraceCanvas);
+fContent.add(params, 'qrMargin', 0,    0.1,  0.005).name('QR margin').onChange(renderTraceCanvas);
+fContent.add(params, 'qrAlignX', ['left', 'right']).name('QR align H').onChange(renderTraceCanvas);
+fContent.add(params, 'qrAlignY', ['top',  'bottom']).name('QR align V').onChange(renderTraceCanvas);
 
 const fAvoid = gui.addFolder('Avoidance map');
 fAvoid.add(params, 'avoidMapScale', 0.05, 1.0, 0.01).name('scale');

@@ -63,7 +63,7 @@ These keys trigger immediate side-effects and are **not** stored in `params`.
 | Key | Type | Effect |
 |-----|------|--------|
 | `status` | `"NORMAL"` \| `"IDLE"` | Switches the simulation state. `IDLE` suppresses mouse/touch input and agent magnetism. |
-| `showQR` | `true` \| `false` | `true` — displays the pre-generated QR code as the active magnet image. `false` — clears the magnet image entirely. |
+| `showQR` | `true` \| `false` | `true` — enables the QR layer on the trace canvas (drawn on top of any user content). `false` — hides the QR layer; user content remains unaffected. |
 | `restart` | `true` | Re-seeds all agents at random positions with fresh velocities. |
 | `clearTrace` | `true` | Clears the magnet image AND the text trace layer. |
 | `clearText` | `true` | Clears only the text trace layer, leaving any QR/image untouched. |
@@ -136,8 +136,9 @@ The trace canvas is always full-screen (scaled by `traceScale`). QR and user con
 | `imageX` | `0.5` | `0 – 1` | User content center X in screen-space (0 = left, 1 = right). |
 | `imageY` | `0.5` | `0 – 1` | User content center Y in screen-space (0 = top, 1 = bottom). |
 | `qrSize` | `0.18` | `0 – 1` | QR size as a fraction of `min(traceW, traceH)`. |
-| `qrX` | `0.88` | `0 – 1` | QR center X in screen-space. |
-| `qrY` | `0.88` | `0 – 1` | QR center Y in screen-space. |
+| `qrMargin` | `0.02` | `0 – 0.1` | Uniform margin from the aligned edge, as a fraction of `min(traceW, traceH)`. Applied equally on both axes. |
+| `qrAlignX` | `"right"` | `"left"` \| `"right"` | Horizontal edge the QR is anchored to. |
+| `qrAlignY` | `"bottom"` | `"top"` \| `"bottom"` | Vertical edge the QR is anchored to. |
 
 ### Agent shadow & proximity fade
 
