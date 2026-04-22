@@ -54,7 +54,7 @@ const params = {
     // Trace canvas
     traceScale:   0.5,   // trace canvas resolution relative to main canvas (perf control)
     // QR placement on trace canvas
-    qrSize:       0.18,   // QR size as fraction of min(traceW, traceH)
+    qrSize:       0.25,   // QR size as fraction of min(traceW, traceH)
     qrMargin:     0.02,  // uniform margin from the aligned edge, as fraction of min(traceW, traceH)
     qrAlignX:     'right',  // 'left' | 'right'
     qrAlignY:     'bottom', // 'top'  | 'bottom'
@@ -715,8 +715,6 @@ async function loadTraceImageFromUrl(url) {
 }
 
 function clearMagnetImage() {
-    simState.qrStatus = 'HIDE';
-    updateStateDisplay();
     imageBitmap = null;
     clearTimeout(autoClearTimer);
     autoClearTimer = null;
@@ -1057,9 +1055,19 @@ function applySimParams(data) {
     if (restart)              seedAgents();
     if (avoidMap === null)    clearAvoidMap();
     else if (typeof avoidMap === 'string') loadAvoidMap(avoidMap);
-    if (clearTrace)                    { clearMagnetImage(); clearTraceText(); }
-    if (showQR === true)               restoreQR();
-    if (showQR === false)              clearMagnetImage();
+    if (clearTrace) {
+        clearMagnetImage();
+        clearTraceText();
+        simState.qrStatus = 'HIDE';
+        updateStateDisplay();
+        renderTraceCanvas();
+    }
+    if (showQR === true)  restoreQR();
+    if (showQR === false) {
+        simState.qrStatus = 'HIDE';
+        updateStateDisplay();
+        renderTraceCanvas();
+    }
     if (typeof traceImage === 'string') loadTraceImageFromUrl(traceImage);
     if (clearText)            clearTraceText();
     if (traceText !== undefined) {
