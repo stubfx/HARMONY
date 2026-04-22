@@ -285,7 +285,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         let dist   = length(toHome);
 
         var freeVel = vel;
-        if (params.followFormula != 0u) {
+        if (params.followFormula != 0u && params.spectatorCount == 0u) {
             freeVel = mix(freeVel, desired * (params.stepLen * weight), params.turnRate);
         }
         freeVel += wind * params.dt * 60.0;
@@ -301,7 +301,8 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         vel = mix(freeVel, homingVel, blendT);
     } else {
         // ── Free agent: formula steering + wind ───────────────────────────────
-        if (params.followFormula != 0u) {
+        // Formula direction is skipped for spectator-assigned particles — tilt is their only drive.
+        if (params.followFormula != 0u && params.spectatorCount == 0u) {
             vel = mix(vel, desired * (params.stepLen * weight), params.turnRate);
         }
         vel += wind * params.dt * 60.0;
