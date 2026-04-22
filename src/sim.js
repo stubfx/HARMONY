@@ -1420,7 +1420,7 @@ function writeSoloUB(dt, time) {
         ? 0.08 + smoothCoherence * 2 * 0.92   // 0.08 → 1.0
         : 1.0  + (smoothCoherence - 0.5) * 4; // 1.0  → 3.0
 
-    const ab = new ArrayBuffer(128);
+    const ab = new ArrayBuffer(144);
     const u  = new Uint32Array(ab);
     const f  = new Float32Array(ab);
     const { x0, y0, x1, y1 } = getImageRegion();
