@@ -47,8 +47,16 @@ const params = {
     alphaThreshold: 0.1,  // min image alpha to trigger homing (0–1)
     blackThreshold: 0.05, // luminance below which pixels are treated as transparent
     vignetteEdge:   0.08, // edge fade width in UV units (0 = none, 0.5 = half image)
-    imageSize:      0.316, // image size as fraction of min(canvasW, canvasH)
+    imageSize:      0.316, // user content size as fraction of min(traceW, traceH)
+    imageX:         0.5,  // user content center X in screen-space 0–1
+    imageY:         0.5,  // user content center Y in screen-space 0–1
     showImage:    false,
+    // Trace canvas
+    traceScale:   0.5,   // trace canvas resolution relative to main canvas (perf control)
+    // QR placement on trace canvas
+    qrSize:       0.18,  // QR size as fraction of min(traceW, traceH)
+    qrX:          0.88,  // QR center X in screen-space 0–1 (0=left, 1=right)
+    qrY:          0.88,  // QR center Y in screen-space 0–1 (0=top,  1=bottom)
     // Contamination
     contamMouse:   false, // treat mouse cursor as a contamination point
     contamPush:    false, // push free agents outward from the eraser circle
@@ -179,17 +187,11 @@ function updateMonitor(fps) {
     if (monAgents) monAgents.textContent = `${params.agentCount.toLocaleString()} agents`;
 }
 
-// ── Image region: centered, preserves image aspect ratio ─────────────────────
-// imageSize scales the image so its longer side = imageSize × min(canvasW, canvasH).
+/// ── Image region ──────────────────────────────────────────────────────────────
+// The trace canvas always maps 1:1 to the full screen. Shaders receive the
+// full-screen rect so agents can home to any bright pixel anywhere on screen.
 function getImageRegion() {
-    const cx     = canvas.width  / 2;
-    const cy     = canvas.height / 2;
-    const refDim = Math.min(canvas.width, canvas.height) * params.imageSize;
-    const aspect = imageNaturalW / imageNaturalH;
-    let hw, hh;
-    if (aspect >= 1) { hw = refDim / 2;         hh = refDim / aspect / 2; }
-    else             { hh = refDim / 2;          hw = refDim * aspect / 2; }
-    return { x0: cx - hw, y0: cy - hh, x1: cx + hw, y1: cy + hh };
+    return { x0: 0, y0: 0, x1: canvas.width, y1: canvas.height };
 }
 
 // ── WebGPU init ───────────────────────────────────────────────────────────────
@@ -547,17 +549,27 @@ function rebuildAgentShadowDensityBG() {
 }
 
 // ── Trace canvas compositor ───────────────────────────────────────────────────
-// Composites imageBitmap (if any) + trace text (if any) onto a single 2D canvas,
-// then uploads the result to the GPU as the trace texture.
-// Called whenever either source changes.
+// The trace canvas is always full-screen (scaled by traceScale for performance).
+// Each element is composited at its own (x, y, size) in screen-space 0–1 coords:
+//
+//   Layer 0 — QR code:      drawn at (qrX, qrY), sized by qrSize.
+//                            Only drawn when qrStatus === 'SHOW' and qrBitmap exists.
+//   Layer 1 — user image:   drawn at (imageX, imageY), sized by imageSize.
+//   Layer 2 — user text:    drawn at (imageX, imageY) over the image, or as multi-
+//                            line standalone text when no image is present.
+//
+// The resulting texture covers the full screen, so getImageRegion() returns the
+// full-screen rect and agents can home to any bright pixel on screen.
 function renderTraceCanvas() {
     if (!device) return;
 
     const text    = document.querySelector('#trace-text-input')?.value.trim() ?? '';
     const hasText = text.length > 0;
+    const hasUserContent = !!imageBitmap || hasText;
+    const showQR         = simState.qrStatus === 'SHOW' && !!qrBitmap;
 
-    // Nothing to show — tear everything down and return to formula-only mode
-    if (!imageBitmap && !hasText) {
+    // Nothing at all — tear down and return to formula-only mode
+    if (!showQR && !hasUserContent) {
         hasImage      = false;
         imageTexView  = null;
         imageNaturalW = 1;
@@ -572,89 +584,87 @@ function renderTraceCanvas() {
         return;
     }
 
-    // ── 1. Determine composite canvas dimensions ──────────────────────────────
-    // Image size is used as base; text-only wraps to screen width (capped at GPU limit).
+    // ── 1. Canvas dimensions — always screen-proportioned, scaled for performance ─
     const MAX_DIM = device.limits.maxTextureDimension2D;
-    let cw, ch;
-    let wrappedLines = null; // only populated for the text-only word-wrap path
+    const tcW = Math.min(Math.max(1, Math.round(canvas.width  * params.traceScale)), MAX_DIM);
+    const tcH = Math.min(Math.max(1, Math.round(canvas.height * params.traceScale)), MAX_DIM);
+    const minDim = Math.min(tcW, tcH);
 
-    if (imageBitmap) {
-        cw = Math.min(imageBitmap.width,  MAX_DIM);
-        ch = Math.min(imageBitmap.height, MAX_DIM);
-    } else {
-        // Text only: fix width to screen width, wrap words, auto-height from line count.
-        // Deriving width from measureText would exceed maxTextureDimension2D for long strings.
-        cw = Math.min(canvas.width, MAX_DIM);
-        const fontSize = Math.round(cw * 0.06);
-        const tmp      = document.createElement('canvas').getContext('2d');
-        tmp.font       = `bold ${fontSize}px sans-serif`;
-        const availW   = cw * 0.92;
+    // ── 2. Paint layers ───────────────────────────────────────────────────────
+    if (!traceCanvas) traceCanvas = document.createElement('canvas');
+    traceCanvas.width  = tcW;
+    traceCanvas.height = tcH;
+    const ctx = traceCanvas.getContext('2d');
+    ctx.clearRect(0, 0, tcW, tcH);
 
-        const words = text.split(' ');
-        const lines = [];
-        let line = '';
-        for (const word of words) {
-            const test = line ? line + ' ' + word : word;
-            if (tmp.measureText(test).width > availW && line) {
-                lines.push(line);
-                line = word;
-            } else {
-                line = test;
-            }
-        }
-        if (line) lines.push(line);
-
-        const lineH = Math.round(fontSize * 1.4);
-        ch = Math.min(Math.max(lines.length * lineH + lineH, 64), MAX_DIM);
-        wrappedLines = { lines, fontSize, lineH };
+    // Layer 0: QR — corner position, always drawn beneath user content
+    if (showQR) {
+        const size = params.qrSize * minDim;
+        const cx   = params.qrX * tcW;
+        const cy   = params.qrY * tcH;
+        ctx.drawImage(qrBitmap, cx - size / 2, cy - size / 2, size, size);
     }
 
-    // ── 2. Paint the composite canvas ─────────────────────────────────────────
-    if (!traceCanvas) traceCanvas = document.createElement('canvas');
-    traceCanvas.width  = cw;
-    traceCanvas.height = ch;
-    const ctx = traceCanvas.getContext('2d');
-    ctx.clearRect(0, 0, cw, ch);
+    // Layer 1: user image — positioned at (imageX, imageY)
+    if (imageBitmap) {
+        const refDim = params.imageSize * minDim;
+        const aspect = imageBitmap.width / imageBitmap.height;
+        const hw = aspect >= 1 ? refDim / 2 : refDim * aspect / 2;
+        const hh = aspect >= 1 ? refDim / (2 * aspect) : refDim / 2;
+        const cx = params.imageX * tcW;
+        const cy = params.imageY * tcH;
+        ctx.drawImage(imageBitmap, cx - hw, cy - hh, hw * 2, hh * 2);
+    }
 
-    // Layer 1: image (if loaded)
-    if (imageBitmap) ctx.drawImage(imageBitmap, 0, 0, cw, ch);
-
-    // Layer 2: text on top, white fill
+    // Layer 2: text — at (imageX, imageY), multi-line when no image is present
     if (hasText) {
         ctx.fillStyle    = 'white';
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
+        const cx = params.imageX * tcW;
+        const cy = params.imageY * tcH;
 
-        if (wrappedLines) {
-            // Multi-line text-only mode
-            const { lines, fontSize, lineH } = wrappedLines;
+        if (!imageBitmap) {
+            // Multi-line word-wrap centered on (cx, cy)
+            const fontSize = Math.round(minDim * 0.10);
             ctx.font = `bold ${fontSize}px sans-serif`;
-            const startY = (ch - lines.length * lineH) / 2 + lineH / 2;
-            lines.forEach((ln, i) => ctx.fillText(ln, cw / 2, startY + i * lineH));
+            const maxW  = tcW * 0.88;
+            const words = text.split(/\s+/);
+            const lines = [];
+            let cur = '';
+            for (const w of words) {
+                const test = cur ? `${cur} ${w}` : w;
+                if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = w; }
+                else cur = test;
+            }
+            if (cur) lines.push(cur);
+            const lineH  = Math.round(fontSize * 1.35);
+            const startY = cy - ((lines.length - 1) * lineH) / 2;
+            lines.forEach((ln, i) => ctx.fillText(ln, cx, startY + i * lineH));
         } else {
-            // Single line over an image — scale font down if wider than canvas
-            let fontSize = ch * 0.72;
+            // Single line over an image — shrink font to fit width
+            let fontSize = minDim * 0.72;
             ctx.font = `bold ${Math.round(fontSize)}px sans-serif`;
             const measured = ctx.measureText(text).width;
-            const maxW     = cw * 0.92;
+            const maxW     = tcW * 0.92;
             if (measured > maxW) {
-                fontSize = fontSize * (maxW / measured);
-                ctx.font = `bold ${Math.round(fontSize)}px sans-serif`;
+                fontSize *= maxW / measured;
+                ctx.font  = `bold ${Math.round(fontSize)}px sans-serif`;
             }
-            ctx.fillText(text, cw / 2, ch / 2);
+            ctx.fillText(text, cx, cy);
         }
     }
 
     // ── 3. Upload composite to GPU ────────────────────────────────────────────
-    imageNaturalW = cw;
-    imageNaturalH = ch;
+    imageNaturalW = tcW;
+    imageNaturalH = tcH;
     if (imageTex) imageTex.destroy();
     imageTex = device.createTexture({
-        size:   [cw, ch],
+        size:   [tcW, tcH],
         format: 'rgba8unorm',
         usage:  GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
     });
-    device.queue.copyExternalImageToTexture({ source: traceCanvas }, { texture: imageTex }, [cw, ch]);
+    device.queue.copyExternalImageToTexture({ source: traceCanvas }, { texture: imageTex }, [tcW, tcH]);
     imageTexView = imageTex.createView();
     hasImage     = true;
     rebuildSimBG();
@@ -711,14 +721,12 @@ async function loadTraceImageFromUrl(url) {
 }
 
 function clearMagnetImage() {
-    const wasQR       = simState.qrStatus === 'SHOW';
     simState.qrStatus = 'HIDE';
     updateStateDisplay();
     imageBitmap = null;
     clearTimeout(autoClearTimer);
     autoClearTimer = null;
     renderTraceCanvas();
-    if (wasQR) pickRandomFormulas();
 }
 
 function clearTraceText() {
@@ -738,7 +746,6 @@ function restoreQR() {
     if (input) input.value = '';
     clearTimeout(autoClearTimer);
     autoClearTimer = null;
-    imageBitmap       = qrBitmap;
     simState.qrStatus = 'SHOW';
     updateStateDisplay();
     renderTraceCanvas();
@@ -1079,6 +1086,8 @@ function applySimParams(data) {
     if ('n8nTestMode'       in rest) socket.emit('set-n8n-test-mode', params.n8nTestMode);
     if ('agentCount'        in rest || 'weightSpread' in rest) seedAgents();
     if ('renderScale'       in rest) { setSize(); rebuildOffscreen(); seedAgents(); }
+    if ('traceScale' in rest || 'qrX' in rest || 'qrY' in rest || 'qrSize' in rest ||
+        'imageX'     in rest || 'imageY' in rest || 'imageSize' in rest) renderTraceCanvas();
     gui.controllersRecursive().forEach(c => c.updateDisplay());
     if (dir !== undefined || wind !== undefined) {
         const newDir  = dir  ?? dirInput.value;
@@ -1148,7 +1157,7 @@ fMagnet.add(params, 'magnetStr',      0, 20,  0.1 ).name('homing speed');
 fMagnet.add(params, 'alphaThreshold', 0,  1,  0.01).name('alpha threshold');
 fMagnet.add(params, 'blackThreshold', 0,  0.5, 0.005).name('black cutoff');
 fMagnet.add(params, 'vignetteEdge',   0,  0.5, 0.005).name('edge fade');
-fMagnet.add(params, 'imageSize', 0.05, 1.0, 0.01).name('size');
+fMagnet.add(params, 'traceScale', 0.1, 1.0, 0.05).name('trace res').onChange(renderTraceCanvas);
 fMagnet.add(params, 'showImage').name('show image');
 fMagnet.add(params, 'contamMouse').name('mouse eraser');
 fMagnet.add(params, 'contamPush').name('eraser push');
@@ -1165,6 +1174,14 @@ fMagnet.add(params, 'clearDelay', 0, 120, 5).name('auto clear (s)');
 fMagnet.add({ load: () => document.querySelector('#image-input').click() }, 'load').name('Load image…');
 fMagnet.add({ clear: clearMagnetImage }, 'clear').name('Clear image');
 fMagnet.add({ clear: clearTraceText },   'clear').name('Clear text');
+
+const fContent = gui.addFolder('Content placement');
+fContent.add(params, 'imageSize', 0.05, 1.0, 0.01).name('content size').onChange(renderTraceCanvas);
+fContent.add(params, 'imageX',    0,    1,   0.01).name('content X').onChange(renderTraceCanvas);
+fContent.add(params, 'imageY',    0,    1,   0.01).name('content Y').onChange(renderTraceCanvas);
+fContent.add(params, 'qrSize',   0.05,  0.5, 0.01).name('QR size').onChange(renderTraceCanvas);
+fContent.add(params, 'qrX',      0,     1,   0.01).name('QR X').onChange(renderTraceCanvas);
+fContent.add(params, 'qrY',      0,     1,   0.01).name('QR Y').onChange(renderTraceCanvas);
 
 const fAvoid = gui.addFolder('Avoidance map');
 fAvoid.add(params, 'avoidMapScale', 0.05, 1.0, 0.01).name('scale');

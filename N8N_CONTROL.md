@@ -120,11 +120,24 @@ Any key matching a property in the `params` object is written directly and takes
 | Key | Default | Range | Description |
 |-----|---------|-------|-------------|
 | `magnetStr` | `5.0` | px/frame | Pull speed: how many canvas px per frame a homing agent advances toward its home position. |
-| `imageSize` | `0.316` | `0 – 1` | Image size as a fraction of `min(canvasW, canvasH)`. |
 | `alphaThreshold` | `0.1` | `0 – 1` | Minimum vignette-weighted alpha a pixel must have for an agent to home to it. |
 | `blackThreshold` | `0.05` | `0 – 1` | Luminance below which a pixel is treated as transparent even if alpha is high. |
-| `vignetteEdge` | `0.08` | `0 – 0.5` | UV-space width of the soft edge fade applied to the magnet image. `0` = no fade. |
-| `showImage` | `false` | bool | Renders a debug overlay of the raw magnet image. |
+| `vignetteEdge` | `0.08` | `0 – 0.5` | UV-space width of the soft edge fade applied to the screen edges. `0` = no fade. |
+| `showImage` | `false` | bool | Renders a debug overlay of the raw trace texture. |
+
+### Trace canvas
+
+The trace canvas is always full-screen (scaled by `traceScale`). QR and user content are composited as independent layers at their own position and size.
+
+| Key | Default | Range | Description |
+|-----|---------|-------|-------------|
+| `traceScale` | `0.5` | `0.1 – 1.0` | Trace canvas resolution relative to the main canvas. Lower = cheaper upload, less detail. |
+| `imageSize` | `0.316` | `0 – 1` | User content size as a fraction of `min(traceW, traceH)`. |
+| `imageX` | `0.5` | `0 – 1` | User content center X in screen-space (0 = left, 1 = right). |
+| `imageY` | `0.5` | `0 – 1` | User content center Y in screen-space (0 = top, 1 = bottom). |
+| `qrSize` | `0.18` | `0 – 1` | QR size as a fraction of `min(traceW, traceH)`. |
+| `qrX` | `0.88` | `0 – 1` | QR center X in screen-space. |
+| `qrY` | `0.88` | `0 – 1` | QR center Y in screen-space. |
 
 ### Agent shadow & proximity fade
 
