@@ -18,12 +18,12 @@ import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
 import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const MAX_AGENTS = 3_000_000;
+const MAX_AGENTS = 5_000_000;
 
 // ── Tunable parameters (mutated by lil-gui) ───────────────────────────────────
 const params = {
     // Agents
-    agentCount:  1_200_000,
+    agentCount:  3_000_000,
     // Motion
     stepLen:     2.0,
     turnRate:    0.04,

@@ -83,7 +83,7 @@ Any key matching a property in the `params` object is written directly and takes
 
 | Key | Default | Range | Description |
 |-----|---------|-------|-------------|
-| `agentCount` | `1 200 000` | `1 000 – 3 000 000` | Number of active agents. Change triggers a full re-seed. Higher counts increase GPU load significantly; test before pushing above 2 M in a live installation. |
+| `agentCount` | `3 000 000` | `1 000 – 5 000 000` | Number of active agents. Change triggers a full re-seed. Higher counts increase GPU load significantly; test before pushing above 2 M in a live installation. |
 | `stepLen` | `2.0` | `0.1 – 8` | Base movement speed in canvas px / frame. |
 | `turnRate` | `0.04` | `0.005 – 0.3` | Maximum angular change per frame (radians). |
 | `maxSpeed` | `5.0` | `1 – 15` | Speed cap in px / frame. Also sets the colour-blend ceiling. |

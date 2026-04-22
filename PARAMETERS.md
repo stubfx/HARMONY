@@ -43,7 +43,7 @@ Clear the text by selecting all and deleting in the input field. If an image is 
 ## Motion
 
 ### agents
-**Range:** 1 000 – 3 000 000 | **Default:** 1 200 000
+**Range:** 1 000 – 5 000 000 | **Default:** 3 000 000
 
 Total number of active particles. Changing this re-seeds all agents (positions and home coordinates are reassigned). The GPU buffer is always allocated at maximum size; this parameter only changes how many agents the compute dispatch and draw calls actually process.
 
