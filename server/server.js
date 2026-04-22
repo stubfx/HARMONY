@@ -258,7 +258,7 @@ io.on('connection', (socket) => {
 
         socket.emit('joined', { room, userCount });
         if (roomData.hostSocketId) {
-            io.to(roomData.hostSocketId).emit('spectator-joined', { spectatorId: sid, userCount });
+            io.to(roomData.hostSocketId).emit('spectator-joined', { userCount });
         }
         socket.to(`${room}:spectators`).emit('peer-joined', { userCount });
 
@@ -273,29 +273,9 @@ io.on('connection', (socket) => {
 
         updateUserState(room, socket.id, type, data);
 
-        if (type === 'tilt') {
-            // Forward individual tilt to the host alongside the aggregated collective-state.
-            const roomData = rooms.get(room);
-            if (roomData?.hostSocketId) {
-                const sid = roomData.connections.get(socket.id) ?? socket.id;
-                io.to(roomData.hostSocketId).emit('spectator-tilt', {
-                    spectatorId: sid,
-                    pitch: data.pitch ?? 0.5,
-                    roll:  data.roll  ?? 0.5,
-                });
-            }
-            return;
-        }
+        if (type === 'tilt') return;
 
         io.to(room).emit('remote-event', { type, spectatorId, data, timestamp: Date.now() });
-    });
-
-    // Host can push a device-message to a specific spectator without going through n8n.
-    socket.on('push-to-spectator', ({ spectatorId, data }) => {
-        const room = assignedRoom ? rooms.get(assignedRoom) : null;
-        if (!room || room.hostSocketId !== socket.id) return;
-        const targetId = room.spectators.get(spectatorId);
-        if (targetId) io.to(targetId).emit('device-message', data ?? {});
     });
 
     socket.on('disconnect', () => {
@@ -314,7 +294,7 @@ io.on('connection', (socket) => {
             } else {
                 const remaining = room.connections.size;
                 if (room.hostSocketId) {
-                    io.to(room.hostSocketId).emit('spectator-left', { spectatorId, userCount: remaining });
+                    io.to(room.hostSocketId).emit('spectator-left', { userCount: remaining });
                 }
                 io.to(`${assignedRoom}:spectators`).emit('peer-left', { userCount: remaining });
                 console.log('[socket] spectator left    room:', assignedRoom, '| remaining:', remaining);

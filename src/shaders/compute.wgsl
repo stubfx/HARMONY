@@ -37,7 +37,6 @@
 //   [120] probeSensorAngle  f32   (half-angle between left/right sensors, radians)
 //   [124] homingChance      f32   (per-frame probability [0–1] that a newly-eligible agent commits to homing)
 //   [128] homingInfluence   f32   (max homing blend weight at dist=0; scales linearly to 0 at dist=canvasW)
-//   [132] spectatorCount    u32   (active connected spectators; 0 = use collective wind bias)
 
 struct SoloParams {
     agentCount:     u32,
@@ -73,19 +72,6 @@ struct SoloParams {
     probeSensorAngle:  f32,
     homingChance:      f32,
     homingInfluence:   f32,
-    spectatorCount:    u32,
-}
-
-// One slot per connected spectator. Agents partitioned as agentIndex % spectatorCount.
-struct SpectatorSlot {
-    tiltX:  f32,   // raw roll  0–1 (0.5 = neutral)
-    tiltY:  f32,   // raw pitch 0–1 (0.5 = neutral)
-    colorR: f32,
-    colorG: f32,
-    colorB: f32,
-    active: u32,
-    _p0:    f32,
-    _p1:    f32,
 }
 
 struct Agent {
@@ -120,7 +106,6 @@ struct ContamParams {
 @group(0) @binding(3) var<uniform>             contam:           ContamParams;
 @group(0) @binding(4) var                      avoidMapTex:      texture_2d<f32>;
 @group(0) @binding(5) var                      shadowDensityTex: texture_2d<f32>;
-@group(0) @binding(6) var<storage, read>       spectatorSlots:   array<SpectatorSlot, 16>;
 
 const PI:     f32 = 3.14159265358979;
 const TWO_PI: f32 = 6.28318530717959;
@@ -218,17 +203,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let desired  = vec2<f32>(cos(dirAngle), sin(dirAngle));
 
     let windAngle = evalWindFormula(x, y, t, idx, cx, cy);
-    // Per-spectator tilt overrides the collective bias when spectators are connected.
-    // Each agent is assigned to a spectator partition: agentIndex % spectatorCount.
-    var windBias = vec2f(params.windBiasX, params.windBiasY);
-    if (params.spectatorCount > 0u) {
-        let slot = spectatorSlots[i % params.spectatorCount];
-        windBias = vec2f(
-            (slot.tiltX - 0.5) * 2.0 * params.windStr,
-            (slot.tiltY - 0.5) * 2.0 * params.windStr,
-        );
-    }
-    let wind = vec2<f32>(cos(windAngle), sin(windAngle)) * params.windStr + windBias;
+    // Collective tilt bias added directly to formula wind — same velocity space.
+    let wind = vec2<f32>(cos(windAngle), sin(windAngle)) * params.windStr
+             + vec2<f32>(params.windBiasX, params.windBiasY);
 
     // ── Trace layer: image-alpha-driven homing ─────────────────────────────────
     // homeInImg true  → agent drives toward its fixed home position (homing mode)
