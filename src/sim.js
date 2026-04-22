@@ -1056,8 +1056,11 @@ function applySimParams(data) {
     if (avoidMap === null)    clearAvoidMap();
     else if (typeof avoidMap === 'string') loadAvoidMap(avoidMap);
     if (clearTrace) {
-        clearMagnetImage();
-        clearTraceText();
+        imageBitmap = null;
+        clearTimeout(autoClearTimer);
+        autoClearTimer = null;
+        const clearInput = document.querySelector('#trace-text-input');
+        if (clearInput) clearInput.value = '';
         simState.qrStatus = 'HIDE';
         updateStateDisplay();
         renderTraceCanvas();

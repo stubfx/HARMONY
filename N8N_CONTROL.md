@@ -67,8 +67,8 @@ These keys trigger immediate side-effects and are **not** stored in `params`.
 | `restart` | `true` | Re-seeds all agents at random positions with fresh velocities. |
 | `clearTrace` | `true` | Clears the magnet image AND the text trace layer. |
 | `clearText` | `true` | Clears only the text trace layer, leaving any QR/image untouched. |
-| `traceText` | `string` | Renders a text string onto the trace canvas and makes it the active magnet image. Replaces QR if one was visible. |
-| `traceImage` | `string` (URL) | Fetches an image from the given URL and uses it as the magnet image. Replaces QR or text if visible. Supports any format the browser can decode (PNG, JPEG, WebP, etc.). |
+| `traceText` | `string` | Renders a text string onto the trace canvas. QR remains visible on top if `qrStatus` is `SHOW`. |
+| `traceImage` | `string` (URL) | Fetches an image from the given URL and composites it onto the trace canvas. QR remains visible on top if `qrStatus` is `SHOW`. Supports any format the browser can decode (PNG, JPEG, WebP, etc.). |
 | `dir` | `string` | Sets the direction formula (WGSL math expression in `x, y, t, cx, cy, PI, TWO_PI`). Applied immediately. |
 | `wind` | `string` | Sets the wind formula (same variable set as `dir`). Applied immediately. |
 | `avoidMap` | `string` \| `null` | URL of an image to use as the avoidance map. `null` clears the current map. |
@@ -135,7 +135,7 @@ The trace canvas is always full-screen (scaled by `traceScale`). QR and user con
 | `imageSize` | `0.316` | `0 – 1` | User content size as a fraction of `min(traceW, traceH)`. |
 | `imageX` | `0.5` | `0 – 1` | User content center X in screen-space (0 = left, 1 = right). |
 | `imageY` | `0.5` | `0 – 1` | User content center Y in screen-space (0 = top, 1 = bottom). |
-| `qrSize` | `0.18` | `0 – 1` | QR size as a fraction of `min(traceW, traceH)`. |
+| `qrSize` | `0.25` | `0 – 1` | QR size as a fraction of `min(traceW, traceH)`. |
 | `qrMargin` | `0.02` | `0 – 0.1` | Uniform margin from the aligned edge, as a fraction of `min(traceW, traceH)`. Applied equally on both axes. |
 | `qrAlignX` | `"right"` | `"left"` \| `"right"` | Horizontal edge the QR is anchored to. |
 | `qrAlignY` | `"bottom"` | `"top"` \| `"bottom"` | Vertical edge the QR is anchored to. |
@@ -176,6 +176,7 @@ The trace canvas is always full-screen (scaled by `traceScale`). QR and user con
 
 | Key | Default | Description |
 |-----|---------|-------------|
+| `maxSpectators` | `1` | Connected spectator count at which the QR is hidden. Used by n8n logic to decide when to call `showQR: false`. The sim does not act on this directly — n8n reads it from the heartbeat and acts accordingly. |
 | `qrFadeZone` | `false` | Fades free agents near the QR rect to keep it scannable. |
 | `remoteTimeout` | `0` | Seconds of silence from all remotes before the QR is restored. `0` = disabled. |
 | `clearDelay` | `0` | Seconds before auto-clearing user-submitted trace content. `0` = disabled. |
