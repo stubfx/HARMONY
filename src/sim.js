@@ -74,8 +74,8 @@ const params = {
     avoidForceStr:   1.0, // multiplier on image-trace avoidance forces
     avoidMapScale:   1.0, // avoidance map coverage as fraction of canvas (1.0 = full)
     // Primed-spot probe (free agents only)
-    probeLen:          150.0, // probe cast distance in canvas pixels
-    probeForceStr:     100.0, // steering force multiplier when probe hits a primed pixel
+    probeLen:          50.0, // probe cast distance in canvas pixels
+    probeForceStr:     150.0, // steering force multiplier when probe hits a primed pixel
     respawnOnCollide:  false, // teleport to a random edge position instead of steering on probe hit
     probeSensorAngle:  0.785, // half-angle between left/right Physarum sensors (radians; π/4 ≈ 45°)
     // Auto-clear
