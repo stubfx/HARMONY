@@ -139,6 +139,8 @@ The trace canvas is always full-screen (scaled by `traceScale`). QR and user con
 | `qrMargin` | `0.02` | `0 – 0.1` | Uniform margin from the aligned edge, as a fraction of `min(traceW, traceH)`. Applied equally on both axes. |
 | `qrAlignX` | `"right"` | `"left"` \| `"right"` | Horizontal edge the QR is anchored to. |
 | `qrAlignY` | `"bottom"` | `"top"` \| `"bottom"` | Vertical edge the QR is anchored to. |
+| `qrQuietZone` | `0` | `0 – 8` | White border around the QR in modules. `0` = none (tightest), `4` = spec minimum (most scannable). Triggers QR regeneration. |
+| `qrInvert` | `false` | bool | Swap dark/light channels: transparent modules on white background instead of white modules on transparent. Triggers QR regeneration. |
 
 ### Agent shadow & proximity fade
 

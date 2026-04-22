@@ -58,6 +58,8 @@ const params = {
     qrMargin:     0.02,  // uniform margin from the aligned edge, as fraction of min(traceW, traceH)
     qrAlignX:     'right',  // 'left' | 'right'
     qrAlignY:     'bottom', // 'top'  | 'bottom'
+    qrQuietZone:  0,        // quiet zone in QR modules (0 = none, 4 = spec minimum)
+    qrInvert:     false,    // swap dark/light: transparent modules on white background
     // Contamination
     contamMouse:   false, // treat mouse cursor as a contamination point
     contamPush:    false, // push free agents outward from the eraser circle
@@ -847,6 +849,19 @@ function updateStateDisplay() {
 
 let qrBitmap           = null;  // permanent reference to the session QR bitmap
 let sessionRoom        = null;  // UUID assigned by server — needed for n8n payload
+let sessionUrl         = null;  // full remote URL — kept so QR can be regenerated on param change
+
+async function generateQR() {
+    if (!sessionUrl) return;
+    const dark  = params.qrInvert ? '#00000000' : '#ffffffff';
+    const light = params.qrInvert ? '#ffffffff' : '#00000000';
+    const qrOffscreen = document.createElement('canvas');
+    await QRCode.toCanvas(qrOffscreen, sessionUrl, {
+        width: 512, margin: params.qrQuietZone,
+        color: { dark, light },
+    });
+    qrBitmap = await createImageBitmap(qrOffscreen);
+}
 let lastRemoteActivity = Date.now(); // timestamp of last remote-event (touch or text)
 
 // ── n8n direct integration ────────────────────────────────────────────────────
@@ -956,34 +971,27 @@ let socket;
         sessionRoom = sessionId;
         // Use VITE_USER_URL as-is (Caddy handles the /remote redirect internally).
         // Falls back to the page's own origin in dev when no env var is set.
-        const envUrl  = (import.meta.env.VITE_USER_URL ?? '').replace(/\/$/, '');
-        const base    = envUrl || window.location.origin;
-        const userUrl = `${base}/?s=${sessionId}`;
+        const envUrl = (import.meta.env.VITE_USER_URL ?? '').replace(/\/$/, '');
+        const base   = envUrl || window.location.origin;
+        sessionUrl   = `${base}/?s=${sessionId}`;
 
-        console.log('[session] remote URL:', userUrl);
+        console.log('[session] remote URL:', sessionUrl);
 
         // ── Small scannable QR in the UI panel ──────────────────────────────
         const uiQr = document.querySelector('#qr-canvas');
         if (uiQr) {
-            await QRCode.toCanvas(uiQr, userUrl, {
+            await QRCode.toCanvas(uiQr, sessionUrl, {
                 width: 120, margin: 1,
                 color: { dark: '#000000', light: '#ffffff' },
             });
             uiQr.style.display = 'block';
             uiQr.style.cursor  = 'pointer';
-            uiQr.addEventListener('click', () => window.open(userUrl, '_blank'));
+            uiQr.addEventListener('click', () => window.open(sessionUrl, '_blank'));
         }
 
-        // ── Large QR bitmap — pre-rendered and stored, not shown yet.
+        // ── Large QR bitmap — pre-rendered via generateQR(), stored for later activation.
         // Activation is driven by n8n via heartbeat response { showQR: true }.
-        // dark=#ffffffff → QR modules are white (alpha=1) — homing agents fill them.
-        // light=#00000000 → quiet zone and gaps are transparent — no agents there.
-        const qrOffscreen = document.createElement('canvas');
-        await QRCode.toCanvas(qrOffscreen, userUrl, {
-            width: 512, margin: 0,
-            color: { dark: '#ffffffff', light: '#00000000' },
-        });
-        qrBitmap = await createImageBitmap(qrOffscreen);
+        await generateQR();
     });
 
     socket.on('sim-params', (data) => {
@@ -1090,6 +1098,7 @@ function applySimParams(data) {
     if ('traceScale' in rest || 'qrSize'   in rest || 'qrMargin' in rest ||
         'qrAlignX'   in rest || 'qrAlignY' in rest ||
         'imageX'     in rest || 'imageY'   in rest || 'imageSize' in rest) renderTraceCanvas();
+    if ('qrQuietZone' in rest || 'qrInvert' in rest) generateQR().then(renderTraceCanvas);
     gui.controllersRecursive().forEach(c => c.updateDisplay());
     if (dir !== undefined || wind !== undefined) {
         const newDir  = dir  ?? dirInput.value;
@@ -1186,6 +1195,8 @@ fContent.add(params, 'qrSize',   0.05, 0.5,  0.01).name('QR size').onChange(rend
 fContent.add(params, 'qrMargin', 0,    0.1,  0.005).name('QR margin').onChange(renderTraceCanvas);
 fContent.add(params, 'qrAlignX', ['left', 'right']).name('QR align H').onChange(renderTraceCanvas);
 fContent.add(params, 'qrAlignY', ['top',  'bottom']).name('QR align V').onChange(renderTraceCanvas);
+fContent.add(params, 'qrQuietZone', 0, 8, 1).name('QR quiet zone').onChange(() => generateQR().then(renderTraceCanvas));
+fContent.add(params, 'qrInvert').name('QR invert colors').onChange(() => generateQR().then(renderTraceCanvas));
 
 const fAvoid = gui.addFolder('Avoidance map');
 fAvoid.add(params, 'avoidMapScale', 0.05, 1.0, 0.01).name('scale');
