@@ -161,9 +161,10 @@ The trace canvas is always full-screen (scaled by `traceScale`). QR and user con
 
 | Key | Default | Range | Description |
 |-----|---------|-------|-------------|
-| `probeLen` | `150.0` | px | How far ahead a free agent probes for shadow density. |
-| `probeForceStr` | `100.0` | multiplier | Base steering force; scaled continuously by sampled shadow density (stronger overlap = stronger avoidance). |
-| `respawnOnCollide` | `false` | bool | When true, high-density probe hits (density > 0.3) teleport the agent to a random edge instead of steering. |
+| `probeLen` | `150.0` | px | Cast distance for all three Physarum sensors. |
+| `probeForceStr` | `100.0` | multiplier | Lateral steering force; scales with density asymmetry between left and right sensors. |
+| `probeSensorAngle` | `0.785` | radians | Half-angle between the forward and each side sensor (π/4 = 45°). Wider = earlier turns, narrower = tighter lane-following. |
+| `respawnOnCollide` | `false` | bool | When true, high-density probe hits (max sensor density > 0.3) teleport the agent to a random edge instead of steering. |
 
 ### Avoidance map
 

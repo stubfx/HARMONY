@@ -75,6 +75,7 @@ const params = {
     probeLen:          150.0, // probe cast distance in canvas pixels
     probeForceStr:     100.0, // steering force multiplier when probe hits a primed pixel
     respawnOnCollide:  false, // teleport to a random edge position instead of steering on probe hit
+    probeSensorAngle:  0.785, // half-angle between left/right Physarum sensors (radians; π/4 ≈ 45°)
     // Auto-clear
     clearDelay:    0,     // seconds before auto-clearing user trace content (0 = disabled)
     // Session / QR restore
@@ -1168,8 +1169,9 @@ fMagnet.add(params, 'agentShadowRadius', 0, 300,   0.5 ).name('shadow radius');
 fMagnet.add(params, 'homingProximityRange', 0, 2000, 10).name('proximity range (px)');
 fMagnet.add(params, 'homingMinAlpha',       0, 1,  0.01).name('proximity min alpha');
 fMagnet.add(params, 'avoidForceStr', 0, 5, 0.05).name('avoid force');
-fMagnet.add(params, 'probeLen',      5, 300, 1   ).name('probe distance');
+fMagnet.add(params, 'probeLen',         5, 300, 1   ).name('probe distance');
 fMagnet.add(params, 'probeForceStr',    0, 200, 1   ).name('probe force');
+fMagnet.add(params, 'probeSensorAngle', 0.05, Math.PI * 0.75, 0.01).name('probe sensor angle');
 fMagnet.add(params, 'respawnOnCollide').name('respawn on collide');
 fMagnet.add(params, 'clearDelay', 0, 120, 5).name('auto clear (s)');
 fMagnet.add({ load: () => document.querySelector('#image-input').click() }, 'load').name('Load image…');
@@ -1438,6 +1440,7 @@ function writeSoloUB(dt, time) {
     f[27] = params.probeLen;
     f[28] = params.probeForceStr;
     u[29] = params.respawnOnCollide ? 1 : 0;
+    f[30] = params.probeSensorAngle;
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 

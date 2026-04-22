@@ -31,9 +31,10 @@
 //   [96] hasAvoidMap    u32   (1 = avoidance map active)
 //   [100] avoidMapScale f32   (map covers this fraction of canvas, centered)
 //   [104] bounceEdges   u32   (1 = reflect at canvas edges, 0 = wrap)
-//   [108] probeLen        f32   (primed-spot probe cast distance in canvas pixels)
-//   [112] probeForceStr   f32   (steering force multiplier when probe hits a primed pixel)
-//   [116] respawnOnCollide u32  (1 = teleport to a corner instead of steering on probe hit)
+//   [108] probeLen          f32   (Physarum sensor cast distance in canvas pixels)
+//   [112] probeForceStr     f32   (lateral steering force multiplier)
+//   [116] respawnOnCollide  u32   (1 = teleport to edge instead of steering on dense probe)
+//   [120] probeSensorAngle  f32   (half-angle between left/right sensors, radians)
 
 struct SoloParams {
     agentCount:     u32,
@@ -63,9 +64,10 @@ struct SoloParams {
     hasAvoidMap:    u32,
     avoidMapScale:  f32,
     bounceEdges:      u32,
-    probeLen:         f32,
-    probeForceStr:    f32,
-    respawnOnCollide: u32,
+    probeLen:          f32,
+    probeForceStr:     f32,
+    respawnOnCollide:  u32,
+    probeSensorAngle:  f32,
 }
 
 struct Agent {
@@ -324,19 +326,24 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             }
         }
 
-        // ── Shadow density probe ──────────────────────────────────────────────
-        // Cast a probe ahead along current velocity and sample the shadow density
-        // texture (cleared to black each frame, filled additively by homing agents).
-        // Brightness = density of overlapping shadows = deterrent strength.
-        // Force scales continuously with density: denser swarm → stronger push.
-        // respawnOnCollide triggers only when density exceeds 0.3 (solid shadow).
+        // ── Shadow density probe (3-sensor Physarum) ─────────────────────────
+        // Left, center, right sensors cast at probeSensorAngle from forward direction.
+        // Agent steers laterally away from the denser side (dR - dL).
+        // Uses 3 texture samples; no gradient needed.
         if (params.hasImage != 0u && params.probeForceStr > 0.001 && params.probeLen > 0.1) {
             let velLen = length(vel);
             if (velLen > 0.001) {
-                let probePos     = pos + normalize(vel) * params.probeLen;
-                let probeDensity = shadowDensityAt(probePos);
-                if (probeDensity > 0.005) {
-                    if (params.respawnOnCollide != 0u && probeDensity > 0.3) {
+                let fwdDir   = normalize(vel);
+                let cosA     = cos(params.probeSensorAngle);
+                let sinA     = sin(params.probeSensorAngle);
+                let leftDir  = vec2f( fwdDir.x*cosA - fwdDir.y*sinA,  fwdDir.x*sinA + fwdDir.y*cosA);
+                let rightDir = vec2f( fwdDir.x*cosA + fwdDir.y*sinA, -fwdDir.x*sinA + fwdDir.y*cosA);
+                let dC = shadowDensityAt(pos + fwdDir   * params.probeLen);
+                let dL = shadowDensityAt(pos + leftDir  * params.probeLen);
+                let dR = shadowDensityAt(pos + rightDir * params.probeLen);
+                let maxDensity = max(dC, max(dL, dR));
+                if (maxDensity > 0.005) {
+                    if (params.respawnOnCollide != 0u && maxDensity > 0.3) {
                         let rng   = hash(i ^ (u32(params.time * 137.0) + 1u));
                         let perim = 2.0 * (params.canvasW + params.canvasH);
                         let t     = rng * perim;
@@ -355,26 +362,11 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                         agents[i].primed = 0.0;
                         return;
                     } else {
-                        // Gradient of shadow density at probe point — steer away from
-                        // denser regions. Force magnitude scales with probeDensity so
-                        // a lone agent barely deflects, a packed cluster strongly repels.
-                        let EPS  = 4.0;
-                        let pgx  = shadowDensityAt(vec2<f32>(probePos.x + EPS, probePos.y))
-                                 - shadowDensityAt(vec2<f32>(probePos.x - EPS, probePos.y));
-                        let pgy  = shadowDensityAt(vec2<f32>(probePos.x, probePos.y + EPS))
-                                 - shadowDensityAt(vec2<f32>(probePos.x, probePos.y - EPS));
-                        let pGrad    = vec2<f32>(pgx, pgy);
-                        let pGradLen = length(pGrad);
-                        if (pGradLen > 0.001) {
-                            vel += -normalize(pGrad) * params.maxSpeed * params.probeForceStr
-                                 * probeDensity * params.dt * 60.0;
-                        } else {
-                            let away = pos - imgCentre;
-                            if (length(away) > 0.001) {
-                                vel += normalize(away) * params.maxSpeed * params.probeForceStr
-                                     * probeDensity * params.dt * 60.0;
-                            }
-                        }
+                        // Perpendicular turn: positive = left. Turn away from denser side.
+                        let perpDir = vec2f(-fwdDir.y, fwdDir.x);
+                        let steer   = (dR - dL) * params.maxSpeed * params.probeForceStr
+                                    * maxDensity * params.dt * 60.0;
+                        vel += perpDir * steer;
                     }
                 }
             }
