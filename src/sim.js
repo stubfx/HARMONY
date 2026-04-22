@@ -84,7 +84,7 @@ const params = {
     // Auto-clear
     clearDelay:    0,     // seconds before auto-clearing user trace content (0 = disabled)
     // Spectator partitioning
-    spectatorSpawnChance: 0.1, // per-frame probability an assigned agent teleports to the spectator's touch point
+    spectatorSpawnChance: 0.01, // per-frame probability an assigned agent teleports to the spectator's touch point
     // Session / QR restore
     remoteTimeout:  0,    // seconds of silence from all remotes before QR is restored (0 = disabled)
     maxSpectators:  1,    // sim QR hides when connected count reaches this threshold

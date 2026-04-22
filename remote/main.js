@@ -224,6 +224,7 @@ gestureSurface?.addEventListener('touchmove', (e) => {
 
 gestureSurface?.addEventListener('touchend', (e) => {
     e.preventDefault();
+    if (touchThrottle) { clearTimeout(touchThrottle); touchThrottle = null; }
     sendEvent('touch', { x: lastTouchX, y: lastTouchY, touching: false });
 }, { passive: false });
 
