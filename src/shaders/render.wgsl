@@ -60,9 +60,9 @@ struct SpectatorSlot {
     colorR: f32,
     colorG: f32,
     colorB: f32,
-    isActive: u32,
-    _p0:      f32,
-    _p1:      f32,
+    active: u32,
+    _p0:    f32,
+    _p1:    f32,
 }
 
 struct Agent {
@@ -112,7 +112,7 @@ struct VsOut {
     var baseColor = vec3f(params.colorR, params.colorG, params.colorB);
     if (params.spectatorCount > 0u) {
         let slot = spectatorSlots[agentId % params.spectatorCount];
-        if (slot.isActive != 0u) {
+        if (slot.active != 0u) {
             baseColor = vec3f(slot.colorR, slot.colorG, slot.colorB);
         }
     }

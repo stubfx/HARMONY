@@ -83,9 +83,9 @@ struct SpectatorSlot {
     colorR: f32,
     colorG: f32,
     colorB: f32,
-    isActive: u32,
-    _p0:      f32,
-    _p1:      f32,
+    active: u32,
+    _p0:    f32,
+    _p1:    f32,
 }
 
 struct Agent {
