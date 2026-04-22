@@ -233,7 +233,11 @@ const soloUB = device.createBuffer({
     size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
-    size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+});
+// 16 spectator slots × 32 bytes: tiltX, tiltY, colorR, colorG, colorB, active u32, _pad, _pad
+const spectatorSlotsBuf = device.createBuffer({
+    size: 512, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 const fadeUB = device.createBuffer({
     size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -514,6 +518,7 @@ function rebuildRenderBG() {
             { binding: 1, resource: { buffer: agentBuf } },
             { binding: 2, resource: imageSampler },
             { binding: 3, resource: texView },
+            { binding: 4, resource: { buffer: spectatorSlotsBuf } },
         ],
     });
 }
@@ -783,6 +788,7 @@ function rebuildSimBG() {
             { binding: 3, resource: { buffer: contamUB } },
             { binding: 4, resource: avoidMapView },
             { binding: 5, resource: shadowDensityRes },
+            { binding: 6, resource: { buffer: spectatorSlotsBuf } },
         ],
     });
 }
@@ -853,6 +859,41 @@ function updateStateDisplay() {
 let qrBitmap           = null;  // permanent reference to the session QR bitmap
 let sessionRoom        = null;  // UUID assigned by server — needed for n8n payload
 let sessionUrl         = null;  // full remote URL — kept so QR can be regenerated on param change
+
+// ── Per-spectator slot management ─────────────────────────────────────────────
+// Each connected spectator owns one slot (index 0..N-1). Agents are partitioned
+// as agentIndex % spectatorCount. When spectatorCount = 0, collective wind applies.
+const MAX_SPECTATOR_SLOTS = 16;
+const SPECTATOR_PALETTE = [
+    '#e63333', '#ff8800', '#ffe600', '#44dd22',
+    '#00ddaa', '#0088ff', '#8833ff', '#ff33bb',
+    '#ff7766', '#ffbb44', '#88ff44', '#33eeff',
+    '#4466ff', '#bb55ff', '#ff6699', '#ffff55',
+];
+
+// activeSlots: ordered array of { spectatorId, tiltX, tiltY, colorR, colorG, colorB }
+const activeSlots = [];
+
+function spectatorCssColor(index) {
+    return SPECTATOR_PALETTE[index % SPECTATOR_PALETTE.length];
+}
+
+function uploadSpectatorSlots() {
+    const ab = new ArrayBuffer(512);
+    const f  = new Float32Array(ab);
+    const u  = new Uint32Array(ab);
+    for (let s = 0; s < activeSlots.length; s++) {
+        const slot = activeSlots[s];
+        const b    = s * 8;
+        f[b + 0] = slot.tiltX;
+        f[b + 1] = slot.tiltY;
+        f[b + 2] = slot.colorR;
+        f[b + 3] = slot.colorG;
+        f[b + 4] = slot.colorB;
+        u[b + 5] = 1;
+    }
+    device.queue.writeBuffer(spectatorSlotsBuf, 0, ab);
+}
 
 async function generateQR() {
     if (!sessionUrl) return;
@@ -1024,11 +1065,33 @@ let socket;
         dbgCoherence.updateDisplay();
     });
 
-    // A spectator joined — fire a brief brightness burst into the field.
-    // Count and QR threshold logic is handled by n8n via the /spectator webhook.
-    socket.on('spectator-joined', () => {
+    // A spectator joined — assign a slot, pick a colour, push it to their device.
+    socket.on('spectator-joined', ({ spectatorId } = {}) => {
         lastRemoteActivity = Date.now();
         burstBrightness    = BURST_BRIGHTNESS;
+        if (!spectatorId || activeSlots.length >= MAX_SPECTATOR_SLOTS) return;
+        if (activeSlots.some(s => s.spectatorId === spectatorId)) return; // rejoin guard
+        const paletteIndex = activeSlots.length;
+        const css          = spectatorCssColor(paletteIndex);
+        const [colorR, colorG, colorB] = hexToF(css);
+        activeSlots.push({ spectatorId, tiltX: 0.5, tiltY: 0.5, colorR, colorG, colorB });
+        uploadSpectatorSlots();
+        socket.emit('push-to-spectator', { spectatorId, data: { color: css } });
+    });
+
+    socket.on('spectator-left', ({ spectatorId } = {}) => {
+        const idx = activeSlots.findIndex(s => s.spectatorId === spectatorId);
+        if (idx === -1) return;
+        activeSlots.splice(idx, 1);
+        uploadSpectatorSlots();
+    });
+
+    socket.on('spectator-tilt', ({ spectatorId, pitch, roll } = {}) => {
+        const slot = activeSlots.find(s => s.spectatorId === spectatorId);
+        if (!slot) return;
+        slot.tiltX = roll  ?? 0.5;
+        slot.tiltY = pitch ?? 0.5;
+        uploadSpectatorSlots();
     });
 
     // ── Remote event registry ─────────────────────────────────────────────────
@@ -1459,11 +1522,12 @@ function writeSoloUB(dt, time) {
     f[30] = params.probeSensorAngle;
     f[31] = params.homingChance;
     f[32] = params.homingInfluence;
+    u[33] = activeSlots.length;
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
 function writeRenderUB() {
-    const ab   = new ArrayBuffer(96);
+    const ab   = new ArrayBuffer(112);
     const u    = new Uint32Array(ab);
     const f    = new Float32Array(ab);
     const rgb  = hexToF(params.color);
@@ -1503,6 +1567,7 @@ function writeRenderUB() {
     u[21] = params.qrFadeZone ? 1 : 0;
     f[22] = params.homingProximityRange;
     f[23] = params.homingMinAlpha;
+    u[24] = activeSlots.length;
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 
