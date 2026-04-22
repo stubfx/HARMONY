@@ -43,7 +43,7 @@ Clear the text by selecting all and deleting in the input field. If an image is 
 ## Motion
 
 ### agents
-**Range:** 1 000 – 1 200 000 | **Default:** 1 200 000
+**Range:** 1 000 – 3 000 000 | **Default:** 1 200 000
 
 Total number of active particles. Changing this re-seeds all agents (positions and home coordinates are reassigned). The GPU buffer is always allocated at maximum size; this parameter only changes how many agents the compute dispatch and draw calls actually process.
 
@@ -509,6 +509,18 @@ The transition is smooth. A crowd touching left and right simultaneously average
 
 ---
 
+### Individual identity — personal swarm
+
+When a spectator joins, the simulation assigns them a color from a fixed 16-color palette and a **partition** of the agent pool. The partition is determined by `agentIndex % spectatorCount` — with 2 spectators, every even-indexed agent belongs to spectator 0 and every odd to spectator 1. The agents in each partition render in that spectator's assigned color (blending toward the global `fast color` at high speed, exactly as the base color normally would).
+
+The assigned color is immediately pushed to the spectator's phone via `device-message`, where it overrides the aura base color — giving the person a private visual confirmation of which "slice" of the swarm is theirs.
+
+**Touch-spawn**: while a spectator holds their finger on the phone screen, a fraction of their assigned agents teleport to the corresponding canvas position each frame. The phone screen maps directly to the canvas: a finger at 30% across / 70% down on the phone places agents at 30% × canvasW, 70% × canvasH. The rate is controlled by `spectatorSpawnChance` (default 1%). Lifting the finger stops spawning immediately.
+
+**Partition note:** agents are distributed by index, not by canvas position — the partition is spatially interleaved across the full canvas, not grouped into a region. Each spectator's color is visible everywhere.
+
+---
+
 ### Join burst — presence signal on the big screen
 
 When a spectator connects, the server emits `spectator-joined` to the host simulation. This triggers a brief directional gust in the particle field:
@@ -592,6 +604,17 @@ The session UUID is stable for the lifetime of the page. A socket disconnect/rec
 ---
 
 ## Session
+
+### spawn chance (`spectatorSpawnChance`)
+**Range:** 0 – 1 | **Default:** 0.01
+
+Per-frame probability that each agent in a spectator's partition teleports to that spectator's current touch position on the canvas. The check runs independently per agent every frame — at 1% and 1,200,000 agents split across two spectators, roughly 6,000 agents relocate each frame, building a continuous stream toward the finger.
+
+Only fires while the spectator's finger is on the screen (`isTouching`). Lifting the finger stops all spawning immediately. Homing agents (those currently converging on a trace pixel) are **never interrupted** by this mechanic — they continue homing regardless of their spectator assignment.
+
+Raise to 0.05–0.1 for a more explosive, immediately-visible effect; lower to 0.005 for a slow, cumulative drift.
+
+---
 
 ### QR fade zone (`qrFadeZone`)
 **Default:** off

@@ -24,13 +24,15 @@ This is deliberate. The wind responds to the *average* of everyone's orientation
 
 The phone is a plumb line. The swarm is the weather. You are somewhere in between.
 
-### Touch — warmth and cold
+### Touch — warmth, cold, and your own swarm
 
-Where you press your finger on the screen determines the temperature of your presence. The top of the screen is cold — blue, distant, crystalline. The bottom is warm — amber, slow, close.
+Where you press your finger on the screen does two things at once.
 
-Every active touch sends a temperature into the room. The swarm's color is the average of everyone's warmth. If the crowd is pressing down, the field glows amber. If they are pressed up high, it shifts toward ice.
+The **vertical position** determines the temperature of your presence. The top of the screen is cold — blue, distant, crystalline. The bottom is warm — amber, slow, close. Every active touch sends a temperature into the room. The swarm's color is the average of everyone's warmth. If the crowd is pressing down, the field glows amber. If they are pressed up high, it shifts toward ice. You are choosing a feeling, not a color. The swarm translates.
 
-You are choosing a feeling, not a color. The swarm translates.
+The **position itself** — not just the height — calls a piece of the swarm to you. Each person who joins is assigned a color and a slice of the particle field. Those particles are yours in color only: they live everywhere, mixed into the whole. But when you touch the screen, a small fraction of them teleport to wherever your finger is, as though the field is orienting toward you. Hold still and they collect. Move quickly and they scatter and regroup. Lift your finger and they drift back into the current.
+
+You cannot isolate your swarm from the others. You can only pull it toward you, temporarily, in one place.
 
 ### Words — the ghostwriting
 

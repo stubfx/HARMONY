@@ -83,7 +83,7 @@ Any key matching a property in the `params` object is written directly and takes
 
 | Key | Default | Range | Description |
 |-----|---------|-------|-------------|
-| `agentCount` | `1 200 000` | `1 000 – 3 000 000` | Number of active agents. Change triggers a full re-seed. |
+| `agentCount` | `1 200 000` | `1 000 – 3 000 000` | Number of active agents. Change triggers a full re-seed. Higher counts increase GPU load significantly; test before pushing above 2 M in a live installation. |
 | `stepLen` | `2.0` | `0.1 – 8` | Base movement speed in canvas px / frame. |
 | `turnRate` | `0.04` | `0.005 – 0.3` | Maximum angular change per frame (radians). |
 | `maxSpeed` | `5.0` | `1 – 15` | Speed cap in px / frame. Also sets the colour-blend ceiling. |
@@ -182,6 +182,7 @@ The trace canvas is always full-screen (scaled by `traceScale`). QR and user con
 | Key | Default | Description |
 |-----|---------|-------------|
 | `maxSpectators` | `1` | Connected spectator count at which the QR is hidden. Used by n8n logic to decide when to call `showQR: false`. The sim does not act on this directly — n8n reads it from the heartbeat and acts accordingly. |
+| `spectatorSpawnChance` | `0.01` | Per-frame probability that an agent in a spectator's partition teleports to that spectator's touch position (0–1). Only fires while the spectator is actively touching; homing agents are exempt. |
 | `qrFadeZone` | `false` | Fades free agents near the QR rect to keep it scannable. |
 | `remoteTimeout` | `0` | Seconds of silence from all remotes before the QR is restored. `0` = disabled. |
 | `clearDelay` | `0` | Seconds before auto-clearing user-submitted trace content. `0` = disabled. |
