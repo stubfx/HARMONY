@@ -264,9 +264,11 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         }
         freeVel += wind * params.dt * 60.0;
 
+        // Speed capped at magnetStr; also capped at dist so the agent can't overshoot.
+        // Using dist/dist (not normalize) to avoid division by zero at dist ≈ 0.
         var homingVel = vec2<f32>(0.0, 0.0);
-        if (dist > 0.5) {
-            homingVel = normalize(toHome) * params.magnetStr;
+        if (dist > 0.001) {
+            homingVel = (toHome / dist) * min(dist, params.magnetStr);
         }
 
         let blendT = clamp(1.0 - dist / params.canvasW, 0.0, 1.0) * params.homingInfluence;
@@ -446,8 +448,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
 
     let spd = length(vel);
-    if (spd > params.maxSpeed)                  { vel = vel * (params.maxSpeed / spd); }
-    if (spd < params.minSpeed && spd > 0.00001) { vel = vel * (params.minSpeed / spd); }
+    if (spd > params.maxSpeed) { vel = vel * (params.maxSpeed / spd); }
+    // minSpeed only enforced for free agents — homing agents must be able to rest at home.
+    if (!homeInImg && spd < params.minSpeed && spd > 0.00001) { vel = vel * (params.minSpeed / spd); }
 
     var np = pos + vel * params.dt * 60.0;
     if (params.bounceEdges != 0u) {
