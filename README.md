@@ -1,6 +1,6 @@
 # Wind Particles
 
-A real-time GPU particle simulation for an art-direction thesis. Up to 1.2 million
+A real-time GPU particle simulation for an art-direction thesis. Up to 5 million
 independent agents move through two invisible mathematical fields — a *direction
 field* and a *wind field* — both defined live by typed formulas compiled directly
 into WGSL compute shaders at runtime.

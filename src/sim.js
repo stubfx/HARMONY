@@ -192,8 +192,8 @@ function hideError()    { if (errEl) errEl.style.display = 'none'; }
 
 function updateMonitor(fps) {
     if (monRes)    monRes.textContent    = `${canvas.width} × ${canvas.height}  @${(window.devicePixelRatio * params.renderScale).toFixed(2)}x`;
-    if (monFps)    monFps.textContent    = `${fps.toFixed(1)} fps`;
-    if (monAgents) monAgents.textContent = `${params.agentCount.toLocaleString()} agents`;
+    if (monFps)    monFps.textContent    = `${fps | 0} fps`;
+    if (monAgents) monAgents.textContent = `${params.agentCount / 1_000_000 | 0}M agents`;
 }
 
 /// ── Image region ──────────────────────────────────────────────────────────────
@@ -1495,9 +1495,9 @@ function writeSoloUB(dt, time) {
         ? 0.08 + smoothCoherence * 2 * 0.92   // 0.08 → 1.0
         : 1.0  + (smoothCoherence - 0.5) * 4; // 1.0  → 3.0
 
-    const ab = new ArrayBuffer(144);
-    const u  = new Uint32Array(ab);
-    const f  = new Float32Array(ab);
+    const ab = _soloAB;
+    const u  = _soloU;
+    const f  = _soloF;
     const { x0, y0, x1, y1 } = getImageRegion();
     u[0] = params.agentCount;
     f[1] = canvas.width;
@@ -1540,9 +1540,9 @@ function writeSoloUB(dt, time) {
 }
 
 function writeRenderUB() {
-    const ab   = new ArrayBuffer(112);
-    const u    = new Uint32Array(ab);
-    const f    = new Float32Array(ab);
+    const ab = _renderAB;
+    const u  = _renderU;
+    const f  = _renderF;
     const rgb  = hexToF(params.color);
     const srgb = hexToF(params.speedColor);
 
@@ -1586,56 +1586,46 @@ function writeRenderUB() {
 
 
 function writeFadeUB() {
-    const ab = new ArrayBuffer(16);
-    new Float32Array(ab)[0] = params.trailDecay;
-    device.queue.writeBuffer(fadeUB, 0, ab);
+    _fadeF[0] = params.trailDecay;
+    device.queue.writeBuffer(fadeUB, 0, _fadeAB);
 }
 
 function writeBlitUB() {
-    const ab = new ArrayBuffer(16);
-    new Float32Array(ab)[0] = params.bgBlackCutoff;
-    device.queue.writeBuffer(blitUB, 0, ab);
+    _blitF[0] = params.bgBlackCutoff;
+    device.queue.writeBuffer(blitUB, 0, _blitAB);
 }
 
 function writeWindVisUB(time, gridW) {
     const step = Math.round(100 * window.devicePixelRatio);
-    const ab = new ArrayBuffer(32);
-    const u  = new Uint32Array(ab);
-    const f  = new Float32Array(ab);
-    f[0] = canvas.width;
-    f[1] = canvas.height;
-    f[2] = time;
-    f[3] = step;
-    f[4] = step * 0.55;
-    u[5] = gridW;
-    device.queue.writeBuffer(windVisUB, 0, ab);
+    _windVisF[0] = canvas.width;
+    _windVisF[1] = canvas.height;
+    _windVisF[2] = time;
+    _windVisF[3] = step;
+    _windVisF[4] = step * 0.55;
+    _windVisU[5] = gridW;
+    device.queue.writeBuffer(windVisUB, 0, _windVisAB);
 }
 
 function writeAgentShadowUB() {
-    const ab = new ArrayBuffer(32);
-    const f  = new Float32Array(ab);
-    const u  = new Uint32Array(ab);
-    f[0] = canvas.width;
-    f[1] = canvas.height;
-    f[2] = params.agentShadowRadius;
-    f[3] = params.agentShadowStr;
-    u[4] = hasImage ? 1 : 0;
-    f[5] = params.homingProximityRange;
-    f[6] = params.homingMinAlpha;
-    device.queue.writeBuffer(agentShadowUB, 0, ab);
+    _shadowF[0] = canvas.width;
+    _shadowF[1] = canvas.height;
+    _shadowF[2] = params.agentShadowRadius;
+    _shadowF[3] = params.agentShadowStr;
+    _shadowU[4] = hasImage ? 1 : 0;
+    _shadowF[5] = params.homingProximityRange;
+    _shadowF[6] = params.homingMinAlpha;
+    device.queue.writeBuffer(agentShadowUB, 0, _shadowAB);
 }
 
 function writeImageDebugUB() {
     const { x0, y0, x1, y1 } = getImageRegion();
-    const ab = new ArrayBuffer(32);
-    const f  = new Float32Array(ab);
-    f[0] = canvas.width;
-    f[1] = canvas.height;
-    f[2] = x0;
-    f[3] = y0;
-    f[4] = x1;
-    f[5] = y1;
-    device.queue.writeBuffer(imageDebugUB, 0, ab);
+    _imgDbgF[0] = canvas.width;
+    _imgDbgF[1] = canvas.height;
+    _imgDbgF[2] = x0;
+    _imgDbgF[3] = y0;
+    _imgDbgF[4] = x1;
+    _imgDbgF[5] = y1;
+    device.queue.writeBuffer(imageDebugUB, 0, _imgDbgAB);
 }
 
 // Writes ContamParams (176 bytes) — header + up to 10 vec4 points.
@@ -1651,9 +1641,9 @@ function writeContamUB() {
     // Future: push additional contamination points here (remote touches, etc.)
 
     const count  = pts.length / 2;  // each point is 2 floats (x, y)
-    const ab     = new ArrayBuffer(176);
-    const u      = new Uint32Array(ab);
-    const f      = new Float32Array(ab);
+    const ab     = _contamAB;
+    const u      = _contamU;
+    const f      = _contamF;
     u[0] = count;
     f[1] = params.contamRadius;
     u[2] = params.contamPush ? 1 : 0;
@@ -1665,11 +1655,22 @@ function writeContamUB() {
     device.queue.writeBuffer(contamUB, 0, ab);
 }
 
+// ── Pre-allocated uniform buffers (reused every frame to avoid GC pressure) ──
+const _soloAB  = new ArrayBuffer(144); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
+const _renderAB= new ArrayBuffer(112); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
+const _fadeAB  = new ArrayBuffer(16);  const _fadeF  = new Float32Array(_fadeAB);
+const _blitAB  = new ArrayBuffer(16);  const _blitF  = new Float32Array(_blitAB);
+const _contamAB= new ArrayBuffer(176); const _contamU= new Uint32Array(_contamAB); const _contamF= new Float32Array(_contamAB);
+const _shadowAB= new ArrayBuffer(32);  const _shadowF= new Float32Array(_shadowAB); const _shadowU= new Uint32Array(_shadowAB);
+const _imgDbgAB= new ArrayBuffer(32);  const _imgDbgF= new Float32Array(_imgDbgAB);
+const _windVisAB=new ArrayBuffer(32);  const _windVisF=new Float32Array(_windVisAB); const _windVisU=new Uint32Array(_windVisAB);
+
 // ── Frame loop ────────────────────────────────────────────────────────────────
 const TIME_MULT = 0.001;
 let prevTime  = performance.now() * TIME_MULT;
 let fpsFrames = 0;
-let fpsLast   = performance.now();
+// FPS update decoupled from the render loop — DOM writes every 1 s must not stall RAF.
+setInterval(() => { updateMonitor(fpsFrames); fpsFrames = 0; }, 1000);
 
 function frame(ts) {
     if (deviceLost) return;
@@ -1766,12 +1767,6 @@ function frame(ts) {
     device.queue.submit([enc.finish()]);
 
     fpsFrames++;
-    const nowMs = performance.now();
-    if (nowMs - fpsLast >= 1000) {
-        updateMonitor((fpsFrames * 1000) / (nowMs - fpsLast));
-        fpsFrames = 0;
-        fpsLast   = nowMs;
-    }
 }
 
 requestAnimationFrame(frame);
