@@ -484,7 +484,8 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
 
     // Touch-spawn: teleport a fraction of the spectator's partition to the finger each frame.
-    if (params.spectatorCount > 0u) {
+    // Primed (homing) agents are never interrupted — they must finish homing.
+    if (!homeInImg && params.spectatorCount > 0u) {
         let slot = spectatorSlots[i % params.spectatorCount];
         if (slot.isActive != 0u && slot.isTouching != 0u) {
             let rng = hash(i ^ (u32(params.time * 137.0) + 17u));
