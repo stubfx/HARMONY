@@ -35,6 +35,8 @@
 //   [112] probeForceStr     f32   (lateral steering force multiplier)
 //   [116] respawnOnCollide  u32   (1 = teleport to edge instead of steering on dense probe)
 //   [120] probeSensorAngle  f32   (half-angle between left/right sensors, radians)
+//   [124] homingChance      f32   (per-frame probability [0–1] that a newly-eligible agent commits to homing)
+//   [128] homingInfluence   f32   (max homing blend weight at dist=0; scales linearly to 0 at dist=canvasW)
 
 struct SoloParams {
     agentCount:     u32,
@@ -68,6 +70,8 @@ struct SoloParams {
     probeForceStr:     f32,
     respawnOnCollide:  u32,
     probeSensorAngle:  f32,
+    homingChance:      f32,
+    homingInfluence:   f32,
 }
 
 struct Agent {
@@ -226,8 +230,19 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             }
         }
 
-        homeInImg = homeAlpha >= params.alphaThreshold;
-        posAlpha  = rawPosAlpha;
+        // Probabilistic homing gate: already-homing agents keep going;
+        // newly-eligible ones commit with homingChance probability per frame.
+        let homeQualifies = homeAlpha >= params.alphaThreshold;
+        let wasHoming     = agents[i].primed > 0.5;
+        if (homeQualifies) {
+            if (wasHoming) {
+                homeInImg = true;
+            } else {
+                let rng = hash(i ^ (u32(params.time * 73.0) + 5u));
+                homeInImg = rng < params.homingChance;
+            }
+        }
+        posAlpha = rawPosAlpha;
     }
 
     let imgCentre = vec2<f32>(
@@ -236,14 +251,26 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     );
 
     if (homeInImg) {
-        // ── Homing agent: steer straight toward assigned home pixel ────────────
+        // ── Homing agent ───────────────────────────────────────────────────────
+        // Formula + wind still apply, but are blended against the homing direction.
+        // Blend weight falls linearly with distance: at dist=0 → homingInfluence,
+        // at dist=canvasW → 0 (pure free forces). No obstacle avoidance while homing.
         let toHome = home - pos;
         let dist   = length(toHome);
-        if (dist > 0.5) {
-            vel = normalize(toHome) * params.magnetStr;
-        } else {
-            vel = vec2<f32>(0.0, 0.0);
+
+        var freeVel = vel;
+        if (params.followFormula != 0u) {
+            freeVel = mix(freeVel, desired * (params.stepLen * weight), params.turnRate);
         }
+        freeVel += wind * params.dt * 60.0;
+
+        var homingVel = vec2<f32>(0.0, 0.0);
+        if (dist > 0.5) {
+            homingVel = normalize(toHome) * params.magnetStr;
+        }
+
+        let blendT = clamp(1.0 - dist / params.canvasW, 0.0, 1.0) * params.homingInfluence;
+        vel = mix(freeVel, homingVel, blendT);
     } else {
         // ── Free agent: formula steering + wind ───────────────────────────────
         if (params.followFormula != 0u) {

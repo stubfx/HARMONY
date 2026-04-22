@@ -120,6 +120,8 @@ Any key matching a property in the `params` object is written directly and takes
 | Key | Default | Range | Description |
 |-----|---------|-------|-------------|
 | `magnetStr` | `5.0` | px/frame | Pull speed: how many canvas px per frame a homing agent advances toward its home position. |
+| `homingChance` | `0.2` | `0 – 1` | Per-frame probability that a newly-eligible agent commits to homing. Already-homing agents are unaffected and keep going. Lower values stagger the formation of the image over time. |
+| `homingInfluence` | `1.0` | `0 – 1` | Maximum homing blend weight, applied at zero distance from home. Scales linearly to 0 at one canvas-width away — agents far from home follow formula and wind almost freely. |
 | `alphaThreshold` | `0.1` | `0 – 1` | Minimum vignette-weighted alpha a pixel must have for an agent to home to it. |
 | `blackThreshold` | `0.05` | `0 – 1` | Luminance below which a pixel is treated as transparent even if alpha is high. |
 | `vignetteEdge` | `0.08` | `0 – 0.5` | UV-space width of the soft edge fade applied to the screen edges. `0` = no fade. |

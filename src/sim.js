@@ -67,6 +67,9 @@ const params = {
     // Agent shadow
     agentShadowStr:    0.20, // peak opacity of each homing-agent shadow splat (0–1)
     agentShadowRadius: 10,   // splat half-radius in canvas pixels
+    // Homing behaviour
+    homingChance:    0.2, // per-frame probability [0–1] that a newly-eligible agent commits to homing
+    homingInfluence: 1.0, // max homing blend weight at dist=0; falls to 0 at dist=canvasW
     // Homing proximity fade
     homingProximityRange: 300, // canvas px — distance over which homing agents fade in
     homingMinAlpha:       0.1, // minimum alpha for a homing agent at max distance (0–1)
@@ -227,7 +230,7 @@ const agentBuf = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 const soloUB = device.createBuffer({
-    size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
     size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -1175,6 +1178,8 @@ fMagnet.add(params, 'contamPush').name('eraser push');
 fMagnet.add(params, 'contamRadius', 10, 600, 5).name('eraser radius');
 fMagnet.add(params, 'agentShadowStr',    0,   1,   0.005).name('shadow strength');
 fMagnet.add(params, 'agentShadowRadius', 0, 300,   0.5 ).name('shadow radius');
+fMagnet.add(params, 'homingChance',    0, 1, 0.01).name('homing chance');
+fMagnet.add(params, 'homingInfluence', 0, 1, 0.01).name('homing influence');
 fMagnet.add(params, 'homingProximityRange', 0, 2000, 10).name('proximity range (px)');
 fMagnet.add(params, 'homingMinAlpha',       0, 1,  0.01).name('proximity min alpha');
 fMagnet.add(params, 'avoidForceStr', 0, 5, 0.05).name('avoid force');
@@ -1452,6 +1457,8 @@ function writeSoloUB(dt, time) {
     f[28] = params.probeForceStr;
     u[29] = params.respawnOnCollide ? 1 : 0;
     f[30] = params.probeSensorAngle;
+    f[31] = params.homingChance;
+    f[32] = params.homingInfluence;
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
