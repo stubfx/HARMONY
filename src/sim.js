@@ -207,7 +207,12 @@ function getImageRegion() {
 if (!navigator.gpu) { showError('WebGPU not supported in this browser.'); throw new Error(); }
 const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
 if (!adapter)       { showError('No WebGPU adapter found.'); throw new Error(); }
-const device = await adapter.requestDevice();
+const device = await adapter.requestDevice({
+    requiredLimits: {
+        maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
+        maxBufferSize:               adapter.limits.maxBufferSize,
+    },
+});
 device.addEventListener('uncapturederror', e => {
     console.error('[WebGPU uncaptured error]', e.error.message);
     showError(e.error.message);
