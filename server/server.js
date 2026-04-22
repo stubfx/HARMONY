@@ -258,7 +258,7 @@ io.on('connection', (socket) => {
 
         socket.emit('joined', { room, userCount });
         if (roomData.hostSocketId) {
-            io.to(roomData.hostSocketId).emit('spectator-joined', { userCount });
+            io.to(roomData.hostSocketId).emit('spectator-joined', { userCount, spectatorId: sid });
         }
         socket.to(`${room}:spectators`).emit('peer-joined', { userCount });
 
@@ -267,15 +267,24 @@ io.on('connection', (socket) => {
 
     // ── User event from remote ────────────────────────────────────────────────
     socket.on('user-event', ({ type, data }) => {
-        const room        = assignedRoom;
-        const spectatorId = socket.id;
+        const room = assignedRoom;
         if (!room) return console.warn('[socket] user-event without room — ignoring');
 
         updateUserState(room, socket.id, type, data);
 
         if (type === 'tilt') return;
 
+        const roomData    = rooms.get(room);
+        const spectatorId = roomData?.connections.get(socket.id) ?? socket.id;
         io.to(room).emit('remote-event', { type, spectatorId, data, timestamp: Date.now() });
+    });
+
+    // ── Host push to a specific spectator ────────────────────────────────────────
+    socket.on('push-to-spectator', ({ spectatorId, data }) => {
+        const room = rooms.get(assignedRoom);
+        if (!room) return;
+        const targetSocketId = room.spectators.get(spectatorId);
+        if (targetSocketId) io.to(targetSocketId).emit('device-message', data);
     });
 
     socket.on('disconnect', () => {
@@ -294,7 +303,7 @@ io.on('connection', (socket) => {
             } else {
                 const remaining = room.connections.size;
                 if (room.hostSocketId) {
-                    io.to(room.hostSocketId).emit('spectator-left', { userCount: remaining });
+                    io.to(room.hostSocketId).emit('spectator-left', { userCount: remaining, spectatorId });
                 }
                 io.to(`${assignedRoom}:spectators`).emit('peer-left', { userCount: remaining });
                 console.log('[socket] spectator left    room:', assignedRoom, '| remaining:', remaining);

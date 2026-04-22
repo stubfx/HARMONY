@@ -176,12 +176,17 @@ function updateTiltDot(roll, pitch) {
 let touchThrottle = null;
 let lastTapTime   = 0;
 let formVisible   = false;
+let lastTouchX    = 0.5;
+let lastTouchY    = 0.5;
 
 function handleTouch(e) {
     const touch = e.touches[0];
     const nx = touch.clientX / window.innerWidth;
     const ny = touch.clientY / window.innerHeight;
     const temp = ny; // top=cold, bottom=warm
+
+    lastTouchX = nx;
+    lastTouchY = ny;
 
     currentTemp      = temp;
     currentCoherence = nx;   // left=chaos, right=order
@@ -190,7 +195,7 @@ function handleTouch(e) {
     if (touchThrottle) return;
     touchThrottle = setTimeout(() => {
         touchThrottle = null;
-        sendEvent('touch', { x: nx, y: ny, temp });
+        sendEvent('touch', { x: nx, y: ny, temp, touching: true });
     }, 100);
 }
 
@@ -219,6 +224,7 @@ gestureSurface?.addEventListener('touchmove', (e) => {
 
 gestureSurface?.addEventListener('touchend', (e) => {
     e.preventDefault();
+    sendEvent('touch', { x: lastTouchX, y: lastTouchY, touching: false });
 }, { passive: false });
 
 // ── Ripple ────────────────────────────────────────────────────────────────────

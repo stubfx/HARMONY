@@ -24,6 +24,7 @@
 //   [84] qrFadeZone          u32   (1 = fade free agents near the QR rect)
 //   [88] homingProximityRange f32  (canvas px over which homing agents fade in)
 //   [92] homingMinAlpha       f32  (minimum alpha for a homing agent at max distance)
+//   [96] spectatorCount       u32  (active spectators; 0 = use global params.color)
 
 struct SoloRenderParams {
     agentCount:           u32,
@@ -50,6 +51,7 @@ struct SoloRenderParams {
     qrFadeZone:           u32,
     homingProximityRange: f32,
     homingMinAlpha:       f32,
+    spectatorCount:       u32,
 }
 
 struct Agent {
@@ -60,10 +62,22 @@ struct Agent {
     primed: f32,   // written by compute each frame: 1.0 = homing, 0.0 = free
 }
 
-@group(0) @binding(0) var<uniform>       params: SoloRenderParams;
-@group(0) @binding(1) var<storage, read> agents: array<Agent>;
-@group(0) @binding(2) var               imgSmp: sampler;
-@group(0) @binding(3) var               imgTex: texture_2d<f32>;
+struct SpectatorSlot {
+    colorR:     f32,
+    colorG:     f32,
+    colorB:     f32,
+    isActive:   u32,
+    touchX:     f32,
+    touchY:     f32,
+    isTouching: u32,
+    _p0:        f32,
+}
+
+@group(0) @binding(0) var<uniform>       params:         SoloRenderParams;
+@group(0) @binding(1) var<storage, read> agents:         array<Agent>;
+@group(0) @binding(2) var                imgSmp:         sampler;
+@group(0) @binding(3) var                imgTex:         texture_2d<f32>;
+@group(0) @binding(4) var<storage, read> spectatorSlots: array<SpectatorSlot, 16>;
 
 struct VsOut {
     @builtin(position) pos:        vec4<f32>,
@@ -92,13 +106,16 @@ struct VsOut {
     let half     = vec2<f32>(params.pointSize / params.canvasW, params.pointSize / params.canvasH);
     let finalNdc = ndc + corners[corner] * half * 2.0;
 
-    let speed      = length(agent.vel);
-    let t          = clamp(speed / max(params.maxSpeed, 0.001), 0.0, 1.0);
-    let color      = mix(
-        vec3<f32>(params.colorR,      params.colorG,      params.colorB),
-        vec3<f32>(params.speedColorR, params.speedColorG, params.speedColorB),
-        t,
-    );
+    let speed = length(agent.vel);
+    let t     = clamp(speed / max(params.maxSpeed, 0.001), 0.0, 1.0);
+    var baseColor = vec3f(params.colorR, params.colorG, params.colorB);
+    if (params.spectatorCount > 0u) {
+        let slot = spectatorSlots[agentId % params.spectatorCount];
+        if (slot.isActive != 0u) {
+            baseColor = vec3f(slot.colorR, slot.colorG, slot.colorB);
+        }
+    }
+    let color = mix(baseColor, vec3f(params.speedColorR, params.speedColorG, params.speedColorB), t);
     let homeUV = vec2<f32>(
         (agent.home.x - params.imgX0) / (params.imgX1 - params.imgX0),
         (agent.home.y - params.imgY0) / (params.imgY1 - params.imgY0),

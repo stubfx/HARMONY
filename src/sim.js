@@ -83,6 +83,8 @@ const params = {
     probeSensorAngle:  0.785, // half-angle between left/right Physarum sensors (radians; π/4 ≈ 45°)
     // Auto-clear
     clearDelay:    0,     // seconds before auto-clearing user trace content (0 = disabled)
+    // Spectator partitioning
+    spectatorSpawnChance: 0.1, // per-frame probability an assigned agent teleports to the spectator's touch point
     // Session / QR restore
     remoteTimeout:  0,    // seconds of silence from all remotes before QR is restored (0 = disabled)
     maxSpectators:  1,    // sim QR hides when connected count reaches this threshold
@@ -233,7 +235,7 @@ const soloUB = device.createBuffer({
     size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
-    size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const fadeUB = device.createBuffer({
     size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -250,6 +252,10 @@ const imageDebugUB = device.createBuffer({
 // ContamParams: 16-byte header + 10 × vec4<f32> (16 bytes each) = 176 bytes
 const contamUB = device.createBuffer({
     size: 176, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+});
+// SpectatorSlots: 16 slots × 32 bytes (8 × f32/u32 per slot) = 512 bytes
+const spectatorSlotsBuf = device.createBuffer({
+    size: 512, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 
 function seedAgents() {
@@ -514,6 +520,7 @@ function rebuildRenderBG() {
             { binding: 1, resource: { buffer: agentBuf } },
             { binding: 2, resource: imageSampler },
             { binding: 3, resource: texView },
+            { binding: 4, resource: { buffer: spectatorSlotsBuf } },
         ],
     });
 }
@@ -783,6 +790,7 @@ function rebuildSimBG() {
             { binding: 3, resource: { buffer: contamUB } },
             { binding: 4, resource: avoidMapView },
             { binding: 5, resource: shadowDensityRes },
+            { binding: 6, resource: { buffer: spectatorSlotsBuf } },
         ],
     });
 }
@@ -950,6 +958,38 @@ restartHeartbeat();
 
 await applyFormulas(startDir, startWind, { reseed: true });
 
+// ── Spectator partitioning ────────────────────────────────────────────────────
+// Each connected spectator gets a color and a contiguous partition of agents
+// (index % spectatorCount). Their touch position is uploaded each frame so the
+// GPU can teleport a fraction of their agents to the touch point.
+const MAX_SPECTATOR_SLOTS = 16;
+const SPECTATOR_PALETTE = [
+    '#e63333','#ff8800','#ffe600','#44dd22',
+    '#00ddaa','#0088ff','#8833ff','#ff33bb',
+    '#ff7766','#ffbb44','#88ff44','#33eeff',
+    '#4466ff','#bb55ff','#ff6699','#ffff55',
+];
+const activeSlots = []; // { spectatorId, colorR, colorG, colorB, touchX, touchY, isTouching }
+
+function uploadSpectatorSlots() {
+    const ab = new ArrayBuffer(512);
+    const f  = new Float32Array(ab);
+    const u  = new Uint32Array(ab);
+    for (let i = 0; i < activeSlots.length; i++) {
+        const b = i * 8;
+        const s = activeSlots[i];
+        f[b + 0] = s.colorR;
+        f[b + 1] = s.colorG;
+        f[b + 2] = s.colorB;
+        u[b + 3] = 1;
+        f[b + 4] = s.touchX;
+        f[b + 5] = s.touchY;
+        u[b + 6] = s.isTouching;
+        f[b + 7] = 0;
+    }
+    device.queue.writeBuffer(spectatorSlotsBuf, 0, ab);
+}
+
 // ── Session: Socket.IO connection + QR code ───────────────────────────────────
 // The server assigns a session UUID on socket connect and emits it back as
 // 'session-id'. The sim renders a QR code pointing to $VITE_USER_URL/?s=<id> as both
@@ -1024,11 +1064,27 @@ let socket;
         dbgCoherence.updateDisplay();
     });
 
-    // A spectator joined — fire a brief brightness burst into the field.
-    // Count and QR threshold logic is handled by n8n via the /spectator webhook.
-    socket.on('spectator-joined', () => {
+    // A spectator joined — assign a slot, send them their color, brightness burst.
+    socket.on('spectator-joined', ({ spectatorId } = {}) => {
         lastRemoteActivity = Date.now();
         burstBrightness    = BURST_BRIGHTNESS;
+        if (spectatorId && activeSlots.length < MAX_SPECTATOR_SLOTS) {
+            const hex     = SPECTATOR_PALETTE[activeSlots.length % SPECTATOR_PALETTE.length];
+            const [r, g, b] = hexToF(hex);
+            activeSlots.push({ spectatorId, colorR: r, colorG: g, colorB: b, touchX: 0.5, touchY: 0.5, isTouching: 0 });
+            uploadSpectatorSlots();
+            socket.emit('push-to-spectator', { spectatorId, data: { color: hex } });
+        }
+    });
+
+    socket.on('spectator-left', ({ spectatorId } = {}) => {
+        if (spectatorId) {
+            const idx = activeSlots.findIndex(s => s.spectatorId === spectatorId);
+            if (idx !== -1) {
+                activeSlots.splice(idx, 1);
+                uploadSpectatorSlots();
+            }
+        }
     });
 
     // ── Remote event registry ─────────────────────────────────────────────────
@@ -1043,6 +1099,19 @@ let socket;
 
     socket.on('remote-event', (event) => {
         lastRemoteActivity = Date.now();
+        if (event.type === 'touch') {
+            const slot = activeSlots.find(s => s.spectatorId === event.spectatorId);
+            if (slot) {
+                if (event.data?.touching === false) {
+                    slot.isTouching = 0;
+                } else {
+                    slot.touchX     = event.data?.x ?? slot.touchX;
+                    slot.touchY     = event.data?.y ?? slot.touchY;
+                    slot.isTouching = 1;
+                }
+                uploadSpectatorSlots();
+            }
+        }
         if (event.type === 'text' && event.data?.text && !N8N_BASE) {
             const input = document.querySelector('#trace-text-input');
             if (input) input.value = event.data.text;
@@ -1209,6 +1278,7 @@ fAvoid.add({ load: () => document.querySelector('#avoid-map-input').click() }, '
 fAvoid.add({ clear: clearAvoidMap }, 'clear').name('Clear map');
 
 const fSession = gui.addFolder('Session');
+fSession.add(params, 'spectatorSpawnChance', 0, 1, 0.01).name('spawn chance');
 fSession.add(params, 'qrFadeZone').name('QR fade zone');
 fSession.add(params, 'remoteTimeout',  0, 180,  5).name('idle restore QR (s)');
 fSession.add(params, 'maxSpectators',  1,  50,  1).name('QR hides at N users');
@@ -1459,11 +1529,13 @@ function writeSoloUB(dt, time) {
     f[30] = params.probeSensorAngle;
     f[31] = params.homingChance;
     f[32] = params.homingInfluence;
+    u[33] = activeSlots.length;
+    f[34] = params.spectatorSpawnChance;
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
 function writeRenderUB() {
-    const ab   = new ArrayBuffer(96);
+    const ab   = new ArrayBuffer(112);
     const u    = new Uint32Array(ab);
     const f    = new Float32Array(ab);
     const rgb  = hexToF(params.color);
@@ -1503,6 +1575,7 @@ function writeRenderUB() {
     u[21] = params.qrFadeZone ? 1 : 0;
     f[22] = params.homingProximityRange;
     f[23] = params.homingMinAlpha;
+    u[24] = activeSlots.length;
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 
