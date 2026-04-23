@@ -104,7 +104,7 @@ Node.js server  (:3000)
 ### Session lifecycle
 
 1. Simulation connects via Socket.IO and emits `'register-host'`
-2. Server generates a UUID, puts the socket in room `<uuid>`, emits `'session-id'` back
+2. Server generates a UUID, puts the socket in room `<uuid>` **and** the `:hosts` sub-room, emits `'session-id'` back
 3. Simulation builds the remote URL (`/remote/?s=<uuid>`) and displays a QR code:
    - **Small scannable overlay** in the bottom-left UI panel (click to open)
    - **Large trace image** in the canvas centre — the particle field writes the QR pattern after the intro delay
@@ -118,6 +118,10 @@ Node.js server  (:3000)
     - `spectator-left` arrives with `userCount === 0`
     - Internal `simSpectatorCount` counter drops to 0 (fallback if server event is missed)
     - No remote events received for `remoteTimeout` seconds (Session → idle restore QR)
+
+### Multi-host sessions
+
+If two browser windows open with the **same session UUID** (set manually in the URL as `?s=<uuid>`), both register as hosts for that room. The server tracks all host sockets in a `Set` and uses a `${sessionId}:hosts` Socket.IO room for all host-directed emits — both windows receive every event (spectator joins, collective state, n8n responses) identically. This is intended for multi-display installations where the same simulation runs on several screens simultaneously.
 
 ### Collective state aggregation
 
@@ -141,23 +145,29 @@ All computation runs on the GPU. No Three.js. No WebGL.
 
 | Pass | Shader | Type | Description |
 |------|--------|------|-------------|
-| **Compute** | `compute.wgsl` | Compute | Agent physics (SoloParams 112 bytes): formula steering, wind force + collective tilt bias, image-trace avoidance (gradient + lookahead), contamination circle avoidance, avoidance map (binding 4), edge bounce/wrap |
+| **Compute** | `compute.wgsl` | Compute | Agent physics (soloUB 144 bytes): formula steering, wind force + collective tilt bias, image-trace avoidance (gradient + lookahead), contamination circle avoidance, avoidance map (binding 4), edge bounce/wrap |
+| **Agent shadow density** | `agentShadow.wgsl` | Render | Greyscale splat texture — one soft disk per homing agent; used as a density probe by the compute shader |
+| **Agent shadow visual** | `agentShadow.wgsl` | Render | Dark soft splats blended onto the offscreen accumulation texture to create depth under homing agents |
 | **Fade** | `fade.wgsl` | Render | Black fullscreen quad with alpha blend — exponential trail decay each frame |
-| **Particles** | `render.wgsl` | Render | Per-agent quads drawn into offscreen texture; attenuated additive blend; speed-color tinted by collective temperature |
-| **Blit** | `blit.wgsl` | Render | Copy offscreen texture → canvas swap-chain; applies `bgBlackCutoff` to clamp near-zero trail residual to pure black |
+| **Particles** | `render.wgsl` | Render | Per-agent quads drawn into `rgba16float` offscreen texture; additive **or** max blend selectable; speed-color tinted by collective temperature |
+| **Blit** | `blit.wgsl` | Render | Tone-map offscreen → canvas swap-chain (blitUB 32 bytes): `bgBlackCutoff` clamp, tone-black/white/gamma curve, shadow boost |
 | **Wind vis** *(debug)* | `wind-vis.wgsl` | Render | Arrow grid overlay — `evalWindFormula` prepended at pipeline build time, same pattern as `compute.wgsl` |
 | **Image debug** *(debug)* | `image-debug.wgsl` | Render | Grayscale overlay of the loaded image at its current size and position |
 
-Agents are stored as `array<Agent>` (pos.xy, vel.xy, home.xy, weight, _pad — 32 bytes each)
+Agents are stored as `array<Agent>` (pos.xy, vel.xy, home.xy, weight, primed — 32 bytes each)
 in a persistent GPU storage buffer. The buffer is always allocated at
 `MAX_AGENTS × 32` bytes; `params.agentCount` drives actual dispatch and draw counts
 without reallocation.
 
-The compute uniform buffer (`SoloParams`, 112 bytes) carries physics params plus:
+The offscreen accumulation texture is `rgba16float`, allowing HDR values beyond [0,1] without clipping. The blit pass tone-maps the result to the display range.
+
+The compute uniform buffer (`soloUB`, 144 bytes) carries physics params plus:
 - `windBiasX` / `windBiasY` — smoothed collective tilt vector, added directly to formula wind
 - `avoidForceStr` — multiplier applied to all image-trace avoidance force vectors
 
-The render uniform buffer (`SoloRenderParams`, 80 bytes) carries visual params only.
+The render uniform buffer (`renderUB`, 112 bytes allocated, 104 bytes used — 26 fields) carries visual params, including `additiveBlend` (field 25) which selects between additive and max-blend render pipelines.
+
+The blit uniform buffer (`blitUB`, 32 bytes) carries 5 × f32: `cutoff`, `toneBlack`, `toneWhite`, `toneGamma`, `shadowBoost`.
 
 The coherence multiplier is applied to `turnRate` in JavaScript before writing the compute buffer, so no shader change is needed for coherence.
 
@@ -361,6 +371,11 @@ The GUI has five folders. See [PARAMETERS.md](PARAMETERS.md) for a full descript
 | base color | Colour of slow/stationary agents |
 | fast color | Colour approached at max speed |
 | brightness | Per-particle alpha; controls additive accumulation — prevents saturation to white |
+| additive blend | On = additive glow (can blow out); Off = max blend (no over-brightness) |
+| tone black | Input level mapped to black in the blit tone curve |
+| tone white | Input level mapped to white — compress HDR above 1.0 |
+| tone gamma | Power curve: < 1 boosts darks, > 1 crushes darks |
+| shadow boost | Inverse-brightness lift peaking at ~12% luminance; makes faint trails pop |
 
 ### Trace
 
@@ -390,8 +405,16 @@ An invisible grayscale mask that repels free agents. White areas push agents awa
 | Control | Description |
 |---------|-------------|
 | scale | Coverage as a fraction of the canvas (1.0 = full canvas); the map is always centered |
+| QR margin | Extra padding around QR avoid zone, as fraction of `min(canvasW, canvasH)`; default 0.01 |
+| QR fade | Blur radius of QR avoid zone edge, as fraction of `min(canvasW, canvasH)`; default 0.01 |
 | Load map… | File picker — any browser-supported image (grayscale PNG recommended) |
 | Clear map | Remove the active avoidance map |
+
+### Content (inside Trace folder)
+
+| Control | Description |
+|---------|-------------|
+| QR overlay | When on (default), QR is shown on a separate 2D canvas; agents are freed from the QR area and a repulsion zone is built automatically |
 
 ### Session
 
@@ -619,15 +642,20 @@ thesis-sim/
 ├── src/
 │   ├── sim.js               Main entry point: GPU setup, frame loop, GUI, formula system,
 │   │                        Socket.IO host, collective-state handler, QR screensaver,
-│   │                        join burst, contamination tracking, auto-clear timer
+│   │                        QR overlay canvas, join burst, contamination tracking,
+│   │                        avoid map, auto-clear timer
 │   └── shaders/
-│       ├── compute.wgsl     Agent physics (SoloParams 96 bytes): formula steering,
+│       ├── compute.wgsl     Agent physics (soloUB 144 bytes): formula steering,
 │       │                    wind + collective tilt bias, image-trace avoidance (gradient
-│       │                    + lookahead), contamination circle avoidance
-│       ├── render.wgsl      Per-agent quad rendering (SoloRenderParams 80 bytes):
-│       │                    speed→colour blend; image-coloured homing agents
+│       │                    + lookahead), avoidance map, contamination circle avoidance
+│       ├── render.wgsl      Per-agent quad rendering (renderUB 112 bytes, 26 fields):
+│       │                    additive or max blend; speed→colour blend; image-coloured
+│       │                    homing agents; proximity fade
+│       ├── agentShadow.wgsl Homing-agent shadow pass: soft dark splat per agent
+│       │                    (visual pass) + density probe texture (density pass)
 │       ├── fade.wgsl        Trail decay — black fullscreen quad with alpha blend
-│       ├── blit.wgsl        Offscreen→canvas copy with black-cutoff clamp
+│       ├── blit.wgsl        Offscreen→canvas tone mapping (blitUB 32 bytes):
+│       │                    cutoff clamp, tone curve, shadow boost
 │       ├── wind-vis.wgsl    Wind arrow debug overlay (evalWindFormula prepended at runtime)
 │       └── image-debug.wgsl Grayscale image region debug overlay
 │

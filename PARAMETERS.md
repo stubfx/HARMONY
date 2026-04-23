@@ -170,6 +170,34 @@ The alpha of each rendered particle quad. Because particle blending is additive 
 
 > **Homing agents are unaffected by this slider.** Agents whose home pixel is primed always render at the full alpha of the image pixel they're assigned to (multiplied only by the edge vignette). This ensures the collective image they form reads at full intended intensity regardless of how dim free agents are set.
 
+### additive blend (`additiveBlend`)
+**Default:** on
+
+Selects the particle blend equation:
+
+- **On (additive):** `dst + src` — particles accumulate, bright spots can blow out to white in dense areas. Creates a glowing, luminous look.
+- **Off (max blend):** `max(dst, src)` — each pixel takes the brighter of the incoming and existing value. Dense clusters never blow out; brightness saturates at the image's peak value. WebGPU max blend ignores alpha by specification; the shader pre-multiplies RGB × alpha before output to keep proximity fade working for homing agents.
+
+### tone black (`toneBlack`)
+**Range:** 0 – 0.5 | **Default:** 0.0
+
+Input level mapped to black in the final blit tone-mapping curve. Raising this lifts the visibility of lone particles that would otherwise sit near the `bgBlackCutoff` clamp. Values above ~0.1 visibly brighten the background noise floor.
+
+### tone white (`toneWhite`)
+**Range:** 0.1 – 4.0 | **Default:** 1.0
+
+Input level mapped to white in the final blit tone-mapping curve. Values above 1.0 allow HDR accumulation to be compressed into the display range without hard clipping — useful with additive blend when dense clusters exceed 1.0 in the `rgba16float` offscreen buffer. Values below 1.0 boost overall brightness.
+
+### tone gamma (`toneGamma`)
+**Range:** 0.2 – 2.0 | **Default:** 1.0
+
+Power curve applied after the tone-black/white remap. Values below 1.0 boost dark areas (mid-tone lift, more visible sparse agents). Values above 1.0 crush darks (stronger contrast, trails appear crisper). At exactly 1.0 the curve is linear.
+
+### shadow boost (`shadowBoost`)
+**Range:** 0 – 8.0 | **Default:** 0.0
+
+Inverse-brightness boost applied during the blit pass: `mapped × (1 − mapped)^6 × shadowBoost`. This function peaks near 12% luminance and is negligible above ~60%, so it preferentially brightens the dark edge of trails and mid-tone halos without affecting bright particle cores. Useful for making faint trail structure visible without raising overall brightness.
+
 ---
 
 ## Trace
@@ -376,6 +404,20 @@ The force magnitude uses the same `avoid force` multiplier as image-trace avoida
 
 The map is always centered on the canvas. This value controls what fraction of the canvas it covers. At 1.0 the map spans the full canvas. At 0.5 it occupies the central half.
 
+### QR margin (`qrAvoidMargin`)
+**Range:** 0 – 0.3 | **Default:** 0.01
+
+Extra padding added around the QR bounding rectangle when the QR avoid zone is built. Given as a fraction of `min(canvasWidth, canvasHeight)`. At 0.01 (default) the repulsion field extends ~1% of the shorter canvas dimension beyond each edge of the QR, providing a small buffer so agents don't graze the finder-pattern corners. Increase for a wider cleared zone; at large values (0.1+) the cleared area becomes noticeably larger than the QR itself.
+
+Only active when `QR overlay` is on and the QR is currently shown.
+
+### QR fade (`qrAvoidFade`)
+**Range:** 0 – 0.15 | **Default:** 0.01
+
+Blur radius applied to the QR avoid zone canvas before it is uploaded as the repulsion texture, given as a fraction of `min(canvasWidth, canvasHeight)`. The blur merges the per-module white halos into a continuous repulsion field and softens the zone boundary. At 0 each individual QR module is a discrete repulsion pixel; at larger values the entire QR rectangle becomes a smooth, solid obstacle with soft edges.
+
+Only active when `QR overlay` is on and the QR is currently shown.
+
 ### Delivering via n8n
 
 The `applySimParams` response accepts an `avoidMap` key:
@@ -388,6 +430,8 @@ Supported formats:
 - **Base64 data URL** (`data:image/...;base64,...`) — self-contained in the JSON
 - **HTTPS URL** (`https://...`) — sim fetches the image directly
 - **`null`** — clears the active avoidance map
+
+> **QR overlay interaction:** when `QR overlay` is on and the QR is showing, `updateQROverlay()` owns the avoidance map. Any external `clearAvoidMap()` or `loadAvoidMap()` call will trigger a re-apply so the QR avoid zone always wins on top. To load an external avoid map while the QR is showing, first turn `QR overlay` off.
 
 ---
 
@@ -608,6 +652,20 @@ A 512×512 QR code generated with **white modules on a transparent background**:
 
 The bitmap is stored internally as `qrBitmap` but **not loaded into the trace layer** until the intro delay has elapsed. This prevents the QR from interfering with the startup spread. Once the intro ends, the bitmap is assigned to `imageBitmap`, `isQRBitmap` is set, and the trace canvas is rendered — at that point QR mode activates.
 
+### QR overlay mode (`qrOverlay`)
+**Default:** on
+
+When on (default), the QR is displayed on a **separate 2D canvas overlay** (`position:fixed; inset:0; z-index:10`) rather than being baked into the trace texture. This has two key benefits:
+
+1. **Agents are freed from the QR area.** Because the QR is not in the trace texture, no agents home to QR pixels. The whole canvas is available to the simulation; agents fill the space naturally.
+2. **The QR is sharp and always scannable.** The overlay canvas is drawn at full device resolution with `image-rendering: pixelated`, independent of the simulation render scale.
+
+The overlay fades in and out with a 0.6 s CSS `opacity` transition. When the QR is hidden, the overlay is transparent and the simulation runs unaffected.
+
+An avoidance zone is automatically built from `qrBitmap` and uploaded as the repulsion texture whenever the overlay is visible, so agents naturally clear the area where the QR code appears. The zone is destroyed when the QR hides. See **QR margin** and **QR fade** in the Avoidance map section above.
+
+When `QR overlay` is **off**, the original behaviour is restored: the QR is baked into the trace texture and agents home to the white modules, forming the QR pattern collectively.
+
 ### QR mode
 
 QR mode is a rendering state, not a physics state. It is active only while the QR is the current trace image (`isQRBitmap = true`). It does not reseed agents and does not change any movement logic — agents continue exactly where they are.
@@ -625,6 +683,8 @@ QR mode is a rendering state, not a physics state. It is active only while the Q
 5. **Formula rotation continues** — the 30-second auto-cycle keeps firing during QR mode; a new random formula is also chosen when QR mode first activates. This keeps the swarm in motion rather than locking into a fixed attractor.
 
 ### Stuck pixels in the QR area
+
+*(Only relevant when `QR overlay` is off — in overlay mode agents are not homing to the QR.)*
 
 A visible side-effect: some particles appear to become stuck inside the transparent gaps of the QR pattern. These are **free agents trapped by the avoidance gradient**, not homing agents. The mechanism:
 
@@ -646,6 +706,8 @@ If `VITE_N8N_BASE_URL` is set, the simulation calls n8n directly (browser HTTPS 
 Each new spectator connection fires a `spectator-joined` event to the host, producing a brief visible gust in the particle field. See *Remote / Swarm Inputs — Join burst* above.
 
 The session UUID is stable for the lifetime of the page. A socket disconnect/reconnect generates a new UUID and a new QR.
+
+If two browser windows open with the same UUID (set manually via `?s=<uuid>`), both are registered as hosts for that room. All host-directed events are broadcast to both. This is intended for multi-display installations.
 
 ---
 
