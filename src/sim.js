@@ -82,8 +82,8 @@ const params = {
     avoidForceStr:   1.0, // multiplier on image-trace avoidance forces
     avoidMapScale:   1.0, // avoidance map coverage as fraction of canvas (1.0 = full)
     qrOverlay:       true,  // true = QR on a 2D overlay canvas; agents freed from QR area
-    qrAvoidMargin:   0.05,  // extra padding around QR in the avoid zone, as fraction of minDim
-    qrAvoidFade:     0.03,  // blur radius of the avoid zone edge, as fraction of minDim
+    qrAvoidMargin:   0.01,  // extra padding around QR in the avoid zone, as fraction of minDim
+    qrAvoidFade:     0.01,  // blur radius of the avoid zone edge, as fraction of minDim
     // Primed-spot probe (free agents only)
     probeLen:          50.0, // probe cast distance in canvas pixels
     probeForceStr:     150.0, // steering force multiplier when probe hits a primed pixel
