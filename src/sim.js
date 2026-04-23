@@ -1097,11 +1097,10 @@ let socket;
         lastRemoteActivity = Date.now();
         burstBrightness    = BURST_BRIGHTNESS;
         if (spectatorId && activeSlots.length < MAX_SPECTATOR_SLOTS) {
-            const hex     = SPECTATOR_PALETTE[activeSlots.length % SPECTATOR_PALETTE.length];
-            const [r, g, b] = hexToF(hex);
-            activeSlots.push({ spectatorId, colorR: r, colorG: g, colorB: b, touchX: 0.5, touchY: 0.5, isTouching: 0, windX: 0, windY: 0 });
+            // Start with a neutral white — the phone sends a 'color-pick' immediately
+            // after joining with its locally generated palette color, which overwrites this.
+            activeSlots.push({ spectatorId, colorR: 1, colorG: 1, colorB: 1, touchX: 0.5, touchY: 0.5, isTouching: 0, windX: 0, windY: 0 });
             uploadSpectatorSlots();
-            socket.emit('push-to-spectator', { spectatorId, data: { color: hex } });
         }
     });
 
@@ -1119,10 +1118,11 @@ let socket;
     // Single source of truth for all event types emitted by spectator devices.
     // sendToN8n: whether this event type is forwarded to n8n via callN8n().
     const REMOTE_EVENTS = {
-        touch:    { sendToN8n: false },
-        tilt:     { sendToN8n: false },
-        rotation: { sendToN8n: false },
-        text:     { sendToN8n: true  },
+        touch:      { sendToN8n: false },
+        tilt:       { sendToN8n: false },
+        'color-pick': { sendToN8n: false },
+        rotation:   { sendToN8n: false },
+        text:       { sendToN8n: true  },
     };
 
     socket.on('remote-event', (event) => {
@@ -1149,6 +1149,14 @@ let socket;
                 // Tilt maps to ±1 at ±90° from portrait, then scaled by windStr in shader.
                 slot.windX = Math.max(-1, Math.min(1, (roll  - 0.5 ) * 2));
                 slot.windY = Math.max(-1, Math.min(1, (pitch - 0.75) * 4));
+                uploadSpectatorSlots();
+            }
+        }
+        if (event.type === 'color-pick') {
+            const slot = activeSlots.find(s => s.spectatorId === event.spectatorId);
+            if (slot && typeof event.data?.color === 'string') {
+                const [r, g, b] = hexToF(event.data.color);
+                slot.colorR = r; slot.colorG = g; slot.colorB = b;
                 uploadSpectatorSlots();
             }
         }

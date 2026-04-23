@@ -67,6 +67,8 @@ socket.on('connect', () => {
 
 socket.on('joined', ({ userCount } = {}) => {
     console.log('[remote] joined room:', room, '| peers already here:', Math.max(0, (userCount ?? 1) - 1));
+    // Push the locally chosen palette color to the sim so the GPU slot matches the aura.
+    sendEvent('color-pick', { color: palette[selectedSwatchIdx].hex });
 });
 
 socket.on('connect_error', () => {
@@ -79,16 +81,69 @@ socket.on('disconnect', () => {
     connDotEl?.classList.remove('connected');
 });
 
+// ── Color palette ─────────────────────────────────────────────────────────────
+// 10 vivid colors at 50 % lightness, evenly spaced hues, random rotation.
+// Selected on page load; user can swap via swatches. n8n can still push an
+// arbitrary aura override via device-message (existing behaviour unchanged).
+function hslToHex(h, s, l) {
+    s /= 100; l /= 100;
+    const a = s * Math.min(l, 1 - l);
+    const f = n => {
+        const k = (n + h / 30) % 12;
+        const c = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+        return Math.round(255 * c).toString(16).padStart(2, '0');
+    };
+    return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+const PALETTE_SIZE = 10;
+const _hueStep   = 360 / PALETTE_SIZE;
+const _hueOffset = Math.random() * _hueStep;
+const palette = Array.from({ length: PALETTE_SIZE }, (_, i) => {
+    const h = (_hueOffset + i * _hueStep) % 360 | 0;
+    const s = 78 + (Math.random() * 12 | 0); // 78–90 % saturation
+    return { css: `hsl(${h},${s}%,50%)`, hex: hslToHex(h, s, 50) };
+});
+
+let selectedSwatchIdx = Math.random() * PALETTE_SIZE | 0;
+
+function pickColor(idx, send = true) {
+    selectedSwatchIdx = idx;
+    pushedColor = palette[idx].css;
+    updateAura();
+    document.querySelectorAll('.color-swatch').forEach((el, i) =>
+        el.classList.toggle('selected', i === idx));
+    if (send) sendEvent('color-pick', { color: palette[idx].hex });
+}
+
+function renderSwatches() {
+    const picker = document.querySelector('#color-picker');
+    if (!picker) return;
+    palette.forEach((c, i) => {
+        const el = document.createElement('button');
+        el.className = 'color-swatch' + (i === selectedSwatchIdx ? ' selected' : '');
+        el.style.background = c.css;
+        el.addEventListener('touchstart', e => { e.stopPropagation(); pickColor(i); }, { passive: true });
+        picker.appendChild(el);
+    });
+}
+renderSwatches();
+
+// Initialise aura with the pre-selected palette color before any socket events.
+let pushedColor = palette[selectedSwatchIdx].css;
+
 // ── Device message (push from n8n) ────────────────────────────────────────────
 // data.text  — notification text shown at the top, auto-dismissed after 5 s
 // data.color — CSS color string for the aura base; persists until overridden.
 //              Send null or empty string to reset to temperature-driven color.
+//              Overrides the user's chosen swatch (swatch ring is cleared).
 let deviceMsgTimer = null;
-let pushedColor    = null;
 
 socket.on('device-message', (data) => {
     if ('color' in (data ?? {})) {
         pushedColor = data.color || null;
+        // n8n override — clear swatch selection since the color may not match any swatch
+        document.querySelectorAll('.color-swatch').forEach(el => el.classList.remove('selected'));
         updateAura();
     }
 
