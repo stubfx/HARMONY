@@ -93,6 +93,14 @@ struct VsOut {
     @location(5)       proximityT: f32,  // 0 = far from home, 1 = at home
 }
 
+fn hash(n: u32) -> f32 {
+    var x = n;
+    x = x ^ (x >> 16u);
+    x = x * 0x45d9f3bu;
+    x = x ^ (x >> 16u);
+    return f32(x) * (1.0 / 4294967296.0);
+}
+
 @vertex fn vs(@builtin(vertex_index) vi: u32) -> VsOut {
     let agentId = vi / 6u;
     let corner  = vi % 6u;
@@ -112,14 +120,21 @@ struct VsOut {
 
     let speed = length(agent.vel);
     let t     = clamp(speed / max(params.maxSpeed, 0.001), 0.0, 1.0);
-    var baseColor = vec3f(params.colorR, params.colorG, params.colorB);
+    let baseColor = vec3f(params.colorR, params.colorG, params.colorB);
+    var color: vec3f;
     if (params.spectatorCount > 0u) {
         let slot = spectatorSlots[agentId % params.spectatorCount];
         if (slot.isActive != 0u) {
-            baseColor = vec3f(slot.colorR, slot.colorG, slot.colorB);
+            // Assigned agents: fixed hue from the user's chosen color, no speed blend.
+            // Each agent gets a random brightness multiplier in [0.7, 1.3].
+            let rnd = hash(agentId) * 0.6 + 0.7;
+            color = clamp(vec3f(slot.colorR, slot.colorG, slot.colorB) * rnd, vec3f(0.0), vec3f(1.0));
+        } else {
+            color = mix(baseColor, vec3f(params.speedColorR, params.speedColorG, params.speedColorB), t);
         }
+    } else {
+        color = mix(baseColor, vec3f(params.speedColorR, params.speedColorG, params.speedColorB), t);
     }
-    let color = mix(baseColor, vec3f(params.speedColorR, params.speedColorG, params.speedColorB), t);
     let homeUV = vec2<f32>(
         (agent.home.x - params.imgX0) / (params.imgX1 - params.imgX0),
         (agent.home.y - params.imgY0) / (params.imgY1 - params.imgY0),
