@@ -443,27 +443,28 @@ Re-seeds all agents: positions are randomised from screen centre, home coordinat
 
 ## Remote / Swarm Inputs
 
-Spectators open `/remote/?s=<uuid>` on their phones. The page is a dark, minimal gesture surface — no labels, no buttons at rest. Three channels feed the simulation collectively through the server's aggregation layer. No single person controls the outcome; the simulation responds to the *average* of all inputs.
+Spectators open `/remote/?s=<uuid>` on their phones. The page is a dark, minimal gesture surface — no labels, no buttons at rest. Three channels feed the simulation. Temperature and coherence are aggregated collectively; tilt is personal.
 
-The server maintains a per-room state table (one entry per connected spectator, pruned after 15 s of inactivity). Every 300 ms it computes averages and emits `collective-state` to the host simulation, where all values are smoothed with an exponential moving average (~0.8 s time constant) before being applied.
+The server maintains a per-room state table (one entry per connected spectator, pruned after 15 s of inactivity). Every 300 ms it computes averages and emits `collective-state` to the host simulation for temperature and coherence, where values are smoothed with an exponential moving average (~0.8 s time constant) before being applied.
 
 ---
 
-### Tilt — collective wind bias
+### Tilt — personal wind
 
-**Phone gesture:** hold the phone and tilt it in any direction.
-**Data sent:** `pitch` (0–1, from vertical axis) and `roll` (0–1, from lateral axis), 0.5 = neutral/flat.
-**Aggregation:** server averages all active spectators' pitch and roll.
-**Effect:** the averaged tilt vector is converted to a wind bias — a constant velocity contribution added directly to the formula wind each frame:
+**Phone gesture:** hold the phone upright in portrait orientation (neutral) and tilt in any direction.
+**Data sent:** `pitch` (0–1, from vertical axis) and `roll` (0–1, from lateral axis). Portrait upright = `pitch ≈ 0.75`, `roll ≈ 0.5` (hardware calibration — these map to zero force).
+**Routing:** forwarded directly to the sim as `remote-event` (not aggregated server-side).
+**Effect:** tilt controls the wind **only for the spectator's own assigned agents**. Formula wind and global wind are replaced for that slice:
 
 ```
-windBiasX = (avgRoll  − 0.5) × 2 × windStr
-windBiasY = (avgPitch − 0.5) × 2 × windStr
+windX = clamp((roll  − 0.5)  × 2, −1, 1)   // ±1 at ±90° roll  from portrait
+windY = clamp((pitch − 0.75) × 4, −1, 1)   // ±1 at ±90° pitch from portrait
+wind  = vec2(windX, windY) × windStr
 ```
 
-When everyone tilts the same way, the field bends coherently in that direction. When tilts cancel out, the bias is zero and only the formula wind remains. The bias scales with the current `windStr` GUI value so it always feels proportional to the existing wind.
+Portrait = zero wind for that spectator's particles. The effect scales with the current `windStr` GUI value. Other spectators' agents and free (unassigned) agents are unaffected.
 
-This value is written to the GPU as `windBiasX` / `windBiasY` in the `SoloParams` uniform buffer (bytes [80] and [84]).
+This value is stored per-slot in `SpectatorSlot.windX` / `.windY` in the GPU storage buffer (bytes [32] and [36] within each 48-byte slot).
 
 ---
 
@@ -511,13 +512,58 @@ The transition is smooth. A crowd touching left and right simultaneously average
 
 ### Individual identity — personal swarm
 
-When a spectator joins, the simulation assigns them a color from a fixed 16-color palette and a **partition** of the agent pool. The partition is determined by `agentIndex % spectatorCount` — with 2 spectators, every even-indexed agent belongs to spectator 0 and every odd to spectator 1. The agents in each partition render in that spectator's assigned color (blending toward the global `fast color` at high speed, exactly as the base color normally would).
+#### The slot system
 
-The assigned color is immediately pushed to the spectator's phone via `device-message`, where it overrides the aura base color — giving the person a private visual confirmation of which "slice" of the swarm is theirs.
+When a spectator joins, the server emits `spectator-joined` with their persistent UUID. The simulation creates an entry in `activeSlots[]` — a JavaScript array, one object per connected spectator (max 16). Each entry holds all per-spectator state: color, touch position, touch state, and tilt-derived wind vector.
 
-**Touch-spawn**: while a spectator holds their finger on the phone screen, a fraction of their assigned agents teleport to the corresponding canvas position each frame. The phone screen maps directly to the canvas: a finger at 30% across / 70% down on the phone places agents at 30% × canvasW, 70% × canvasH. The rate is controlled by `spectatorSpawnChance` (default 1%). Lifting the finger stops spawning immediately.
+```js
+{
+  spectatorId: "uuid",
+  colorR, colorG, colorB,   // assigned palette color
+  touchX, touchY,            // last touch position (0–1 each axis)
+  isTouching,                // 1 while finger is down
+  windX, windY               // tilt bias (0,0 = portrait neutral)
+}
+```
 
-**Partition note:** agents are distributed by index, not by canvas position — the partition is spatially interleaved across the full canvas, not grouped into a region. Each spectator's color is visible everywhere.
+Every time any field changes (join, leave, touch, tilt), `uploadSpectatorSlots()` serializes the entire array into a flat 768-byte `ArrayBuffer` and writes it to `spectatorSlotsBuf` — a GPU storage buffer bound at `@binding(6)` in the compute shader and `@binding(4)` in the render shader. The GPU always sees the full current state.
+
+The buffer holds 16 fixed slots of 48 bytes each:
+
+```
+slot 0: bytes   0–47   (first spectator)
+slot 1: bytes  48–95   (second spectator)
+…
+slot 15: bytes 720–767
+```
+
+#### Agent partitioning
+
+Each agent's slot assignment is computed on the GPU at every frame with a single modulo:
+
+```wgsl
+let slot = spectatorSlots[agentIndex % spectatorCount]
+```
+
+With 2 spectators and 2 000 000 agents:
+- agent 0 → slot 0, agent 1 → slot 1, agent 2 → slot 0, agent 3 → slot 1 …
+
+Each spectator owns exactly `agentCount / spectatorCount` agents. The assignment is **interleaved by index, not by canvas position** — each spectator's agents are spread uniformly across the entire canvas, not grouped into a region. Every spectator's color is visible everywhere in the field at all times.
+
+When spectators join or leave, `spectatorCount` changes and the modulo re-partitions all agents instantly — no re-seeding required.
+
+#### What each shader does with the slot
+
+- **compute.wgsl** — reads `windX`/`windY` to override wind for that agent, and reads `touchX`/`touchY`/`isTouching` to probabilistically teleport the agent to the touch point. Homing agents (primed = 1) are exempt from teleport.
+- **render.wgsl** — reads `colorR`/`colorG`/`colorB` to replace the base color for that agent. The color blends toward the global `fast color` at high speed, exactly as the base color would.
+
+#### Per-spectator interactions
+
+**Color**: assigned from a fixed 16-color palette on join. Immediately pushed to the spectator's phone via `device-message`, overriding the aura color — a private visual confirmation of which slice is theirs.
+
+**Touch-spawn**: while a spectator holds their finger on the screen, a fraction of their assigned agents teleport to the corresponding canvas position each frame. The phone screen maps directly to the canvas: a finger at 30% across / 70% down places agents at 30% × canvasW, 70% × canvasH. Rate is controlled by `spectatorSpawnChance` (default 1%). Lifting the finger stops spawning immediately.
+
+**Tilt-wind**: when a spectator tilts their phone, the wind force for their assigned agents is overridden with a personal tilt-derived vector. Portrait upright = zero wind. Tilting in any direction pushes their slice of the field proportionally. Other spectators' agents and unassigned agents follow the normal wind formula unchanged.
 
 ---
 

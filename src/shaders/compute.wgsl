@@ -78,8 +78,8 @@ struct SoloParams {
     spectatorSpawnChance: f32,
 }
 
-// Per-spectator partition data — color, touch position, touch state.
-// 8 × f32/u32 = 32 bytes per slot; 16 slots = 512 bytes total.
+// Per-spectator partition data — color, touch position, touch state, personal wind.
+// 12 × f32/u32 = 48 bytes per slot; 16 slots = 768 bytes total.
 struct SpectatorSlot {
     colorR:     f32,
     colorG:     f32,
@@ -88,7 +88,11 @@ struct SpectatorSlot {
     touchX:     f32,
     touchY:     f32,
     isTouching: u32,
-    _p0:        f32,
+    _p0:        u32,
+    windX:      f32,   // tilt-derived wind X — portrait = 0, scaled to ±1 at ±90° roll
+    windY:      f32,   // tilt-derived wind Y — portrait = 0, scaled to ±1 at ±90° pitch
+    _p1:        u32,
+    _p2:        u32,
 }
 
 struct Agent {
@@ -221,9 +225,16 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let desired  = vec2<f32>(cos(dirAngle), sin(dirAngle));
 
     let windAngle = evalWindFormula(x, y, t, idx, cx, cy);
-    // Collective tilt bias added directly to formula wind — same velocity space.
-    let wind = vec2<f32>(cos(windAngle), sin(windAngle)) * params.windStr
+    var wind = vec2<f32>(cos(windAngle), sin(windAngle)) * params.windStr
              + vec2<f32>(params.windBiasX, params.windBiasY);
+    // Per-spectator tilt override: assigned agents use the spectator's personal wind.
+    // windX/Y are portrait-zeroed bias values (±1 at ±90° tilt) scaled by windStr.
+    if (params.spectatorCount > 0u) {
+        let tiltSlot = spectatorSlots[i % params.spectatorCount];
+        if (tiltSlot.isActive != 0u) {
+            wind = vec2<f32>(tiltSlot.windX, tiltSlot.windY) * params.windStr;
+        }
+    }
 
     // ── Trace layer: image-alpha-driven homing ─────────────────────────────────
     // homeInImg true  → agent drives toward its fixed home position (homing mode)

@@ -70,7 +70,11 @@ struct SpectatorSlot {
     touchX:     f32,
     touchY:     f32,
     isTouching: u32,
-    _p0:        f32,
+    _p0:        u32,
+    windX:      f32,
+    windY:      f32,
+    _p1:        u32,
+    _p2:        u32,
 }
 
 @group(0) @binding(0) var<uniform>       params:         SoloRenderParams;

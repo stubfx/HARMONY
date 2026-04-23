@@ -258,9 +258,9 @@ const imageDebugUB = device.createBuffer({
 const contamUB = device.createBuffer({
     size: 176, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
-// SpectatorSlots: 16 slots × 32 bytes (8 × f32/u32 per slot) = 512 bytes
+// SpectatorSlots: 16 slots × 48 bytes (12 × f32/u32 per slot) = 768 bytes
 const spectatorSlotsBuf = device.createBuffer({
-    size: 512, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    size: 768, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 
 function seedAgents() {
@@ -974,14 +974,14 @@ const SPECTATOR_PALETTE = [
     '#ff7766','#ffbb44','#88ff44','#33eeff',
     '#4466ff','#bb55ff','#ff6699','#ffff55',
 ];
-const activeSlots = []; // { spectatorId, colorR, colorG, colorB, touchX, touchY, isTouching }
+const activeSlots = []; // { spectatorId, colorR, colorG, colorB, touchX, touchY, isTouching, windX, windY }
 
 function uploadSpectatorSlots() {
-    const ab = new ArrayBuffer(512);
+    const ab = new ArrayBuffer(768);
     const f  = new Float32Array(ab);
     const u  = new Uint32Array(ab);
     for (let i = 0; i < activeSlots.length; i++) {
-        const b = i * 8;
+        const b = i * 12;
         const s = activeSlots[i];
         f[b + 0] = s.colorR;
         f[b + 1] = s.colorG;
@@ -990,7 +990,11 @@ function uploadSpectatorSlots() {
         f[b + 4] = s.touchX;
         f[b + 5] = s.touchY;
         u[b + 6] = s.isTouching;
-        f[b + 7] = 0;
+        u[b + 7] = 0;
+        f[b + 8] = s.windX;
+        f[b + 9] = s.windY;
+        u[b + 10] = 0;
+        u[b + 11] = 0;
     }
     device.queue.writeBuffer(spectatorSlotsBuf, 0, ab);
 }
@@ -1051,9 +1055,7 @@ let socket;
     // Tilt bias: avgPitch/avgRoll are 0-1 (0.5 = phone held flat/neutral).
     // Temperature: 0 = cold (top of phone screen), 1 = warm (bottom of phone screen).
     socket.on('collective-state', ({ avgPitch, avgRoll, avgTemp, avgCoherence, userCount }) => {
-        const biasStr = params.windStr;
-        collectiveBiasX     = (avgRoll  - 0.5) * 2 * biasStr;
-        collectiveBiasY     = (avgPitch - 0.5) * 2 * biasStr;
+        // Tilt is now per-spectator via remote-event; collective-state only drives temp/coherence.
         collectiveTemp      = avgTemp      ?? 0.5;
         collectiveCoherence = avgCoherence ?? 0.5;
         // Mirror to GUI debug panel (manual refresh — no .listen() RAF loop)
@@ -1067,6 +1069,9 @@ let socket;
         dbgRoll.updateDisplay();
         dbgTemp.updateDisplay();
         dbgCoherence.updateDisplay();
+        gizmoPitch = avgPitch ?? 0.75;
+        gizmoRoll  = avgRoll  ?? 0.5;
+        drawGizmo();
     });
 
     // A spectator joined — assign a slot, send them their color, brightness burst.
@@ -1076,7 +1081,7 @@ let socket;
         if (spectatorId && activeSlots.length < MAX_SPECTATOR_SLOTS) {
             const hex     = SPECTATOR_PALETTE[activeSlots.length % SPECTATOR_PALETTE.length];
             const [r, g, b] = hexToF(hex);
-            activeSlots.push({ spectatorId, colorR: r, colorG: g, colorB: b, touchX: 0.5, touchY: 0.5, isTouching: 0 });
+            activeSlots.push({ spectatorId, colorR: r, colorG: g, colorB: b, touchX: 0.5, touchY: 0.5, isTouching: 0, windX: 0, windY: 0 });
             uploadSpectatorSlots();
             socket.emit('push-to-spectator', { spectatorId, data: { color: hex } });
         }
@@ -1095,9 +1100,9 @@ let socket;
     // ── Remote event registry ─────────────────────────────────────────────────
     // Single source of truth for all event types emitted by spectator devices.
     // sendToN8n: whether this event type is forwarded to n8n via callN8n().
-    // Note: 'tilt' is consumed server-side for collective-state and never arrives here.
     const REMOTE_EVENTS = {
         touch:    { sendToN8n: false },
+        tilt:     { sendToN8n: false },
         rotation: { sendToN8n: false },
         text:     { sendToN8n: true  },
     };
@@ -1114,6 +1119,18 @@ let socket;
                     slot.touchY     = event.data?.y ?? slot.touchY;
                     slot.isTouching = 1;
                 }
+                uploadSpectatorSlots();
+            }
+        }
+        if (event.type === 'tilt') {
+            const slot = activeSlots.find(s => s.spectatorId === event.spectatorId);
+            if (slot) {
+                const roll  = event.data?.roll  ?? 0.5;
+                const pitch = event.data?.pitch ?? 0.75;
+                // Portrait upright = (roll≈0.5, pitch≈0.75) → windX/Y = 0.
+                // Tilt maps to ±1 at ±90° from portrait, then scaled by windStr in shader.
+                slot.windX = Math.max(-1, Math.min(1, (roll  - 0.5 ) * 2));
+                slot.windY = Math.max(-1, Math.min(1, (pitch - 0.75) * 4));
                 uploadSpectatorSlots();
             }
         }
@@ -1298,6 +1315,84 @@ const dbgPitch     = fDebug.add(swarmDebug, 'pitch',     0, 1).name('avg pitch')
 const dbgRoll      = fDebug.add(swarmDebug, 'roll',      0, 1).name('avg roll').disable();
 const dbgTemp      = fDebug.add(swarmDebug, 'temp',      0, 1).name('avg temp').disable();
 const dbgCoherence = fDebug.add(swarmDebug, 'coherence', 0, 1).name('avg coherence').disable();
+
+// ── Tilt gizmo (avg orientation of connected spectators) ──────────────────────
+let gizmoCtx   = null;
+let gizmoPitch = 0.75; // portrait upright default
+let gizmoRoll  = 0.5;
+
+function drawGizmo() {
+    if (!gizmoCtx) return;
+    const ctx = gizmoCtx;
+    const W = 80, H = 80, cx = 40, cy = 40, R = 26;
+
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#161616';
+    ctx.fillRect(0, 0, W, H);
+
+    // Rotation angles centered at portrait neutral (pitch=0.75, roll=0.5 → 0,0)
+    const ry = (gizmoRoll  - 0.5 ) * Math.PI;       // roll  → Ry rotation
+    const rx = (gizmoPitch - 0.75) * Math.PI * 2;   // pitch → Rx rotation
+
+    function rot([x, y, z]) {
+        const x1 =  x * Math.cos(ry) + z * Math.sin(ry);
+        const y1 = y;
+        const z1 = -x * Math.sin(ry) + z * Math.cos(ry);
+        return [
+            x1,
+             y1 * Math.cos(rx) - z1 * Math.sin(rx),
+             y1 * Math.sin(rx) + z1 * Math.cos(rx),
+        ];
+    }
+
+    const axes = [
+        { v: [1, 0, 0], col: '#ff4444', lbl: 'X' },
+        { v: [0, 1, 0], col: '#44cc44', lbl: 'Y' },
+        { v: [0, 0, 1], col: '#4488ff', lbl: 'Z' },
+    ].map(a => ({ ...a, r: rot(a.v) })).sort((a, b) => a.r[2] - b.r[2]);
+
+    ctx.fillStyle = '#555';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    for (const { r, col, lbl } of axes) {
+        const px = cx + r[0] * R;
+        const py = cy - r[1] * R;
+        const alpha = 0.3 + 0.7 * (r[2] + 1) / 2;
+
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(px, py);
+        ctx.stroke();
+
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.font = '9px monospace';
+        ctx.fillText(lbl, px + (r[0] >= 0 ? 5 : -11), py + (r[1] >= 0 ? -4 : 10));
+    }
+    ctx.globalAlpha = 1;
+}
+
+function initGizmo() {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;align-items:center;justify-content:center;padding:4px 0 6px';
+    const c = document.createElement('canvas');
+    c.width = 80; c.height = 80;
+    c.style.cssText = 'display:block;border-radius:3px';
+    gizmoCtx = c.getContext('2d');
+    wrap.appendChild(c);
+    fDebug.domElement.appendChild(wrap);
+    drawGizmo();
+}
+initGizmo();
+
 fDebug.close();
 
 gui.add({ restart: () => seedAgents() }, 'restart').name('↺  Restart');

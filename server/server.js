@@ -272,8 +272,6 @@ io.on('connection', (socket) => {
 
         updateUserState(room, socket.id, type, data);
 
-        if (type === 'tilt') return;
-
         const roomData    = rooms.get(room);
         const spectatorId = roomData?.connections.get(socket.id) ?? socket.id;
         io.to(room).emit('remote-event', { type, spectatorId, data, timestamp: Date.now() });

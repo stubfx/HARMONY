@@ -16,13 +16,15 @@ This is the sensation we are designing for: participation without authorship.
 
 ## How the body speaks to the swarm
 
-### Tilt — the collective wind
+### Tilt — your personal wind
 
-Hold the phone still and the swarm breathes on its own. Tilt it — forward, sideways, anywhere — and you are nudging the invisible air that moves through the field. You won't see your specific influence. What you will see, if enough people tilt together, is the field bending.
+Hold the phone still and the swarm breathes on its own. Tilt it — forward, sideways, anywhere — and the portion of the field that belongs to you bends with it.
 
-This is deliberate. The wind responds to the *average* of everyone's orientation. One person tilting hard changes almost nothing. Twenty people tilting the same way changes everything. The physics becomes social.
+This is deliberately personal. Tilt is not averaged with anyone else's. Your orientation steers only your assigned slice of the field — the particles that carry your color. The rest of the swarm is untouched. You cannot move the whole field. You can only move your part of it.
 
-The phone is a plumb line. The swarm is the weather. You are somewhere in between.
+Portrait is neutral. The moment you tip the phone, a current runs through your particles. Put it flat and they drift back into the shared current.
+
+The phone is a plumb line. Your fragment of the swarm is the weather. You are somewhere in between.
 
 ### Touch — warmth, cold, and your own swarm
 
