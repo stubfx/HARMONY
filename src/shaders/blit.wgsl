@@ -13,9 +13,9 @@ struct V { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> }
     let range  = max(p.toneWhite - p.toneBlack, 0.001);
     let mapped = pow(clamp((col.rgb - p.toneBlack) / range, vec3<f32>(0.0), vec3<f32>(1.0)), vec3<f32>(p.toneGamma));
     // Shadow boost: x*(1-x)^6 peaks near 12% luminance, ~zero above 60% — only dim particles lifted.
-    let boost  = p.shadowBoost * mapped * pow(vec3<f32>(1.0) - mapped, vec3<f32>(6.0));
-    let final  = clamp(mapped + boost, vec3<f32>(0.0), vec3<f32>(1.0));
-    let luma   = dot(final, vec3<f32>(0.299, 0.587, 0.114));
+    let boost   = p.shadowBoost * mapped * pow(vec3<f32>(1.0) - mapped, vec3<f32>(6.0));
+    let boosted = clamp(mapped + boost, vec3<f32>(0.0), vec3<f32>(1.0));
+    let luma    = dot(boosted, vec3<f32>(0.299, 0.587, 0.114));
     if (luma < p.cutoff) { return vec4<f32>(0.0, 0.0, 0.0, 1.0); }
-    return vec4<f32>(final, col.a);
+    return vec4<f32>(boosted, col.a);
 }
