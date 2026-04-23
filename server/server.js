@@ -85,7 +85,7 @@ const USER_TIMEOUT_MS = 15_000;
 function getOrCreateRoom(roomId) {
     if (!rooms.has(roomId)) {
         rooms.set(roomId, {
-            hostSocketId: null,
+            hostSockets:  new Set(), // all host socketIds sharing this session
             connections:  new Map(), // socketId  → spectatorId
             spectators:   new Map(), // spectatorId → socketId  (reverse index for push)
             users:        new Map(), // socketId  → UserState
@@ -136,7 +136,7 @@ async function callN8nSpectator(roomId, type, spectatorId, userCount, testMode) 
             const data = await res.json();
             if (data && typeof data === 'object') {
                 const room = rooms.get(roomId);
-                if (room?.hostSocketId) io.to(room.hostSocketId).emit('sim-params', data);
+                if (room?.hostSockets.size) io.to(`${roomId}:hosts`).emit('sim-params', data);
             }
         }
     } catch (err) {
@@ -150,11 +150,11 @@ async function callN8nSpectator(roomId, type, spectatorId, userCount, testMode) 
 // userCount reflects actual socket connections (room.connections), not active tilt senders.
 setInterval(() => {
     const now = Date.now();
-    for (const [, room] of rooms) {
+    for (const [roomId, room] of rooms) {
         for (const [uid, u] of room.users) {
             if (now - u.lastSeen > USER_TIMEOUT_MS) room.users.delete(uid);
         }
-        if (!room.hostSocketId || !room.connections.size) continue;
+        if (!room.hostSockets.size || !room.connections.size) continue;
 
         let sp = 0, sr = 0, st = 0, sc = 0;
         const activeUsers = [...room.users.values()];
@@ -163,7 +163,7 @@ setInterval(() => {
             for (const u of activeUsers) { sp += u.pitch; sr += u.roll; st += u.temperature; sc += u.coherence; }
         }
 
-        io.to(room.hostSocketId).emit('collective-state', {
+        io.to(`${roomId}:hosts`).emit('collective-state', {
             avgPitch:     n > 0 ? sp / n : 0.5,
             avgRoll:      n > 0 ? sr / n : 0.5,
             avgTemp:      n > 0 ? st / n : 0.5,
@@ -194,17 +194,18 @@ io.on('connection', (socket) => {
         const sessionId = preferredId || randomUUID();
         assignedRoom    = sessionId;
         socket.join(sessionId);
+        socket.join(`${sessionId}:hosts`);
         socket.emit('session-id', sessionId);
         const room = getOrCreateRoom(sessionId);
-        room.hostSocketId = socket.id;
+        room.hostSockets.add(socket.id);
         room.n8nTestMode  = !!testMode;
-        console.log('[socket] host registered   room:', sessionId, '| testMode:', !!testMode);
+        console.log('[socket] host registered   room:', sessionId, '| hosts:', room.hostSockets.size, '| testMode:', !!testMode);
     });
 
     // Syncs the host sim's n8nTestMode toggle so the server calls the right endpoint.
     socket.on('set-n8n-test-mode', (testMode) => {
         const room = assignedRoom ? rooms.get(assignedRoom) : null;
-        if (room && room.hostSocketId === socket.id) {
+        if (room && room.hostSockets.has(socket.id)) {
             room.n8nTestMode = !!testMode;
             console.log('[socket] n8nTestMode →', !!testMode, '  room:', assignedRoom);
         }
@@ -238,8 +239,8 @@ io.on('connection', (socket) => {
             return;
         }
         const roomData = rooms.get(assignedRoom);
-        if (!roomData?.hostSocketId) return;
-        io.to(roomData.hostSocketId).emit('sim-params', params);
+        if (!roomData?.hostSockets.size) return;
+        io.to(`${assignedRoom}:hosts`).emit('sim-params', params);
     });
 
     // ── Remote device (spectator) ─────────────────────────────────────────────
@@ -257,8 +258,8 @@ io.on('connection', (socket) => {
         console.log('[socket] remote joined     room:', room, '| spectator:', sid, '| total:', userCount);
 
         socket.emit('joined', { room, userCount });
-        if (roomData.hostSocketId) {
-            io.to(roomData.hostSocketId).emit('spectator-joined', { userCount, spectatorId: sid });
+        if (roomData.hostSockets.size) {
+            io.to(`${room}:hosts`).emit('spectator-joined', { userCount, spectatorId: sid });
         }
         socket.to(`${room}:spectators`).emit('peer-joined', { userCount });
 
@@ -290,18 +291,19 @@ io.on('connection', (socket) => {
         console.log('[socket] disconnected      room:', assignedRoom);
         const room = rooms.get(assignedRoom);
         if (room) {
-            const isHost      = room.hostSocketId === socket.id;
+            const isHost      = room.hostSockets.has(socket.id);
             const spectatorId = room.connections.get(socket.id);
             room.users.delete(socket.id);
             room.connections.delete(socket.id);
             if (spectatorId !== undefined) room.spectators.delete(spectatorId);
 
             if (isHost) {
-                room.hostSocketId = null;
+                room.hostSockets.delete(socket.id);
+                console.log('[socket] host left         room:', assignedRoom, '| hosts remaining:', room.hostSockets.size);
             } else {
                 const remaining = room.connections.size;
-                if (room.hostSocketId) {
-                    io.to(room.hostSocketId).emit('spectator-left', { userCount: remaining, spectatorId });
+                if (room.hostSockets.size) {
+                    io.to(`${assignedRoom}:hosts`).emit('spectator-left', { userCount: remaining, spectatorId });
                 }
                 io.to(`${assignedRoom}:spectators`).emit('peer-left', { userCount: remaining });
                 console.log('[socket] spectator left    room:', assignedRoom, '| remaining:', remaining);
@@ -311,7 +313,7 @@ io.on('connection', (socket) => {
                 }
             }
 
-            if (!room.hostSocketId && !room.connections.size) rooms.delete(assignedRoom);
+            if (!room.hostSockets.size && !room.connections.size) rooms.delete(assignedRoom);
         }
     });
 });
