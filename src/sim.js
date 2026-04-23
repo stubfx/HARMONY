@@ -42,7 +42,9 @@ const params = {
     color:       '#1a0099',
     speedColor:  '#ff4400',   // color approached at max speed
     brightness:  0.06,        // per-particle alpha; prevents additive saturation to white
-    additiveBlend: false,     // true = additive (glow, accumulates); false = max blend (no over-brightness)
+    additiveBlend: true,      // true = additive (glow, accumulates); false = max blend (no over-brightness)
+    toneBlack:   0.0,         // input level mapped to black (lifts lone-particle visibility)
+    toneWhite:   1.0,         // input level mapped to white (HDR saturation point)
     // Magnet
     magnetStr:      5.0,  // homing speed: px/frame agents move toward their home position
     alphaThreshold: 0.1,  // min image alpha to trigger homing (0–1)
@@ -345,7 +347,7 @@ const fadePipe = device.createRenderPipeline({
     fragment: {
         module: fadeMod, entryPoint: 'fs',
         targets: [{
-            format: 'rgba8unorm',
+            format: 'rgba16float',
             blend: {
                 color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
                 alpha: { srcFactor: 'one',        dstFactor: 'one-minus-src-alpha', operation: 'add' },
@@ -377,7 +379,7 @@ const renderPipe = device.createRenderPipeline({
     fragment: {
         module: renderMod, entryPoint: 'fs',
         targets: [{
-            format: 'rgba8unorm',
+            format: 'rgba16float',
             blend: {
                 color: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' },
                 alpha: { srcFactor: 'one',        dstFactor: 'one', operation: 'add' },
@@ -395,7 +397,7 @@ const renderPipeNormal = device.createRenderPipeline({
     fragment: {
         module: renderMod, entryPoint: 'fs',
         targets: [{
-            format: 'rgba8unorm',
+            format: 'rgba16float',
             blend: {
                 color: { srcFactor: 'one', dstFactor: 'one', operation: 'max' },
                 alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'max' },
@@ -432,7 +434,7 @@ const agentShadowPipe = device.createRenderPipeline({
     fragment: {
         module: agentShadowMod, entryPoint: 'fs',
         targets: [{
-            format: 'rgba8unorm',
+            format: 'rgba16float',
             blend: {
                 color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
                 alpha: { srcFactor: 'one',        dstFactor: 'one-minus-src-alpha', operation: 'add' },
@@ -489,7 +491,7 @@ function rebuildOffscreen() {
     if (offscreenTex) offscreenTex.destroy();
     offscreenTex = device.createTexture({
         size:   [canvas.width, canvas.height],
-        format: 'rgba8unorm',
+        format: 'rgba16float',
         usage:  GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     });
     offscreenView = offscreenTex.createView();
@@ -1297,6 +1299,8 @@ fVis.add(params, 'renderScale', 0.1, 1.0, 0.05).name('render scale').onChange(()
 });
 fVis.add(params,  'trailDecay',    0.005, 0.4,  0.005).name('trail decay');
 fVis.add(params,  'bgBlackCutoff', 0,     0.05, 0.001).name('black cutoff');
+fVis.add(params,  'toneBlack',    0,     0.5,  0.005).name('tone black');
+fVis.add(params,  'toneWhite',    0.1,   4.0,  0.05 ).name('tone white');
 fVis.add(params,  'pointSize',     1,     6,    0.1  ).name('agent size');
 fVis.addColor(params, 'color').name('base color');
 fVis.addColor(params, 'speedColor').name('fast color');
@@ -1734,6 +1738,8 @@ function writeFadeUB() {
 
 function writeBlitUB() {
     _blitF[0] = params.bgBlackCutoff;
+    _blitF[1] = params.toneBlack;
+    _blitF[2] = params.toneWhite;
     device.queue.writeBuffer(blitUB, 0, _blitAB);
 }
 
