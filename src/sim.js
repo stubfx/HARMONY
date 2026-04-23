@@ -100,6 +100,17 @@ const params = {
     useDeltaTime:  true,  // false = fixed 1/60 s timestep (no frame-spike compensation)
 };
 
+// ── URL param overrides ───────────────────────────────────────────────────────
+// ?s=<uuid>      — pin the sim to a specific session room (survives reloads via URL)
+// ?amount=<n>    — override the starting agent count (still adjustable in the GUI)
+const _urlParams     = new URLSearchParams(location.search);
+const _forcedSession = _urlParams.get('s') || null;
+{
+    const n = parseInt(_urlParams.get('amount') ?? '', 10);
+    if (Number.isFinite(n) && n > 0)
+        params.agentCount = Math.max(1_000, Math.min(MAX_AGENTS, n));
+}
+
 const DEFAULT_DIR  = 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI';
 const DEFAULT_WIND = 'sin(x * 0.004 - y * 0.003 + t * 0.4) * TWO_PI';
 
@@ -1017,10 +1028,17 @@ let socket;
 
     // Identify this socket as the host simulation so the server can distinguish
     // it from remote spectator sockets and assign a UUID session room.
-    socket.emit('register-host', { testMode: params.n8nTestMode });
+    // Pass _forcedSession if ?s= is in the URL — server will use it as the room ID.
+    socket.emit('register-host', { testMode: params.n8nTestMode, sessionId: _forcedSession || undefined });
 
     socket.on('session-id', async (sessionId) => {
         sessionRoom = sessionId;
+        // Pin this session ID in the page URL so reloads reconnect to the same room.
+        const currentUrl = new URL(location.href);
+        if (currentUrl.searchParams.get('s') !== sessionId) {
+            currentUrl.searchParams.set('s', sessionId);
+            history.replaceState(null, '', currentUrl);
+        }
         // Use VITE_USER_URL as-is (Caddy handles the /remote redirect internally).
         // Falls back to the page's own origin in dev when no env var is set.
         const envUrl = (import.meta.env.VITE_USER_URL ?? '').replace(/\/$/, '');

@@ -190,8 +190,8 @@ io.on('connection', (socket) => {
     let assignedRoom = null;
 
     // ── Host (simulation display) ─────────────────────────────────────────────
-    socket.on('register-host', ({ testMode } = {}) => {
-        const sessionId = randomUUID();
+    socket.on('register-host', ({ testMode, sessionId: preferredId } = {}) => {
+        const sessionId = preferredId || randomUUID();
         assignedRoom    = sessionId;
         socket.join(sessionId);
         socket.emit('session-id', sessionId);
