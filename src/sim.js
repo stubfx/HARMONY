@@ -45,6 +45,7 @@ const params = {
     additiveBlend: true,      // true = additive (glow, accumulates); false = max blend (no over-brightness)
     toneBlack:   0.0,         // input level mapped to black (lifts lone-particle visibility)
     toneWhite:   1.0,         // input level mapped to white (HDR saturation point)
+    toneGamma:   1.0,         // power curve: <1 boosts darks, >1 crushes darks
     // Magnet
     magnetStr:      5.0,  // homing speed: px/frame agents move toward their home position
     alphaThreshold: 0.1,  // min image alpha to trigger homing (0–1)
@@ -1301,6 +1302,7 @@ fVis.add(params,  'trailDecay',    0.005, 0.4,  0.005).name('trail decay');
 fVis.add(params,  'bgBlackCutoff', 0,     0.05, 0.001).name('black cutoff');
 fVis.add(params,  'toneBlack',    0,     0.5,  0.005).name('tone black');
 fVis.add(params,  'toneWhite',    0.1,   4.0,  0.05 ).name('tone white');
+fVis.add(params,  'toneGamma',    0.2,   2.0,  0.05 ).name('tone gamma');
 fVis.add(params,  'pointSize',     1,     6,    0.1  ).name('agent size');
 fVis.addColor(params, 'color').name('base color');
 fVis.addColor(params, 'speedColor').name('fast color');
@@ -1740,6 +1742,7 @@ function writeBlitUB() {
     _blitF[0] = params.bgBlackCutoff;
     _blitF[1] = params.toneBlack;
     _blitF[2] = params.toneWhite;
+    _blitF[3] = params.toneGamma;
     device.queue.writeBuffer(blitUB, 0, _blitAB);
 }
 
