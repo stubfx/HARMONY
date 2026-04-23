@@ -46,6 +46,7 @@ const params = {
     toneBlack:   0.0,         // input level mapped to black (lifts lone-particle visibility)
     toneWhite:   1.0,         // input level mapped to white (HDR saturation point)
     toneGamma:   1.0,         // power curve: <1 boosts darks, >1 crushes darks
+    shadowBoost: 0.0,         // inverse-brightness boost: peaks at ~12% luminance, negligible above 60%
     // Magnet
     magnetStr:      5.0,  // homing speed: px/frame agents move toward their home position
     alphaThreshold: 0.1,  // min image alpha to trigger homing (0–1)
@@ -261,7 +262,7 @@ const fadeUB = device.createBuffer({
     size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const blitUB = device.createBuffer({
-    size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const windVisUB = device.createBuffer({
     size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -1303,6 +1304,7 @@ fVis.add(params,  'bgBlackCutoff', 0,     0.05, 0.001).name('black cutoff');
 fVis.add(params,  'toneBlack',    0,     0.5,  0.005).name('tone black');
 fVis.add(params,  'toneWhite',    0.1,   4.0,  0.05 ).name('tone white');
 fVis.add(params,  'toneGamma',    0.2,   2.0,  0.05 ).name('tone gamma');
+fVis.add(params,  'shadowBoost',  0,     8.0,  0.1  ).name('shadow boost');
 fVis.add(params,  'pointSize',     1,     6,    0.1  ).name('agent size');
 fVis.addColor(params, 'color').name('base color');
 fVis.addColor(params, 'speedColor').name('fast color');
@@ -1743,6 +1745,7 @@ function writeBlitUB() {
     _blitF[1] = params.toneBlack;
     _blitF[2] = params.toneWhite;
     _blitF[3] = params.toneGamma;
+    _blitF[4] = params.shadowBoost;
     device.queue.writeBuffer(blitUB, 0, _blitAB);
 }
 
@@ -1810,7 +1813,7 @@ function writeContamUB() {
 const _soloAB  = new ArrayBuffer(144); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
 const _renderAB= new ArrayBuffer(112); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
 const _fadeAB  = new ArrayBuffer(16);  const _fadeF  = new Float32Array(_fadeAB);
-const _blitAB  = new ArrayBuffer(16);  const _blitF  = new Float32Array(_blitAB);
+const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB);
 const _contamAB= new ArrayBuffer(176); const _contamU= new Uint32Array(_contamAB); const _contamF= new Float32Array(_contamAB);
 const _shadowAB= new ArrayBuffer(32);  const _shadowF= new Float32Array(_shadowAB); const _shadowU= new Uint32Array(_shadowAB);
 const _imgDbgAB= new ArrayBuffer(32);  const _imgDbgF= new Float32Array(_imgDbgAB);

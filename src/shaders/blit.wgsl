@@ -1,4 +1,4 @@
-struct BP { cutoff: f32, toneBlack: f32, toneWhite: f32, toneGamma: f32 }
+struct BP { cutoff: f32, toneBlack: f32, toneWhite: f32, toneGamma: f32, shadowBoost: f32 }
 @group(0) @binding(0) var<uniform> p: BP;
 @group(0) @binding(1) var s: sampler;
 @group(0) @binding(2) var t: texture_2d<f32>;
@@ -12,7 +12,10 @@ struct V { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> }
     let col    = textureSampleLevel(t, s, v.uv, 0.0);
     let range  = max(p.toneWhite - p.toneBlack, 0.001);
     let mapped = pow(clamp((col.rgb - p.toneBlack) / range, vec3<f32>(0.0), vec3<f32>(1.0)), vec3<f32>(p.toneGamma));
-    let luma   = dot(mapped, vec3<f32>(0.299, 0.587, 0.114));
+    // Shadow boost: x*(1-x)^6 peaks near 12% luminance, ~zero above 60% — only dim particles lifted.
+    let boost  = p.shadowBoost * mapped * pow(vec3<f32>(1.0) - mapped, vec3<f32>(6.0));
+    let final  = clamp(mapped + boost, vec3<f32>(0.0), vec3<f32>(1.0));
+    let luma   = dot(final, vec3<f32>(0.299, 0.587, 0.114));
     if (luma < p.cutoff) { return vec4<f32>(0.0, 0.0, 0.0, 1.0); }
-    return vec4<f32>(mapped, col.a);
+    return vec4<f32>(final, col.a);
 }
