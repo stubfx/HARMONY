@@ -42,7 +42,7 @@ const params = {
     color:       '#1a0099',
     speedColor:  '#ff4400',   // color approached at max speed
     brightness:  0.06,        // per-particle alpha; prevents additive saturation to white
-    additiveBlend: true,      // true = additive (glow, accumulates); false = normal alpha composite
+    additiveBlend: false,     // true = additive (glow, accumulates); false = max blend (no over-brightness)
     // Magnet
     magnetStr:      5.0,  // homing speed: px/frame agents move toward their home position
     alphaThreshold: 0.1,  // min image alpha to trigger homing (0–1)
@@ -386,6 +386,9 @@ const renderPipe = device.createRenderPipeline({
     },
     primitive: { topology: 'triangle-list' },
 });
+// Max blend: result = max(src, dst) per channel — luminosity can never exceed a
+// single particle's color. No accumulation, no color-space math needed.
+// srcFactor / dstFactor must be 'one' when operation is 'max' (WebGPU spec).
 const renderPipeNormal = device.createRenderPipeline({
     layout: 'auto',
     vertex:   { module: renderMod, entryPoint: 'vs' },
@@ -394,8 +397,8 @@ const renderPipeNormal = device.createRenderPipeline({
         targets: [{
             format: 'rgba8unorm',
             blend: {
-                color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-                alpha: { srcFactor: 'one',        dstFactor: 'one-minus-src-alpha', operation: 'add' },
+                color: { srcFactor: 'one', dstFactor: 'one', operation: 'max' },
+                alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'max' },
             },
         }],
     },
