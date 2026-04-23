@@ -42,6 +42,7 @@ const params = {
     color:       '#1a0099',
     speedColor:  '#ff4400',   // color approached at max speed
     brightness:  0.06,        // per-particle alpha; prevents additive saturation to white
+    additiveBlend: true,      // true = additive (glow, accumulates); false = normal alpha composite
     // Magnet
     magnetStr:      5.0,  // homing speed: px/frame agents move toward their home position
     alphaThreshold: 0.1,  // min image alpha to trigger homing (0–1)
@@ -385,8 +386,25 @@ const renderPipe = device.createRenderPipeline({
     },
     primitive: { topology: 'triangle-list' },
 });
-// renderBG is rebuilt whenever the image changes (see rebuildRenderBG)
-let renderBG = null;
+const renderPipeNormal = device.createRenderPipeline({
+    layout: 'auto',
+    vertex:   { module: renderMod, entryPoint: 'vs' },
+    fragment: {
+        module: renderMod, entryPoint: 'fs',
+        targets: [{
+            format: 'rgba8unorm',
+            blend: {
+                color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+                alpha: { srcFactor: 'one',        dstFactor: 'one-minus-src-alpha', operation: 'add' },
+            },
+        }],
+    },
+    primitive: { topology: 'triangle-list' },
+});
+
+// renderBG / renderBGNormal are rebuilt whenever the image changes (see rebuildRenderBG)
+let renderBG       = null;
+let renderBGNormal = null;
 
 // Blit: copy offscreen → canvas swap-chain
 const blitMod = device.createShaderModule({ code: blitWGSL });
@@ -529,16 +547,15 @@ let traceCanvas   = null;   // offscreen 2D canvas used for compositing
 // Rebuilds particle render bind group — called after pipeline creation and on image change
 function rebuildRenderBG() {
     const texView = (hasImage && imageTexView) ? imageTexView : placeholderTexView;
-    renderBG = device.createBindGroup({
-        layout: renderPipe.getBindGroupLayout(0),
-        entries: [
-            { binding: 0, resource: { buffer: renderUB } },
-            { binding: 1, resource: { buffer: agentBuf } },
-            { binding: 2, resource: imageSampler },
-            { binding: 3, resource: texView },
-            { binding: 4, resource: { buffer: spectatorSlotsBuf } },
-        ],
-    });
+    const entries = [
+        { binding: 0, resource: { buffer: renderUB } },
+        { binding: 1, resource: { buffer: agentBuf } },
+        { binding: 2, resource: imageSampler },
+        { binding: 3, resource: texView },
+        { binding: 4, resource: { buffer: spectatorSlotsBuf } },
+    ];
+    renderBG       = device.createBindGroup({ layout: renderPipe.getBindGroupLayout(0),       entries });
+    renderBGNormal = device.createBindGroup({ layout: renderPipeNormal.getBindGroupLayout(0), entries });
 }
 rebuildRenderBG();
 rebuildAgentShadowBG();
@@ -1281,6 +1298,7 @@ fVis.add(params,  'pointSize',     1,     6,    0.1  ).name('agent size');
 fVis.addColor(params, 'color').name('base color');
 fVis.addColor(params, 'speedColor').name('fast color');
 fVis.add(params, 'brightness', 0.01, 0.5, 0.005).name('brightness');
+fVis.add(params, 'additiveBlend').name('additive blend');
 
 
 const fMagnet = gui.addFolder('Trace');
@@ -1851,8 +1869,8 @@ function frame(ts) {
         rp.draw(params.agentCount * 6);
     }
     if (renderBG) {
-        rp.setPipeline(renderPipe);
-        rp.setBindGroup(0, renderBG);
+        rp.setPipeline(params.additiveBlend ? renderPipe : renderPipeNormal);
+        rp.setBindGroup(0, params.additiveBlend ? renderBG : renderBGNormal);
         rp.draw(params.agentCount * 6);
     }
     rp.end();
