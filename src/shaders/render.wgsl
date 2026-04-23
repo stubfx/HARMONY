@@ -1,5 +1,5 @@
 // ─── Solo Particle Render Shader ──────────────────────────────────────────────
-// SoloRenderParams layout (104 bytes):
+// SoloRenderParams layout (96 bytes):
 //   [0]  agentCount          u32
 //   [4]  canvasW             f32
 //   [8]  canvasH             f32
@@ -25,7 +25,6 @@
 //   [88] homingProximityRange f32  (canvas px over which homing agents fade in)
 //   [92] homingMinAlpha       f32  (minimum alpha for a homing agent at max distance)
 //   [96] spectatorCount       u32  (active spectators; 0 = use global params.color)
-//   [100] primedPassMode      u32  (0 = free agents only; 1 = primed agents only)
 
 struct SoloRenderParams {
     agentCount:           u32,
@@ -53,7 +52,6 @@ struct SoloRenderParams {
     homingProximityRange: f32,
     homingMinAlpha:       f32,
     spectatorCount:       u32,
-    primedPassMode:       u32,
 }
 
 struct Agent {
@@ -155,11 +153,7 @@ fn hash(n: u32) -> f32 {
     // agent.primed is written by the compute shader each frame (1.0 = homing, 0.0 = free).
     // Using it as the sole gate guarantees render, shadow, and compute always agree —
     // no independent texture re-sampling means no bilinear/nearest-neighbour mismatch.
-    let isPrimed = params.hasImage != 0u && in.primed > 0.5;
-    // primedPassMode 0 = free-agent pass (discard primed); 1 = primed pass (discard free).
-    if (params.primedPassMode == 0u &&  isPrimed) { discard; }
-    if (params.primedPassMode == 1u && !isPrimed) { discard; }
-    if (isPrimed) {
+    if (params.hasImage != 0u && in.primed > 0.5) {
         let uv = clamp(in.homeUV, vec2<f32>(0.0), vec2<f32>(1.0));
 
         // Sample image for actual RGB colour. QR mode uses nearest-neighbour to keep

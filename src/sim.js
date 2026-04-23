@@ -46,7 +46,6 @@ const params = {
     toneBlack:   0.0,         // input level mapped to black (lifts lone-particle visibility)
     toneWhite:   1.0,         // input level mapped to white (HDR saturation point)
     toneGamma:   1.0,         // power curve: <1 boosts darks, >1 crushes darks
-    shadowBoost: 0.0,         // inverse-brightness boost: dim particles get more lift than bright ones
     // Magnet
     magnetStr:      5.0,  // homing speed: px/frame agents move toward their home position
     alphaThreshold: 0.1,  // min image alpha to trigger homing (0–1)
@@ -258,14 +257,11 @@ const soloUB = device.createBuffer({
 const renderUB = device.createBuffer({
     size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
-const renderPrimedUB = device.createBuffer({
-    size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-});
 const fadeUB = device.createBuffer({
     size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const blitUB = device.createBuffer({
-    size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const windVisUB = device.createBuffer({
     size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -412,13 +408,9 @@ const renderPipeNormal = device.createRenderPipeline({
     primitive: { topology: 'triangle-list' },
 });
 
-// Rebuilt whenever the image changes (see rebuildRenderBG).
-// Free pass (primedPassMode=0) and primed pass (primedPassMode=1) use separate uniform buffers
-// so both can be recorded in the same command encoder without a second queue submission.
-let renderFreeBG        = null;
-let renderFreeNormalBG  = null;
-let renderPrimedBG      = null;
-let renderPrimedNormalBG = null;
+// renderBG / renderBGNormal are rebuilt whenever the image changes (see rebuildRenderBG)
+let renderBG       = null;
+let renderBGNormal = null;
 
 // Blit: copy offscreen → canvas swap-chain
 const blitMod = device.createShaderModule({ code: blitWGSL });
@@ -492,8 +484,6 @@ const imageDebugPipe = device.createRenderPipeline({
 // ── Offscreen texture (rebuilt on resize) ─────────────────────────────────────
 let offscreenTex       = null;
 let offscreenView      = null;
-let primedOffscreenTex  = null;
-let primedOffscreenView = null;
 let blitBG             = null;
 let shadowDensityTex   = null;
 let shadowDensityView  = null;
@@ -506,14 +496,6 @@ function rebuildOffscreen() {
         usage:  GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     });
     offscreenView = offscreenTex.createView();
-
-    if (primedOffscreenTex) primedOffscreenTex.destroy();
-    primedOffscreenTex = device.createTexture({
-        size:   [canvas.width, canvas.height],
-        format: 'rgba16float',
-        usage:  GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    });
-    primedOffscreenView = primedOffscreenTex.createView();
 
     if (shadowDensityTex) shadowDensityTex.destroy();
     shadowDensityTex = device.createTexture({
@@ -529,7 +511,6 @@ function rebuildOffscreen() {
             { binding: 0, resource: { buffer: blitUB } },
             { binding: 1, resource: screenSmp },
             { binding: 2, resource: offscreenView },
-            { binding: 3, resource: primedOffscreenView },
         ],
     });
     const enc = device.createCommandEncoder();
@@ -540,14 +521,6 @@ function rebuildOffscreen() {
         }],
     });
     rp.end();
-    // Primed layer starts transparent so pixels with no primed agents are invisible.
-    const pp = enc.beginRenderPass({
-        colorAttachments: [{
-            view: primedOffscreenView, loadOp: 'clear',
-            clearValue: { r: 0, g: 0, b: 0, a: 0 }, storeOp: 'store',
-        }],
-    });
-    pp.end();
     device.queue.submit([enc.finish()]);
 }
 rebuildOffscreen();
@@ -580,17 +553,15 @@ let traceCanvas   = null;   // offscreen 2D canvas used for compositing
 // Rebuilds particle render bind group — called after pipeline creation and on image change
 function rebuildRenderBG() {
     const texView = (hasImage && imageTexView) ? imageTexView : placeholderTexView;
-    const sharedEntries = (ub) => [
-        { binding: 0, resource: { buffer: ub } },
+    const entries = [
+        { binding: 0, resource: { buffer: renderUB } },
         { binding: 1, resource: { buffer: agentBuf } },
         { binding: 2, resource: imageSampler },
         { binding: 3, resource: texView },
         { binding: 4, resource: { buffer: spectatorSlotsBuf } },
     ];
-    renderFreeBG        = device.createBindGroup({ layout: renderPipe.getBindGroupLayout(0),       entries: sharedEntries(renderUB) });
-    renderFreeNormalBG  = device.createBindGroup({ layout: renderPipeNormal.getBindGroupLayout(0), entries: sharedEntries(renderUB) });
-    renderPrimedBG      = device.createBindGroup({ layout: renderPipe.getBindGroupLayout(0),       entries: sharedEntries(renderPrimedUB) });
-    renderPrimedNormalBG = device.createBindGroup({ layout: renderPipeNormal.getBindGroupLayout(0), entries: sharedEntries(renderPrimedUB) });
+    renderBG       = device.createBindGroup({ layout: renderPipe.getBindGroupLayout(0),       entries });
+    renderBGNormal = device.createBindGroup({ layout: renderPipeNormal.getBindGroupLayout(0), entries });
 }
 rebuildRenderBG();
 rebuildAgentShadowBG();
@@ -663,13 +634,6 @@ function renderTraceCanvas() {
         rebuildImageDebugBG();
         rebuildAgentShadowBG();
         rebuildAgentShadowDensityBG();
-        // Flush any accumulated primed-agent content so it doesn't linger in the blit composite.
-        if (primedOffscreenView) {
-            const enc = device.createCommandEncoder();
-            const cp  = enc.beginRenderPass({ colorAttachments: [{ view: primedOffscreenView, loadOp: 'clear', clearValue: { r:0,g:0,b:0,a:0 }, storeOp: 'store' }] });
-            cp.end();
-            device.queue.submit([enc.finish()]);
-        }
         return;
     }
 
@@ -1339,7 +1303,6 @@ fVis.add(params,  'bgBlackCutoff', 0,     0.05, 0.001).name('black cutoff');
 fVis.add(params,  'toneBlack',    0,     0.5,  0.005).name('tone black');
 fVis.add(params,  'toneWhite',    0.1,   4.0,  0.05 ).name('tone white');
 fVis.add(params,  'toneGamma',    0.2,   2.0,  0.05 ).name('tone gamma');
-fVis.add(params,  'shadowBoost',  0,     8.0,  0.1  ).name('shadow boost');
 fVis.add(params,  'pointSize',     1,     6,    0.1  ).name('agent size');
 fVis.addColor(params, 'color').name('base color');
 fVis.addColor(params, 'speedColor').name('fast color');
@@ -1766,10 +1729,7 @@ function writeRenderUB() {
     f[22] = params.homingProximityRange;
     f[23] = params.homingMinAlpha;
     u[24] = activeSlots.length;
-    u[25] = 0; // free-agent pass
     device.queue.writeBuffer(renderUB, 0, ab);
-    u[25] = 1; // primed-agent pass
-    device.queue.writeBuffer(renderPrimedUB, 0, ab);
 }
 
 
@@ -1783,7 +1743,6 @@ function writeBlitUB() {
     _blitF[1] = params.toneBlack;
     _blitF[2] = params.toneWhite;
     _blitF[3] = params.toneGamma;
-    _blitF[4] = params.shadowBoost;
     device.queue.writeBuffer(blitUB, 0, _blitAB);
 }
 
@@ -1851,7 +1810,7 @@ function writeContamUB() {
 const _soloAB  = new ArrayBuffer(144); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
 const _renderAB= new ArrayBuffer(112); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
 const _fadeAB  = new ArrayBuffer(16);  const _fadeF  = new Float32Array(_fadeAB);
-const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB);
+const _blitAB  = new ArrayBuffer(16);  const _blitF  = new Float32Array(_blitAB);
 const _contamAB= new ArrayBuffer(176); const _contamU= new Uint32Array(_contamAB); const _contamF= new Float32Array(_contamAB);
 const _shadowAB= new ArrayBuffer(32);  const _shadowF= new Float32Array(_shadowAB); const _shadowU= new Uint32Array(_shadowAB);
 const _imgDbgAB= new ArrayBuffer(32);  const _imgDbgF= new Float32Array(_imgDbgAB);
@@ -1921,26 +1880,12 @@ function frame(ts) {
         rp.setBindGroup(0, agentShadowBG);
         rp.draw(params.agentCount * 6);
     }
-    if (renderFreeBG) {
+    if (renderBG) {
         rp.setPipeline(params.additiveBlend ? renderPipe : renderPipeNormal);
-        rp.setBindGroup(0, params.additiveBlend ? renderFreeBG : renderFreeNormalBG);
+        rp.setBindGroup(0, params.additiveBlend ? renderBG : renderBGNormal);
         rp.draw(params.agentCount * 6);
     }
     rp.end();
-
-    // Primed agents rendered to a separate texture so tone mapping never distorts image colours.
-    // Uses loadOp:'load' so the image accumulates across frames (same trail behaviour as main offscreen).
-    if (hasImage && renderPrimedBG) {
-        const pp = enc.beginRenderPass({
-            colorAttachments: [{
-                view: primedOffscreenView, loadOp: 'load', storeOp: 'store',
-            }],
-        });
-        pp.setPipeline(params.additiveBlend ? renderPipe : renderPipeNormal);
-        pp.setBindGroup(0, params.additiveBlend ? renderPrimedBG : renderPrimedNormalBG);
-        pp.draw(params.agentCount * 6);
-        pp.end();
-    }
 
     const visStep  = Math.round(100 * window.devicePixelRatio);
     const visGridW = Math.ceil(canvas.width  / visStep) + 1;
