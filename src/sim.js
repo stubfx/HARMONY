@@ -1731,6 +1731,7 @@ function writeRenderUB() {
     f[22] = params.homingProximityRange;
     f[23] = params.homingMinAlpha;
     u[24] = activeSlots.length;
+    u[25] = params.additiveBlend ? 1 : 0;
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 

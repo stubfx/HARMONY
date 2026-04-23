@@ -1,5 +1,5 @@
 // ─── Solo Particle Render Shader ──────────────────────────────────────────────
-// SoloRenderParams layout (96 bytes):
+// SoloRenderParams layout (104 bytes):
 //   [0]  agentCount          u32
 //   [4]  canvasW             f32
 //   [8]  canvasH             f32
@@ -25,6 +25,7 @@
 //   [88] homingProximityRange f32  (canvas px over which homing agents fade in)
 //   [92] homingMinAlpha       f32  (minimum alpha for a homing agent at max distance)
 //   [96] spectatorCount       u32  (active spectators; 0 = use global params.color)
+//   [100] additiveBlend       u32  (1 = additive; 0 = max blend with pre-multiplied alpha)
 
 struct SoloRenderParams {
     agentCount:           u32,
@@ -52,6 +53,7 @@ struct SoloRenderParams {
     homingProximityRange: f32,
     homingMinAlpha:       f32,
     spectatorCount:       u32,
+    additiveBlend:        u32,
 }
 
 struct Agent {
@@ -172,7 +174,11 @@ fn hash(n: u32) -> f32 {
         // Proximity factor fades the agent in as it closes in on its home pixel.
         let distEdge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
         let vig      = select(smoothstep(0.0, max(params.vignetteEdge, 0.0001), distEdge), 1.0, params.qrMode != 0u);
-        return vec4<f32>(imgSample.rgb, imgSample.a * vig * in.proximityT);
+        let a        = imgSample.a * vig * in.proximityT;
+        // Max blend (operation:'max', factors:'one') ignores alpha — pre-multiply so the
+        // max comparison sees distance-scaled colours instead of raw image values.
+        if (params.additiveBlend == 0u) { return vec4<f32>(imgSample.rgb * a, a); }
+        return vec4<f32>(imgSample.rgb, a);
     }
     // QR mode: optionally fade free agents near the QR rect to keep it scannable.
     // Signed distance to the rect edge → smoothstep over 80px falloff.
