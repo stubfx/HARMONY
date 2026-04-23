@@ -81,6 +81,9 @@ const params = {
     // Avoidance
     avoidForceStr:   1.0, // multiplier on image-trace avoidance forces
     avoidMapScale:   1.0, // avoidance map coverage as fraction of canvas (1.0 = full)
+    qrOverlay:       true,  // true = QR on a 2D overlay canvas; agents freed from QR area
+    qrAvoidMargin:   0.05,  // extra padding around QR in the avoid zone, as fraction of minDim
+    qrAvoidFade:     0.03,  // blur radius of the avoid zone edge, as fraction of minDim
     // Primed-spot probe (free agents only)
     probeLen:          50.0, // probe cast distance in canvas pixels
     probeForceStr:     150.0, // steering force multiplier when probe hits a primed pixel
@@ -186,6 +189,12 @@ const PRESETS = [
 const canvas = document.createElement('canvas');
 canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;display:block;';
 document.body.prepend(canvas);
+
+// QR overlay: 2D canvas on top of the simulation, below GUI (z-index 10).
+// Shown only when qrOverlay is on and the QR is active; fades via CSS opacity.
+const qrOverlayEl = document.createElement('canvas');
+qrOverlayEl.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:10;opacity:0;transition:opacity 0.6s ease;image-rendering:pixelated;';
+document.body.appendChild(qrOverlayEl);
 
 function setSize() {
     const scale   = window.devicePixelRatio * params.renderScale;
@@ -602,6 +611,62 @@ function rebuildAgentShadowDensityBG() {
     });
 }
 
+// ── QR overlay + avoid map ────────────────────────────────────────────────────
+// When qrOverlay is on the QR is displayed on qrOverlayEl (not baked into the trace),
+// and the qrBitmap is uploaded as the avoid map so agents naturally avoid the QR area.
+// White QR modules (r=1) repel agents; blur merges them into a solid repulsion zone.
+let _inQROverlayUpdate = false;
+function updateQROverlay() {
+    const visible = params.qrOverlay && simState.qrStatus === 'SHOW' && !!qrBitmap;
+    qrOverlayEl.style.opacity = visible ? '1' : '0';
+    if (!visible) {
+        _inQROverlayUpdate = true;
+        clearAvoidMap();
+        _inQROverlayUpdate = false;
+        return;
+    }
+
+    // ── Display layer ──────────────────────────────────────────────────────────
+    qrOverlayEl.width  = canvas.width;
+    qrOverlayEl.height = canvas.height;
+    const octx   = qrOverlayEl.getContext('2d');
+    octx.clearRect(0, 0, canvas.width, canvas.height);
+    const minDim = Math.min(canvas.width, canvas.height);
+    const size   = params.qrSize   * minDim;
+    const margin = params.qrMargin * minDim + size / 2;
+    const cx     = params.qrAlignX === 'left' ? margin : canvas.width  - margin;
+    const cy     = params.qrAlignY === 'top'  ? margin : canvas.height - margin;
+    octx.drawImage(qrBitmap, cx - size / 2, cy - size / 2, size, size);
+
+    // ── Avoid map layer ────────────────────────────────────────────────────────
+    // Draw qrBitmap (white modules on transparent) to a full-canvas 2D element.
+    // Blur merges adjacent module halos into a continuous repulsion field.
+    const avoidCanvas  = document.createElement('canvas');
+    avoidCanvas.width  = canvas.width;
+    avoidCanvas.height = canvas.height;
+    const actx   = avoidCanvas.getContext('2d');
+    const pad    = params.qrAvoidMargin * minDim;
+    const blurPx = params.qrAvoidFade   * minDim;
+    if (blurPx > 0) actx.filter = `blur(${blurPx}px)`;
+    actx.drawImage(qrBitmap, cx - size / 2 - pad, cy - size / 2 - pad, size + 2 * pad, size + 2 * pad);
+    if (blurPx > 0) actx.filter = 'none';
+
+    if (avoidMapTex) avoidMapTex.destroy();
+    avoidMapTex = device.createTexture({
+        size:   [canvas.width, canvas.height],
+        format: 'rgba8unorm',
+        usage:  GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    device.queue.copyExternalImageToTexture(
+        { source: avoidCanvas },
+        { texture: avoidMapTex },
+        [canvas.width, canvas.height],
+    );
+    avoidMapTexView = avoidMapTex.createView();
+    hasAvoidMap     = true;
+    rebuildSimBG();
+}
+
 // ── Trace canvas compositor ───────────────────────────────────────────────────
 // The trace canvas is always full-screen (scaled by traceScale for performance).
 // Each element is composited at its own (x, y, size) in screen-space 0–1 coords:
@@ -620,7 +685,8 @@ function renderTraceCanvas() {
     const text    = document.querySelector('#trace-text-input')?.value.trim() ?? '';
     const hasText = text.length > 0;
     const hasUserContent = !!imageBitmap || hasText;
-    const showQR         = simState.qrStatus === 'SHOW' && !!qrBitmap;
+    // When qrOverlay is on the QR lives on the 2D overlay canvas, not the trace.
+    const showQR = !params.qrOverlay && simState.qrStatus === 'SHOW' && !!qrBitmap;
 
     // Nothing at all — tear down and return to formula-only mode
     if (!showQR && !hasUserContent) {
@@ -635,6 +701,7 @@ function renderTraceCanvas() {
         rebuildImageDebugBG();
         rebuildAgentShadowBG();
         rebuildAgentShadowDensityBG();
+        updateQROverlay();
         return;
     }
 
@@ -727,6 +794,7 @@ function renderTraceCanvas() {
     rebuildImageDebugBG();
     rebuildAgentShadowBG();
     rebuildAgentShadowDensityBG();
+    updateQROverlay();
 }
 
 // ── Auto-clear timer ──────────────────────────────────────────────────────────
@@ -1348,9 +1416,12 @@ fContent.add(params, 'qrAlignX', ['left', 'right']).name('QR align H').onChange(
 fContent.add(params, 'qrAlignY', ['top',  'bottom']).name('QR align V').onChange(renderTraceCanvas);
 fContent.add(params, 'qrQuietZone', 0, 8, 1).name('QR quiet zone').onChange(() => generateQR().then(renderTraceCanvas));
 fContent.add(params, 'qrInvert').name('QR invert colors').onChange(() => generateQR().then(renderTraceCanvas));
+fContent.add(params, 'qrOverlay').name('QR overlay').onChange(renderTraceCanvas);
 
 const fAvoid = gui.addFolder('Avoidance map');
-fAvoid.add(params, 'avoidMapScale', 0.05, 1.0, 0.01).name('scale');
+fAvoid.add(params, 'avoidMapScale',   0.05, 1.0,  0.01 ).name('scale');
+fAvoid.add(params, 'qrAvoidMargin',   0,    0.3,  0.005).name('QR margin').onChange(renderTraceCanvas);
+fAvoid.add(params, 'qrAvoidFade',     0,    0.15, 0.005).name('QR fade').onChange(renderTraceCanvas);
 fAvoid.add({ load: () => document.querySelector('#avoid-map-input').click() }, 'load').name('Load map…');
 fAvoid.add({ clear: clearAvoidMap }, 'clear').name('Clear map');
 
@@ -1555,6 +1626,7 @@ async function loadAvoidMap(source) {
     avoidMapTexView = avoidMapTex.createView();
     hasAvoidMap     = true;
     rebuildSimBG();
+    if (!_inQROverlayUpdate && params.qrOverlay && simState.qrStatus === 'SHOW' && qrBitmap) updateQROverlay();
 }
 
 function clearAvoidMap() {
@@ -1562,6 +1634,7 @@ function clearAvoidMap() {
     avoidMapTexView = null;
     hasAvoidMap     = false;
     rebuildSimBG();
+    if (!_inQROverlayUpdate && params.qrOverlay && simState.qrStatus === 'SHOW' && qrBitmap) updateQROverlay();
 }
 
 document.querySelector('#avoid-map-input').addEventListener('change', e => {
