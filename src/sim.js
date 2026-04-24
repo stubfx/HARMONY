@@ -745,35 +745,82 @@ function renderTraceCanvas() {
     const ctx = traceCanvas.getContext('2d');
     ctx.clearRect(0, 0, tcW, tcH);
 
-    // Layer 0: user image — cover-fit to fill the full trace canvas
-    if (imageBitmap) {
-        const imgAspect    = imageBitmap.width / imageBitmap.height;
-        const canvasAspect = tcW / tcH;
-        let sx, sy, sw, sh;
-        if (imgAspect > canvasAspect) {
-            sh = imageBitmap.height;
-            sw = sh * canvasAspect;
-            sx = (imageBitmap.width - sw) / 2;
-            sy = 0;
-        } else {
-            sw = imageBitmap.width;
-            sh = sw / canvasAspect;
-            sx = 0;
-            sy = (imageBitmap.height - sh) / 2;
+    // ── Layout: caption zone ─────────────────────────────────────────────────
+    // When both image and caption are present the canvas is split vertically:
+    //   [0 … imageZoneH)         → image (cover-fit)
+    //   [imageZoneH … tcH)       → caption (auto-sized, capped at 40 % of canvas)
+    // When only one is present it fills the full canvas.
+    const MAX_CAPTION_FRAC = 0.40;
+    const CAPTION_V_PAD    = Math.round(minDim * 0.04); // internal top+bottom padding
+
+    let captionZoneH  = 0;
+    let captionLines  = [];
+    let captionFS     = 0;
+
+    if (hasCaption) {
+        const maxW = tcW * 0.80;
+        let fs     = Math.round(minDim * params.captionSize);
+
+        const wrap = size => {
+            ctx.font = `bold ${size}px sans-serif`;
+            const words = captionText.split(/\s+/);
+            const ls = [];
+            let cur = '';
+            for (const w of words) {
+                const test = cur ? `${cur} ${w}` : w;
+                if (ctx.measureText(test).width > maxW && cur) { ls.push(cur); cur = w; }
+                else cur = test;
+            }
+            if (cur) ls.push(cur);
+            return ls;
+        };
+
+        captionLines = wrap(fs);
+        const maxH   = Math.round(tcH * (imageBitmap ? MAX_CAPTION_FRAC : 1.0));
+        let blockH   = captionLines.length * Math.round(fs * 1.35) + CAPTION_V_PAD * 2;
+
+        if (blockH > maxH) {
+            fs           = Math.max(8, Math.round(fs * maxH / blockH));
+            captionLines = wrap(fs);
+            blockH       = captionLines.length * Math.round(fs * 1.35) + CAPTION_V_PAD * 2;
         }
-        ctx.drawImage(imageBitmap, sx, sy, sw, sh, 0, 0, tcW, tcH);
+
+        captionFS    = fs;
+        captionZoneH = imageBitmap ? Math.min(blockH, maxH) : 0;
     }
 
-    // Layer 2: text — at (imageX, imageY), multi-line when no image is present
+    const imageZoneH = tcH - captionZoneH;
+
+    // Layer 0: image — cover-fit to the image zone (full canvas when no caption)
+    if (imageBitmap) {
+        const dstW = tcW, dstH = imageZoneH;
+        const imgA = imageBitmap.width / imageBitmap.height;
+        const dstA = dstW / Math.max(dstH, 1);
+        let sx, sy, sw, sh;
+        if (imgA > dstA) {
+            sh = imageBitmap.height; sw = sh * dstA;
+            sx = (imageBitmap.width - sw) / 2; sy = 0;
+        } else {
+            sw = imageBitmap.width; sh = sw / dstA;
+            sx = 0; sy = (imageBitmap.height - sh) / 2;
+        }
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, dstW, dstH);
+        ctx.clip();
+        ctx.drawImage(imageBitmap, sx, sy, sw, sh, 0, 0, dstW, dstH);
+        ctx.restore();
+    }
+
+    // Layer 1: trace text — positioned over the image zone
     if (hasText) {
         ctx.fillStyle    = 'white';
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
         const cx = params.imageX * tcW;
-        const cy = params.imageY * tcH;
+        const cy = params.imageY * imageZoneH;
 
         if (!imageBitmap) {
-            // Multi-line word-wrap centered on (cx, cy)
             const fontSize = Math.round(minDim * 0.10);
             ctx.font = `bold ${fontSize}px sans-serif`;
             const maxW  = tcW * 0.88;
@@ -790,7 +837,6 @@ function renderTraceCanvas() {
             const startY = cy - ((lines.length - 1) * lineH) / 2;
             lines.forEach((ln, i) => ctx.fillText(ln, cx, startY + i * lineH));
         } else {
-            // Single line over an image — shrink font to fit width
             let fontSize = minDim * 0.72;
             ctx.font = `bold ${Math.round(fontSize)}px sans-serif`;
             const measured = ctx.measureText(text).width;
@@ -803,27 +849,18 @@ function renderTraceCanvas() {
         }
     }
 
-    // Caption layer: word-wrapped text anchored to the bottom center, subtitle-sized
+    // Caption: bottom zone when image is present; bottom of full canvas otherwise
     if (hasCaption) {
         ctx.fillStyle    = 'white';
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'alphabetic';
-        const fontSize = Math.round(minDim * params.captionSize);
-        ctx.font = `bold ${fontSize}px sans-serif`;
-        const maxW  = tcW * 0.80;
-        const words = captionText.split(/\s+/);
-        const lines = [];
-        let cur = '';
-        for (const w of words) {
-            const test = cur ? `${cur} ${w}` : w;
-            if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = w; }
-            else cur = test;
-        }
-        if (cur) lines.push(cur);
-        const lineH      = Math.round(fontSize * 1.35);
-        const bottomY    = tcH - Math.round(minDim * 0.05);
-        const startY     = bottomY - (lines.length - 1) * lineH;
-        lines.forEach((ln, i) => ctx.fillText(ln, tcW / 2, startY + i * lineH));
+        ctx.font         = `bold ${captionFS}px sans-serif`;
+        const lineH      = Math.round(captionFS * 1.35);
+        const zoneY      = imageBitmap ? imageZoneH : 0;
+        const zoneH      = imageBitmap ? captionZoneH : tcH;
+        const totalTextH = captionLines.length * lineH;
+        const startY     = zoneY + (zoneH - totalTextH) / 2 + lineH * 0.8;
+        captionLines.forEach((ln, i) => ctx.fillText(ln, tcW / 2, startY + i * lineH));
     }
 
     // Topmost layer: QR — always drawn last so it is never obscured by user content
