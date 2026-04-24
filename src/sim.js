@@ -2034,8 +2034,8 @@ function frame(ts) {
                     slot._smoothDx += (slot.dx - slot._smoothDx) * steer;
                     slot._smoothDy += (slot.dy - slot._smoothDy) * steer;
                     const vBoost = params.spawnerSpeed * (1 + slot.velocity * params.spawnerVelocityBoost);
-                    slot.spawnerX = Math.max(0, Math.min(1, slot.spawnerX + slot._smoothDx * slot.magnitude * vBoost * dt));
-                    slot.spawnerY = Math.max(0, Math.min(1, slot.spawnerY + slot._smoothDy * slot.magnitude * vBoost * dt));
+                    slot.spawnerX = ((slot.spawnerX + slot._smoothDx * slot.magnitude * vBoost * dt) % 1 + 1) % 1;
+                    slot.spawnerY = ((slot.spawnerY + slot._smoothDy * slot.magnitude * vBoost * dt) % 1 + 1) % 1;
                     dirty = true;
                 }
             }
