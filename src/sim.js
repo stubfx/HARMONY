@@ -1473,6 +1473,7 @@ function applySimParams(data) {
 }));
 
 stateCtrl.onChange(v => { if (v === 'DOT') applyFormulas(DOT_DIR, DOT_WIND); });
+qrStateCtrl.onChange(() => { updateStateDisplay(); renderTraceCanvas(); });
 
 window.addEventListener('keydown', e => {
     if (e.key === 'Control') toggleGUI();
