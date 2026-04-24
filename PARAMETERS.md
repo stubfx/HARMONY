@@ -205,7 +205,7 @@ Inverse-brightness boost applied during the blit pass: `mapped × (1 − mapped)
 The trace layer loads a static image onto the GPU and uses it to redirect agents. The image is never rendered directly — it is only felt through collective agent density and color.
 
 ### homing speed (`magnetStr`)
-**Range:** 0 – 20 | **Default:** 5.0
+**Range:** 0 – 50 | **Default:** 30.0
 
 When an agent's home position falls on a sufficiently opaque image pixel, the agent abandons its direction formula and steers straight toward home. This parameter sets that homing velocity in canvas pixels per frame (before dt scaling). Higher values make agents snap back to their home positions quickly; lower values produce a slow, drifting attraction.
 
@@ -752,12 +752,16 @@ Seconds between periodic snapshots sent to n8n at `/webhook/heartbeat` (or `/web
 **Payload:**
 ```json
 {
-  "type":       "heartbeat",
-  "room":       "<session-uuid>",
-  "spectators": 3,
-  "status":     "NORMAL",
-  "qrStatus":   "HIDE",
-  "params":     { ...all current tunable params... }
+  "type":              "heartbeat",
+  "room":              "<session-uuid>",
+  "spectators":        3,
+  "status":            "NORMAL",
+  "qrStatus":          "HIDE",
+  "step":              2,
+  "storyStepComplete": false,
+  "storyVoteResult":   null,
+  "stepStatus":        "VOTE",
+  "params":            { ...all current tunable params... }
 }
 ```
 
@@ -767,9 +771,65 @@ Seconds between periodic snapshots sent to n8n at `/webhook/heartbeat` (or `/web
 | `spectators` | Live connected-device count synced from the server |
 | `status` | Simulation state machine: `"NORMAL"` or `"IDLE"` |
 | `qrStatus` | QR visibility: `"SHOW"` or `"HIDE"` |
+| `step` | Current story step ID as sent by n8n; `null` when not in story mode |
+| `storyStepComplete` | `true` once the step's duration has elapsed or a vote has settled |
+| `storyVoteResult` | Winning option label (e.g. `"Garden"`) when a VOTE step completes; `null` otherwise |
+| `stepStatus` | Current spectator interaction mode: `"IDLE"`, `"DRAW"`, or `"VOTE"` |
 | `params` | Full snapshot of every tunable parameter in the GUI |
 
-The response is handled identically to `sim-event` — any recognised keys are applied via `applySimParams`. This is the primary channel through which n8n drives all content lifecycle: QR show/hide, trace images, formula changes, and parameter adjustments.
+The response is handled identically to `sim-event` — any recognised keys are applied via `applySimParams`. This is the primary channel through which n8n drives all content lifecycle: QR show/hide, trace images, formula changes, parameter adjustments, and story step delivery.
+
+When a story step completes (`storyStepComplete` flips to `true`), an **out-of-cycle heartbeat** fires immediately — the sim does not wait for the next scheduled tick. n8n should listen for this signal and send the next step as the response.
+
+---
+
+## Story Mode
+
+Story mode layers a scripted, sequential narrative on top of the simulation. Steps are generated on-the-fly by an LLM via n8n and delivered through the existing `applySimParams` channel (heartbeat response). The sim has no built-in story state machine — n8n owns sequencing and branching; the sim just plays the current step and reports when it is done.
+
+### Step fields (sent by n8n in any `applySimParams` response)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `step` | any | Step identifier — echoed back in every heartbeat so n8n can correlate. Receiving a new `step` resets all completion state |
+| `stepDuration` | number | Seconds until the step auto-completes. When elapsed, `storyStepComplete` flips to `true` and an immediate out-of-cycle heartbeat fires |
+| `stepStatus` | `"IDLE"` \| `"DRAW"` \| `"VOTE"` | Spectator interaction mode for this step (see below). Defaults to `"IDLE"` when a new step arrives without an explicit value |
+| `optionA` | string | Label for the first vote option — required when `stepStatus` is `"VOTE"` |
+| `optionB` | string | Label for the second vote option — required when `stepStatus` is `"VOTE"` |
+| `caption` | string \| null | Subtitle text drawn at the bottom of the simulation canvas as a particle attractor (white glyphs, same pipeline as `traceText`). Word-wrapped to 80 % canvas width. `null` or `""` clears it |
+
+A minimal narration step:
+```json
+{ "step": 1, "stepDuration": 10, "stepStatus": "IDLE", "caption": "I am a voice from the future.", "status": "IDLE" }
+```
+
+A vote step:
+```json
+{ "step": 2, "stepDuration": 30, "stepStatus": "VOTE", "optionA": "House", "optionB": "Garden", "caption": "Where do we look?" }
+```
+
+### `stepStatus` — spectator interaction modes
+
+| Value | Remote UI | Gesture surface |
+|-------|-----------|-----------------|
+| `"IDLE"` | Default atmospheric surface | Disabled (no touch events sent) |
+| `"DRAW"` | Default atmospheric surface | Active — touch spawns agents, tilt/temperature/coherence all live |
+| `"VOTE"` | Two full-screen buttons labelled `optionA` / `optionB` | Hidden behind vote panel |
+
+When `stepStatus` changes the server broadcasts a `story-ui` Socket.IO event to all spectators in the room. The remote page switches its interface immediately.
+
+### Vote mechanics
+
+- Each spectator can vote once per step (subsequent taps overwrite their previous vote)
+- Server counts A vs B votes and emits a running `story-vote-update` tally to the host sim after every vote change
+- The sim tracks the current leader in `storyVoteResult`
+- When `stepDuration` expires, `storyVoteResult` holds whichever option was leading; `null` on a tie
+- n8n reads `storyVoteResult` from the immediate out-of-cycle heartbeat and branches accordingly
+- Votes are cleared automatically when a new `story-ui` event is broadcast (i.e. when a new step arrives)
+
+### Caption
+
+The `caption` field draws text at the bottom of the simulation canvas using the same white-glyph-on-transparent-background technique as `traceText`. Agents home to the letterforms, making the caption feel like part of the particle field rather than a DOM overlay. It is rendered as a separate layer below the QR (if visible) and persists until explicitly cleared.
 
 ---
 

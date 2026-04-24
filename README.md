@@ -384,7 +384,7 @@ The image is never rendered directly — it is felt through collective agent den
 
 | Control | Description |
 |---------|-------------|
-| homing speed | px/frame agents move toward their home when homing is active |
+| homing speed | px/frame agents move toward their home when homing is active (0–50, default 30) |
 | alpha threshold | Min image alpha required at an agent's home to activate homing |
 | black cutoff | Luminance below which pixels are treated as fully transparent |
 | edge fade | Width of smooth rectangular fade applied to all four image edges |
@@ -550,8 +550,14 @@ The **n8n test mode** toggle in the GUI switches between production and test pat
 
 ```json
 {
-  "type": "heartbeat",
-  "room": "session-UUID",
+  "type":              "heartbeat",
+  "room":              "session-UUID",
+  "status":            "NORMAL",
+  "qrStatus":          "HIDE",
+  "step":              2,
+  "storyStepComplete": false,
+  "storyVoteResult":   null,
+  "stepStatus":        "IDLE",
   "params": {
     "agentCount": 1200000,
     "stepLen": 2.0,
@@ -561,6 +567,8 @@ The **n8n test mode** toggle in the GUI switches between production and test pat
   }
 }
 ```
+
+When a story step completes (`storyStepComplete` flips to `true`), an **out-of-cycle heartbeat** fires immediately so n8n does not have to wait for the next scheduled tick.
 
 ### Response format (`applySimParams`)
 
@@ -577,12 +585,26 @@ Both endpoints consume the same response format. Return a JSON object with any c
 | `status` | `"NORMAL" \| "IDLE"` | Set simulation state (`IDLE` suspends formula steering and wind) |
 | `dir` | `string` | New direction formula (WGSL expression returning radians) |
 | `wind` | `string` | New wind formula (WGSL expression returning radians) |
+| `step` | any | Story step ID — resets `storyStepComplete`, `storyVoteResult`, and `stepStatus` for a new step |
+| `stepDuration` | number | Seconds until the step auto-completes and an out-of-cycle heartbeat fires |
+| `stepStatus` | `"IDLE" \| "DRAW" \| "VOTE"` | Spectator interaction mode — relayed to all remote devices via Socket.IO |
+| `optionA` | string | First vote option label (required with `VOTE` steps) |
+| `optionB` | string | Second vote option label (required with `VOTE` steps) |
+| `caption` | `string \| null` | Subtitle text drawn at the bottom of the canvas as a particle attractor; `null` clears it |
 | any `params` key | number/bool | Overwrite the matching simulation parameter live |
 
-Example minimal response:
+Example story step response:
 
 ```json
-{ "traceText": "Hello world", "status": "NORMAL" }
+{
+  "step": 3,
+  "stepDuration": 25,
+  "stepStatus": "VOTE",
+  "optionA": "House",
+  "optionB": "Garden",
+  "caption": "Where do we look?",
+  "status": "IDLE"
+}
 ```
 
 ---
