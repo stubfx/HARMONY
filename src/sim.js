@@ -7,6 +7,7 @@
 // Speed drives brightness. A fading trail accumulates on an offscreen texture.
 
 import { initGUI }      from './gui.js';
+import { startMic, stopAudio, isActive, getVolume } from './audio.js';
 import QRCode           from 'qrcode';
 import { io as ioConnect } from 'socket.io-client';
 import soloSimTemplate  from './shaders/compute.wgsl?raw';
@@ -113,6 +114,8 @@ const params = {
     autoDir:       true,  // randomly cycle dir formula every 30 s
     bounceEdges:   false, // reflect agents at canvas edges instead of wrapping
     useDeltaTime:  true,  // false = fixed 1/60 s timestep (no frame-spike compensation)
+    // Audio reactivity
+    audioFloor:    0.1,   // brightness multiplier when fully silent (0 = black, 1 = no effect)
 };
 
 // ── URL param overrides ───────────────────────────────────────────────────────
@@ -1740,7 +1743,10 @@ function writeRenderUB() {
     f[13] = tinted[0];
     f[14] = tinted[1];
     f[15] = tinted[2];
-    f[16] = params.brightness + burstBrightness;
+    const audioMult = isActive()
+        ? params.audioFloor + (1 - params.audioFloor) * getVolume()
+        : 1.0;
+    f[16] = (params.brightness + burstBrightness) * audioMult;
     f[17] = params.alphaThreshold;
     f[18] = params.blackThreshold;
     f[19] = simState.qrStatus === 'SHOW' ? 0 : params.vignetteEdge;

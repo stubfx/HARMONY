@@ -1,4 +1,5 @@
 import GUI from 'lil-gui';
+import { startMic, stopAudio, isActive } from './audio.js';
 
 // ── GUI initialisation ────────────────────────────────────────────────────────
 // Call once after all sim functions are defined.
@@ -152,6 +153,25 @@ export function initGUI({
     fSession.add(params, 'maxSpectators',            1,  50,  1   ).name('QR hides at N users');
     fSession.add(params, 'n8nTestMode').name('n8n test mode').onChange(v => socket.emit('set-n8n-test-mode', v));
     fSession.add(params, 'heartbeatInterval', 0, 120, 5).name('heartbeat (s)').onChange(() => restartHeartbeat());
+
+    // ── Audio ─────────────────────────────────────────────────────────────────
+    const fAudio = gui.addFolder('Audio');
+    const _audioState = { mic: false };
+    fAudio.add(_audioState, 'mic').name('microphone').onChange(async v => {
+        if (v) {
+            try {
+                await startMic();
+            } catch (e) {
+                console.warn('[audio] mic denied:', e);
+                _audioState.mic = false;
+                fAudio.controllersRecursive().find(c => c.property === 'mic')?.updateDisplay();
+            }
+        } else {
+            stopAudio();
+        }
+    });
+    fAudio.add(params, 'audioFloor', 0, 1, 0.01).name('silence floor');
+    fAudio.close();
 
     // ── Debug ─────────────────────────────────────────────────────────────────
     const fDebug = gui.addFolder('Debug');
