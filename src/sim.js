@@ -277,7 +277,7 @@ const agentBuf = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 const soloUB = device.createBuffer({
-    size: 148, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
     size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -703,8 +703,7 @@ function updateQROverlay() {
 //
 // The resulting texture covers the full screen, so getImageRegion() returns the
 // full-screen rect and agents can home to any bright pixel on screen.
-let captionText  = ''; // story caption — drawn at bottom of trace canvas like subtitle
-let avoidYMax    = 1.0; // fraction of canvas height the avoid map covers (1 = full screen)
+let captionText = ''; // story caption — drawn at bottom of trace canvas like subtitle
 
 function renderTraceCanvas() {
     if (!device) return;
@@ -746,83 +745,35 @@ function renderTraceCanvas() {
     const ctx = traceCanvas.getContext('2d');
     ctx.clearRect(0, 0, tcW, tcH);
 
-    // ── Layout: caption zone ─────────────────────────────────────────────────
-    // When both image and caption are present the canvas is split vertically:
-    //   [0 … imageZoneH)         → image (cover-fit)
-    //   [imageZoneH … tcH)       → caption (auto-sized, capped at 40 % of canvas)
-    // When only one is present it fills the full canvas.
-    const MAX_CAPTION_FRAC = 0.40;
-    const CAPTION_V_PAD    = Math.round(minDim * 0.04); // internal top+bottom padding
-
-    let captionZoneH  = 0;
-    let captionLines  = [];
-    let captionFS     = 0;
-
-    if (hasCaption) {
-        const maxW = tcW * 0.80;
-        let fs     = Math.round(minDim * params.captionSize);
-
-        const wrap = size => {
-            ctx.font = `bold ${size}px sans-serif`;
-            const words = captionText.split(/\s+/);
-            const ls = [];
-            let cur = '';
-            for (const w of words) {
-                const test = cur ? `${cur} ${w}` : w;
-                if (ctx.measureText(test).width > maxW && cur) { ls.push(cur); cur = w; }
-                else cur = test;
-            }
-            if (cur) ls.push(cur);
-            return ls;
-        };
-
-        captionLines = wrap(fs);
-        const maxH   = Math.round(tcH * (imageBitmap ? MAX_CAPTION_FRAC : 1.0));
-        let blockH   = captionLines.length * Math.round(fs * 1.35) + CAPTION_V_PAD * 2;
-
-        if (blockH > maxH) {
-            fs           = Math.max(8, Math.round(fs * maxH / blockH));
-            captionLines = wrap(fs);
-            blockH       = captionLines.length * Math.round(fs * 1.35) + CAPTION_V_PAD * 2;
-        }
-
-        captionFS    = fs;
-        captionZoneH = imageBitmap ? Math.min(blockH, maxH) : 0;
-    }
-
-    const imageZoneH = tcH - captionZoneH;
-    avoidYMax = imageZoneH / tcH; // keep avoid map aligned with the image zone
-
-    // Layer 0: image — cover-fit to the image zone (full canvas when no caption)
+    // Layer 0: user image — cover-fit to fill the full trace canvas
     if (imageBitmap) {
-        const dstW = tcW, dstH = imageZoneH;
-        const imgA = imageBitmap.width / imageBitmap.height;
-        const dstA = dstW / Math.max(dstH, 1);
+        const imgAspect    = imageBitmap.width / imageBitmap.height;
+        const canvasAspect = tcW / tcH;
         let sx, sy, sw, sh;
-        if (imgA > dstA) {
-            sh = imageBitmap.height; sw = sh * dstA;
-            sx = (imageBitmap.width - sw) / 2; sy = 0;
+        if (imgAspect > canvasAspect) {
+            sh = imageBitmap.height;
+            sw = sh * canvasAspect;
+            sx = (imageBitmap.width - sw) / 2;
+            sy = 0;
         } else {
-            sw = imageBitmap.width; sh = sw / dstA;
-            sx = 0; sy = (imageBitmap.height - sh) / 2;
+            sw = imageBitmap.width;
+            sh = sw / canvasAspect;
+            sx = 0;
+            sy = (imageBitmap.height - sh) / 2;
         }
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(0, 0, dstW, dstH);
-        ctx.clip();
-        ctx.drawImage(imageBitmap, sx, sy, sw, sh, 0, 0, dstW, dstH);
-        ctx.restore();
+        ctx.drawImage(imageBitmap, sx, sy, sw, sh, 0, 0, tcW, tcH);
     }
 
-    // Layer 1: trace text — positioned over the image zone
+    // Layer 2: text — at (imageX, imageY), multi-line when no image is present
     if (hasText) {
         ctx.fillStyle    = 'white';
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
         const cx = params.imageX * tcW;
-        const cy = params.imageY * imageZoneH;
+        const cy = params.imageY * tcH;
 
         if (!imageBitmap) {
+            // Multi-line word-wrap centered on (cx, cy)
             const fontSize = Math.round(minDim * 0.10);
             ctx.font = `bold ${fontSize}px sans-serif`;
             const maxW  = tcW * 0.88;
@@ -839,6 +790,7 @@ function renderTraceCanvas() {
             const startY = cy - ((lines.length - 1) * lineH) / 2;
             lines.forEach((ln, i) => ctx.fillText(ln, cx, startY + i * lineH));
         } else {
+            // Single line over an image — shrink font to fit width
             let fontSize = minDim * 0.72;
             ctx.font = `bold ${Math.round(fontSize)}px sans-serif`;
             const measured = ctx.measureText(text).width;
@@ -851,15 +803,27 @@ function renderTraceCanvas() {
         }
     }
 
-    // Caption: always anchored to the bottom of the canvas
+    // Caption layer: word-wrapped text anchored to the bottom center, subtitle-sized
     if (hasCaption) {
         ctx.fillStyle    = 'white';
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'alphabetic';
-        ctx.font         = `bold ${captionFS}px sans-serif`;
-        const lineH  = Math.round(captionFS * 1.35);
-        const startY = tcH - CAPTION_V_PAD - (captionLines.length - 1) * lineH;
-        captionLines.forEach((ln, i) => ctx.fillText(ln, tcW / 2, startY + i * lineH));
+        const fontSize = Math.round(minDim * params.captionSize);
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        const maxW  = tcW * 0.80;
+        const words = captionText.split(/\s+/);
+        const lines = [];
+        let cur = '';
+        for (const w of words) {
+            const test = cur ? `${cur} ${w}` : w;
+            if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = w; }
+            else cur = test;
+        }
+        if (cur) lines.push(cur);
+        const lineH      = Math.round(fontSize * 1.35);
+        const bottomY    = tcH - Math.round(minDim * 0.05);
+        const startY     = bottomY - (lines.length - 1) * lineH;
+        lines.forEach((ln, i) => ctx.fillText(ln, tcW / 2, startY + i * lineH));
     }
 
     // Topmost layer: QR — always drawn last so it is never obscured by user content
@@ -1743,7 +1707,6 @@ function writeSoloUB(dt, time) {
     f[32] = params.homingInfluence;
     u[33] = activeSlots.length;
     f[34] = Math.min(params.spectatorSpawnChance * activeSlots.length * params.spectatorSpawnMultiplier, 1.0);
-    f[35] = avoidYMax;
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
@@ -1872,7 +1835,7 @@ function writeContamUB() {
 }
 
 // ── Pre-allocated uniform buffers (reused every frame to avoid GC pressure) ──
-const _soloAB  = new ArrayBuffer(148); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
+const _soloAB  = new ArrayBuffer(144); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
 const _renderAB= new ArrayBuffer(112); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
 const _fadeAB  = new ArrayBuffer(16);  const _fadeF  = new Float32Array(_fadeAB);
 const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB);
