@@ -46,7 +46,7 @@ The sim sends this every `heartbeatInterval` seconds (default: 5 s). Use it to k
 |-------|------|-------------|
 | `type` | `"heartbeat"` | Always `"heartbeat"` |
 | `room` | `string` | Session room UUID |
-| `status` | `"NORMAL"` \| `"IDLE"` | Current simulation state |
+| `status` | `"NORMAL"` \| `"FREEROAM"` \| `"DOT"` | Current simulation state |
 | `qrStatus` | `"SHOW"` \| `"HIDE"` | Whether the QR code is the active magnet image |
 | `params` | `object` | Full snapshot of all current sim params (see below) |
 
@@ -62,7 +62,7 @@ These keys trigger immediate side-effects and are **not** stored in `params`.
 
 | Key | Type | Effect |
 |-----|------|--------|
-| `status` | `"NORMAL"` \| `"IDLE"` | Switches the simulation state. `IDLE` suppresses mouse/touch input and agent magnetism. |
+| `status` | `"NORMAL"` \| `"FREEROAM"` \| `"DOT"` | Switches the simulation state. `FREEROAM` suspends formula steering and wind; `DOT` applies a fixed inward-spiral attractor. |
 | `showQR` | `true` \| `false` | `true` — enables the QR layer on the trace canvas (drawn on top of any user content). `false` — hides the QR layer; user content remains unaffected. |
 | `restart` | `true` | Re-seeds all agents at random positions with fresh velocities. |
 | `clearTrace` | `true` | Clears the magnet image AND the text trace layer. |

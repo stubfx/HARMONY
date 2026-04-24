@@ -243,7 +243,7 @@ export function initGUI({
 
     gui.add({ restart: () => seedAgents() }, 'restart').name('↺  Restart');
 
-    const stateCtrl   = gui.add(simState, 'status',   ['NORMAL', 'IDLE', 'DOT']).name('status');
+    const stateCtrl   = gui.add(simState, 'status',   ['NORMAL', 'FREEROAM', 'DOT']).name('status');
     const qrStateCtrl = gui.add(simState, 'qrStatus').name('qr').disable();
 
     fMotion.open();

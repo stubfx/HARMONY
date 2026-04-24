@@ -586,7 +586,7 @@ Both endpoints consume the same response format. Return a JSON object with any c
 | `showQR` | `bool` | `true` = restore QR; `false` = clear trace image |
 | `avoidMap` | `string \| null` | Load a new avoidance map from a base64 data URL or HTTPS URL; `null` clears it |
 | `restart` | `bool` | Re-seed all agents |
-| `status` | `"NORMAL" \| "IDLE"` | Set simulation state (`IDLE` suspends formula steering and wind) |
+| `status` | `"NORMAL" \| "FREEROAM" \| "DOT"` | Set simulation state (`FREEROAM` suspends formula steering and wind; `DOT` applies a fixed inward-spiral attractor) |
 | `dir` | `string` | New direction formula (WGSL expression returning radians) |
 | `wind` | `string` | New wind formula (WGSL expression returning radians) |
 | `step` | any | Story step ID — resets `storyStepComplete`, `storyVoteResult`, and `stepStatus` for a new step |
@@ -607,7 +607,7 @@ Example story step response:
   "optionA": "House",
   "optionB": "Garden",
   "caption": "Where do we look?",
-  "status": "IDLE"
+  "status": "FREEROAM"
 }
 ```
 

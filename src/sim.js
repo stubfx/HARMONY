@@ -1012,7 +1012,7 @@ const rndPick   = arr => arr[Math.floor(Math.random() * arr.length)];
 //                    Independent of user content — both can be visible simultaneously.
 //           'HIDE' — QR layer is skipped; only user content (image/text) is drawn.
 // status:   'NORMAL' — formula steering + wind active, auto-cycling runs
-//           'IDLE'   — no formula, no wind; particles drift freely on momentum
+//           'FREEROAM' — no formula, no wind; particles drift freely on momentum
 //           'DOT'    — fixed inward-spiral formulas; wind + formula forced on regardless of params
 const simState = {
     qrStatus:          'HIDE',
@@ -1402,7 +1402,7 @@ function applySimParams(data) {
         if (optionB !== undefined) simState.optionB = optionB;
         socket.emit('story-ui', { stepStatus: simState.stepStatus, optionA: simState.optionA, optionB: simState.optionB });
     }
-    if (status === 'NORMAL' || status === 'IDLE' || status === 'DOT') {
+    if (status === 'NORMAL' || status === 'FREEROAM' || status === 'DOT') {
         simState.status = status;
         if (status === 'DOT') applyFormulas(DOT_DIR, DOT_WIND);
         updateStateDisplay();
@@ -1489,7 +1489,7 @@ windInput.value = DOT_WIND;
 
 // ── Auto formula cycle — random pick every 30 s ───────────────────────────────
 // Each flag is checked independently; both can fire in the same tick.
-// STATUS=IDLE suspends cycling; followFormula / windEnabled guard the rest.
+// STATUS=FREEROAM suspends cycling; followFormula / windEnabled guard the rest.
 setInterval(() => {
     if (simState.status !== 'NORMAL') return;
 
@@ -1671,7 +1671,7 @@ function writeSoloUB(dt, time) {
     f[3] = params.stepLen;
     f[4] = dt;
     f[5] = time;
-    const isIdle = simState.status === 'IDLE';
+    const isIdle = simState.status === 'FREEROAM';
     const isDot  = simState.status === 'DOT';
     f[6] = isIdle ? 0.0 : (isDot || params.windEnabled ? params.windStr : 0.0);
     f[7] = params.turnRate * coherenceMult;  // coherence scales how sharply agents follow the formula

@@ -785,7 +785,7 @@ Seconds between periodic snapshots sent to n8n at `/webhook/heartbeat` (or `/web
 |-------|-------------|
 | `room` | Session UUID assigned at socket connect — stable for the page lifetime |
 | `spectators` | Live connected-device count synced from the server |
-| `status` | Simulation state machine: `"NORMAL"` or `"IDLE"` |
+| `status` | Simulation state machine: `"NORMAL"`, `"FREEROAM"`, or `"DOT"` |
 | `qrStatus` | QR visibility: `"SHOW"` or `"HIDE"` |
 | `step` | Current story step ID as sent by n8n; `null` when not in story mode |
 | `storyStepComplete` | `true` once the step's duration has elapsed or a vote has settled |
@@ -816,7 +816,7 @@ Story mode layers a scripted, sequential narrative on top of the simulation. Ste
 
 A minimal narration step:
 ```json
-{ "step": 1, "stepDuration": 10, "stepStatus": "IDLE", "caption": "I am a voice from the future.", "status": "IDLE" }
+{ "step": 1, "stepDuration": 10, "stepStatus": "IDLE", "caption": "I am a voice from the future.", "status": "FREEROAM" }
 ```
 
 A vote step:
