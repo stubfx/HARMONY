@@ -233,21 +233,19 @@ The timer restarts whenever content changes. The QR is immune to auto-clear.
 
 ## Remote Spectator Interactions
 
-Spectators open the `/remote/` page on their phones. The page is intentionally minimal — a dark full-screen surface with no labels or visible controls. Three interaction channels feed the simulation collectively:
+Spectators open the `/remote/` page on their phones. The page has a virtual joystick centered on screen, a color picker and text input always visible at the top, and tilt support. The join button reads "swarm". A star field canvas (65 stars drifting counter to joystick direction, streaking on fast moves) is visible only in DRAW mode.
 
 | Channel | Phone gesture | Aggregation | Simulation effect |
 |---------|--------------|-------------|-------------------|
+| **Joystick** | Use the virtual joystick | Forwarded directly as `remote-event` | Moves the spectator's spawner across the canvas; agents teleport to spawner at scaled spawn chance |
+| **Color** | Color picker at top of page | Forwarded directly to simulation | Assigned color for that spectator's agents |
 | **Tilt** | Hold and tilt phone in any direction | Server averages all pitch/roll vectors | Collective wind bias — the whole field leans with the crowd |
-| **Temperature** | Touch anywhere — Y position matters | Server averages all touch Y values | Speed-color hue: cold blue (finger at top) → warm amber (finger at bottom) |
-| **Coherence** | Touch anywhere — X position matters | Server averages all touch X values | turnRate multiplier: left = agents drift chaotically, right = agents snap to formula |
-| **Text** | Type in the bottom input | Forwarded directly to simulation | Trace attractor — particle field writes the word |
-
-No single person steers the simulation. The field responds to the *average* of everyone's input. Individual gestures dissolve into the collective.
+| **Text** | Type in the text input at top | Forwarded directly to simulation | Trace attractor — particle field writes the word |
 
 ### Feedback loops
 
 - **On the big screen**: every new spectator join fires a brief directional gust in the particle field — a visible pulse that confirms the join without any text or notification
-- **On the phone**: the aura behind the screen reflects all three axes simultaneously (hue = temperature, tightness = coherence, anchor point = tilt). When another spectator joins, all phones feel a brief aura dimming pulse.
+- **On the phone**: the aura behind the screen reflects the selected color (center hue) and tilt (gradient anchor point). When another spectator joins, all phones feel a brief aura dimming pulse.
 - **Tilt indicator**: after motion permission is granted, a small bubble appears at the center of the phone screen and moves with the physical phone orientation.
 
 See [behavior.md](behavior.md) for the full art-direction intent behind these interactions.
@@ -388,7 +386,7 @@ The image is never rendered directly — it is felt through collective agent den
 | alpha threshold | Min image alpha required at an agent's home to activate homing |
 | black cutoff | Luminance below which pixels are treated as fully transparent |
 | edge fade | Width of smooth rectangular fade applied to all four image edges |
-| size | Image footprint as fraction of `min(canvasW, canvasH)`; aspect ratio preserved |
+| size | Controls trace text overlay positioning; the trace image is always drawn fullscreen cover-fit (centered, aspect-ratio-preserving crop) |
 | show image | Grayscale debug overlay of the loaded image |
 | mouse eraser | Treat the mouse cursor as a live contamination point (toggle, default on) |
 | eraser radius | Radius in canvas pixels of each contamination circle |
@@ -420,6 +418,12 @@ An invisible grayscale mask that repels free agents. White areas push agents awa
 
 | Control | Description |
 |---------|-------------|
+| spawn chance (base) | Base per-frame teleport probability, scaled by `users × spawn multiplier` |
+| spawn multiplier | Scales spawn chance by active user count (default 3) |
+| spawner speed | Canvas fractions/sec the spawner moves at full joystick deflection |
+| spawner velocity boost | Extra speed when joystick is flicked fast |
+| spawner steering | Direction change rate (1/s); lower = wider curves |
+| spawner timeout (s) | Seconds of joystick silence before spawner deactivates |
 | idle restore QR (s) | Seconds of silence from all remotes before QR trace is restored; 0 = disabled |
 | QR hides at N users | Remote page QR fades when `userCount` reaches this threshold |
 | n8n test mode | When on, calls `/webhook-test/` paths instead of `/webhook/`; no rebuild needed |
@@ -684,9 +688,11 @@ thesis-sim/
 ├── remote/
 │   ├── index.html           Spectator page (served at /remote/?s=<uuid>);
 │   │                        includes persistent #session-qr canvas (bottom-right corner)
-│   ├── main.js              Socket.IO client — tilt, touch (temp+coherence), text events;
-│   │                        aura reflects all three axes; peer-joined/peer-left for QR
-│   │                        visibility; QR auto-hides on first interaction or full room
+│   ├── main.js              Socket.IO client — joystick (spawner direction + velocity),
+│   │                        tilt (personal wind), color picker, text events; star field
+│   │                        canvas drifts counter to joystick; aura reflects tilt and
+│   │                        selected color; peer-joined/peer-left for QR visibility;
+│   │                        QR auto-hides on first interaction or full room
 │   ├── style.css            Dark atmospheric design, ripple animation, tilt indicator,
 │   │                        session-qr fade transition
 │   ├── gyro.js              Device orientation helpers (pitch, roll, motion magnitude)

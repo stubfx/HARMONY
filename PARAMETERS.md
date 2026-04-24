@@ -57,7 +57,6 @@ The nominal step length an agent wants to travel each frame, in canvas pixels. A
 
 How sharply each agent steers toward the direction formula each frame. This is a `mix` factor: `vel = mix(vel, desired, turnRate)`. At 0 the agent ignores the formula entirely and coasts on inertia. At 1 the agent snaps to the desired direction immediately. Low values produce long, sweeping curves; high values produce tight, reactive motion.
 
-> **Collective coherence modulation**: this value is scaled every frame by the smoothed average of all spectators' horizontal touch position (left = chaos multiplier 0.08×, right = order multiplier 3.0×, neutral = 1.0×). The GUI value sets the baseline; the crowd scales it. See *Remote / Swarm Inputs* below.
 
 ### max speed
 **Range:** 1 – 15 | **Default:** 5.0
@@ -161,8 +160,6 @@ The color of slow or stationary agents. This is the low end of the speed-to-colo
 
 The color agents approach as their speed reaches `max speed`. The two colors are blended linearly using `speed / maxSpeed` as the interpolation factor.
 
-> **Collective temperature tint**: before the color is written to the GPU each frame, it is blended up to 65% toward a temperature target driven by the average spectator touch Y position. Cold (top of phone screen) tints toward deep blue `#0d26e6`; warm (bottom) tints toward amber `#ff6600`. At neutral (no spectators touching) the GUI color is used unchanged.
-
 ### brightness
 **Range:** 0.01 – 0.5 | **Default:** 0.08
 
@@ -260,7 +257,7 @@ The avoidance map uses the same multiplier. At 0, avoidance is disabled and free
 ### size (`imageSize`)
 **Range:** 0.05 – 1.0 | **Default:** 0.316
 
-The image footprint as a fraction of `min(canvasWidth, canvasHeight)`. The image is always centered on the canvas. Aspect ratio is preserved: the reference dimension (the shorter side of the image) is set to `size × min(canvasW, canvasH)`, and the other dimension scales proportionally. At 1.0 the shorter image dimension spans the full shorter canvas dimension.
+The uploaded trace image is always drawn with CSS `object-fit: cover` behaviour — centered and aspect-ratio-preserving, cropped to fill the full trace canvas. The `imageSize`, `imageX`, and `imageY` parameters no longer control image placement; they control the positioning of the **trace text overlay** on top of the image.
 
 ### show image
 **Default:** off
@@ -487,9 +484,9 @@ Re-seeds all agents: positions are randomised from screen centre, home coordinat
 
 ## Remote / Swarm Inputs
 
-Spectators open `/remote/?s=<uuid>` on their phones. The page is a dark, minimal gesture surface — no labels, no buttons at rest. Three channels feed the simulation. Temperature and coherence are aggregated collectively; tilt is personal.
+Spectators open `/remote/?s=<uuid>` on their phones. The page features a virtual joystick centered on screen, a color picker and text input always visible at the top, and tilt support. Temperature and coherence are no longer sent from the remote page. Tilt is personal. A star field canvas (65 stars drifting counter to joystick direction, streaking on fast moves) is visible only in DRAW mode (story mode). The join button reads "swarm" and the device message is shown large and centered.
 
-The server maintains a per-room state table (one entry per connected spectator, pruned after 15 s of inactivity). Every 300 ms it computes averages and emits `collective-state` to the host simulation for temperature and coherence, where values are smoothed with an exponential moving average (~0.8 s time constant) before being applied.
+The server maintains a per-room state table (one entry per connected spectator, pruned after 15 s of inactivity). Every 300 ms it computes averages and emits `collective-state` to the host simulation for tilt, where values are smoothed with an exponential moving average (~0.8 s time constant) before being applied.
 
 ---
 
@@ -512,37 +509,12 @@ This value is stored per-slot in `SpectatorSlot.windX` / `.windY` in the GPU sto
 
 ---
 
-### Temperature — collective color mood
+### Joystick — personal spawner
 
-**Phone gesture:** touch anywhere on the screen; the **vertical position** of your finger determines temperature.
-**Data sent:** `temp` value derived from touch Y — `0` (finger at top, cold) to `1` (finger at bottom, warm).
-**Aggregation:** server averages all active spectators' temperature values.
-**Effect:** the smoothed average temperature tints the `fast color` (speed color) every frame by up to 65%:
-
-| avgTemp | Color shift |
-|---------|-------------|
-| 0.0 | Deep blue `#0d26e6` |
-| 0.5 | Your GUI `fast color` unchanged |
-| 1.0 | Amber `#ff6600` |
-
-The blend is nonlinear: the GUI color is always the neutral anchor at 0.5, fading toward cold or warm as the crowd drifts toward either extreme. This affects the fast-color only; the `base color` is unchanged.
-
----
-
-### Coherence — collective order vs chaos
-
-**Phone gesture:** touch anywhere on the screen; the **horizontal position** of your finger determines coherence.
-**Data sent:** `x` value from touch position — `0` (left edge) to `1` (right edge).
-**Aggregation:** server averages all active spectators' X positions.
-**Effect:** the smoothed average coherence is applied as a multiplier on `turnRate` every frame:
-
-| avgCoherence | Multiplier | Field character |
-|---|---|---|
-| 0.0 (all left) | 0.08× | Agents barely steer — each follows its own momentum, field dissolves into texture |
-| 0.5 (centre) | 1.0× | GUI `turn rate` unchanged |
-| 1.0 (all right) | 3.0× | Agents snap instantly to formula — field becomes crystalline, almost rigid |
-
-The transition is smooth. A crowd touching left and right simultaneously averages to neutral. The effect is most visible when many spectators coordinate.
+**Phone gesture:** use the virtual joystick centered on the remote page.
+**Data sent:** `dx`, `dy`, `magnitude` (0–1), `velocity` (0–1, normalized finger speed). Throttled to 300 ms; velocity is computed from finger speed.
+**Routing:** forwarded directly as `remote-event` (not aggregated server-side).
+**Effect:** moves the spectator's personal spawner position across the canvas each frame. Each frame the spawner advances along the smoothed joystick direction at `spawnerSpeed × magnitude × (1 + velocity × spawnerVelocityBoost)`. Direction lerps toward the joystick target at `spawnerSteering` (1/s). Spawner position wraps toroidally. After `spawnerInactiveTimeout` seconds of no joystick input the spawner deactivates; on re-activation it receives a new random canvas position. Agents from that spectator's partition teleport to the spawner position at scaled spawn chance each frame.
 
 ---
 
@@ -558,19 +530,23 @@ The transition is smooth. A crowd touching left and right simultaneously average
 
 #### The slot system
 
-When a spectator joins, the server emits `spectator-joined` with their persistent UUID. The simulation creates an entry in `activeSlots[]` — a JavaScript array, one object per connected spectator (max 16). Each entry holds all per-spectator state: color, touch position, touch state, and tilt-derived wind vector.
+When a spectator joins, the server emits `spectator-joined` with their persistent UUID. The simulation creates an entry in `activeSlots[]` — a JavaScript array, one object per connected spectator (max 16). Each entry holds all per-spectator state: color, joystick-driven spawner position, joystick input, and tilt-derived wind vector.
 
 ```js
 {
   spectatorId: "uuid",
-  colorR, colorG, colorB,   // assigned palette color
-  touchX, touchY,            // last touch position (0–1 each axis)
-  isTouching,                // 1 while finger is down
-  windX, windY               // tilt bias (0,0 = portrait neutral)
+  colorR, colorG, colorB,           // assigned palette color
+  spawnerX, spawnerY,                // joystick-driven spawner position (0–1 each axis)
+  spawnerLocationActive,             // 1 while joystick is active (not timed out)
+  dx, dy, magnitude,                 // last joystick direction + magnitude
+  velocity,                          // normalized finger speed (0–1)
+  _smoothDx, _smoothDy,              // sim-side smoothed direction (not uploaded to GPU)
+  windX, windY,                      // tilt bias (0,0 = portrait neutral)
+  lastInputTime                      // timestamp of last joystick event (ms)
 }
 ```
 
-Every time any field changes (join, leave, touch, tilt), `uploadSpectatorSlots()` serializes the entire array into a flat 768-byte `ArrayBuffer` and writes it to `spectatorSlotsBuf` — a GPU storage buffer bound at `@binding(6)` in the compute shader and `@binding(4)` in the render shader. The GPU always sees the full current state.
+Every time any field changes (join, leave, joystick, tilt), `uploadSpectatorSlots()` serializes the entire array into a flat 768-byte `ArrayBuffer` and writes it to `spectatorSlotsBuf` — a GPU storage buffer bound at `@binding(6)` in the compute shader and `@binding(4)` in the render shader. The GPU always sees the full current state.
 
 The buffer holds 16 fixed slots of 48 bytes each:
 
@@ -596,16 +572,18 @@ Each spectator owns exactly `agentCount / spectatorCount` agents. The assignment
 
 When spectators join or leave, `spectatorCount` changes and the modulo re-partitions all agents instantly — no re-seeding required.
 
+The GPU SpectatorSlot struct now has `spawnerX`, `spawnerY`, `spawnerLocationActive` instead of `touchX`, `touchY`, `isTouching`.
+
 #### What each shader does with the slot
 
-- **compute.wgsl** — reads `windX`/`windY` to override wind for that agent, and reads `touchX`/`touchY`/`isTouching` to probabilistically teleport the agent to the touch point. Homing agents (primed = 1) are exempt from teleport.
+- **compute.wgsl** — reads `windX`/`windY` to override wind for that agent, and reads `spawnerX`/`spawnerY`/`spawnerLocationActive` to probabilistically teleport the agent to the spawner position. Homing agents (primed = 1) are exempt from teleport.
 - **render.wgsl** — reads `colorR`/`colorG`/`colorB` to replace the base color for that agent. The color blends toward the global `fast color` at high speed, exactly as the base color would.
 
 #### Per-spectator interactions
 
 **Color**: assigned from a fixed 16-color palette on join. Immediately pushed to the spectator's phone via `device-message`, overriding the aura color — a private visual confirmation of which slice is theirs.
 
-**Touch-spawn**: while a spectator holds their finger on the screen, a fraction of their assigned agents teleport to the corresponding canvas position each frame. The phone screen maps directly to the canvas: a finger at 30% across / 70% down places agents at 30% × canvasW, 70% × canvasH. Rate is controlled by `spectatorSpawnChance` (default 1%). Lifting the finger stops spawning immediately.
+**Joystick-spawn**: while a spectator's spawner is active (joystick in use and not timed out), a fraction of their assigned agents teleport to the spawner position each frame. The effective spawn chance is `spectatorSpawnChance × activeUsers × spectatorSpawnMultiplier` (capped at 1.0). When the joystick is idle for `spawnerInactiveTimeout` seconds the spawner deactivates and spawning stops.
 
 **Tilt-wind**: when a spectator tilts their phone, the wind force for their assigned agents is overridden with a personal tilt-derived vector. Portrait upright = zero wind. Tilting in any direction pushes their slice of the field proportionally. Other spectators' agents and unassigned agents follow the normal wind formula unchanged.
 
@@ -625,12 +603,11 @@ When the same event fires, all other connected phones receive `peer-joined` and 
 
 ### Remote page aura — per-user feedback
 
-The atmospheric glow behind the phone screen reflects all three interaction axes simultaneously:
+The atmospheric glow behind the phone screen reflects the spectator's color selection and tilt:
 
 | Axis | Visual effect |
 |------|--------------|
-| Temperature (touch Y) | Hue: deep blue (top) → warm amber (bottom) |
-| Coherence (touch X) | Gradient tightness: wide/diffuse (left) → narrow/focused (right) |
+| Color (swatch or n8n push) | Center hue of the radial gradient |
 | Tilt | Anchor point of the gradient follows the phone's physical lean |
 
 This gives each spectator private, immediate feedback on what they are sending — without showing them what the collective result looks like.
@@ -699,7 +676,7 @@ This is intentional and left as-is — the trapped pixels contribute to the visu
 When all spectators leave or `idle restore QR (s)` seconds pass with no remote activity, `restoreQR()` is called. It re-assigns `qrBitmap` to `imageBitmap`, sets `isQRBitmap`, re-renders the trace canvas, and picks a new random formula. It is a no-op if the QR is already showing or was never generated.
 
 ### Signal routing
-Spectators connect via Socket.IO and emit `user-event` messages. The server always forwards touch/text events directly to the simulation as `'remote-event'`. Tilt events are consumed server-side for aggregation and never forwarded individually.
+Spectators connect via Socket.IO and emit `user-event` messages. The server always forwards joystick/text events directly to the simulation as `'remote-event'`. Tilt events are consumed server-side for aggregation and never forwarded individually.
 
 If `VITE_N8N_BASE_URL` is set, the simulation calls n8n directly (browser HTTPS fetch) on every `remote-event`. The server is not involved in the n8n round-trip. Text events are only applied locally (without n8n) when `VITE_N8N_BASE_URL` is blank.
 
@@ -713,14 +690,53 @@ If two browser windows open with the same UUID (set manually via `?s=<uuid>`), b
 
 ## Session
 
-### spawn chance (`spectatorSpawnChance`)
+### spawn chance (base) (`spectatorSpawnChance`)
 **Range:** 0 – 1 | **Default:** 0.01
 
-Per-frame probability that each agent in a spectator's partition teleports to that spectator's current touch position on the canvas. The check runs independently per agent every frame — at 1% and 1,200,000 agents split across two spectators, roughly 6,000 agents relocate each frame, building a continuous stream toward the finger.
+Base per-frame probability used to compute the effective spawn chance. The actual probability applied each frame is:
 
-Only fires while the spectator's finger is on the screen (`isTouching`). Lifting the finger stops all spawning immediately. Homing agents (those currently converging on a trace pixel) are **never interrupted** by this mechanic — they continue homing regardless of their spectator assignment.
+```
+effectiveSpawnChance = spectatorSpawnChance × activeUsers × spectatorSpawnMultiplier
+```
+
+(capped at 1.0). The check runs independently per agent every frame. Only fires while the spectator's spawner is active (`spawnerLocationActive`). Homing agents (those currently converging on a trace pixel) are **never interrupted** by this mechanic — they continue homing regardless of their spectator assignment.
 
 Raise to 0.05–0.1 for a more explosive, immediately-visible effect; lower to 0.005 for a slow, cumulative drift.
+
+---
+
+### spawn multiplier (`spectatorSpawnMultiplier`)
+**Range:** 0 – 10 | **Default:** 3
+
+Scales the effective spawn chance by the number of active users. Combined with `spectatorSpawnChance` and the live `activeUsers` count in the formula above, this ensures the spawner effect remains perceptible even when only one user is connected while preventing over-saturation at high user counts (the product is capped at 1.0).
+
+---
+
+### spawner speed (`spawnerSpeed`)
+**Range:** 0 – 2 | **Default:** 0.3
+
+Canvas fractions per second the spawner position moves at full joystick deflection (magnitude = 1). The actual speed each frame is `spawnerSpeed × magnitude × (1 + velocity × spawnerVelocityBoost)`.
+
+---
+
+### spawner velocity boost (`spawnerVelocityBoost`)
+**Range:** 0 – 5 | **Default:** 2.0
+
+Extra speed multiplier applied when the joystick is moved fast. At 2.0, a fast flick (velocity ≈ 1) triples the effective speed relative to a slow drag (velocity ≈ 0). Allows precise slow positioning and sweeping fast throws from the same joystick.
+
+---
+
+### spawner steering (`spawnerSteering`)
+**Range:** 1 – 20 | **Default:** 6
+
+Direction lerp rate in 1/s. Lower values produce wide, sweeping arcs as the spawner takes time to turn; higher values allow tighter, more responsive turns. Prevents sharp angle reversals that would look like teleportation.
+
+---
+
+### spawner timeout (s) (`spawnerInactiveTimeout`)
+**Range:** 1 – 30 | **Default:** 5
+
+Seconds of joystick silence before the spawner deactivates. On re-activation after a timeout, the spawner is assigned a new random canvas position.
 
 ---
 
@@ -813,7 +829,7 @@ A vote step:
 | Value | Remote UI | Gesture surface |
 |-------|-----------|-----------------|
 | `"IDLE"` | Default atmospheric surface | Disabled (no touch events sent) |
-| `"DRAW"` | Default atmospheric surface | Active — touch spawns agents, tilt/temperature/coherence all live |
+| `"DRAW"` | Default atmospheric surface | Active — joystick moves spawner, tilt/color all live |
 | `"VOTE"` | Two full-screen buttons labelled `optionA` / `optionB` | Hidden behind vote panel |
 
 When `stepStatus` changes the server broadcasts a `story-ui` Socket.IO event to all spectators in the room. The remote page switches its interface immediately.
