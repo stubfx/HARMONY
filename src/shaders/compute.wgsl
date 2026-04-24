@@ -39,6 +39,7 @@
 //   [128] homingInfluence      f32   (max homing blend weight at dist=0; scales linearly to 0 at dist=canvasW)
 //   [132] spectatorCount       u32   (active connected spectators; 0 = collective wind only)
 //   [136] spectatorSpawnChance f32   (per-frame probability an assigned agent teleports to the touch point)
+//   [140] avoidYMax            f32   (avoid map covers top fraction of canvas [0–1]; 1 = full screen)
 
 struct SoloParams {
     agentCount:     u32,
@@ -76,6 +77,7 @@ struct SoloParams {
     homingInfluence:      f32,
     spectatorCount:       u32,
     spectatorSpawnChance: f32,
+    avoidYMax:            f32,
 }
 
 // Per-spectator partition data — color, joystick spawner position, personal wind.
@@ -167,15 +169,19 @@ fn imgAlphaAt(canvasPx: vec2<f32>, texDims: vec2<u32>) -> f32 {
 // Cover fit: texture scaled so it fills the entire canvas while preserving its
 // aspect ratio (like object-fit:cover) — the larger axis determines the scale,
 // the shorter axis overflows and is cropped. avoidMapScale zooms in/out on top.
+// avoidYMax clips the active zone to the top fraction of the canvas (for caption layout).
 // Returns red channel [0, 1]; 0 outside the visible texture area.
 fn avoidMapStrAt(canvasPx: vec2<f32>) -> f32 {
+    let zoneH = params.canvasH * params.avoidYMax;
+    if (canvasPx.y > zoneH) { return 0.0; }
+
     let dims  = textureDimensions(avoidMapTex, 0u);
     let texSz = vec2<f32>(f32(dims.x), f32(dims.y));
 
-    let coverScale = max(params.canvasW / texSz.x, params.canvasH / texSz.y)
+    let coverScale = max(params.canvasW / texSz.x, zoneH / texSz.y)
                    * params.avoidMapScale;
 
-    let center = vec2<f32>(params.canvasW, params.canvasH) * 0.5;
+    let center = vec2<f32>(params.canvasW * 0.5, zoneH * 0.5);
     let uv     = (canvasPx - center) / (texSz * coverScale) + 0.5;
 
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { return 0.0; }

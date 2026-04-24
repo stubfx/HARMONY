@@ -277,7 +277,7 @@ const agentBuf = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 const soloUB = device.createBuffer({
-    size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 148, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
     size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -703,7 +703,8 @@ function updateQROverlay() {
 //
 // The resulting texture covers the full screen, so getImageRegion() returns the
 // full-screen rect and agents can home to any bright pixel on screen.
-let captionText = ''; // story caption — drawn at bottom of trace canvas like subtitle
+let captionText  = ''; // story caption — drawn at bottom of trace canvas like subtitle
+let avoidYMax    = 1.0; // fraction of canvas height the avoid map covers (1 = full screen)
 
 function renderTraceCanvas() {
     if (!device) return;
@@ -790,6 +791,7 @@ function renderTraceCanvas() {
     }
 
     const imageZoneH = tcH - captionZoneH;
+    avoidYMax = imageZoneH / tcH; // keep avoid map aligned with the image zone
 
     // Layer 0: image — cover-fit to the image zone (full canvas when no caption)
     if (imageBitmap) {
@@ -1741,6 +1743,7 @@ function writeSoloUB(dt, time) {
     f[32] = params.homingInfluence;
     u[33] = activeSlots.length;
     f[34] = Math.min(params.spectatorSpawnChance * activeSlots.length * params.spectatorSpawnMultiplier, 1.0);
+    f[35] = avoidYMax;
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
@@ -1869,7 +1872,7 @@ function writeContamUB() {
 }
 
 // ── Pre-allocated uniform buffers (reused every frame to avoid GC pressure) ──
-const _soloAB  = new ArrayBuffer(144); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
+const _soloAB  = new ArrayBuffer(148); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
 const _renderAB= new ArrayBuffer(112); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
 const _fadeAB  = new ArrayBuffer(16);  const _fadeF  = new Float32Array(_fadeAB);
 const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB);
