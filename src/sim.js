@@ -95,6 +95,7 @@ const params = {
     spectatorSpawnChance:   0.01, // per-frame probability an assigned agent teleports to the spectator's spawner point
     spawnerSpeed:           0.3,  // canvas fractions per second the spawner moves at full joystick deflection
     spawnerVelocityBoost:   2.0,  // multiplier applied to spawnerSpeed when joystick is moved quickly (0 = no boost)
+    spawnerSteering:        6,    // direction-change rate (1/s); lower = wider curves, higher = tighter turns
     spawnerInactiveTimeout: 5,    // seconds of joystick silence before spawner goes inactive
     // Session / QR restore
     remoteTimeout:  0,    // seconds of silence from all remotes before QR is restored (0 = disabled)
@@ -1254,7 +1255,7 @@ let socket;
         if (spectatorId && activeSlots.length < MAX_SPECTATOR_SLOTS) {
             // Start with a neutral white — the phone sends a 'color-pick' immediately
             // after joining with its locally generated palette color, which overwrites this.
-            activeSlots.push({ spectatorId, colorR: 1, colorG: 1, colorB: 1, spawnerX: 0.5, spawnerY: 0.5, spawnerLocationActive: 0, windX: 0, windY: 0, dx: 0, dy: 0, magnitude: 0, velocity: 0, lastInputTime: 0 });
+            activeSlots.push({ spectatorId, colorR: 1, colorG: 1, colorB: 1, spawnerX: 0.5, spawnerY: 0.5, spawnerLocationActive: 0, windX: 0, windY: 0, dx: 0, dy: 0, magnitude: 0, velocity: 0, _smoothDx: 0, _smoothDy: 0, lastInputTime: 0 });
             uploadSpectatorSlots();
         }
     });
@@ -1533,6 +1534,7 @@ const fSession = gui.addFolder('Session');
 fSession.add(params, 'spectatorSpawnChance',   0,   1,  0.01).name('spawn chance');
 fSession.add(params, 'spawnerSpeed',           0,   2,  0.05).name('spawner speed');
 fSession.add(params, 'spawnerVelocityBoost',   0,   5,  0.1 ).name('spawner velocity boost');
+fSession.add(params, 'spawnerSteering',        1,  20,  0.5 ).name('spawner steering');
 fSession.add(params, 'spawnerInactiveTimeout', 1,  30,  1   ).name('spawner timeout (s)');
 fSession.add(params, 'qrFadeZone').name('QR fade zone');
 fSession.add(params, 'remoteTimeout',  0, 180,  5).name('idle restore QR (s)');
@@ -2025,11 +2027,15 @@ function frame(ts) {
                 if (wallNow - slot.lastInputTime > params.spawnerInactiveTimeout * 1000) {
                     slot.spawnerLocationActive = 0;
                     slot.dx = 0; slot.dy = 0; slot.magnitude = 0; slot.velocity = 0;
+                    slot._smoothDx = 0; slot._smoothDy = 0;
                     dirty = true;
                 } else if (slot.magnitude > 0) {
+                    const steer = Math.min(params.spawnerSteering * dt, 1);
+                    slot._smoothDx += (slot.dx - slot._smoothDx) * steer;
+                    slot._smoothDy += (slot.dy - slot._smoothDy) * steer;
                     const vBoost = params.spawnerSpeed * (1 + slot.velocity * params.spawnerVelocityBoost);
-                    slot.spawnerX = Math.max(0, Math.min(1, slot.spawnerX + slot.dx * slot.magnitude * vBoost * dt));
-                    slot.spawnerY = Math.max(0, Math.min(1, slot.spawnerY + slot.dy * slot.magnitude * vBoost * dt));
+                    slot.spawnerX = Math.max(0, Math.min(1, slot.spawnerX + slot._smoothDx * slot.magnitude * vBoost * dt));
+                    slot.spawnerY = Math.max(0, Math.min(1, slot.spawnerY + slot._smoothDy * slot.magnitude * vBoost * dt));
                     dirty = true;
                 }
             }
