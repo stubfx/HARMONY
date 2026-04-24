@@ -628,13 +628,17 @@ function rebuildAgentShadowDensityBG() {
 // and the qrBitmap is uploaded as the avoid map so agents naturally avoid the QR area.
 // White QR modules (r=1) repel agents; blur merges them into a solid repulsion zone.
 let _inQROverlayUpdate = false;
+let _qrOwnedAvoidMap   = false; // true when the current avoid map was set by updateQROverlay
 function updateQROverlay() {
     const visible = params.qrOverlay && simState.qrStatus === 'SHOW' && !!qrBitmap;
     qrOverlayEl.style.opacity = visible ? '1' : '0';
     if (!visible) {
-        _inQROverlayUpdate = true;
-        clearAvoidMap();
-        _inQROverlayUpdate = false;
+        if (_qrOwnedAvoidMap) {
+            _inQROverlayUpdate = true;
+            clearAvoidMap();
+            _inQROverlayUpdate = false;
+            _qrOwnedAvoidMap = false;
+        }
         return;
     }
 
@@ -678,8 +682,9 @@ function updateQROverlay() {
         { texture: avoidMapTex },
         [canvas.width, canvas.height],
     );
-    avoidMapTexView = avoidMapTex.createView();
-    hasAvoidMap     = true;
+    avoidMapTexView  = avoidMapTex.createView();
+    hasAvoidMap      = true;
+    _qrOwnedAvoidMap = true;
     rebuildSimBG();
 }
 
@@ -1428,9 +1433,11 @@ function applySimParams(data) {
     if (clearText)            clearTraceText();
     if (traceText !== undefined) {
         const input = document.querySelector('#trace-text-input');
-        if (input) input.value = traceText;
+        if (input) input.value = traceText || '';
+        clearTimeout(autoClearTimer);
+        autoClearTimer = null;
         renderTraceCanvas();
-        scheduleAutoClear();
+        if (traceText) scheduleAutoClear();
     }
     Object.entries(rest).forEach(([k, v]) => {
         if (k in params) params[k] = v;
@@ -1545,6 +1552,7 @@ document.querySelector('#image-input').addEventListener('change', e => {
 
 // ── Avoidance map upload ──────────────────────────────────────────────────────
 async function loadAvoidMap(source) {
+    _qrOwnedAvoidMap = false; // user-loaded map; QR must not clear it
     let bmp;
     if (typeof source === 'string') {
         const res  = await fetch(source);
