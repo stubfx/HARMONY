@@ -61,8 +61,8 @@ const params = {
     // QR placement on trace canvas
     qrSize:       0.25,   // QR size as fraction of min(traceW, traceH)
     qrMargin:     0.02,  // uniform margin from the aligned edge, as fraction of min(traceW, traceH)
-    qrAlignX:     'right',  // 'left' | 'right'
-    qrAlignY:     'bottom', // 'top'  | 'bottom'
+    qrAlignX:     'center', // 'left' | 'center' | 'right'
+    qrAlignY:     'center', // 'top'  | 'center' | 'bottom'
     qrQuietZone:  0,        // quiet zone in QR modules (0 = none, 4 = spec minimum)
     qrInvert:     false,    // swap dark/light: transparent modules on white background
     // Contamination
@@ -81,7 +81,7 @@ const params = {
     // Avoidance
     avoidForceStr:   1.0, // multiplier on image-trace avoidance forces
     avoidMapScale:   1.0, // avoidance map coverage as fraction of canvas (1.0 = full)
-    qrOverlay:       true,  // true = QR on a 2D overlay canvas; agents freed from QR area
+    qrOverlay:       false, // true = QR on a 2D overlay canvas; agents freed from QR area
     qrAvoidMargin:   0.01,  // extra padding around QR in the avoid zone, as fraction of minDim
     qrAvoidFade:     0.01,  // blur radius of the avoid zone edge, as fraction of minDim
     // Primed-spot probe (free agents only)
@@ -641,8 +641,12 @@ function updateQROverlay() {
     const minDim = Math.min(canvas.width, canvas.height);
     const size   = params.qrSize   * minDim;
     const margin = params.qrMargin * minDim + size / 2;
-    const cx     = params.qrAlignX === 'left' ? margin : canvas.width  - margin;
-    const cy     = params.qrAlignY === 'top'  ? margin : canvas.height - margin;
+    const cx     = params.qrAlignX === 'left'   ? margin
+                 : params.qrAlignX === 'right'  ? canvas.width  - margin
+                 :                                canvas.width  / 2;
+    const cy     = params.qrAlignY === 'top'    ? margin
+                 : params.qrAlignY === 'bottom' ? canvas.height - margin
+                 :                                canvas.height / 2;
     octx.drawImage(qrBitmap, cx - size / 2, cy - size / 2, size, size);
 
     // ── Avoid map layer ────────────────────────────────────────────────────────
@@ -813,8 +817,12 @@ function renderTraceCanvas() {
     if (showQR) {
         const size   = params.qrSize   * minDim;
         const margin = params.qrMargin * minDim + size / 2;
-        const cx = params.qrAlignX === 'left'   ? margin       : tcW - margin;
-        const cy = params.qrAlignY === 'top'    ? margin       : tcH - margin;
+        const cx = params.qrAlignX === 'left'   ? margin
+                 : params.qrAlignX === 'right'  ? tcW - margin
+                 :                                tcW / 2;
+        const cy = params.qrAlignY === 'top'    ? margin
+                 : params.qrAlignY === 'bottom' ? tcH - margin
+                 :                                tcH / 2;
         ctx.drawImage(qrBitmap, cx - size / 2, cy - size / 2, size, size);
     }
 

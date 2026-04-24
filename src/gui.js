@@ -124,8 +124,8 @@ export function initGUI({
     fContent.add(params, 'qrFadeZone').name('QR fade zone');
     fContent.add(params, 'qrSize',      0.05, 0.5,  0.01).name('QR size').onChange(renderTraceCanvas);
     fContent.add(params, 'qrMargin',    0,    0.1,  0.005).name('QR margin').onChange(renderTraceCanvas);
-    fContent.add(params, 'qrAlignX',    ['left', 'right']).name('QR align H').onChange(renderTraceCanvas);
-    fContent.add(params, 'qrAlignY',    ['top',  'bottom']).name('QR align V').onChange(renderTraceCanvas);
+    fContent.add(params, 'qrAlignX',    ['left', 'center', 'right']).name('QR align H').onChange(renderTraceCanvas);
+    fContent.add(params, 'qrAlignY',    ['top',  'center', 'bottom']).name('QR align V').onChange(renderTraceCanvas);
     fContent.add(params, 'qrQuietZone', 0, 8, 1).name('QR quiet zone').onChange(() => generateQR().then(renderTraceCanvas));
     fContent.add(params, 'qrInvert').name('QR invert colors').onChange(() => generateQR().then(renderTraceCanvas));
     fContent.add(params, 'imageSize', 0.05, 1.0, 0.01).name('content size').onChange(renderTraceCanvas);
