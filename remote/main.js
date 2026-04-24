@@ -29,6 +29,7 @@ const tiltRingEl      = document.querySelector('#tilt-ring');
 const tiltDotEl       = document.querySelector('#tilt-dot');
 const joystickBaseEl  = document.querySelector('#joystick-base');
 const joystickStickEl = document.querySelector('#joystick-stick');
+const joystickTailEl  = document.querySelector('#joystick-tail');
 const joinOverlayEl   = document.querySelector('#join-overlay');
 const joinBtnEl       = document.querySelector('#join-btn');
 const formEl          = document.querySelector('#input-form');
@@ -152,7 +153,8 @@ function setStoryUI({ stepStatus, optionA, optionB } = {}) {
     _storyOptionA = optionA ?? null;
     _storyOptionB = optionB ?? null;
     const isVote = stepStatus === 'VOTE';
-    const isDraw = stepStatus === 'DRAW';
+    // Joystick + tail visible only in DRAW mode (or when no story is running)
+    const showJoystick = !stepStatus || stepStatus === 'DRAW';
 
     if (votePanelEl) {
         if (isVote) {
@@ -164,9 +166,13 @@ function setStoryUI({ stepStatus, optionA, optionB } = {}) {
         }
     }
 
-    // Joystick is disabled during IDLE and VOTE story steps only
     if (joystickBaseEl) {
-        joystickBaseEl.style.pointerEvents = (stepStatus === 'IDLE' || isVote) ? 'none' : 'auto';
+        joystickBaseEl.style.opacity       = showJoystick ? '1' : '0';
+        joystickBaseEl.style.pointerEvents = showJoystick ? 'auto' : 'none';
+    }
+    if (!showJoystick) {
+        if (joystickIsActive) releaseJoystick();
+        updateTail(0, 0, 0);
     }
 }
 
@@ -221,6 +227,23 @@ function updateTiltDot(roll, pitch) {
     tiltDotEl.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
 }
 
+// ── Joystick tail ─────────────────────────────────────────────────────────────
+// A streak anchored at screen center pointing opposite to the joystick direction.
+// Length and opacity scale with magnitude; hidden when magnitude is near zero.
+function updateTail(dx, dy, magnitude) {
+    if (!joystickTailEl) return;
+    if (magnitude < 0.05) {
+        joystickTailEl.style.opacity = '0';
+        return;
+    }
+    // Tail extends opposite to push direction; rotate so element (extending down)
+    // aligns with (-dx, -dy): angle = atan2(-dx, -dy) converts to CSS clockwise degrees.
+    const angleDeg = Math.atan2(-dx, -dy) * (180 / Math.PI);
+    joystickTailEl.style.height    = `${Math.round(magnitude * 150)}px`;
+    joystickTailEl.style.opacity   = (magnitude * 0.6 + 0.1).toFixed(2);
+    joystickTailEl.style.transform = `translateX(-50%) rotate(${angleDeg}deg)`;
+}
+
 // ── Joystick ──────────────────────────────────────────────────────────────────
 // Single-touch virtual joystick. Sends 'spawner' direction events every 300 ms
 // while held; sends active:false on release.
@@ -247,6 +270,7 @@ function computeJoystick(touch) {
     if (joystickStickEl) {
         joystickStickEl.style.transform = `translate(calc(-50% + ${sx}px), calc(-50% + ${sy}px))`;
     }
+    updateTail(joystickDx, joystickDy, joystickMag);
 }
 
 function releaseJoystick() {
@@ -260,6 +284,7 @@ function releaseJoystick() {
         joystickStickEl.style.transform  = 'translate(-50%, -50%)';
         setTimeout(() => { if (joystickStickEl) joystickStickEl.style.transition = ''; }, 150);
     }
+    updateTail(0, 0, 0);
     sendEvent('spawner', { dx: 0, dy: 0, magnitude: 0, active: false });
 }
 
