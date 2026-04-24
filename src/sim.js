@@ -48,7 +48,7 @@ const params = {
     toneGamma:   1.0,         // power curve: <1 boosts darks, >1 crushes darks
     shadowBoost: 0.0,         // inverse-brightness boost: peaks at ~12% luminance, negligible above 60%
     // Magnet
-    magnetStr:      5.0,  // homing speed: px/frame agents move toward their home position
+    magnetStr:      30.0, // homing speed: px/frame agents move toward their home position
     alphaThreshold: 0.1,  // min image alpha to trigger homing (0–1)
     blackThreshold: 0.05, // luminance below which pixels are treated as transparent
     vignetteEdge:   0.08, // edge fade width in UV units (0 = none, 0.5 = half image)
@@ -189,6 +189,16 @@ const PRESETS = [
 const canvas = document.createElement('canvas');
 canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;display:block;';
 document.body.prepend(canvas);
+
+// Caption overlay: DOM div at the bottom of the screen for story subtitles (z-index 20).
+const captionEl = document.createElement('div');
+captionEl.id = 'caption';
+document.body.appendChild(captionEl);
+
+function setCaption(text) {
+    captionEl.textContent = text || '';
+    captionEl.style.opacity = text ? '1' : '0';
+}
 
 // QR overlay: 2D canvas on top of the simulation, below GUI (z-index 10).
 // Shown only when qrOverlay is on and the QR is active; fades via CSS opacity.
@@ -1308,7 +1318,7 @@ let socket;
 // if formulas are included they re-trigger pipeline compilation.
 function applySimParams(data) {
     const { dir, wind, restart, clearTrace, showQR, traceText, clearText, traceImage, status, avoidMap,
-            step, stepDuration, stepStatus, optionA, optionB, ...rest } = data;
+            step, stepDuration, stepStatus, optionA, optionB, caption, ...rest } = data;
 
     // Story step — a new step ID resets all completion state then applies the step's UI mode.
     if (step !== undefined) {
@@ -1348,6 +1358,7 @@ function applySimParams(data) {
         updateStateDisplay();
         renderTraceCanvas();
     }
+    if (caption !== undefined) setCaption(caption);
     if (showQR === true)  restoreQR();
     if (showQR === false) {
         simState.qrStatus = 'HIDE';
@@ -1443,7 +1454,7 @@ fVis.add(params, 'additiveBlend').name('additive blend');
 
 
 const fMagnet = gui.addFolder('Trace');
-fMagnet.add(params, 'magnetStr',      0, 20,  0.1 ).name('homing speed');
+fMagnet.add(params, 'magnetStr',      0, 50,  0.1 ).name('homing speed');
 fMagnet.add(params, 'alphaThreshold', 0,  1,  0.01).name('alpha threshold');
 fMagnet.add(params, 'blackThreshold', 0,  0.5, 0.005).name('black cutoff');
 fMagnet.add(params, 'vignetteEdge',   0,  0.5, 0.005).name('edge fade');

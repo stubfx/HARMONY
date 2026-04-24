@@ -103,6 +103,29 @@
         .text-input:focus { border-color: rgba(255, 200, 80, .55); }
         .text-input::placeholder { color: rgba(255, 200, 80, .25); }
 
+        /* ── Caption — story subtitle overlay ──────────────────────────────── */
+        #caption {
+            position: fixed;
+            bottom: 3.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            max-width: 72%;
+            padding: .55rem 1.4rem;
+            background: rgba(0, 0, 0, .55);
+            color: rgba(255, 255, 255, .9);
+            font-family: monospace;
+            font-size: 1.1rem;
+            line-height: 1.55;
+            text-align: center;
+            letter-spacing: .04em;
+            border-radius: 4px;
+            pointer-events: none;
+            white-space: pre-wrap;
+            opacity: 0;
+            transition: opacity .5s ease;
+        }
+
         /* ── Monitor ────────────────────────────────────────────────────────── */
         #monitor {
             position: fixed;
