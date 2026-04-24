@@ -725,15 +725,23 @@ function renderTraceCanvas() {
     const ctx = traceCanvas.getContext('2d');
     ctx.clearRect(0, 0, tcW, tcH);
 
-    // Layer 0: user image — positioned at (imageX, imageY)
+    // Layer 0: user image — cover-fit to fill the full trace canvas
     if (imageBitmap) {
-        const refDim = params.imageSize * minDim;
-        const aspect = imageBitmap.width / imageBitmap.height;
-        const hw = aspect >= 1 ? refDim / 2 : refDim * aspect / 2;
-        const hh = aspect >= 1 ? refDim / (2 * aspect) : refDim / 2;
-        const cx = params.imageX * tcW;
-        const cy = params.imageY * tcH;
-        ctx.drawImage(imageBitmap, cx - hw, cy - hh, hw * 2, hh * 2);
+        const imgAspect    = imageBitmap.width / imageBitmap.height;
+        const canvasAspect = tcW / tcH;
+        let sx, sy, sw, sh;
+        if (imgAspect > canvasAspect) {
+            sh = imageBitmap.height;
+            sw = sh * canvasAspect;
+            sx = (imageBitmap.width - sw) / 2;
+            sy = 0;
+        } else {
+            sw = imageBitmap.width;
+            sh = sw / canvasAspect;
+            sx = 0;
+            sy = (imageBitmap.height - sh) / 2;
+        }
+        ctx.drawImage(imageBitmap, sx, sy, sw, sh, 0, 0, tcW, tcH);
     }
 
     // Layer 2: text — at (imageX, imageY), multi-line when no image is present
