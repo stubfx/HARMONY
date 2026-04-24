@@ -90,6 +90,8 @@ function getOrCreateRoom(roomId) {
             spectators:   new Map(), // spectatorId → socketId  (reverse index for push)
             users:        new Map(), // socketId  → UserState
             n8nTestMode:  false,
+            votes:        new Map(), // socketId  → choice string (one vote per spectator)
+            storyOptions: { a: null, b: null }, // current VOTE step options
         });
     }
     return rooms.get(roomId);
@@ -278,6 +280,38 @@ io.on('connection', (socket) => {
         io.to(room).emit('remote-event', { type, spectatorId, data, timestamp: Date.now() });
     });
 
+    // ── Story UI — host broadcasts step status to all spectators ─────────────────
+    socket.on('story-ui', (data) => {
+        const room = rooms.get(assignedRoom);
+        if (!room?.hostSockets.has(socket.id)) return;
+        room.votes.clear();
+        room.storyOptions.a = data?.optionA ?? null;
+        room.storyOptions.b = data?.optionB ?? null;
+        io.to(`${assignedRoom}:spectators`).emit('story-ui', data);
+        console.log('[socket] story-ui          room:', assignedRoom, '| status:', data?.stepStatus);
+    });
+
+    // ── Story vote — spectator casts one vote; host gets running tally ───────────
+    socket.on('story-vote', ({ choice } = {}) => {
+        const room = rooms.get(assignedRoom);
+        if (!room || !choice) return;
+        room.votes.set(socket.id, choice);
+        const { a, b } = room.storyOptions;
+        let votesA = 0, votesB = 0;
+        for (const v of room.votes.values()) {
+            if (v === a) votesA++;
+            else if (v === b) votesB++;
+        }
+        if (room.hostSockets.size) {
+            io.to(`${assignedRoom}:hosts`).emit('story-vote-update', {
+                optionA: a, votesA,
+                optionB: b, votesB,
+                total:   room.votes.size,
+            });
+        }
+        console.log('[socket] story-vote        room:', assignedRoom, '|', a, votesA, 'vs', b, votesB);
+    });
+
     // ── Host push to a specific spectator ────────────────────────────────────────
     socket.on('push-to-spectator', ({ spectatorId, data }) => {
         const room = rooms.get(assignedRoom);
@@ -294,6 +328,7 @@ io.on('connection', (socket) => {
             const isHost      = room.hostSockets.has(socket.id);
             const spectatorId = room.connections.get(socket.id);
             room.users.delete(socket.id);
+            room.votes.delete(socket.id);
             room.connections.delete(socket.id);
             if (spectatorId !== undefined) room.spectators.delete(spectatorId);
 

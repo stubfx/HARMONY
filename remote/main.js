@@ -164,6 +164,48 @@ socket.on('device-message', (data) => {
     }, 5000);
 });
 
+// ── Story UI ──────────────────────────────────────────────────────────────────
+// stepStatus 'IDLE'  — gesture surface disabled, no vote panel
+// stepStatus 'DRAW'  — gesture surface active (normal touch behaviour)
+// stepStatus 'VOTE'  — vote panel shown with two labelled buttons; gesture surface hidden
+const votePanelEl      = document.querySelector('#vote-panel');
+const voteBtnA         = document.querySelector('#vote-btn-a');
+const voteBtnB         = document.querySelector('#vote-btn-b');
+const gestureSurfaceEl = document.querySelector('#gesture-surface');
+let _storyOptionA = null;
+let _storyOptionB = null;
+
+function setStoryUI({ stepStatus, optionA, optionB } = {}) {
+    _storyOptionA = optionA ?? null;
+    _storyOptionB = optionB ?? null;
+    const isVote = stepStatus === 'VOTE';
+    const isDraw = stepStatus === 'DRAW';
+    if (votePanelEl) {
+        if (isVote) {
+            if (voteBtnA) voteBtnA.textContent = _storyOptionA ?? 'A';
+            if (voteBtnB) voteBtnB.textContent = _storyOptionB ?? 'B';
+            votePanelEl.classList.add('visible');
+        } else {
+            votePanelEl.classList.remove('visible');
+        }
+    }
+    if (gestureSurfaceEl) {
+        gestureSurfaceEl.style.pointerEvents = isDraw ? 'auto' : 'none';
+    }
+}
+
+voteBtnA?.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (_storyOptionA) socket.emit('story-vote', { choice: _storyOptionA });
+}, { passive: false });
+
+voteBtnB?.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (_storyOptionB) socket.emit('story-vote', { choice: _storyOptionB });
+}, { passive: false });
+
+socket.on('story-ui', (data) => setStoryUI(data));
+
 // ── Peer events ───────────────────────────────────────────────────────────────
 // Brief aura pulse when another spectator joins.
 socket.on('peer-joined', () => {

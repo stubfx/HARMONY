@@ -956,7 +956,16 @@ const startWind = rndPick(WIND_FORMULAS);
 //           'HIDE' — QR layer is skipped; only user content (image/text) is drawn.
 // status:   'NORMAL' — formula steering + wind active, auto-cycling runs
 //           'IDLE'   — no formula, no wind; particles drift freely on momentum
-const simState = { qrStatus: 'HIDE', status: 'NORMAL' };
+const simState = {
+    qrStatus:          'HIDE',
+    status:            'NORMAL',
+    storyStep:         null,   // echoed from n8n step ID; null = not in story mode
+    storyStepComplete: false,
+    storyVoteResult:   null,
+    stepStatus:        'IDLE', // 'IDLE' | 'DRAW' | 'VOTE' — spectator interaction mode
+    optionA:           null,
+    optionB:           null,
+};
 
 let stateCtrl   = null;  // lil-gui controller — set after gui is created
 let qrStateCtrl = null;
@@ -1022,6 +1031,9 @@ async function callN8n(event) {
 // Periodic heartbeat — sends the full params snapshot to n8n every
 // params.heartbeatInterval seconds. Response is handled identically to sim-event.
 // Has its own in-flight guard so it never blocks user-triggered events.
+// _pendingOutOfCycle: set by fireOutOfCycleHeartbeat() when a send is requested
+// while one is already in-flight; consumed in the finally block.
+let _pendingOutOfCycle = false;
 async function callN8nHeartbeat() {
     if (!N8N_BASE || n8nHeartbeatInFlight) return;
     n8nHeartbeatInFlight = true;
@@ -1033,11 +1045,15 @@ async function callN8nHeartbeat() {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({
-                type:     'heartbeat',
-                room:     sessionRoom,
-                status:   simState.status,
-                qrStatus: simState.qrStatus,
-                params:   { ...params },
+                type:              'heartbeat',
+                room:              sessionRoom,
+                status:            simState.status,
+                qrStatus:          simState.qrStatus,
+                step:              simState.storyStep,
+                storyStepComplete: simState.storyStepComplete,
+                storyVoteResult:   simState.storyVoteResult,
+                stepStatus:        simState.stepStatus,
+                params:            { ...params },
             }),
             signal:  controller.signal,
         });
@@ -1051,7 +1067,23 @@ async function callN8nHeartbeat() {
         if (err.name !== 'AbortError') console.warn('[n8n heartbeat]', err.message);
     } finally {
         n8nHeartbeatInFlight = false;
+        if (_pendingOutOfCycle) { _pendingOutOfCycle = false; callN8nHeartbeat(); }
     }
+}
+
+// Fire an immediate heartbeat regardless of the periodic schedule.
+// Used when a story step completes to notify n8n without waiting for the next tick.
+function fireOutOfCycleHeartbeat() {
+    if (n8nHeartbeatInFlight) { _pendingOutOfCycle = true; return; }
+    callN8nHeartbeat();
+}
+
+// Called when the current story step finishes (timer expiry or vote settled).
+let _stepDurationTimer = null;
+function _onStoryStepComplete(voteResult = null) {
+    simState.storyStepComplete = true;
+    simState.storyVoteResult   = voteResult;
+    fireOutOfCycleHeartbeat();
 }
 
 let heartbeatTimer = null;
@@ -1261,6 +1293,13 @@ let socket;
         if (REMOTE_EVENTS[event.type]?.sendToN8n) callN8n(event);
     });
 
+    // Running vote tally from server — update storyVoteResult to current leader.
+    socket.on('story-vote-update', ({ optionA, votesA, optionB, votesB }) => {
+        if      (votesA > votesB) simState.storyVoteResult = optionA;
+        else if (votesB > votesA) simState.storyVoteResult = optionB;
+        else                      simState.storyVoteResult = null;
+    });
+
     socket.on('connect_error', () => console.warn('[socket] connection failed, will retry…'));
 }
 
@@ -1268,7 +1307,30 @@ let socket;
 // Only numeric/boolean keys present in the payload are applied;
 // if formulas are included they re-trigger pipeline compilation.
 function applySimParams(data) {
-    const { dir, wind, restart, clearTrace, showQR, traceText, clearText, traceImage, status, avoidMap, ...rest } = data;
+    const { dir, wind, restart, clearTrace, showQR, traceText, clearText, traceImage, status, avoidMap,
+            step, stepDuration, stepStatus, optionA, optionB, ...rest } = data;
+
+    // Story step — a new step ID resets all completion state then applies the step's UI mode.
+    if (step !== undefined) {
+        clearTimeout(_stepDurationTimer);
+        _stepDurationTimer         = null;
+        simState.storyStep         = step;
+        simState.storyStepComplete = false;
+        simState.storyVoteResult   = null;
+        simState.stepStatus        = stepStatus ?? 'IDLE';
+        simState.optionA           = optionA    ?? null;
+        simState.optionB           = optionB    ?? null;
+        socket.emit('story-ui', { stepStatus: simState.stepStatus, optionA: simState.optionA, optionB: simState.optionB });
+        if (stepDuration > 0) {
+            _stepDurationTimer = setTimeout(() => _onStoryStepComplete(), stepDuration * 1000);
+        }
+    } else if (stepStatus !== undefined) {
+        // Mid-step status change (no new step ID).
+        simState.stepStatus = stepStatus;
+        if (optionA !== undefined) simState.optionA = optionA;
+        if (optionB !== undefined) simState.optionB = optionB;
+        socket.emit('story-ui', { stepStatus: simState.stepStatus, optionA: simState.optionA, optionB: simState.optionB });
+    }
     if (status === 'NORMAL' || status === 'IDLE') {
         simState.status = status;
         updateStateDisplay();

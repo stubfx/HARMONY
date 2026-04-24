@@ -272,3 +272,38 @@ html, body {
     border-bottom-color: rgba(255, 255, 255, 0.3);
     color: rgba(255, 255, 255, 0.75);
 }
+
+/* ── Story vote panel ────────────────────────────────────────────────────────── */
+#vote-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    display: none;
+    flex-direction: row;
+}
+
+#vote-panel.visible { display: flex; }
+
+.vote-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.75);
+    font-family: ui-monospace, monospace;
+    font-size: clamp(1.1rem, 5vw, 1.8rem);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+    padding: 1.5rem;
+    word-break: break-word;
+}
+
+.vote-btn:last-child { border-right: none; }
+
+.vote-btn:active {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 1);
+}
