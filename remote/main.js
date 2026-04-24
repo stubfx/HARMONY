@@ -29,7 +29,8 @@ const tiltRingEl      = document.querySelector('#tilt-ring');
 const tiltDotEl       = document.querySelector('#tilt-dot');
 const joystickBaseEl  = document.querySelector('#joystick-base');
 const joystickStickEl = document.querySelector('#joystick-stick');
-const joystickTailEl  = document.querySelector('#joystick-tail');
+const starCanvas      = document.querySelector('#star-field');
+const starCtx         = starCanvas?.getContext('2d');
 const joinOverlayEl   = document.querySelector('#join-overlay');
 const joinBtnEl       = document.querySelector('#join-btn');
 const formEl          = document.querySelector('#input-form');
@@ -170,10 +171,8 @@ function setStoryUI({ stepStatus, optionA, optionB } = {}) {
         joystickBaseEl.style.opacity       = showJoystick ? '1' : '0';
         joystickBaseEl.style.pointerEvents = showJoystick ? 'auto' : 'none';
     }
-    if (!showJoystick) {
-        if (joystickIsActive) releaseJoystick();
-        updateTail(0, 0, 0);
-    }
+    setStarMode(showJoystick);
+    if (!showJoystick && joystickIsActive) releaseJoystick();
 }
 
 voteBtnA?.addEventListener('touchstart', (e) => {
@@ -227,22 +226,98 @@ function updateTiltDot(roll, pitch) {
     tiltDotEl.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
 }
 
-// ── Joystick tail ─────────────────────────────────────────────────────────────
-// A streak anchored at screen center pointing opposite to the joystick direction.
-// Length and opacity scale with magnitude; hidden when magnitude is near zero.
-function updateTail(dx, dy, magnitude) {
-    if (!joystickTailEl) return;
-    if (magnitude < 0.05) {
-        joystickTailEl.style.opacity = '0';
-        return;
-    }
-    // Tail extends opposite to push direction; rotate so element (extending down)
-    // aligns with (-dx, -dy): angle = atan2(-dx, -dy) converts to CSS clockwise degrees.
-    const angleDeg = Math.atan2(-dx, -dy) * (180 / Math.PI);
-    joystickTailEl.style.height    = `${Math.round(magnitude * 150)}px`;
-    joystickTailEl.style.opacity   = (magnitude * 0.6 + 0.1).toFixed(2);
-    joystickTailEl.style.transform = `translateX(-50%) rotate(${angleDeg}deg)`;
+// ── Star field ─────────────────────────────────────────────────────────────────
+// 65 stars with random depth drift counter to the joystick direction.
+// Visible (dimly) at rest; brighter + streaking when the joystick is active.
+// Enabled only in DRAW mode; cleared and paused otherwise.
+const STAR_COUNT = 65;
+const stars = Array.from({ length: STAR_COUNT }, () => ({
+    x:    Math.random(),           // normalized 0–1
+    y:    Math.random(),
+    r:    Math.random() * 1.4 + 0.3, // dot radius in px
+    z:    Math.random() * 0.8 + 0.2, // depth: 0.2 (far/slow) → 1.0 (close/fast)
+    base: Math.random() * 0.35 + 0.1, // base opacity
+}));
+
+let _starMode = true;
+let _starRAF  = null;
+
+function _resizeStarCanvas() {
+    if (!starCanvas) return;
+    starCanvas.width  = window.innerWidth;
+    starCanvas.height = window.innerHeight;
 }
+_resizeStarCanvas();
+window.addEventListener('resize', _resizeStarCanvas);
+
+function _drawStarFrame() {
+    if (!starCtx || !starCanvas) return;
+    const W   = starCanvas.width;
+    const H   = starCanvas.height;
+    const dx  = joystickDx;
+    const dy  = joystickDy;
+    const mag = joystickMag;
+    const vel = joystickVelocity;
+
+    // Move stars counter to joystick direction; depth (z) makes far stars slower
+    const speed = mag * (1 + vel * 1.5) * 0.008;
+    if (speed > 0) {
+        for (const s of stars) {
+            s.x += -dx * speed * s.z;
+            s.y += -dy * speed * s.z;
+            if (s.x < 0) s.x += 1;
+            if (s.x > 1) s.x -= 1;
+            if (s.y < 0) s.y += 1;
+            if (s.y > 1) s.y -= 1;
+        }
+    }
+
+    starCtx.clearRect(0, 0, W, H);
+    if (!_starMode) return;
+
+    for (const s of stars) {
+        const px  = s.x * W;
+        const py  = s.y * H;
+        const op  = s.base * (0.35 + mag * 0.65);
+
+        // Streak trail — extends in direction of travel (where the star came from)
+        const trailLen = mag * s.z * 32 * (1 + vel);
+        if (trailLen > 1) {
+            starCtx.beginPath();
+            starCtx.moveTo(px, py);
+            starCtx.lineTo(px + dx * trailLen, py + dy * trailLen);
+            starCtx.strokeStyle = `rgba(255,255,255,${(op * 0.5).toFixed(3)})`;
+            starCtx.lineWidth   = s.r * 0.65;
+            starCtx.stroke();
+        }
+
+        // Star dot — grows slightly when moving fast + close
+        const r = s.r * (1 + mag * s.z * 0.5);
+        starCtx.beginPath();
+        starCtx.arc(px, py, r, 0, Math.PI * 2);
+        starCtx.fillStyle = `rgba(255,255,255,${op.toFixed(3)})`;
+        starCtx.fill();
+    }
+}
+
+function _starLoop() {
+    _drawStarFrame();
+    _starRAF = requestAnimationFrame(_starLoop);
+}
+
+function setStarMode(enabled) {
+    _starMode = enabled;
+    if (enabled && !_starRAF) {
+        _starRAF = requestAnimationFrame(_starLoop);
+    } else if (!enabled && _starRAF) {
+        cancelAnimationFrame(_starRAF);
+        _starRAF = null;
+        starCtx?.clearRect(0, 0, starCanvas?.width ?? 0, starCanvas?.height ?? 0);
+    }
+}
+
+// Start immediately — stars idle behind the join overlay and come alive on reveal
+_starRAF = requestAnimationFrame(_starLoop);
 
 // ── Joystick ──────────────────────────────────────────────────────────────────
 // Single-touch virtual joystick. Sends 'spawner' direction events every 300 ms
@@ -255,8 +330,10 @@ let joystickCenterY  = 0;
 let joystickDx       = 0;
 let joystickDy       = 0;
 let joystickMag      = 0;
+let joystickVelocity = 0; // smoothed normalized finger speed, 0–1
 let joystickIsActive = false;
 let joystickInterval = null;
+let _velLastX = 0, _velLastY = 0, _velLastT = 0;
 
 function computeJoystick(touch) {
     const rawX = touch.clientX - joystickCenterX;
@@ -270,22 +347,38 @@ function computeJoystick(touch) {
     if (joystickStickEl) {
         joystickStickEl.style.transform = `translate(calc(-50% + ${sx}px), calc(-50% + ${sy}px))`;
     }
-    updateTail(joystickDx, joystickDy, joystickMag);
+
+    // Track finger speed in px/ms; EMA-smooth; normalize so 0.6 px/ms = 1.0
+    const now = performance.now();
+    if (_velLastT > 0) {
+        const elapsed = now - _velLastT;
+        if (elapsed > 0) {
+            const ddx = touch.clientX - _velLastX;
+            const ddy = touch.clientY - _velLastY;
+            const rawV = Math.sqrt(ddx * ddx + ddy * ddy) / elapsed;
+            joystickVelocity = 0.5 * joystickVelocity + 0.5 * Math.min(rawV / 0.6, 1.0);
+        }
+    }
+    _velLastX = touch.clientX;
+    _velLastY = touch.clientY;
+    _velLastT = now;
+
 }
+
 
 function releaseJoystick() {
     joystickIsActive = false;
     joystickTouchId  = null;
     clearInterval(joystickInterval);
     joystickInterval = null;
-    joystickDx = joystickDy = joystickMag = 0;
+    joystickDx = joystickDy = joystickMag = joystickVelocity = 0;
+    _velLastT = 0;
     if (joystickStickEl) {
         joystickStickEl.style.transition = 'transform 0.15s ease';
         joystickStickEl.style.transform  = 'translate(-50%, -50%)';
         setTimeout(() => { if (joystickStickEl) joystickStickEl.style.transition = ''; }, 150);
     }
-    updateTail(0, 0, 0);
-    sendEvent('spawner', { dx: 0, dy: 0, magnitude: 0, active: false });
+    sendEvent('spawner', { dx: 0, dy: 0, magnitude: 0, velocity: 0, active: false });
 }
 
 joystickBaseEl?.addEventListener('touchstart', (e) => {
@@ -294,14 +387,17 @@ joystickBaseEl?.addEventListener('touchstart', (e) => {
     const touch = e.changedTouches[0];
     joystickTouchId  = touch.identifier;
     joystickIsActive = true;
+    joystickVelocity = 0;
+    _velLastT = 0;
     const rect = joystickBaseEl.getBoundingClientRect();
     joystickCenterX = rect.left + rect.width  / 2;
     joystickCenterY = rect.top  + rect.height / 2;
     computeJoystick(touch);
-    sendEvent('spawner', { dx: joystickDx, dy: joystickDy, magnitude: joystickMag, active: true });
+    sendEvent('spawner', { dx: joystickDx, dy: joystickDy, magnitude: joystickMag, velocity: 0, active: true });
     joystickInterval = setInterval(() => {
         if (joystickIsActive) {
-            sendEvent('spawner', { dx: joystickDx, dy: joystickDy, magnitude: joystickMag, active: true });
+            joystickVelocity *= 0.6; // decay when finger is stationary between sends
+            sendEvent('spawner', { dx: joystickDx, dy: joystickDy, magnitude: joystickMag, velocity: joystickVelocity, active: true });
         }
     }, 300);
 }, { passive: false });
