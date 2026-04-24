@@ -133,6 +133,11 @@ const DEFAULT_WIND = 'sin(x * 0.004 - y * 0.003 + t * 0.4) * TWO_PI';
 const IDLE_DIR  = 'atan2(cy - y, cx - x)';
 const IDLE_WIND = 'atan2(y - cy, x - cx) + sin(length(vec2(x-cx,y-cy)) * 0.008) * PI + t';
 
+// DOT mode — wobbly inward spiral; applied automatically when status === 'DOT'
+// Direction wobbles around the inward vector; wind is tangential + time-varying.
+const DOT_DIR  = 'atan2(cy - y, cx - x) + sin(t * 1.4 + length(vec2(x-cx,y-cy)) * 0.012) * PI * 0.38';
+const DOT_WIND = 'atan2(cy - y, cx - x) + PI * 0.46 + sin(t * 0.65 + length(vec2(x-cx,y-cy)) * 0.007) * 0.6';
+
 // 20 direction formulas cycled automatically when params.autoDir is true.
 // Variables: x, y, t, cx, cy, PI, TWO_PI
 const DIR_FORMULAS = [
@@ -1005,6 +1010,7 @@ const startWind = rndPick(WIND_FORMULAS);
 //           'HIDE' — QR layer is skipped; only user content (image/text) is drawn.
 // status:   'NORMAL' — formula steering + wind active, auto-cycling runs
 //           'IDLE'   — no formula, no wind; particles drift freely on momentum
+//           'DOT'    — fixed inward-spiral formulas; wind + formula forced on regardless of params
 const simState = {
     qrStatus:          'HIDE',
     status:            'NORMAL',
@@ -1393,8 +1399,9 @@ function applySimParams(data) {
         if (optionB !== undefined) simState.optionB = optionB;
         socket.emit('story-ui', { stepStatus: simState.stepStatus, optionA: simState.optionA, optionB: simState.optionB });
     }
-    if (status === 'NORMAL' || status === 'IDLE') {
+    if (status === 'NORMAL' || status === 'IDLE' || status === 'DOT') {
         simState.status = status;
+        if (status === 'DOT') applyFormulas(DOT_DIR, DOT_WIND);
         updateStateDisplay();
     }
     if (restart)              seedAgents();
@@ -1459,6 +1466,8 @@ function applySimParams(data) {
     clearMagnetImage, clearTraceText, clearAvoidMap,
     restartHeartbeat,
 }));
+
+stateCtrl.onChange(v => { if (v === 'DOT') applyFormulas(DOT_DIR, DOT_WIND); });
 
 window.addEventListener('keydown', e => {
     if (e.key === 'Control') toggleGUI();
@@ -1657,7 +1666,8 @@ function writeSoloUB(dt, time) {
     f[4] = dt;
     f[5] = time;
     const isIdle = simState.status === 'IDLE';
-    f[6] = isIdle ? 0.0 : (params.windEnabled ? params.windStr : 0.0);
+    const isDot  = simState.status === 'DOT';
+    f[6] = isIdle ? 0.0 : (isDot || params.windEnabled ? params.windStr : 0.0);
     f[7] = params.turnRate * coherenceMult;  // coherence scales how sharply agents follow the formula
     f[8] = params.maxSpeed;
     f[9] = params.minSpeed;
@@ -1667,7 +1677,7 @@ function writeSoloUB(dt, time) {
     f[13] = y0;
     f[14] = x1;
     f[15] = y1;
-    u[16] = (!isIdle && params.followFormula) ? 1 : 0;
+    u[16] = (!isIdle && (isDot || params.followFormula)) ? 1 : 0;
     f[17] = params.alphaThreshold;
     f[18] = params.blackThreshold;
     const isQR = simState.qrStatus === 'SHOW';
