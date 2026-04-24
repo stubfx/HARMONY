@@ -190,16 +190,6 @@ const canvas = document.createElement('canvas');
 canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;display:block;';
 document.body.prepend(canvas);
 
-// Caption overlay: DOM div at the bottom of the screen for story subtitles (z-index 20).
-const captionEl = document.createElement('div');
-captionEl.id = 'caption';
-document.body.appendChild(captionEl);
-
-function setCaption(text) {
-    captionEl.textContent = text || '';
-    captionEl.style.opacity = text ? '1' : '0';
-}
-
 // QR overlay: 2D canvas on top of the simulation, below GUI (z-index 10).
 // Shown only when qrOverlay is on and the QR is active; fades via CSS opacity.
 const qrOverlayEl = document.createElement('canvas');
@@ -689,12 +679,15 @@ function updateQROverlay() {
 //
 // The resulting texture covers the full screen, so getImageRegion() returns the
 // full-screen rect and agents can home to any bright pixel on screen.
+let captionText = ''; // story caption — drawn at bottom of trace canvas like subtitle
+
 function renderTraceCanvas() {
     if (!device) return;
 
-    const text    = document.querySelector('#trace-text-input')?.value.trim() ?? '';
-    const hasText = text.length > 0;
-    const hasUserContent = !!imageBitmap || hasText;
+    const text       = document.querySelector('#trace-text-input')?.value.trim() ?? '';
+    const hasText    = text.length > 0;
+    const hasCaption = captionText.length > 0;
+    const hasUserContent = !!imageBitmap || hasText || hasCaption;
     // When qrOverlay is on the QR lives on the 2D overlay canvas, not the trace.
     const showQR = !params.qrOverlay && simState.qrStatus === 'SHOW' && !!qrBitmap;
 
@@ -776,6 +769,29 @@ function renderTraceCanvas() {
             }
             ctx.fillText(text, cx, cy);
         }
+    }
+
+    // Caption layer: word-wrapped text anchored to the bottom center, subtitle-sized
+    if (hasCaption) {
+        ctx.fillStyle    = 'white';
+        ctx.textAlign    = 'center';
+        ctx.textBaseline = 'alphabetic';
+        const fontSize = Math.round(minDim * 0.055);
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        const maxW  = tcW * 0.80;
+        const words = captionText.split(/\s+/);
+        const lines = [];
+        let cur = '';
+        for (const w of words) {
+            const test = cur ? `${cur} ${w}` : w;
+            if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = w; }
+            else cur = test;
+        }
+        if (cur) lines.push(cur);
+        const lineH      = Math.round(fontSize * 1.35);
+        const bottomY    = tcH - Math.round(minDim * 0.05);
+        const startY     = bottomY - (lines.length - 1) * lineH;
+        lines.forEach((ln, i) => ctx.fillText(ln, tcW / 2, startY + i * lineH));
     }
 
     // Topmost layer: QR — always drawn last so it is never obscured by user content
@@ -1358,7 +1374,7 @@ function applySimParams(data) {
         updateStateDisplay();
         renderTraceCanvas();
     }
-    if (caption !== undefined) setCaption(caption);
+    if (caption !== undefined) { captionText = caption || ''; renderTraceCanvas(); }
     if (showQR === true)  restoreQR();
     if (showQR === false) {
         simState.qrStatus = 'HIDE';
