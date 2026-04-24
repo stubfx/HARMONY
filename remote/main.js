@@ -1,19 +1,8 @@
 // ─── Remote spectator page ────────────────────────────────────────────────────
-// The phone is the instrument. Three channels feed the swarm:
-//
-//   tilt        — phone orientation (pitch + roll) → collective wind direction
-//   touch       — finger position → spatial presence; Y axis → temperature
-//   text        — typed word → trace attractor in the simulation
-//
-// Tilt events are consumed server-side and aggregated into a collective wind bias.
-// Touch and text events are forwarded directly to the simulation.
-//
-// n8n can push messages back to this device via POST /spectator-push on the server.
-// The 'device-message' socket event can carry:
-//   text  — shown as a top notification, auto-dismissed after 5 s
-//   color — CSS color string that overrides the aura base color (null to reset)
-//
-// Text input is hidden by default; double-tap the gesture surface to reveal/hide it.
+// Three channels feed the swarm:
+//   joystick — moves the spectator's spawner location across the canvas
+//   tilt     — phone orientation (pitch + roll) → collective wind direction
+//   text     — typed word → trace attractor in the simulation
 //
 // Signal path (outbound): this page → socket → server → [n8n →] socket → simulation
 // Signal path (inbound):  n8n → POST /spectator-push → server → socket → this page
@@ -33,23 +22,20 @@ const spectatorId = sessionStorage.getItem('spectator-id') ?? (() => {
 })();
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
-const sessionInfoEl  = document.querySelector('#session-info');
-const connDotEl      = document.querySelector('#conn-dot');
-const auraEl         = document.querySelector('#aura');
-const tiltRingEl     = document.querySelector('#tilt-ring');
-const tiltDotEl      = document.querySelector('#tilt-dot');
-const gestureSurface = document.querySelector('#gesture-surface');
-const joinOverlayEl  = document.querySelector('#join-overlay');
-const joinBtnEl      = document.querySelector('#join-btn');
-const formEl         = document.querySelector('#input-form');
-const bottomBarEl    = document.querySelector('#bottom-bar');
-const deviceMsgEl    = document.querySelector('#device-message');
+const sessionInfoEl   = document.querySelector('#session-info');
+const connDotEl       = document.querySelector('#conn-dot');
+const auraEl          = document.querySelector('#aura');
+const tiltRingEl      = document.querySelector('#tilt-ring');
+const tiltDotEl       = document.querySelector('#tilt-dot');
+const joystickBaseEl  = document.querySelector('#joystick-base');
+const joystickStickEl = document.querySelector('#joystick-stick');
+const joinOverlayEl   = document.querySelector('#join-overlay');
+const joinBtnEl       = document.querySelector('#join-btn');
+const formEl          = document.querySelector('#input-form');
+const deviceMsgEl     = document.querySelector('#device-message');
 
-// ── Session info ──────────────────────────────────────────────────────────────
 if (sessionInfoEl) {
-    sessionInfoEl.textContent = room
-        ? `${room.slice(0, 8)}…`
-        : 'no session';
+    sessionInfoEl.textContent = room ? `${room.slice(0, 8)}…` : 'no session';
 }
 
 // ── Socket.IO ─────────────────────────────────────────────────────────────────
@@ -67,7 +53,6 @@ socket.on('connect', () => {
 
 socket.on('joined', ({ userCount } = {}) => {
     console.log('[remote] joined room:', room, '| peers already here:', Math.max(0, (userCount ?? 1) - 1));
-    // Push the locally chosen palette color to the sim so the GPU slot matches the aura.
     sendEvent('color-pick', { color: palette[selectedSwatchIdx].hex });
 });
 
@@ -82,9 +67,6 @@ socket.on('disconnect', () => {
 });
 
 // ── Color palette ─────────────────────────────────────────────────────────────
-// 10 vivid colors at 50 % lightness, evenly spaced hues, random rotation.
-// Selected on page load; user can swap via swatches. n8n can still push an
-// arbitrary aura override via device-message (existing behaviour unchanged).
 function hslToHex(h, s, l) {
     s /= 100; l /= 100;
     const a = s * Math.min(l, 1 - l);
@@ -101,7 +83,7 @@ const _hueStep   = 360 / PALETTE_SIZE;
 const _hueOffset = Math.random() * _hueStep;
 const palette = Array.from({ length: PALETTE_SIZE }, (_, i) => {
     const h = (_hueOffset + i * _hueStep) % 360 | 0;
-    const s = 78 + (Math.random() * 12 | 0); // 78–90 % saturation
+    const s = 78 + (Math.random() * 12 | 0);
     return { css: `hsl(${h},${s}%,50%)`, hex: hslToHex(h, s, 50) };
 });
 
@@ -129,20 +111,15 @@ function renderSwatches() {
 }
 renderSwatches();
 
-// Initialise aura with the pre-selected palette color before any socket events.
 let pushedColor = palette[selectedSwatchIdx].css;
 
 // ── Device message (push from n8n) ────────────────────────────────────────────
-// data.text  — notification text shown at the top, auto-dismissed after 5 s
-// data.color — CSS color string for the aura base; persists until overridden.
-//              Send null or empty string to reset to temperature-driven color.
-//              Overrides the user's chosen swatch (swatch ring is cleared).
+// Shown large and centered; auto-dismissed after 5 s.
 let deviceMsgTimer = null;
 
 socket.on('device-message', (data) => {
     if ('color' in (data ?? {})) {
         pushedColor = data.color || null;
-        // n8n override — clear swatch selection since the color may not match any swatch
         document.querySelectorAll('.color-swatch').forEach(el => el.classList.remove('selected'));
         updateAura();
     }
@@ -150,10 +127,7 @@ socket.on('device-message', (data) => {
     const text = data?.text ?? '';
     if (!deviceMsgEl || !text) return;
 
-    if (deviceMsgTimer) {
-        clearTimeout(deviceMsgTimer);
-        deviceMsgTimer = null;
-    }
+    if (deviceMsgTimer) { clearTimeout(deviceMsgTimer); deviceMsgTimer = null; }
 
     deviceMsgEl.textContent = text;
     deviceMsgEl.classList.add('visible');
@@ -165,13 +139,12 @@ socket.on('device-message', (data) => {
 });
 
 // ── Story UI ──────────────────────────────────────────────────────────────────
-// stepStatus 'IDLE'  — gesture surface disabled, no vote panel
-// stepStatus 'DRAW'  — gesture surface active (normal touch behaviour)
-// stepStatus 'VOTE'  — vote panel shown with two labelled buttons; gesture surface hidden
-const votePanelEl      = document.querySelector('#vote-panel');
-const voteBtnA         = document.querySelector('#vote-btn-a');
-const voteBtnB         = document.querySelector('#vote-btn-b');
-const gestureSurfaceEl = document.querySelector('#gesture-surface');
+// IDLE — joystick disabled
+// DRAW — joystick active (default when no story step is running)
+// VOTE — vote panel shown; joystick hidden
+const votePanelEl = document.querySelector('#vote-panel');
+const voteBtnA    = document.querySelector('#vote-btn-a');
+const voteBtnB    = document.querySelector('#vote-btn-b');
 let _storyOptionA = null;
 let _storyOptionB = null;
 
@@ -180,6 +153,7 @@ function setStoryUI({ stepStatus, optionA, optionB } = {}) {
     _storyOptionB = optionB ?? null;
     const isVote = stepStatus === 'VOTE';
     const isDraw = stepStatus === 'DRAW';
+
     if (votePanelEl) {
         if (isVote) {
             if (voteBtnA) voteBtnA.textContent = _storyOptionA ?? 'A';
@@ -189,8 +163,10 @@ function setStoryUI({ stepStatus, optionA, optionB } = {}) {
             votePanelEl.classList.remove('visible');
         }
     }
-    if (gestureSurfaceEl) {
-        gestureSurfaceEl.style.pointerEvents = isDraw ? 'auto' : 'none';
+
+    // Joystick is disabled during IDLE and VOTE story steps only
+    if (joystickBaseEl) {
+        joystickBaseEl.style.pointerEvents = (stepStatus === 'IDLE' || isVote) ? 'none' : 'auto';
     }
 }
 
@@ -207,7 +183,6 @@ voteBtnB?.addEventListener('touchstart', (e) => {
 socket.on('story-ui', (data) => setStoryUI(data));
 
 // ── Peer events ───────────────────────────────────────────────────────────────
-// Brief aura pulse when another spectator joins.
 socket.on('peer-joined', () => {
     if (!auraEl) return;
     auraEl.style.transition = 'background 0s, opacity 0.05s ease';
@@ -224,122 +199,114 @@ function sendEvent(type, data) {
 }
 
 // ── Aura ──────────────────────────────────────────────────────────────────────
-// Background glow that reflects all three interaction axes simultaneously:
-//   Y (temperature) → hue shift: cold blue (top) → warm amber (bottom)
-//   tilt            → anchor point: the glow leans with the phone
-//   X (coherence)   → gradient tightness: diffuse (left/chaos) → focused (right/order)
-// If n8n pushes a color via device-message, it overrides the temperature-driven hue
-// and persists until a new push clears it (data.color = null).
-let currentTemp      = 0.5;
-let currentRoll      = 0.5;
-let currentPitch     = 0.5;
-let currentCoherence = 0.5;
+// Tilt drives the anchor point; selected/pushed color drives the center hue.
+let currentRoll  = 0.5;
+let currentPitch = 0.5;
 
 function updateAura() {
     if (!auraEl) return;
-    // Anchor follows tilt
     const ax = 50 + (currentRoll  - 0.5) * 60;
     const ay = 50 + (currentPitch - 0.5) * 60;
-    // Coherence: diffuse wide ellipse (chaos) → tight narrow ellipse (order)
-    const ew = 190 - currentCoherence * 110;  // 190% → 80%
-    const eh = 110 - currentCoherence * 70;   // 110% → 40%
-    // Center color: pushed by n8n or computed from temperature
-    const centerColor = pushedColor ?? (() => {
-        // Hue: 215 (cold blue) → 32 (warm amber)
-        const h = 215 + (32 - 215) * currentTemp;
-        const s = 60 + 25 * currentTemp;
-        const l = 9  + 10 * currentTemp;
-        return `hsl(${h},${s}%,${l}%)`;
-    })();
+    const centerColor = pushedColor ?? 'hsl(215,45%,9%)';
     auraEl.style.background =
-        `radial-gradient(ellipse ${ew}% ${eh}% at ${ax}% ${ay}%, ${centerColor} 0%, #000 60%)`;
+        `radial-gradient(ellipse 120% 60% at ${ax}% ${ay}%, ${centerColor} 0%, #000 60%)`;
 }
 updateAura();
 
 // ── Tilt indicator ────────────────────────────────────────────────────────────
 function updateTiltDot(roll, pitch) {
     if (!tiltDotEl) return;
-    // Map [0,1] to [-24px, +24px] within the ring
-    const x = (roll  - 0.5) * 48;
-    const y = (pitch - 0.5) * 48;
+    const x = (roll  - 0.5) * 18;
+    const y = (pitch - 0.5) * 18;
     tiltDotEl.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
 }
 
-// ── Touch ─────────────────────────────────────────────────────────────────────
-// The whole screen is the instrument surface.
-// X + Y → normalized spatial position.
-// Y → temperature: finger near top = cold (0), near bottom = warm (1).
-// Double-tap → toggle text input visibility.
-let touchThrottle = null;
-let lastTapTime   = 0;
-let formVisible   = false;
-let lastTouchX    = 0.5;
-let lastTouchY    = 0.5;
+// ── Joystick ──────────────────────────────────────────────────────────────────
+// Single-touch virtual joystick. Sends 'spawner' direction events every 300 ms
+// while held; sends active:false on release.
+const JOYSTICK_RADIUS = 38; // max stick displacement in px (base radius - stick radius)
 
-function handleTouch(e) {
-    const touch = e.touches[0];
-    const nx = touch.clientX / window.innerWidth;
-    const ny = touch.clientY / window.innerHeight;
-    const temp = ny; // top=cold, bottom=warm
+let joystickTouchId  = null;
+let joystickCenterX  = 0;
+let joystickCenterY  = 0;
+let joystickDx       = 0;
+let joystickDy       = 0;
+let joystickMag      = 0;
+let joystickIsActive = false;
+let joystickInterval = null;
 
-    lastTouchX = nx;
-    lastTouchY = ny;
-
-    currentTemp      = temp;
-    currentCoherence = nx;   // left=chaos, right=order
-    updateAura();
-
-    if (touchThrottle) return;
-    touchThrottle = setTimeout(() => {
-        touchThrottle = null;
-        sendEvent('touch', { x: nx, y: ny, temp, touching: true });
-    }, 100);
-}
-
-gestureSurface?.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-
-    // Double-tap detection: two taps within 280 ms toggle the text input
-    const now = Date.now();
-    if (now - lastTapTime < 280) {
-        formVisible = !formVisible;
-        bottomBarEl?.classList.toggle('visible', formVisible);
-        if (formVisible) formEl?.querySelector('input')?.focus();
-        lastTapTime = 0; // reset so triple-tap doesn't re-trigger
-    } else {
-        lastTapTime = now;
+function computeJoystick(touch) {
+    const rawX = touch.clientX - joystickCenterX;
+    const rawY = touch.clientY - joystickCenterY;
+    const dist = Math.sqrt(rawX * rawX + rawY * rawY);
+    joystickMag = Math.min(dist / JOYSTICK_RADIUS, 1);
+    joystickDx  = dist > 0.5 ? rawX / dist : 0;
+    joystickDy  = dist > 0.5 ? rawY / dist : 0;
+    const sx = joystickDx * joystickMag * JOYSTICK_RADIUS;
+    const sy = joystickDy * joystickMag * JOYSTICK_RADIUS;
+    if (joystickStickEl) {
+        joystickStickEl.style.transform = `translate(calc(-50% + ${sx}px), calc(-50% + ${sy}px))`;
     }
-
-    createRipple(e.touches[0].clientX, e.touches[0].clientY);
-    handleTouch(e);
-}, { passive: false });
-
-gestureSurface?.addEventListener('touchmove', (e) => {
-    e.preventDefault();
-    handleTouch(e);
-}, { passive: false });
-
-gestureSurface?.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    if (touchThrottle) { clearTimeout(touchThrottle); touchThrottle = null; }
-    sendEvent('touch', { x: lastTouchX, y: lastTouchY, touching: false });
-}, { passive: false });
-
-// ── Ripple ────────────────────────────────────────────────────────────────────
-function createRipple(x, y) {
-    const el = document.createElement('div');
-    el.className = 'ripple';
-    el.style.left = `${x}px`;
-    el.style.top  = `${y}px`;
-    document.body.appendChild(el);
-    el.addEventListener('animationend', () => el.remove(), { once: true });
 }
+
+function releaseJoystick() {
+    joystickIsActive = false;
+    joystickTouchId  = null;
+    clearInterval(joystickInterval);
+    joystickInterval = null;
+    joystickDx = joystickDy = joystickMag = 0;
+    if (joystickStickEl) {
+        joystickStickEl.style.transition = 'transform 0.15s ease';
+        joystickStickEl.style.transform  = 'translate(-50%, -50%)';
+        setTimeout(() => { if (joystickStickEl) joystickStickEl.style.transition = ''; }, 150);
+    }
+    sendEvent('spawner', { dx: 0, dy: 0, magnitude: 0, active: false });
+}
+
+joystickBaseEl?.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (joystickIsActive) return;
+    const touch = e.changedTouches[0];
+    joystickTouchId  = touch.identifier;
+    joystickIsActive = true;
+    const rect = joystickBaseEl.getBoundingClientRect();
+    joystickCenterX = rect.left + rect.width  / 2;
+    joystickCenterY = rect.top  + rect.height / 2;
+    computeJoystick(touch);
+    sendEvent('spawner', { dx: joystickDx, dy: joystickDy, magnitude: joystickMag, active: true });
+    joystickInterval = setInterval(() => {
+        if (joystickIsActive) {
+            sendEvent('spawner', { dx: joystickDx, dy: joystickDy, magnitude: joystickMag, active: true });
+        }
+    }, 300);
+}, { passive: false });
+
+window.addEventListener('touchmove', (e) => {
+    if (!joystickIsActive) return;
+    for (const touch of e.changedTouches) {
+        if (touch.identifier === joystickTouchId) {
+            e.preventDefault();
+            computeJoystick(touch);
+            break;
+        }
+    }
+}, { passive: false });
+
+window.addEventListener('touchend', (e) => {
+    if (!joystickIsActive) return;
+    for (const touch of e.changedTouches) {
+        if (touch.identifier === joystickTouchId) { releaseJoystick(); break; }
+    }
+});
+
+window.addEventListener('touchcancel', (e) => {
+    if (!joystickIsActive) return;
+    for (const touch of e.changedTouches) {
+        if (touch.identifier === joystickTouchId) { releaseJoystick(); break; }
+    }
+});
 
 // ── Join overlay + motion permission ─────────────────────────────────────────
-// "join the swarm" is the first and only gate.
-// Tapping it requests device-motion permission (required on iOS 13+).
-// Whether permission is granted or denied the overlay is dismissed and the
-// full UI (touch surface + text form) becomes active.
 let motionEnabled = false;
 let tiltThrottle  = null;
 
@@ -349,12 +316,10 @@ function startTilt() {
 
     startDeviceTilt(20, (d) => {
         if (!d.enabled) return;
-
-        currentRoll  = d.g;   // roll  0-1
-        currentPitch = d.b;   // pitch 0-1
+        currentRoll  = d.g;
+        currentPitch = d.b;
         updateAura();
         updateTiltDot(currentRoll, currentPitch);
-
         if (tiltThrottle || !motionEnabled) return;
         tiltThrottle = setTimeout(() => {
             tiltThrottle = null;
@@ -371,22 +336,17 @@ function dismissOverlay() {
 }
 
 joinBtnEl?.addEventListener('click', async () => {
-    // Request permission first — iOS requires a user gesture in the call stack.
     try { await requestMotionOrientationPermission(); } catch { /* denied or unsupported */ }
     startTilt();
     dismissOverlay();
 });
 
 // ── Text form ─────────────────────────────────────────────────────────────────
-// Hidden by default; revealed by double-tapping the gesture surface.
-// Collapses automatically after submission.
 formEl?.addEventListener('submit', (e) => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(formEl));
     if (!data.text1?.trim()) return;
     sendEvent('text', { text: data.text1.trim() });
     formEl.reset();
-    formVisible = false;
-    bottomBarEl?.classList.remove('visible');
     console.log('[remote] → text', data.text1.trim());
 });

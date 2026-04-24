@@ -14,13 +14,13 @@
         <!-- Slow idle breathing pulse — always on, subtle -->
         <div id="breath"></div>
 
-        <!-- Full-screen gesture surface — touch anywhere, double-tap to write -->
-        <div id="gesture-surface"></div>
-
-        <!-- Tilt bubble — moves with phone orientation -->
+        <!-- Tilt indicator — corner bubble showing phone orientation -->
         <div id="tilt-ring"><div id="tilt-dot"></div></div>
 
-        <!-- Push notification from n8n — fades in at top, dismissed automatically -->
+        <!-- Virtual joystick — centered, controls spawner direction -->
+        <div id="joystick-base"><div id="joystick-stick"></div></div>
+
+        <!-- Push message from n8n — shown large and centered -->
         <div id="device-message" aria-live="polite"></div>
 
         <!-- Minimal status bar -->
@@ -38,8 +38,8 @@
             <button id="vote-btn-b" class="vote-btn"></button>
         </div>
 
-        <!-- Text input + color picker — hidden by default, revealed by double-tapping the surface -->
-        <div id="bottom-bar">
+        <!-- Text input + color picker — always visible at top -->
+        <div id="top-bar">
             <div id="color-picker"></div>
             <form id="input-form" autocomplete="off">
                 <input name="text1" type="text" placeholder="write to the swarm…" autocomplete="off" autocorrect="off" spellcheck="false">

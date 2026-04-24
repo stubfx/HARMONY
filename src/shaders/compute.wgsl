@@ -78,21 +78,21 @@ struct SoloParams {
     spectatorSpawnChance: f32,
 }
 
-// Per-spectator partition data — color, touch position, touch state, personal wind.
+// Per-spectator partition data — color, joystick spawner position, personal wind.
 // 12 × f32/u32 = 48 bytes per slot; 16 slots = 768 bytes total.
 struct SpectatorSlot {
-    colorR:     f32,
-    colorG:     f32,
-    colorB:     f32,
-    isActive:   u32,
-    touchX:     f32,
-    touchY:     f32,
-    isTouching: u32,
-    _p0:        u32,
-    windX:      f32,   // tilt-derived wind X — portrait = 0, scaled to ±1 at ±90° roll
-    windY:      f32,   // tilt-derived wind Y — portrait = 0, scaled to ±1 at ±90° pitch
-    _p1:        u32,
-    _p2:        u32,
+    colorR:               f32,
+    colorG:               f32,
+    colorB:               f32,
+    isActive:             u32,
+    spawnerX:             f32,
+    spawnerY:             f32,
+    spawnerLocationActive: u32,
+    _p0:                  u32,
+    windX:                f32,   // tilt-derived wind X — portrait = 0, scaled to ±1 at ±90° roll
+    windY:                f32,   // tilt-derived wind Y — portrait = 0, scaled to ±1 at ±90° pitch
+    _p1:                  u32,
+    _p2:                  u32,
 }
 
 struct Agent {
@@ -494,14 +494,14 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         np.y = ((np.y % params.canvasH) + params.canvasH) % params.canvasH;
     }
 
-    // Touch-spawn: teleport a fraction of the spectator's partition to the finger each frame.
+    // Spawner-teleport: move a fraction of the spectator's partition to the joystick spawner each frame.
     // Primed (homing) agents are never interrupted — they must finish homing.
     if (!homeInImg && params.spectatorCount > 0u) {
         let slot = spectatorSlots[i % params.spectatorCount];
-        if (slot.isActive != 0u && slot.isTouching != 0u) {
+        if (slot.isActive != 0u && slot.spawnerLocationActive != 0u) {
             let rng = hash(i ^ (u32(params.time * 137.0) + 17u));
             if (rng < params.spectatorSpawnChance) {
-                np = vec2<f32>(slot.touchX * params.canvasW, slot.touchY * params.canvasH);
+                np = vec2<f32>(slot.spawnerX * params.canvasW, slot.spawnerY * params.canvasH);
             }
         }
     }

@@ -92,7 +92,9 @@ const params = {
     // Auto-clear
     clearDelay:    0,     // seconds before auto-clearing user trace content (0 = disabled)
     // Spectator partitioning
-    spectatorSpawnChance: 0.01, // per-frame probability an assigned agent teleports to the spectator's touch point
+    spectatorSpawnChance:   0.01, // per-frame probability an assigned agent teleports to the spectator's spawner point
+    spawnerSpeed:           0.3,  // canvas fractions per second the spawner moves at full joystick deflection
+    spawnerInactiveTimeout: 5,    // seconds of joystick silence before spawner goes inactive
     // Session / QR restore
     remoteTimeout:  0,    // seconds of silence from all remotes before QR is restored (0 = disabled)
     maxSpectators:  1,    // sim QR hides when connected count reaches this threshold
@@ -1135,7 +1137,9 @@ const SPECTATOR_PALETTE = [
     '#ff7766','#ffbb44','#88ff44','#33eeff',
     '#4466ff','#bb55ff','#ff6699','#ffff55',
 ];
-const activeSlots = []; // { spectatorId, colorR, colorG, colorB, touchX, touchY, isTouching, windX, windY }
+// { spectatorId, colorR, colorG, colorB, spawnerX, spawnerY, spawnerLocationActive,
+//   windX, windY, dx, dy, magnitude, lastInputTime }
+const activeSlots = [];
 
 function uploadSpectatorSlots() {
     const ab = new ArrayBuffer(768);
@@ -1148,9 +1152,9 @@ function uploadSpectatorSlots() {
         f[b + 1] = s.colorG;
         f[b + 2] = s.colorB;
         u[b + 3] = 1;
-        f[b + 4] = s.touchX;
-        f[b + 5] = s.touchY;
-        u[b + 6] = s.isTouching;
+        f[b + 4] = s.spawnerX;
+        f[b + 5] = s.spawnerY;
+        u[b + 6] = s.spawnerLocationActive;
         u[b + 7] = 0;
         f[b + 8] = s.windX;
         f[b + 9] = s.windY;
@@ -1249,7 +1253,7 @@ let socket;
         if (spectatorId && activeSlots.length < MAX_SPECTATOR_SLOTS) {
             // Start with a neutral white — the phone sends a 'color-pick' immediately
             // after joining with its locally generated palette color, which overwrites this.
-            activeSlots.push({ spectatorId, colorR: 1, colorG: 1, colorB: 1, touchX: 0.5, touchY: 0.5, isTouching: 0, windX: 0, windY: 0 });
+            activeSlots.push({ spectatorId, colorR: 1, colorG: 1, colorB: 1, spawnerX: 0.5, spawnerY: 0.5, spawnerLocationActive: 0, windX: 0, windY: 0, dx: 0, dy: 0, magnitude: 0, lastInputTime: 0 });
             uploadSpectatorSlots();
         }
     });
@@ -1268,7 +1272,7 @@ let socket;
     // Single source of truth for all event types emitted by spectator devices.
     // sendToN8n: whether this event type is forwarded to n8n via callN8n().
     const REMOTE_EVENTS = {
-        touch:      { sendToN8n: false },
+        spawner:    { sendToN8n: false },
         tilt:       { sendToN8n: false },
         'color-pick': { sendToN8n: false },
         rotation:   { sendToN8n: false },
@@ -1277,15 +1281,24 @@ let socket;
 
     socket.on('remote-event', (event) => {
         lastRemoteActivity = Date.now();
-        if (event.type === 'touch') {
+        if (event.type === 'spawner') {
             const slot = activeSlots.find(s => s.spectatorId === event.spectatorId);
             if (slot) {
-                if (event.data?.touching === false) {
-                    slot.isTouching = 0;
+                const { dx = 0, dy = 0, magnitude = 0, active = true } = event.data ?? {};
+                if (!active) {
+                    slot.spawnerLocationActive = 0;
+                    slot.dx = 0; slot.dy = 0; slot.magnitude = 0;
                 } else {
-                    slot.touchX     = event.data?.x ?? slot.touchX;
-                    slot.touchY     = event.data?.y ?? slot.touchY;
-                    slot.isTouching = 1;
+                    if (slot.spawnerLocationActive === 0) {
+                        // Re-activating after inactive — new random canvas position
+                        slot.spawnerX = Math.random();
+                        slot.spawnerY = Math.random();
+                    }
+                    slot.spawnerLocationActive = 1;
+                    slot.dx        = dx;
+                    slot.dy        = dy;
+                    slot.magnitude = magnitude;
+                    slot.lastInputTime = Date.now();
                 }
                 uploadSpectatorSlots();
             }
@@ -1515,7 +1528,9 @@ fAvoid.add({ load: () => document.querySelector('#avoid-map-input').click() }, '
 fAvoid.add({ clear: clearAvoidMap }, 'clear').name('Clear map');
 
 const fSession = gui.addFolder('Session');
-fSession.add(params, 'spectatorSpawnChance', 0, 1, 0.01).name('spawn chance');
+fSession.add(params, 'spectatorSpawnChance',   0,   1,  0.01).name('spawn chance');
+fSession.add(params, 'spawnerSpeed',           0,   2,  0.05).name('spawner speed');
+fSession.add(params, 'spawnerInactiveTimeout', 1,  30,  1   ).name('spawner timeout (s)');
 fSession.add(params, 'qrFadeZone').name('QR fade zone');
 fSession.add(params, 'remoteTimeout',  0, 180,  5).name('idle restore QR (s)');
 fSession.add(params, 'maxSpectators',  1,  50,  1).name('QR hides at N users');
@@ -1997,6 +2012,26 @@ function frame(ts) {
     const rawDt  = Math.min(Math.max(now - prevTime, TIME_MULT), 0.05);
     const dt     = params.useDeltaTime ? rawDt : (1 / 60);
     prevTime     = now;
+
+    // Move each spectator's spawner along the last joystick direction, check inactivity timeout.
+    if (activeSlots.length) {
+        const wallNow = Date.now();
+        let dirty = false;
+        for (const slot of activeSlots) {
+            if (slot.spawnerLocationActive === 1) {
+                if (wallNow - slot.lastInputTime > params.spawnerInactiveTimeout * 1000) {
+                    slot.spawnerLocationActive = 0;
+                    slot.dx = 0; slot.dy = 0; slot.magnitude = 0;
+                    dirty = true;
+                } else if (slot.magnitude > 0) {
+                    slot.spawnerX = Math.max(0, Math.min(1, slot.spawnerX + slot.dx * slot.magnitude * params.spawnerSpeed * dt));
+                    slot.spawnerY = Math.max(0, Math.min(1, slot.spawnerY + slot.dy * slot.magnitude * params.spawnerSpeed * dt));
+                    dirty = true;
+                }
+            }
+        }
+        if (dirty) uploadSpectatorSlots();
+    }
 
     writeSoloUB(dt, now);
     writeRenderUB();
