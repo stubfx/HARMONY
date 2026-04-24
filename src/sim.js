@@ -92,7 +92,8 @@ const params = {
     // Auto-clear
     clearDelay:    0,     // seconds before auto-clearing user trace content (0 = disabled)
     // Spectator partitioning
-    spectatorSpawnChance:   0.01, // per-frame probability an assigned agent teleports to the spectator's spawner point
+    spectatorSpawnChance:      0.01, // base per-frame spawn probability (scaled by user count × multiplier)
+    spectatorSpawnMultiplier:  3,    // scales spawn chance proportionally with active user count
     spawnerSpeed:           0.3,  // canvas fractions per second the spawner moves at full joystick deflection
     spawnerVelocityBoost:   2.0,  // multiplier applied to spawnerSpeed when joystick is moved quickly (0 = no boost)
     spawnerSteering:        6,    // direction-change rate (1/s); lower = wider curves, higher = tighter turns
@@ -1539,7 +1540,8 @@ fAvoid.add({ load: () => document.querySelector('#avoid-map-input').click() }, '
 fAvoid.add({ clear: clearAvoidMap }, 'clear').name('Clear map');
 
 const fSession = gui.addFolder('Session');
-fSession.add(params, 'spectatorSpawnChance',   0,   1,  0.01).name('spawn chance');
+fSession.add(params, 'spectatorSpawnChance',      0,   1,  0.01).name('spawn chance (base)');
+fSession.add(params, 'spectatorSpawnMultiplier', 0,  10,  0.1 ).name('spawn multiplier');
 fSession.add(params, 'spawnerSpeed',           0,   2,  0.05).name('spawner speed');
 fSession.add(params, 'spawnerVelocityBoost',   0,   5,  0.1 ).name('spawner velocity boost');
 fSession.add(params, 'spawnerSteering',        1,  20,  0.5 ).name('spawner steering');
@@ -1875,7 +1877,7 @@ function writeSoloUB(dt, time) {
     f[31] = params.homingChance;
     f[32] = params.homingInfluence;
     u[33] = activeSlots.length;
-    f[34] = params.spectatorSpawnChance;
+    f[34] = Math.min(params.spectatorSpawnChance * activeSlots.length * params.spectatorSpawnMultiplier, 1.0);
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
