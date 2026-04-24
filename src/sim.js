@@ -1006,8 +1006,6 @@ async function applyFormulas(dir, wind, { reseed = false } = {}) {
 }
 
 const rndPick   = arr => arr[Math.floor(Math.random() * arr.length)];
-const startDir  = rndPick(DIR_FORMULAS);
-const startWind = rndPick(WIND_FORMULAS);
 
 // ── Simulation state machine ──────────────────────────────────────────────────
 /// qrStatus: 'SHOW' — QR is drawn as the topmost layer on the trace canvas.
@@ -1018,7 +1016,7 @@ const startWind = rndPick(WIND_FORMULAS);
 //           'DOT'    — fixed inward-spiral formulas; wind + formula forced on regardless of params
 const simState = {
     qrStatus:          'HIDE',
-    status:            'NORMAL',
+    status:            'DOT',
     storyStep:         null,   // echoed from n8n step ID; null = not in story mode
     storyStepComplete: false,
     storyVoteResult:   null,
@@ -1159,7 +1157,7 @@ function restartHeartbeat() {
 }
 restartHeartbeat();
 
-await applyFormulas(startDir, startWind, { reseed: true });
+await applyFormulas(DOT_DIR, DOT_WIND, { reseed: true });
 
 // ── Spectator partitioning ────────────────────────────────────────────────────
 // Each connected spectator gets a color and a contiguous partition of agents
@@ -1486,8 +1484,8 @@ const windInput = document.querySelector('#wind-input');
 const applyBtn  = document.querySelector('#apply-btn');
 const presetsEl = document.querySelector('#presets');
 
-dirInput.value  = startDir;
-windInput.value = startWind;
+dirInput.value  = DOT_DIR;
+windInput.value = DOT_WIND;
 
 // ── Auto formula cycle — random pick every 30 s ───────────────────────────────
 // Each flag is checked independently; both can fire in the same tick.
