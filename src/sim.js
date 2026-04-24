@@ -849,17 +849,14 @@ function renderTraceCanvas() {
         }
     }
 
-    // Caption: bottom zone when image is present; bottom of full canvas otherwise
+    // Caption: always anchored to the bottom of the canvas
     if (hasCaption) {
         ctx.fillStyle    = 'white';
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'alphabetic';
         ctx.font         = `bold ${captionFS}px sans-serif`;
-        const lineH      = Math.round(captionFS * 1.35);
-        const zoneY      = imageBitmap ? imageZoneH : 0;
-        const zoneH      = imageBitmap ? captionZoneH : tcH;
-        const totalTextH = captionLines.length * lineH;
-        const startY     = zoneY + (zoneH - totalTextH) / 2 + lineH * 0.8;
+        const lineH  = Math.round(captionFS * 1.35);
+        const startY = tcH - CAPTION_V_PAD - (captionLines.length - 1) * lineH;
         captionLines.forEach((ln, i) => ctx.fillText(ln, tcW / 2, startY + i * lineH));
     }
 
