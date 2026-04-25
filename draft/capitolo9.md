@@ -28,7 +28,7 @@ Quando il comportamento collettivo di un gruppo è visualizzato in tempo reale s
 
 > **[IMG]** Screenshot che mostra un pattern visivo chiaro emergente dal comportamento collettivo — una struttura nel flusso che rivela l'organizzazione implicita del gruppo in quel momento.
 
-David Rokeby ha descritto il suo *Very Nervous System* come «uno specchio che trasforma». Il sistema riflette il tuo comportamento, ma non come uno specchio ordinario: lo traduce in qualcos'altro, lo rende osservabile in una forma nuova. Questo progetto funziona in modo simile, su scala collettiva: riflette il comportamento del gruppo non come immagine fedele, ma come pattern di movimento e luce. La traduzione introduce una distanza interpretativa: quello che si vede sullo schermo è il gruppo, ma trasformato.
+La logica è la stessa che Rokeby aveva identificato nel suo lavoro, descritta nel primo capitolo: il sistema non restituisce una copia fedele di ciò che riceve. Lo traduce. E la traduzione introduce una distanza interpretativa che rende osservabile quello che altrimenti resterebbe invisibile. Su scala collettiva, questa traduzione funziona su un materiale più complesso: non il movimento di un corpo singolo, ma il comportamento aggregato di un gruppo. Quello che si vede sullo schermo è il gruppo, ma trasformato in qualcosa che il gruppo non avrebbe potuto vedere di sé stesso in nessun altro modo.
 
 Questa trasformazione ha un effetto preciso: rende osservabile quello che normalmente si sente soltanto. Si può avere la sensazione di far parte di un gruppo coeso o di un gruppo disperso; con questo sistema, quella sensazione ha una forma visiva. Si può vederla.
 
@@ -36,9 +36,9 @@ Questa trasformazione ha un effetto preciso: rende osservabile quello che normal
 
 ## 9.3 — La macchina che propone
 
-La differenza fondamentale tra un sistema interattivo tradizionale e questo progetto sta in chi fa la prima mossa. Un sistema tradizionale aspetta: si presenta come uno strumento pronto all'uso, e diventa attivo solo quando qualcuno lo usa. Questo progetto no. Il sistema è già in movimento nel momento in cui le persone entrano nella stanza. Ha già qualcosa in corso. Non aspetta.
+Tutti i sistemi descritti fin qui, le particelle, le modalità, la narrativa, condividono una caratteristica che non è mai stata nominata direttamente: il sistema non aspetta. Quando le persone entrano nella stanza, il sistema ha già qualcosa in corso. Non si attiva in risposta a qualcuno: esiste prima che qualcuno arrivi, e continuerà a esistere dopo che se ne sarà andato.
 
-Questa distinzione cambia radicalmente il tipo di relazione che si stabilisce. Quando si arriva in un ambiente in cui qualcosa sta già succedendo, la prima reazione non è "come lo uso?" ma "cosa sta facendo?". Si osserva, si interpreta, si cerca di capire prima di agire. La postura è completamente diversa da quella di chi usa uno strumento.
+Questo cambia tutto nel tipo di relazione che si stabilisce. Di fronte a un ambiente già in movimento, la prima domanda non è "come lo uso?" ma "cosa sta facendo?". Si osserva prima di agire. Si cerca di capire la logica prima di intervenire. È una postura radicalmente diversa da quella di chi usa uno strumento.
 
 > **[IMG]** Screenshot della modalità DOT o FREEROAM — il sistema in uno stato attivo senza input esterno, le particelle che si muovono secondo una propria logica visibile.
 
@@ -58,4 +58,4 @@ Questo progetto appartiene a quella tradizione, ma la prolunga in una direzione 
 
 Quello che questo progetto propone, implicitamente, è un modello diverso per pensare il rapporto tra umani e sistemi intelligenti. Non lo strumento che si usa quando se ne ha bisogno. Non l'oracolo che risponde alle domande. Qualcosa di più vicino a una presenza: un sistema che ha una propria vita, che si modifica in risposta al contesto, che offre qualcosa e chiede qualcosa in cambio. Una relazione, invece di una funzione.
 
-Questa proposta non ha ambizioni di universalità. È un esperimento, un prototipo, una domanda formulata attraverso la forma invece che attraverso il testo. Ma la domanda è reale: cosa cambia nell'esperienza di interagire con un sistema intelligente, quando quel sistema ha già qualcosa in corso nel momento in cui arrivi?
+Questa proposta non ha ambizioni di universalità. È un esperimento, un prototipo, una domanda formulata attraverso la forma invece che attraverso il testo. E come ogni domanda formulata bene, non esaurisce il problema che pone: lo rende più preciso, più maneggiabile, più difficile da ignorare.

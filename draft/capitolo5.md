@@ -12,7 +12,7 @@ Presa singolarmente, una particella è quasi invisibile: un punto luminoso contr
 
 > **[IMG]** Primo piano di un cluster di particelle ad alta densità — luce che si accumula e produce un bagliore, singoli punti distinguibili ai margini dove la densità decresce.
 
-Il fatto che ogni particella abbia un colore che corrisponde a un partecipante specifico crea una struttura nascosta dentro il sistema: in ogni momento, lo sciame è la sovrapposizione di tanti sotto-sciami individuali, ognuno con la propria tinta. Questa struttura non è sempre visibile, ma è sempre presente. È il modo in cui l'identità individuale sopravvive dentro il corpo collettivo, come un filo colorato tessuto in un tessuto più grande.
+Il fatto che ogni particella abbia un colore che corrisponde a un partecipante specifico crea una struttura nascosta dentro il sistema: in ogni momento, lo sciame è la sovrapposizione di tanti sotto-sciami individuali, ognuno con la propria tinta. Questa struttura non è sempre visibile, ma è sempre presente. È il modo in cui l'identità individuale sopravvive dentro il corpo collettivo: sempre presente, anche quando non è visibile in superficie.
 
 ---
 

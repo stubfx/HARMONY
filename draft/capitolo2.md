@@ -72,3 +72,5 @@ Steven Johnson, nel suo saggio *Emergence* (2001), osserva che le città funzion
 È questa consapevolezza il punto che interessa questo progetto. Non cosa succede quando le persone si comportano come uno sciame senza saperlo. Ma cosa succede quando lo sanno. Quando qualcuno mostra loro che il loro comportamento collettivo ha una forma, che quella forma è visibile in tempo reale, che si può osservare mentre si contribuisce a crearla.
 
 Cosa cambia, nell'esperienza di far parte di qualcosa, quando si riesce a vederlo dall'interno?
+
+Per rispondere a questa domanda, vale la pena guardare prima a come altri hanno costruito le condizioni di quella visibilità: cosa significa fare un'opera che ha bisogno del pubblico per esistere, e cosa hanno già capito gli artisti che ci hanno provato prima.

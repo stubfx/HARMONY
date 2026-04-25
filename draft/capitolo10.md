@@ -1,6 +1,6 @@
 # 10. Limiti e direzioni future
 
-Ogni progetto ha un orizzonte oltre il quale non arriva. Riconoscere quel confine non è una sconfitta: è parte di qualsiasi lavoro onesto. I limiti definiscono la forma di quello che è stato fatto, tanto quanto le scelte che sono state compiute deliberatamente.
+Costruire qualcosa insegna anche cosa non si riesce a fare. Questo non è un dato neutro: i limiti di un sistema ne rivelano la natura con la stessa precisione delle sue possibilità. Quello che un sistema non sa fare dice dove finisce la sua intelligenza e dove comincia la necessità di qualcosa di diverso.
 
 ---
 

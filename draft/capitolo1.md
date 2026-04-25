@@ -69,3 +69,5 @@ James Turrell costruisce stanze di luce in cui è difficile capire dove finisce 
 Non tutti i progetti di questo tipo vogliono essere così radicali. Ma quasi tutti condividono l'idea che la chiarezza immediata non sia sempre una virtù. Che lasciare una domanda aperta, una logica da scoprire, un meccanismo da intuire, possa essere una forma di rispetto verso il pubblico: un invito a partecipare davvero, invece di seguire istruzioni.
 
 È una posizione che questo progetto fa propria. Niente spiega come funziona il sistema. Si scopre usandolo.
+
+Ma perché qualcuno voglia scoprirlo, deve avere qualcosa in mano. Il capitolo che segue riguarda quello strumento: il corpo, il gesto, e il dispositivo che in questo progetto li connette al sistema.

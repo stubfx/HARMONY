@@ -38,7 +38,7 @@ I partecipanti connessi possono spingere il proprio sotto-sciame in qualsiasi di
 
 > **[IMG]** Screenshot della modalità NORMAL — flusso di particelle con pattern visibili, correnti e vortici emergenti, movimento strutturato ma non rigido.
 
-Questa tensione è intenzionale. Se ogni partecipante potesse controllare completamente le proprie particelle, il sistema diventerebbe una somma di controlli individuali e perderebbe la qualità di organismo: diventerebbe uno strumento, non una presenza. La resistenza del sistema è parte di ciò che lo rende qualcosa con cui si dialoga, invece di qualcosa che si usa.
+Questa tensione è intenzionale. Se ogni partecipante potesse controllare completamente le proprie particelle, il sistema diventerebbe una somma di controlli individuali e perderebbe la qualità che lo distingue: quella di avere qualcosa di proprio da proporre, una direzione che non è stata chiesta ma che esiste. La resistenza è la condizione del dialogo.
 
 NORMAL è la modalità predefinita dell'esperienza, quella in cui si trascorre la maggior parte del tempo. Le altre modalità sono eccezioni, cambi di qualità che rendono più evidente per contrasto quello che il sistema fa normalmente.
 
