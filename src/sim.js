@@ -7,7 +7,7 @@
 // Speed drives brightness. A fading trail accumulates on an offscreen texture.
 
 import { initGUI }      from './gui.js';
-import { startMic, stopAudio, isActive, getVolume, playAudio } from './audio.js';
+import { startMic, stopAudio, isActive, getVolume, playAudio, unlockAudio } from './audio.js';
 import QRCode           from 'qrcode';
 import { io as ioConnect } from 'socket.io-client';
 import soloSimTemplate  from './shaders/compute.wgsl?raw';
@@ -1548,6 +1548,12 @@ PRESETS.forEach(({ label, dir, wind }) => {
 });
 
 // ── File input for trace image ────────────────────────────────────────────────
+// ── Audio unlock button ───────────────────────────────────────────────────────
+document.querySelector('#audio-unlock').addEventListener('click', async () => {
+    await unlockAudio();
+    document.querySelector('#audio-unlock').classList.add('unlocked');
+});
+
 document.querySelector('#image-input').addEventListener('change', e => {
     const file = e.target.files[0];
     if (file) loadMagnetImage(file);

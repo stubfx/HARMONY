@@ -67,6 +67,13 @@ export function stopAudio() {
 
 export function isActive() { return _active; }
 
+// Call on first user interaction to satisfy the browser autoplay policy.
+// Safe to call multiple times — no-ops if already running.
+export async function unlockAudio() {
+    _ensureAnalyser();
+    if (_ctx.state === 'suspended') await _ctx.resume();
+}
+
 // Call once per frame (inside the render loop).
 // Returns a smoothed 0–1 brightness multiplier; 1.0 when audio is off.
 export function getVolume() {
