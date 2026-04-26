@@ -58,12 +58,14 @@ function showAuthError() {
     passwordInput.focus();
 }
 
+let _uiBuilt = false;
+
 // Skip gate if token already stored (server rejects if expired → re-auth triggered).
 if (adminToken) showAdmin();
 
 // ── Socket ────────────────────────────────────────────────────────────────────
 function connectSocket() {
-    if (socket) { socket.disconnect(); socket = null; }
+    if (socket) { socket.removeAllListeners(); socket.disconnect(); socket = null; }
     socket = ioConnect(socketUrl, { reconnectionDelay: 2000 });
     socket.on('connect', () => {
         if (adminToken) socket.emit('register-admin', { room, token: adminToken });
@@ -125,7 +127,7 @@ function showAdmin() {
     adminUI.classList.remove('hidden');
     if (sessionLabel) sessionLabel.textContent = room ? `${room.slice(0, 8)}…` : '—';
     connectSocket();
-    buildUI();
+    if (!_uiBuilt) { buildUI(); _uiBuilt = true; }
 }
 
 function buildUI() {
