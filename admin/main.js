@@ -58,10 +58,6 @@ function showAuthError() {
     passwordInput.focus();
 }
 
-let _uiBuilt = false;
-
-// Skip gate if token already stored (server rejects if expired → re-auth triggered).
-if (adminToken) showAdmin();
 
 // ── Socket ────────────────────────────────────────────────────────────────────
 function connectSocket() {
@@ -300,3 +296,7 @@ function mkSlider(label, key, def, min, max, step) {
     wrap.appendChild(input);
     return wrap;
 }
+
+// Bootstrap — all let/const declarations above must be initialized before this runs.
+let _uiBuilt = false;
+if (adminToken) showAdmin();
