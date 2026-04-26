@@ -1070,7 +1070,7 @@ const N8N_BASE            = (import.meta.env.VITE_N8N_BASE_URL ?? '').replace(/\
 const N8N_USER_TIMEOUT_MS = 15_000; // timeout for user-event calls (text submit, etc.)
 // Heartbeat timeout scales with the interval so heavy n8n responses don't get aborted.
 // 90% of the interval, minimum 5 s — recomputed each call so GUI/n8n changes take effect.
-function n8nHeartbeatTimeoutMs() { return Math.max(params.heartbeatInterval * 900, 5_000); }
+function n8nHeartbeatTimeoutMs() { return Math.min(Math.max(params.heartbeatInterval * 900, 5_000), 30_000); }
 let   n8nInFlight          = false;
 let   n8nHeartbeatInFlight = false;
 
@@ -1102,10 +1102,7 @@ async function callN8n(event) {
 
 // Periodic heartbeat — sends the full params snapshot to n8n every
 // params.heartbeatInterval seconds. Response is handled identically to sim-event.
-// Has its own in-flight guard so it never blocks user-triggered events.
-// _pendingOutOfCycle: set by fireOutOfCycleHeartbeat() when a send is requested
-// while one is already in-flight; consumed in the finally block.
-let _pendingOutOfCycle = false;
+// In-flight guard: any heartbeat requested while one is running is dropped (no queue).
 async function callN8nHeartbeat() {
     if (!N8N_BASE || n8nHeartbeatInFlight) return;
     n8nHeartbeatInFlight = true;
@@ -1139,14 +1136,13 @@ async function callN8nHeartbeat() {
         if (err.name !== 'AbortError') console.warn('[n8n heartbeat]', err.message);
     } finally {
         n8nHeartbeatInFlight = false;
-        if (_pendingOutOfCycle) { _pendingOutOfCycle = false; callN8nHeartbeat(); }
     }
 }
 
 // Fire an immediate heartbeat regardless of the periodic schedule.
-// Used when a story step completes to notify n8n without waiting for the next tick.
+// Dropped silently if one is already in-flight — no queue.
 function fireOutOfCycleHeartbeat() {
-    if (n8nHeartbeatInFlight) { _pendingOutOfCycle = true; return; }
+    if (n8nHeartbeatInFlight) return;
     callN8nHeartbeat();
 }
 
