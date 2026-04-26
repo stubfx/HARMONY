@@ -217,11 +217,11 @@ let currentPitch = 0.5;
 
 function updateAura() {
     if (!auraEl) return;
-    const ax = 50 + (currentRoll  - 0.5) * 60;
-    const ay = 50 + (currentPitch - 0.5) * 60;
+    const ax = 50 + (currentRoll  - 0.5) * 40;
+    const ay = 50 + (currentPitch - 0.5) * 40;
     const centerColor = pushedColor ?? 'hsl(215,45%,9%)';
     auraEl.style.background =
-        `radial-gradient(ellipse 120% 60% at ${ax}% ${ay}%, ${centerColor} 0%, #000 60%)`;
+        `radial-gradient(circle at ${ax}% ${ay}%, ${centerColor} 0%, #000 65%)`;
 }
 updateAura();
 

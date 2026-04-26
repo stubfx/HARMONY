@@ -23,7 +23,7 @@ html, body {
     z-index: 0;
     pointer-events: none;
     transition: background 0.6s ease;
-    background: radial-gradient(ellipse 120% 60% at 50% 110%, hsl(210,70%,12%) 0%, #000 55%);
+    background: radial-gradient(circle at 50% 110%, hsl(210,70%,12%) 0%, #000 65%);
 }
 
 /* ── Breathing pulse — subtle idle life ─────────────────────────────────────── */
@@ -42,34 +42,6 @@ html, body {
     50%       { opacity: 1;   transform: scale(1.12); }
 }
 
-/* ── Tilt ring + bubble ──────────────────────────────────────────────────────── */
-#tilt-ring {
-    position: fixed;
-    right: 1.5rem;
-    bottom: max(env(safe-area-inset-bottom), 4rem);
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    z-index: 3;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.4s ease;
-}
-
-#tilt-ring.visible { opacity: 1; }
-
-#tilt-dot {
-    position: absolute;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.5);
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    transition: transform 0.15s ease;
-}
 
 /* ── Device message — large centered push text from n8n ─────────────────────── */
 #device-message {
@@ -110,23 +82,6 @@ html, body {
     line-height: 1.4;
 }
 
-/* ── Connection dot ──────────────────────────────────────────────────────────── */
-#conn-dot {
-    position: fixed;
-    top: max(env(safe-area-inset-top), 0.75rem);
-    right: 0.75rem;
-    z-index: 10;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.15);
-    transition: background 0.4s ease, box-shadow 0.4s ease;
-}
-
-#conn-dot.connected {
-    background: rgba(255, 255, 255, 0.7);
-    box-shadow: 0 0 6px rgba(255, 255, 255, 0.4);
-}
 
 /* ── Top bar — text input + color picker, always visible ────────────────────── */
 #top-bar {
