@@ -144,10 +144,10 @@ function buildUI() {
 
     // ── QR toggle ─────────────────────────────────────────────────────────────
     const qrBtn = document.createElement('button');
-    function updateQRBtn() {
+    const updateQRBtn = () => {
         qrBtn.className   = `btn-big ${qrVisible ? 'btn-qr-on' : 'btn-qr-off'}`;
         qrBtn.textContent = qrVisible ? '⬛  hide qr code' : '⬜  show qr code';
-    }
+    };
     updateQRBtn();
     qrBtn.addEventListener('click', () => {
         const next = !qrVisible;
