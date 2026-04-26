@@ -42,7 +42,7 @@ const port        = process.env.PORT ?? 3000;
 const isDev       = process.env.NODE_ENV === 'development';
 const VITE_PORT   = process.env.VITE_PORT ?? 5173;
 
-const ADMIN_PASS = process.env.ADMIN_PASSWORD ?? '';
+const ADMIN_PASS = (process.env.ADMIN_PASSWORD ?? '').trim();
 const N8N_BASE   = (process.env.VITE_N8N_BASE_URL ?? '').replace(/\/$/, '');
 const N8N_SECRET = process.env.N8N_SECRET ?? '';
 

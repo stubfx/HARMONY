@@ -56,8 +56,11 @@ if (adminToken) showAdmin();
 
 // ── Socket ────────────────────────────────────────────────────────────────────
 function connectSocket() {
+    if (socket) { socket.disconnect(); socket = null; }
     socket = ioConnect(socketUrl, { reconnectionDelay: 2000 });
-    socket.on('connect',       () => socket.emit('register-admin', { room, token: adminToken }));
+    socket.on('connect', () => {
+        if (adminToken) socket.emit('register-admin', { room, token: adminToken });
+    });
     socket.on('admin-registered', () => connDot?.classList.add('connected'));
     socket.on('admin-auth-error', () => {
         sessionStorage.removeItem('admin-token');
