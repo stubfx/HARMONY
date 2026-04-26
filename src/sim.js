@@ -86,12 +86,12 @@ const params = {
     qrAvoidMargin:   0.01,  // extra padding around QR in the avoid zone, as fraction of minDim
     qrAvoidFade:     0.01,  // blur radius of the avoid zone edge, as fraction of minDim
     // Primed-spot probe (free agents only)
-    probeLen:          50.0, // probe cast distance in canvas pixels
+    probeLen:          15.0, // probe cast distance in canvas pixels
     probeForceStr:     150.0, // steering force multiplier when probe hits a primed pixel
     respawnOnCollide:  false, // teleport to a random edge position instead of steering on probe hit
     probeSensorAngle:  0.785, // half-angle between left/right Physarum sensors (radians; π/4 ≈ 45°)
     // Caption
-    captionSize:   0.055, // font size as fraction of min(canvas width, canvas height)
+    captionSize:   0.035, // font size as fraction of min(canvas width, canvas height)
     // Auto-clear
     clearDelay:    0,     // seconds before auto-clearing user trace content (0 = disabled)
     // Spectator partitioning
