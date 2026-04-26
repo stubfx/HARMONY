@@ -202,6 +202,8 @@ io.on('connection', (socket) => {
         room.hostSockets.add(socket.id);
         room.n8nTestMode  = !!testMode;
         console.log('[socket] host registered   room:', sessionId, '| hosts:', room.hostSockets.size, '| testMode:', !!testMode);
+        // Tell existing spectators the host is live so they can re-handshake.
+        if (room.connections.size) io.to(`${sessionId}:spectators`).emit('host-reconnected');
     });
 
     // Syncs the host sim's n8nTestMode toggle so the server calls the right endpoint.
@@ -330,7 +332,11 @@ io.on('connection', (socket) => {
             room.users.delete(socket.id);
             room.votes.delete(socket.id);
             room.connections.delete(socket.id);
-            if (spectatorId !== undefined) room.spectators.delete(spectatorId);
+            // Only remove from spectators map if this socket is still the active one —
+            // guards against a late disconnect event wiping a freshly reconnected entry.
+            if (spectatorId !== undefined && room.spectators.get(spectatorId) === socket.id) {
+                room.spectators.delete(spectatorId);
+            }
 
             if (isHost) {
                 room.hostSockets.delete(socket.id);

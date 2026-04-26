@@ -281,30 +281,112 @@ html, body {
     z-index: 15;
     display: none;
     flex-direction: row;
+    align-items: stretch;
+    background: rgba(0, 0, 0, 0.25);
 }
 
-#vote-panel.visible { display: flex; }
+#vote-panel.visible {
+    display: flex;
+    animation: vote-panel-in 0.5s ease both;
+}
+
+@keyframes vote-panel-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.vote-divider {
+    width: 1px;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.1);
+    position: relative;
+}
+
+.vote-divider::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1px;
+    height: 40%;
+    background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.5) 50%, transparent);
+    animation: divider-glow 2.8s ease-in-out infinite;
+}
+
+@keyframes divider-glow {
+    0%, 100% { opacity: 0.35; height: 30%; }
+    50%       { opacity: 1;   height: 55%; }
+}
 
 .vote-btn {
     flex: 1;
     background: transparent;
     border: none;
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.75);
+    color: rgba(255, 255, 255, 0.65);
     font-family: ui-monospace, monospace;
-    font-size: clamp(1.1rem, 5vw, 1.8rem);
-    letter-spacing: 0.08em;
+    font-size: clamp(1.2rem, 5.5vw, 2rem);
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     cursor: pointer;
-    transition: background 0.15s, color 0.15s;
     -webkit-tap-highlight-color: transparent;
-    padding: 1.5rem;
+    padding: 2rem;
     word-break: break-word;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.35s ease;
+    animation: vote-btn-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.vote-btn:last-child { border-right: none; }
+#vote-btn-a { animation-delay: 0.1s; }
+#vote-btn-b { animation-delay: 0.18s; }
+
+@keyframes vote-btn-in {
+    from { opacity: 0; transform: scale(0.93); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+/* Ambient radial glow — always subtly present, brightens on selection */
+.vote-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 75% 55% at 50% 50%, rgba(255, 255, 255, 0.07) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    pointer-events: none;
+}
 
 .vote-btn:active {
-    background: rgba(255, 255, 255, 0.06);
     color: rgba(255, 255, 255, 1);
+}
+
+.vote-btn:active::before {
+    opacity: 1;
+    transition: none;
+}
+
+/* Chosen option: persistent glow + full brightness */
+.vote-btn.voted {
+    color: rgba(255, 255, 255, 1);
+}
+
+.vote-btn.voted::before {
+    opacity: 1;
+    background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(255, 255, 255, 0.12) 0%, transparent 70%);
+    animation: voted-pulse 2.6s ease-in-out infinite;
+}
+
+@keyframes voted-pulse {
+    0%, 100% { opacity: 0.75; }
+    50%       { opacity: 1; }
+}
+
+/* Unchosen option: dimmed out */
+.vote-btn.vote-dimmed {
+    color: rgba(255, 255, 255, 0.2);
+    transition: color 0.5s ease;
 }

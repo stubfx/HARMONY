@@ -149,16 +149,19 @@ const voteBtnA    = document.querySelector('#vote-btn-a');
 const voteBtnB    = document.querySelector('#vote-btn-b');
 let _storyOptionA = null;
 let _storyOptionB = null;
+let _hasVoted     = false;
 
 function setStoryUI({ stepStatus, optionA, optionB } = {}) {
     _storyOptionA = optionA ?? null;
     _storyOptionB = optionB ?? null;
     const isVote = stepStatus === 'VOTE';
-    // Joystick + tail visible only in DRAW mode (or when no story is running)
     const showJoystick = !stepStatus || stepStatus === 'DRAW';
 
     if (votePanelEl) {
         if (isVote) {
+            _hasVoted = false;
+            voteBtnA?.classList.remove('voted', 'vote-dimmed');
+            voteBtnB?.classList.remove('voted', 'vote-dimmed');
             if (voteBtnA) voteBtnA.textContent = _storyOptionA ?? 'A';
             if (voteBtnB) voteBtnB.textContent = _storyOptionB ?? 'B';
             votePanelEl.classList.add('visible');
@@ -177,15 +180,30 @@ function setStoryUI({ stepStatus, optionA, optionB } = {}) {
 
 voteBtnA?.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    if (_storyOptionA) socket.emit('story-vote', { choice: _storyOptionA });
+    if (_storyOptionA && !_hasVoted) {
+        _hasVoted = true;
+        socket.emit('story-vote', { choice: _storyOptionA });
+        voteBtnA.classList.add('voted');
+        voteBtnB?.classList.add('vote-dimmed');
+    }
 }, { passive: false });
 
 voteBtnB?.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    if (_storyOptionB) socket.emit('story-vote', { choice: _storyOptionB });
+    if (_storyOptionB && !_hasVoted) {
+        _hasVoted = true;
+        socket.emit('story-vote', { choice: _storyOptionB });
+        voteBtnB.classList.add('voted');
+        voteBtnA?.classList.add('vote-dimmed');
+    }
 }, { passive: false });
 
 socket.on('story-ui', (data) => setStoryUI(data));
+
+// Re-join when the host sim reconnects so it immediately knows about this spectator.
+socket.on('host-reconnected', () => {
+    socket.emit('join-session', { room, spectatorId });
+});
 
 // ── Peer events ───────────────────────────────────────────────────────────────
 socket.on('peer-joined', () => {
