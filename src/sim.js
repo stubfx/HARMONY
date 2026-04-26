@@ -98,7 +98,7 @@ const params = {
     dotCenterRadius:     50,   // px — agents within this radius of centre are candidates for respawn (0 = disabled)
     dotRespawnChance:    0.01, // per-frame probability that a centre-zone agent is respawned to an edge
     // Spectator partitioning
-    spectatorAgentShare:       100,  // % of agents assigned to spectators (0 = sim only, 100 = full user control)
+    spectatorAgentShare:       35,   // % of agents assigned to spectators (0 = sim only, 100 = full user control)
     spectatorSpawnChance:      0.01, // base per-frame spawn probability (scaled by user count × multiplier)
     spectatorSpawnMultiplier:  3,    // scales spawn chance proportionally with active user count
     spawnerSpeed:           0.3,  // canvas fractions per second the spawner moves at full joystick deflection
