@@ -38,7 +38,7 @@ Return any sim params to push to the host immediately. The server forwards the r
 
 ## `/webhook/heartbeat` — Periodic sim snapshot (sim → n8n)
 
-The sim sends this every `heartbeatInterval` seconds (default: 5 s). Use it to keep n8n in sync with the current state and to push changes back proactively.
+The sim sends this every `heartbeatInterval` seconds (default: 20 s). Use it to keep n8n in sync with the current state and to push changes back proactively.
 
 ### Payload
 
@@ -186,11 +186,12 @@ The trace canvas is always full-screen (scaled by `traceScale`). QR and user con
 | Key | Default | Description |
 |-----|---------|-------------|
 | `maxSpectators` | `1` | Connected spectator count at which the QR is hidden. Used by n8n logic to decide when to call `showQR: false`. The sim does not act on this directly — n8n reads it from the heartbeat and acts accordingly. |
+| `spectatorAgentShare` | `100` | Percentage of agents (by index) that are assigned to spectators (0–100). The top `(100 − share)%` of agents always behave as pure sim agents — default color, formula/global wind, no joystick spawner — leaving them free to form trace images undisturbed. Changes take effect on the next frame with no re-seeding. |
 | `spectatorSpawnChance` | `0.01` | Per-frame probability that an agent in a spectator's partition teleports to that spectator's touch position (0–1). Only fires while the spectator is actively touching; homing agents are exempt. |
 | `qrFadeZone` | `false` | Fades free agents near the QR rect to keep it scannable. |
 | `remoteTimeout` | `0` | Seconds of silence from all remotes before the QR is restored. `0` = disabled. |
 | `clearDelay` | `0` | Seconds before auto-clearing user-submitted trace content. `0` = disabled. |
-| `heartbeatInterval` | `5` | Seconds between heartbeat calls. `0` = off. |
+| `heartbeatInterval` | `20` | Seconds between heartbeat calls. `0` = off. The fetch timeout scales automatically with this value (90% of the interval, minimum 5 s), so heavy n8n responses are not aborted when the interval is long. |
 | `n8nTestMode` | `false` | Routes all n8n calls (sim and server) to `/webhook-test/` endpoints. Server follows automatically via socket sync. |
 
 ---

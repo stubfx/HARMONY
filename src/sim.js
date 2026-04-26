@@ -107,7 +107,7 @@ const params = {
     maxSpectators:  1,    // sim QR hides when connected count reaches this threshold
     qrFadeZone:     false, // fade free agents near the QR rect to keep it scannable
     n8nTestMode:       false, // true = /webhook-test/sim-event, false = /webhook/sim-event
-    heartbeatInterval: 5,    // seconds between periodic param snapshots sent to n8n (0 = off)
+    heartbeatInterval: 20,   // seconds between periodic param snapshots sent to n8n (0 = off)
     // Weight
     weightSpread: 0.8,    // 0 = all equal; 1 = weights span [0.05 … 1.95]
     // Motion behaviour

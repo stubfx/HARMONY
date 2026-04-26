@@ -690,6 +690,19 @@ If two browser windows open with the same UUID (set manually via `?s=<uuid>`), b
 
 ## Session
 
+### agent share (%) (`spectatorAgentShare`)
+**Range:** 0 – 100 | **Default:** 100
+
+Percentage of agents (by index, starting from 0) that are assigned to spectators. The remaining agents at the top of the index range always behave as pure simulation agents — they use the global base color, follow formula and global wind, and are never interrupted by the joystick spawner.
+
+- `100` — all agents follow spectators (previous behaviour)
+- `50` — the lower half of the index space is spectator-controlled; the upper half is free to form trace images undisturbed
+- `0` — spectators are still connected and their input is received, but zero agents respond to it
+
+The boundary is applied every frame with no re-seeding. All three spectator mechanics are gated: tilt wind, joystick spawner, and per-spectator color.
+
+---
+
 ### spawn chance (base) (`spectatorSpawnChance`)
 **Range:** 0 – 1 | **Default:** 0.01
 
@@ -761,9 +774,11 @@ The remote page's persistent QR code fades when the connected spectator count re
 When on, all n8n calls use `/webhook-test/` paths instead of `/webhook/`. This lets you use the n8n test-trigger for a workflow without activating it in production. Does not require a rebuild — toggled live in the GUI.
 
 ### heartbeat (s) (`heartbeatInterval`)
-**Range:** 0 – 120 | **Default:** 5
+**Range:** 0 – 120 | **Default:** 20
 
 Seconds between periodic snapshots sent to n8n at `/webhook/heartbeat` (or `/webhook-test/heartbeat` in test mode). Set to 0 to disable.
+
+The fetch timeout for each heartbeat request scales automatically with this value: **90% of the interval, minimum 5 s**. At the default interval of 5 s the timeout is 5 s (unchanged); at 20 s it becomes 18 s; at 60 s it becomes 54 s. This prevents heavy n8n responses (e.g. audio payloads loaded from disk) from being aborted when the interval is set longer than 5 s.
 
 **Payload:**
 ```json
