@@ -26,6 +26,7 @@
 //   [92] homingMinAlpha       f32  (minimum alpha for a homing agent at max distance)
 //   [96] spectatorCount       u32  (active spectators; 0 = use global params.color)
 //   [100] additiveBlend       u32  (1 = additive; 0 = max blend with pre-multiplied alpha)
+//   [104] spectatorAgentShare f32  (0–1 fraction of agents assigned to spectators; rest use global color)
 
 struct SoloRenderParams {
     agentCount:           u32,
@@ -54,6 +55,7 @@ struct SoloRenderParams {
     homingMinAlpha:       f32,
     spectatorCount:       u32,
     additiveBlend:        u32,
+    spectatorAgentShare:  f32,
 }
 
 struct Agent {
@@ -124,7 +126,7 @@ fn hash(n: u32) -> f32 {
     let t     = clamp(speed / max(params.maxSpeed, 0.001), 0.0, 1.0);
     let baseColor = vec3f(params.colorR, params.colorG, params.colorB);
     var color: vec3f;
-    if (params.spectatorCount > 0u) {
+    if (params.spectatorCount > 0u && agentId < u32(f32(params.agentCount) * params.spectatorAgentShare)) {
         let slot = spectatorSlots[agentId % params.spectatorCount];
         if (slot.isActive != 0u) {
             // Assigned agents: fixed hue from the user's chosen color, no speed blend.

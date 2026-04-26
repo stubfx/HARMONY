@@ -39,6 +39,7 @@
 //   [128] homingInfluence      f32   (max homing blend weight at dist=0; scales linearly to 0 at dist=canvasW)
 //   [132] spectatorCount       u32   (active connected spectators; 0 = collective wind only)
 //   [136] spectatorSpawnChance f32   (per-frame probability an assigned agent teleports to the touch point)
+//   [140] spectatorAgentShare  f32   (0–1 fraction of agents that follow spectators; rest are sim-only)
 
 struct SoloParams {
     agentCount:     u32,
@@ -76,6 +77,7 @@ struct SoloParams {
     homingInfluence:      f32,
     spectatorCount:       u32,
     spectatorSpawnChance: f32,
+    spectatorAgentShare:  f32,
 }
 
 // Per-spectator partition data — color, joystick spawner position, personal wind.
@@ -229,7 +231,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
              + vec2<f32>(params.windBiasX, params.windBiasY);
     // Per-spectator tilt override: assigned agents use the spectator's personal wind.
     // windX/Y are portrait-zeroed bias values (±1 at ±90° tilt) scaled by windStr.
-    if (params.spectatorCount > 0u) {
+    if (params.spectatorCount > 0u && i < u32(f32(params.agentCount) * params.spectatorAgentShare)) {
         let tiltSlot = spectatorSlots[i % params.spectatorCount];
         if (tiltSlot.isActive != 0u) {
             wind = vec2<f32>(tiltSlot.windX, tiltSlot.windY) * params.windStr;
@@ -496,7 +498,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     // Spawner-teleport: move a fraction of the spectator's partition to the joystick spawner each frame.
     // Primed (homing) agents are never interrupted — they must finish homing.
-    if (!homeInImg && params.spectatorCount > 0u) {
+    if (!homeInImg && params.spectatorCount > 0u && i < u32(f32(params.agentCount) * params.spectatorAgentShare)) {
         let slot = spectatorSlots[i % params.spectatorCount];
         if (slot.isActive != 0u && slot.spawnerLocationActive != 0u) {
             let rng = hash(i ^ (u32(params.time * 137.0) + 17u));

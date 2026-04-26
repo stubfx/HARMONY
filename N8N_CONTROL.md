@@ -72,6 +72,10 @@ These keys trigger immediate side-effects and are **not** stored in `params`.
 | `dir` | `string` | Sets the direction formula (WGSL math expression in `x, y, t, cx, cy, PI, TWO_PI`). Applied immediately. |
 | `wind` | `string` | Sets the wind formula (same variable set as `dir`). Applied immediately. |
 | `avoidMap` | `string` \| `null` | URL of an image to use as the avoidance map. `null` clears the current map. |
+| `audio` | `string` \| `null` | Base64-encoded audio for the **voiceover track** (plays once, then stops). Decoded and routed through the Web Audio analyser — drives particle brightness via RMS. `null` or `""` stops any running voiceover immediately. Absent key = no-op. |
+| `audiobg` | `string` \| `null` | Base64-encoded audio for the **background music track** (loops continuously). Same analyser routing as `audio`. `null` or `""` stops the loop immediately. Absent key = no-op. |
+| `audioFormat` | `string` | MIME type for the `audio` payload. Defaults to `"audio/webm;codecs=opus"` when omitted. |
+| `audiobgFormat` | `string` | MIME type for the `audiobg` payload. Defaults to `"audio/webm;codecs=opus"` when omitted. |
 
 ---
 

@@ -95,6 +95,7 @@ const params = {
     // Auto-clear
     clearDelay:    0,     // seconds before auto-clearing user trace content (0 = disabled)
     // Spectator partitioning
+    spectatorAgentShare:       100,  // % of agents assigned to spectators (0 = sim only, 100 = full user control)
     spectatorSpawnChance:      0.01, // base per-frame spawn probability (scaled by user count × multiplier)
     spectatorSpawnMultiplier:  3,    // scales spawn chance proportionally with active user count
     spawnerSpeed:           0.3,  // canvas fractions per second the spawner moves at full joystick deflection
@@ -1717,6 +1718,7 @@ function writeSoloUB(dt, time) {
     f[32] = params.homingInfluence;
     u[33] = activeSlots.length;
     f[34] = Math.min(params.spectatorSpawnChance * activeSlots.length * params.spectatorSpawnMultiplier, 1.0);
+    f[35] = params.spectatorAgentShare / 100.0;
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
@@ -1766,6 +1768,7 @@ function writeRenderUB() {
     f[23] = params.homingMinAlpha;
     u[24] = activeSlots.length;
     u[25] = params.additiveBlend ? 1 : 0;
+    f[26] = params.spectatorAgentShare / 100.0;
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 

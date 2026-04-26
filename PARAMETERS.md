@@ -271,7 +271,7 @@ Opens a file picker. Any browser-supported image format (PNG, JPEG, WebP, etc.) 
 Removes the loaded image. If trace text is currently entered, the text trace remains active (the composite is re-rendered with text only). If no text is present, agents return to formula-only mode immediately.
 
 ### probe distance (`probeLen`)
-**Range:** 5 – 300 | **Default:** 150
+**Range:** 5 – 300 | **Default:** 15
 
 Distance in canvas pixels that free agents cast a probe ahead of themselves along their current velocity. The probe samples the **shadow density texture** — a separate greyscale texture filled each frame with additive shadow splats from all homing agents. Brighter pixels mean more homing agents are converging there. Free agents steer away from the detected density. Shorter values give less reaction time; longer values cause earlier, wider detours.
 
@@ -846,6 +846,30 @@ When `stepStatus` changes the server broadcasts a `story-ui` Socket.IO event to 
 ### Caption
 
 The `caption` field draws text at the bottom of the simulation canvas using the same white-glyph-on-transparent-background technique as `traceText`. Agents home to the letterforms, making the caption feel like part of the particle field rather than a DOM overlay. It is rendered as a separate layer below the QR (if visible) and persists until explicitly cleared.
+
+**`captionSize`** controls the font size as a fraction of the canvas height. **Default:** `0.035`. Higher values produce larger, coarser glyphs; lower values produce finer text that may be harder to form at low agent counts.
+
+---
+
+## Audio
+
+The simulation uses the Web Audio API to route sound through an `AnalyserNode`. Every frame, `getVolume()` reads an RMS value from the analyser and the compute shader uses it as a brightness multiplier for free agents — louder audio = brighter particles. Three sources share the same analyser simultaneously: the microphone (when enabled), the voiceover track, and the background track.
+
+### Audio unlock button
+
+Browser autoplay policy prevents `AudioContext` from starting without a prior user gesture. A small muted-speaker icon (bottom-right corner, `#ffffff35` opacity) lets visitors unlock audio before any sound arrives. Clicking it resumes the `AudioContext` and the icon fades out. If the user has already interacted with the page for another reason (e.g. formula editing), the context may already be running and the button tap is a no-op.
+
+### Voiceover track (`audio`)
+
+Delivered via n8n as a base64-encoded audio blob. Plays once and stops. A new `audio` payload stops any currently playing voiceover before starting the new one. Sending `null` or `""` stops the track without starting another. If the `audio` key is absent from the response, no change is made. Default format: `audio/webm;codecs=opus`.
+
+### Background music track (`audiobg`)
+
+Same delivery mechanism as `audio`, but loops continuously until stopped. Sending a new `audiobg` payload replaces any running loop. Sending `null` or `""` stops it. Absent key = no-op. Default format: `audio/webm;codecs=opus`.
+
+### Microphone
+
+Enabled via `startMic()` (not controllable from the GUI or n8n). When active, the microphone signal drives the same brightness pipeline as the audio tracks. The mic source is connected only to the analyser (not to `destination`) — no feedback loop.
 
 ---
 

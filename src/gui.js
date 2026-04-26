@@ -143,6 +143,7 @@ export function initGUI({
 
     // ── Session ───────────────────────────────────────────────────────────────
     const fSession = gui.addFolder('Session');
+    fSession.add(params, 'spectatorAgentShare',       0, 100,  1   ).name('agent share (%)');
     fSession.add(params, 'spectatorSpawnChance',     0,   1,  0.01).name('spawn chance (base)');
     fSession.add(params, 'spectatorSpawnMultiplier', 0,  10,  0.1 ).name('spawn multiplier');
     fSession.add(params, 'spawnerSpeed',             0,   2,  0.05).name('spawner speed');
