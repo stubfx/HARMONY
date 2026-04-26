@@ -5,10 +5,17 @@
 //   • Background (base64, loop)  — via playAudioBg()  key: "audiobg"
 // All three drive getVolume(), which the sim reads each frame for brightness.
 // Sending null/empty for either audio key stops that track immediately.
+//
+// Ducking: when a voiceover plays, the bg track is smoothly attenuated to
+// DUCK_LEVEL and restored when the voiceover ends (naturally or via stop).
 
 const FFT_SIZE    = 256;
 const EMA_ALPHA   = 0.12; // smoothing — lower = slower reaction
 const RAW_CEILING = 0.25; // RMS level mapped to volume 1.0 (typical speech peak)
+
+const DUCK_LEVEL   = 0.15; // bg gain while voiceover is active
+const DUCK_ATTACK  = 0.3;  // seconds to ramp down
+const DUCK_RELEASE = 1.0;  // seconds to ramp back up after voice ends
 
 let _ctx       = null;
 let _analyser  = null;
@@ -18,6 +25,8 @@ let _vol       = 0;
 let _active    = false;
 let _voiceSrc  = null; // currently playing voiceover BufferSourceNode
 let _bgSrc     = null; // currently playing background BufferSourceNode
+let _bgGain    = null; // GainNode on the bg path — used for ducking
+let _voiceGen  = 0;    // increments each time a voiceover starts; guards onended
 
 function _ensureCtx() {
     if (!_ctx) _ctx = new AudioContext();
@@ -30,6 +39,11 @@ function _ensureAnalyser() {
     _analyser.fftSize               = FFT_SIZE;
     _analyser.smoothingTimeConstant = 0; // we do our own EMA
     _buf    = new Float32Array(FFT_SIZE);
+    // Permanent GainNode for the bg track — sits between _bgSrc and the outputs.
+    // Gain starts at 1.0; ducking ramps it to DUCK_LEVEL during voiceovers.
+    _bgGain = _ctx.createGain();
+    _bgGain.connect(_analyser);
+    _bgGain.connect(_ctx.destination);
     _active = true;
 }
 
@@ -49,6 +63,22 @@ async function _decode(base64) {
     return _ctx.decodeAudioData(bytes.buffer);
 }
 
+function _duckBg() {
+    if (!_bgGain) return;
+    const now = _ctx.currentTime;
+    _bgGain.gain.cancelScheduledValues(now);
+    _bgGain.gain.setValueAtTime(_bgGain.gain.value, now);
+    _bgGain.gain.linearRampToValueAtTime(DUCK_LEVEL, now + DUCK_ATTACK);
+}
+
+function _unduckBg() {
+    if (!_bgGain) return;
+    const now = _ctx.currentTime;
+    _bgGain.gain.cancelScheduledValues(now);
+    _bgGain.gain.setValueAtTime(_bgGain.gain.value, now);
+    _bgGain.gain.linearRampToValueAtTime(1.0, now + DUCK_RELEASE);
+}
+
 export async function startMic() {
     if (_stream) return;
     _stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
@@ -61,13 +91,23 @@ export async function startMic() {
 export async function playAudio(base64, mimeType = 'audio/webm;codecs=opus') {
     _stopSrc(_voiceSrc);
     _voiceSrc = null;
-    if (!base64) return;
+    if (!base64) {
+        _unduckBg(); // restore bg if we're explicitly stopping the voiceover
+        return;
+    }
     const audioBuffer = await _decode(base64);
+    const gen         = ++_voiceGen;
     _voiceSrc         = _ctx.createBufferSource();
     _voiceSrc.buffer  = audioBuffer;
     _voiceSrc.connect(_analyser);
     _voiceSrc.connect(_ctx.destination);
-    _voiceSrc.onended = () => { _voiceSrc = null; };
+    _voiceSrc.onended = () => {
+        if (gen === _voiceGen) { // only unduck if no newer voiceover has taken over
+            _voiceSrc = null;
+            _unduckBg();
+        }
+    };
+    _duckBg();
     _voiceSrc.start();
 }
 
@@ -80,8 +120,7 @@ export async function playAudioBg(base64, mimeType = 'audio/webm;codecs=opus') {
     _bgSrc            = _ctx.createBufferSource();
     _bgSrc.buffer     = audioBuffer;
     _bgSrc.loop       = true;
-    _bgSrc.connect(_analyser);
-    _bgSrc.connect(_ctx.destination);
+    _bgSrc.connect(_bgGain); // routed through the gain node for ducking
     _bgSrc.start();
 }
 
@@ -91,7 +130,7 @@ export function stopAudio() {
     if (!_active && !_stream) return;
     _stream?.getTracks().forEach(t => t.stop());
     _ctx?.close();
-    _ctx = _analyser = _buf = _stream = null;
+    _ctx = _analyser = _buf = _stream = _bgGain = null;
     _vol    = 0;
     _active = false;
 }
