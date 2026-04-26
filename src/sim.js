@@ -1029,7 +1029,6 @@ const simState = {
     qrStatus:          'HIDE',
     status:            'DOT',
     storyStep:         null,   // echoed from n8n step ID; null = not in story mode
-    storyStepComplete: false,
     storyVoteResult:   null,
     stepStatus:        'IDLE', // 'IDLE' | 'DRAW' | 'VOTE' — spectator interaction mode
     optionA:           null,
@@ -1125,7 +1124,6 @@ async function callN8nHeartbeat() {
                 status:            simState.status,
                 qrStatus:          simState.qrStatus,
                 step:              simState.storyStep,
-                storyStepComplete: simState.storyStepComplete,
                 storyVoteResult:   simState.storyVoteResult,
                 stepStatus:        simState.stepStatus,
                 params:            { ...params },
@@ -1145,20 +1143,6 @@ async function callN8nHeartbeat() {
     }
 }
 
-// Fire an immediate heartbeat regardless of the periodic schedule.
-// Dropped silently if one is already in-flight — no queue.
-function fireOutOfCycleHeartbeat() {
-    if (n8nHeartbeatInFlight) return;
-    callN8nHeartbeat();
-}
-
-// Called when the current story step finishes (timer expiry or vote settled).
-let _stepDurationTimer = null;
-function _onStoryStepComplete(voteResult = null) {
-    simState.storyStepComplete = true;
-    simState.storyVoteResult   = voteResult;
-    fireOutOfCycleHeartbeat();
-}
 
 let heartbeatTimer = null;
 function restartHeartbeat() {
@@ -1392,7 +1376,7 @@ let socket;
 // if formulas are included they re-trigger pipeline compilation.
 function applySimParams(data) {
     const { dir, wind, restart, clearTrace, showQR, traceText, clearText, traceImage, status, avoidMap,
-            step, stepDuration, stepStatus, optionA, optionB, caption,
+            step, stepStatus, optionA, optionB, caption,
             audio, audioFormat, audiobg, audiobgFormat, mode, ...rest } = data;
 
     if (audio    !== undefined) playAudio(audio    || null, audioFormat)   .catch(e => console.warn('[audio]',    e));
@@ -1400,18 +1384,12 @@ function applySimParams(data) {
 
     // Story step — a new step ID resets all completion state then applies the step's UI mode.
     if (step !== undefined) {
-        clearTimeout(_stepDurationTimer);
-        _stepDurationTimer         = null;
-        simState.storyStep         = step;
-        simState.storyStepComplete = false;
-        simState.storyVoteResult   = null;
-        simState.stepStatus        = stepStatus ?? 'IDLE';
-        simState.optionA           = optionA    ?? null;
-        simState.optionB           = optionB    ?? null;
+        simState.storyStep  = step;
+        simState.storyVoteResult = null;
+        simState.stepStatus = stepStatus ?? 'IDLE';
+        simState.optionA    = optionA    ?? null;
+        simState.optionB    = optionB    ?? null;
         socket.emit('story-ui', { stepStatus: simState.stepStatus, optionA: simState.optionA, optionB: simState.optionB });
-        if (stepDuration > 0) {
-            _stepDurationTimer = setTimeout(() => _onStoryStepComplete(), stepDuration * 1000);
-        }
     } else if (stepStatus !== undefined) {
         // Mid-step status change (no new step ID).
         simState.stepStatus = stepStatus;
