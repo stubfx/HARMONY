@@ -13,7 +13,8 @@ const FFT_SIZE    = 256;
 const EMA_ALPHA   = 0.12; // smoothing — lower = slower reaction
 const RAW_CEILING = 0.25; // RMS level mapped to volume 1.0 (typical speech peak)
 
-const DUCK_LEVEL   = 0.15; // bg gain while voiceover is active
+let _duckLevel = 0.15; // bg gain while voiceover is active — adjustable via setDuckLevel()
+export function setDuckLevel(v) { _duckLevel = Math.max(0, Math.min(1, v)); }
 const DUCK_ATTACK  = 0.3;  // seconds to ramp down
 const DUCK_RELEASE = 1.0;  // seconds to ramp back up after voice ends
 
@@ -68,7 +69,7 @@ function _duckBg() {
     const now = _ctx.currentTime;
     _bgGain.gain.cancelScheduledValues(now);
     _bgGain.gain.setValueAtTime(_bgGain.gain.value, now);
-    _bgGain.gain.linearRampToValueAtTime(DUCK_LEVEL, now + DUCK_ATTACK);
+    _bgGain.gain.linearRampToValueAtTime(_duckLevel, now + DUCK_ATTACK);
 }
 
 function _unduckBg() {

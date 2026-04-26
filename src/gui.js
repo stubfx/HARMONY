@@ -1,5 +1,5 @@
 import GUI from 'lil-gui';
-import { startMic, stopAudio, isActive } from './audio.js';
+import { startMic, stopAudio, isActive, setDuckLevel } from './audio.js';
 
 // ── GUI initialisation ────────────────────────────────────────────────────────
 // Call once after all sim functions are defined.
@@ -55,6 +55,7 @@ export function initGUI({
     fMotion.add(params, 'autoDir').name('auto-cycle formula');
     fMotion.add(params, 'bounceEdges').name('bounce edges');
     fMotion.add(params, 'useDeltaTime').name('delta time');
+    fMotion.add(params, 'dotCenterRadius', 0, 500, 1).name('DOT center radius (px)');
 
     // ── Wind ──────────────────────────────────────────────────────────────────
     const fWind = gui.addFolder('Wind');
@@ -172,6 +173,7 @@ export function initGUI({
         }
     });
     fAudio.add(params, 'audioFloor', 0, 1, 0.01).name('silence floor');
+    fAudio.add(params, 'duckLevel',  0, 1, 0.01).name('duck level').onChange(v => setDuckLevel(v));
     fAudio.close();
 
     // ── Debug ─────────────────────────────────────────────────────────────────

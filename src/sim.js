@@ -7,7 +7,7 @@
 // Speed drives brightness. A fading trail accumulates on an offscreen texture.
 
 import { initGUI }      from './gui.js';
-import { startMic, stopAudio, isActive, getVolume, playAudio, playAudioBg, unlockAudio } from './audio.js';
+import { startMic, stopAudio, isActive, getVolume, playAudio, playAudioBg, unlockAudio, setDuckLevel } from './audio.js';
 import QRCode           from 'qrcode';
 import { io as ioConnect } from 'socket.io-client';
 import soloSimTemplate  from './shaders/compute.wgsl?raw';
@@ -94,6 +94,8 @@ const params = {
     captionSize:   0.035, // font size as fraction of min(canvas width, canvas height)
     // Auto-clear
     clearDelay:    0,     // seconds before auto-clearing user trace content (0 = disabled)
+    // DOT mode
+    dotCenterRadius: 50,  // px — agents within this radius of centre are respawned to edges (0 = disabled)
     // Spectator partitioning
     spectatorAgentShare:       100,  // % of agents assigned to spectators (0 = sim only, 100 = full user control)
     spectatorSpawnChance:      0.01, // base per-frame spawn probability (scaled by user count × multiplier)
@@ -117,6 +119,7 @@ const params = {
     useDeltaTime:  true,  // false = fixed 1/60 s timestep (no frame-spike compensation)
     // Audio reactivity
     audioFloor:    0.1,   // brightness multiplier when fully silent (0 = black, 1 = no effect)
+    duckLevel:     0.15,  // bg gain while voiceover is active (0 = mute, 1 = no ducking)
 };
 
 // ── URL param overrides ───────────────────────────────────────────────────────
@@ -278,7 +281,7 @@ const agentBuf = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 const soloUB = device.createBuffer({
-    size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 160, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
     size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -1452,6 +1455,7 @@ function applySimParams(data) {
         if (k in params) params[k] = v;
     });
     if ('heartbeatInterval' in rest) restartHeartbeat();
+    if ('duckLevel'         in rest) setDuckLevel(params.duckLevel);
     if ('n8nTestMode'       in rest) socket.emit('set-n8n-test-mode', params.n8nTestMode);
     if ('agentCount'        in rest || 'weightSpread' in rest) seedAgents();
     if ('renderScale'       in rest) { setSize(); rebuildOffscreen(); seedAgents(); }
@@ -1722,6 +1726,8 @@ function writeSoloUB(dt, time) {
     u[33] = activeSlots.length;
     f[34] = Math.min(params.spectatorSpawnChance * activeSlots.length * params.spectatorSpawnMultiplier, 1.0);
     f[35] = params.spectatorAgentShare / 100.0;
+    u[36] = isDot ? 1 : 0;
+    f[37] = params.dotCenterRadius;
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
@@ -1851,7 +1857,7 @@ function writeContamUB() {
 }
 
 // ── Pre-allocated uniform buffers (reused every frame to avoid GC pressure) ──
-const _soloAB  = new ArrayBuffer(144); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
+const _soloAB  = new ArrayBuffer(160); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
 const _renderAB= new ArrayBuffer(112); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
 const _fadeAB  = new ArrayBuffer(16);  const _fadeF  = new Float32Array(_fadeAB);
 const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB);
