@@ -7,7 +7,7 @@
 // Speed drives brightness. A fading trail accumulates on an offscreen texture.
 
 import { initGUI }      from './gui.js';
-import { startMic, stopAudio, isActive, getVolume } from './audio.js';
+import { startMic, stopAudio, isActive, getVolume, playAudio } from './audio.js';
 import QRCode           from 'qrcode';
 import { io as ioConnect } from 'socket.io-client';
 import soloSimTemplate  from './shaders/compute.wgsl?raw';
@@ -1382,7 +1382,9 @@ let socket;
 // if formulas are included they re-trigger pipeline compilation.
 function applySimParams(data) {
     const { dir, wind, restart, clearTrace, showQR, traceText, clearText, traceImage, status, avoidMap,
-            step, stepDuration, stepStatus, optionA, optionB, caption, ...rest } = data;
+            step, stepDuration, stepStatus, optionA, optionB, caption, audio, audioFormat, ...rest } = data;
+
+    if (audio) playAudio(audio, audioFormat).catch(e => console.warn('[audio]', e));
 
     // Story step — a new step ID resets all completion state then applies the step's UI mode.
     if (step !== undefined) {

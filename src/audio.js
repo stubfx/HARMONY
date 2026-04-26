@@ -1,9 +1,8 @@
 // ── Audio input → volume ──────────────────────────────────────────────────────
-// Currently: microphone via getUserMedia.
-// Future: swap _connect() to accept an AudioNode from the server stream.
-//
-// getVolume() returns a smoothed 0–1 amplitude each frame.
-// When inactive it returns 1.0 so the sim is unaffected.
+// Two sources feed the same analyser pipeline:
+//   • Microphone (getUserMedia)  — via startMic()
+//   • Server-sent audio (base64) — via playAudio()
+// Both drive getVolume(), which the sim reads each frame for brightness.
 
 const FFT_SIZE    = 256;
 const EMA_ALPHA   = 0.12; // smoothing — lower = slower reaction
@@ -16,25 +15,49 @@ let _stream   = null;
 let _vol      = 0;
 let _active   = false;
 
-function _connect(sourceNode) {
+function _ensureCtx() {
+    if (!_ctx) _ctx = new AudioContext();
+}
+
+function _ensureAnalyser() {
+    if (_analyser) return;
+    _ensureCtx();
     _analyser = _ctx.createAnalyser();
-    _analyser.fftSize              = FFT_SIZE;
+    _analyser.fftSize               = FFT_SIZE;
     _analyser.smoothingTimeConstant = 0; // we do our own EMA
-    sourceNode.connect(_analyser);
     _buf    = new Float32Array(FFT_SIZE);
     _active = true;
 }
 
+function _connect(sourceNode) {
+    _ensureAnalyser();
+    sourceNode.connect(_analyser);
+}
+
 export async function startMic() {
-    if (_active) return;
+    if (_stream) return;
     _stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-    _ctx = new AudioContext();
+    _ensureCtx();
     _connect(_ctx.createMediaStreamSource(_stream));
     _vol = 0;
 }
 
+// Decode base64 audio and play it through the same analyser pipeline.
+// mimeType defaults to Opus; pass a different value only if needed.
+export async function playAudio(base64, mimeType = 'audio/webm;codecs=opus') {
+    _ensureAnalyser();
+    if (_ctx.state === 'suspended') await _ctx.resume();
+    const bytes       = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+    const audioBuffer = await _ctx.decodeAudioData(bytes.buffer);
+    const source      = _ctx.createBufferSource();
+    source.buffer     = audioBuffer;
+    source.connect(_analyser);        // drives volume / brightness
+    source.connect(_ctx.destination); // plays to speakers
+    source.start();
+}
+
 export function stopAudio() {
-    if (!_active) return;
+    if (!_active && !_stream) return;
     _stream?.getTracks().forEach(t => t.stop());
     _ctx?.close();
     _ctx = _analyser = _buf = _stream = null;
