@@ -1,5 +1,6 @@
-// ─── Admin control page (simplified) ──────────────────────────────────────────
-// Controls: reset, QR toggle, clear trace, agent color, speed, turn rate, presets.
+// ─── Admin control page ──────────────────────────────────────────────────────
+// Safety-net panel for a show operator: mode, step status, QR, audio mute,
+// spectator count, heartbeat trigger, formula presets, agent speed.
 // URL: /admin/?s=<session-id>
 
 import './style.css';
@@ -22,9 +23,6 @@ const socketUrl = import.meta.env.DEV
     ? `http://localhost:${import.meta.env.VITE_SERVER_PORT ?? 3000}`
     : (import.meta.env.VITE_SOCKET_URL || '/');
 
-// In dev the Vite proxy forwards /admin-auth → Express, so a relative URL works.
-// In production the fetch must hit the Express server directly (same host as Socket.IO)
-// rather than the static CDN/Caddy layer, which doesn't know about the route.
 const _authBase = import.meta.env.DEV
     ? ''
     : (import.meta.env.VITE_SOCKET_URL || '').replace(/\/$/, '');
@@ -58,7 +56,6 @@ function showAuthError() {
     passwordInput.focus();
 }
 
-
 // ── Socket ────────────────────────────────────────────────────────────────────
 function connectSocket() {
     if (socket) { socket.removeAllListeners(); socket.disconnect(); socket = null; }
@@ -73,6 +70,9 @@ function connectSocket() {
         adminUI.classList.add('hidden');
         authGate.classList.remove('hidden');
         connDot?.classList.remove('connected');
+    });
+    socket.on('spectator-count', ({ count }) => {
+        if (_spectatorCountEl) _spectatorCountEl.textContent = count;
     });
     socket.on('disconnect',    () => connDot?.classList.remove('connected'));
     socket.on('connect_error', () => connDot?.classList.remove('connected'));
@@ -104,18 +104,16 @@ function send(params) {
 
 // ── Presets (must match PRESETS in sim.js) ────────────────────────────────────
 const PRESETS = [
-    { label: 'waves',         dir: 'sin(x * 0.006 + t * 0.4) * PI',                                     wind: 'sin(x * 0.004 + t * 0.3) * PI + cos(y * 0.003 + t * 0.2) * 0.8' },
-    { label: 'spiral',        dir: 'atan2(y - cy, x - cx) + t * 0.3',                                    wind: 'sin(x * 0.005 + t * 0.4) * PI + cos(y * 0.005 - t * 0.3) * PI * 0.6' },
-    { label: 'cells',         dir: 'sin(x * 0.006) * cos(y * 0.006) * TWO_PI',                           wind: 'sin(x * 0.006 + sin(y * 0.005 + t * 0.4)) * TWO_PI' },
-    { label: 'vortex',        dir: 'atan2(y - cy, x - cx) + PI * 0.5',                                   wind: 'atan2(y - cy, x - cx) + t + sin(x * 0.003) * 0.8' },
-    { label: 'turbulence',    dir: 'sin(x * 0.009 + sin(y * 0.006 + t)) * TWO_PI',                      wind: 'sin(x * 0.005 + cos(y * 0.006 + t * 0.3)) * TWO_PI' },
-    { label: 'radial pulse',  dir: 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI', wind: 'sin(x * 0.004 - y * 0.003 + t * 0.4) * TWO_PI' },
+    { label: 'waves',        dir: 'sin(x * 0.006 + t * 0.4) * PI',                                     wind: 'sin(x * 0.004 + t * 0.3) * PI + cos(y * 0.003 + t * 0.2) * 0.8' },
+    { label: 'spiral',       dir: 'atan2(y - cy, x - cx) + t * 0.3',                                    wind: 'sin(x * 0.005 + t * 0.4) * PI + cos(y * 0.005 - t * 0.3) * PI * 0.6' },
+    { label: 'cells',        dir: 'sin(x * 0.006) * cos(y * 0.006) * TWO_PI',                           wind: 'sin(x * 0.006 + sin(y * 0.005 + t * 0.4)) * TWO_PI' },
+    { label: 'vortex',       dir: 'atan2(y - cy, x - cx) + PI * 0.5',                                   wind: 'atan2(y - cy, x - cx) + t + sin(x * 0.003) * 0.8' },
+    { label: 'turbulence',   dir: 'sin(x * 0.009 + sin(y * 0.006 + t)) * TWO_PI',                      wind: 'sin(x * 0.005 + cos(y * 0.006 + t * 0.3)) * TWO_PI' },
+    { label: 'radial pulse', dir: 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI', wind: 'sin(x * 0.004 - y * 0.003 + t * 0.4) * TWO_PI' },
 ];
 
-// ── QR state ──────────────────────────────────────────────────────────────────
-// Tracks what we last told the sim — initialised to true since the sim shows
-// the QR by default on startup.
-let qrVisible = true;
+// ── Spectator count display ref ───────────────────────────────────────────────
+let _spectatorCountEl = null;
 
 // ── Build UI ──────────────────────────────────────────────────────────────────
 function showAdmin() {
@@ -129,76 +127,147 @@ function showAdmin() {
 function buildUI() {
     controlsEl.innerHTML = '';
 
-    // ── Reset ─────────────────────────────────────────────────────────────────
-    const resetBtn = document.createElement('button');
-    resetBtn.className   = 'btn-big btn-reset';
-    resetBtn.textContent = '↺  restart agents';
-    resetBtn.addEventListener('click', () => {
+    // ── Spectator count ───────────────────────────────────────────────────────
+    const statEl = document.createElement('div');
+    statEl.className = 'stat-block';
+    const statLabel = document.createElement('span');
+    statLabel.className = 'stat-label';
+    statLabel.textContent = 'spectators online';
+    const statCount = document.createElement('span');
+    statCount.className = 'stat-count';
+    statCount.textContent = '—';
+    statEl.appendChild(statLabel);
+    statEl.appendChild(statCount);
+    controlsEl.appendChild(statEl);
+    _spectatorCountEl = statCount;
+
+    // ── Restart + full reset ──────────────────────────────────────────────────
+    const actionRow = document.createElement('div');
+    actionRow.className = 'btn-row';
+
+    const restartBtn = document.createElement('button');
+    restartBtn.className   = 'btn-big btn-reset';
+    restartBtn.textContent = '↺  restart agents';
+    restartBtn.addEventListener('click', () => {
         if (window.confirm('Restart all agents?')) send({ restart: true });
     });
-    controlsEl.appendChild(resetBtn);
 
-    // ── QR toggle ─────────────────────────────────────────────────────────────
-    const qrBtn = document.createElement('button');
-    const updateQRBtn = () => {
-        qrBtn.className   = `btn-big ${qrVisible ? 'btn-qr-on' : 'btn-qr-off'}`;
-        qrBtn.textContent = qrVisible ? '⬛  hide qr code' : '⬜  show qr code';
-    };
-    updateQRBtn();
-    qrBtn.addEventListener('click', () => {
-        const next = !qrVisible;
-        const msg  = next ? 'Show QR code?' : 'Hide QR code?';
-        if (!window.confirm(msg)) return;
-        qrVisible = next;
-        send({ showQR: qrVisible });
-        updateQRBtn();
+    const fullResetBtn = document.createElement('button');
+    fullResetBtn.className   = 'btn-big btn-danger';
+    fullResetBtn.textContent = '⊘  full reset';
+    fullResetBtn.addEventListener('click', () => {
+        if (!window.confirm('Full reset: restart agents + clear trace + hide QR?')) return;
+        send({ restart: true, clearTrace: true, showQR: false, caption: '' });
     });
-    controlsEl.appendChild(qrBtn);
+
+    actionRow.appendChild(restartBtn);
+    actionRow.appendChild(fullResetBtn);
+    controlsEl.appendChild(actionRow);
+
+    // ── Mute audio ────────────────────────────────────────────────────────────
+    let muted = false;
+    const muteBtn = document.createElement('button');
+    const updateMuteBtn = () => {
+        muteBtn.className   = `btn-big ${muted ? 'btn-mute-active' : 'btn-mute'}`;
+        muteBtn.textContent = muted ? '♪  audio muted' : '✕  mute audio';
+    };
+    updateMuteBtn();
+    muteBtn.addEventListener('click', () => {
+        muted = !muted;
+        if (muted) send({ audio: null, audiobg: null });
+        updateMuteBtn();
+    });
+    controlsEl.appendChild(muteBtn);
+
+    // ── Mode ──────────────────────────────────────────────────────────────────
+    controlsEl.appendChild(mkLabel('Mode'));
+    controlsEl.appendChild(mkBtnGroup([
+        { label: 'STORY',    action: () => send({ mode: 'STORY' }) },
+        { label: 'SHOWCASE', action: () => send({ mode: 'SHOWCASE' }) },
+    ]));
+
+    // ── Step status ───────────────────────────────────────────────────────────
+    controlsEl.appendChild(mkLabel('Step status'));
+    controlsEl.appendChild(mkBtnGroup([
+        { label: 'IDLE', action: () => send({ stepStatus: 'IDLE' }) },
+        { label: 'DRAW', action: () => send({ stepStatus: 'DRAW' }) },
+        { label: 'VOTE', action: () => send({ stepStatus: 'VOTE' }) },
+    ]));
+
+    // ── QR code ───────────────────────────────────────────────────────────────
+    controlsEl.appendChild(mkLabel('QR code'));
+    const qrRow = document.createElement('div');
+    qrRow.className = 'btn-row';
+
+    const showQRBtn = document.createElement('button');
+    showQRBtn.className   = 'btn-big btn-qr-on';
+    showQRBtn.textContent = '⬜  show qr';
+    showQRBtn.addEventListener('click', () => send({ showQR: true }));
+
+    const hideQRBtn = document.createElement('button');
+    hideQRBtn.className   = 'btn-big btn-qr-off';
+    hideQRBtn.textContent = '⬛  hide qr';
+    hideQRBtn.addEventListener('click', () => send({ showQR: false }));
+
+    qrRow.appendChild(showQRBtn);
+    qrRow.appendChild(hideQRBtn);
+    controlsEl.appendChild(qrRow);
+
+    // ── QR location ───────────────────────────────────────────────────────────
+    controlsEl.appendChild(mkLabel('QR location'));
+    const qrGrid = document.createElement('div');
+    qrGrid.className = 'qr-grid';
+    const positions = [
+        { x: 'left',   y: 'top'    },
+        { x: 'center', y: 'top'    },
+        { x: 'right',  y: 'top'    },
+        { x: 'left',   y: 'center' },
+        { x: 'center', y: 'center' },
+        { x: 'right',  y: 'center' },
+        { x: 'left',   y: 'bottom' },
+        { x: 'center', y: 'bottom' },
+        { x: 'right',  y: 'bottom' },
+    ];
+    let activeQRCell = null;
+    positions.forEach(({ x, y }) => {
+        const cell = document.createElement('button');
+        cell.className = 'qr-cell';
+        if (x === 'center' && y === 'center') { cell.classList.add('active'); activeQRCell = cell; }
+        cell.addEventListener('click', () => {
+            if (activeQRCell) activeQRCell.classList.remove('active');
+            cell.classList.add('active');
+            activeQRCell = cell;
+            send({ qrAlignX: x, qrAlignY: y });
+        });
+        qrGrid.appendChild(cell);
+    });
+    controlsEl.appendChild(qrGrid);
 
     // ── Clear trace ───────────────────────────────────────────────────────────
     const clearBtn = document.createElement('button');
     clearBtn.className   = 'btn-big btn-clear';
     clearBtn.textContent = '✕  clear trace';
-    clearBtn.addEventListener('click', () => send({ clearTrace: true }));
+    clearBtn.addEventListener('click', () => send({ clearTrace: true, caption: '' }));
     controlsEl.appendChild(clearBtn);
 
-    // ── Agent color ───────────────────────────────────────────────────────────
-    controlsEl.appendChild(mkLabel('Agent color'));
-    const colorBlock = document.createElement('div');
-    colorBlock.className = 'color-block';
-    const colorLbl = document.createElement('span');
-    colorLbl.className   = 'ctrl-label';
-    colorLbl.textContent = 'Base color';
-    const colorInput = document.createElement('input');
-    colorInput.type  = 'color';
-    colorInput.value = '#000000';
-    colorInput.addEventListener('input', () => queue('color', colorInput.value));
-    colorBlock.appendChild(colorLbl);
-    colorBlock.appendChild(colorInput);
-    controlsEl.appendChild(colorBlock);
+    // ── Heartbeat ─────────────────────────────────────────────────────────────
+    controlsEl.appendChild(mkLabel('n8n'));
+    const heartbeatBtn = document.createElement('button');
+    heartbeatBtn.className   = 'btn-big btn-heartbeat';
+    heartbeatBtn.textContent = '↑  trigger heartbeat';
+    heartbeatBtn.addEventListener('click', () => {
+        if (window.confirm('Trigger n8n heartbeat now?')) send({ triggerHeartbeat: true });
+    });
+    controlsEl.appendChild(heartbeatBtn);
 
-    const speedColorBlock = document.createElement('div');
-    speedColorBlock.className = 'color-block';
-    const speedColorLbl = document.createElement('span');
-    speedColorLbl.className   = 'ctrl-label';
-    speedColorLbl.textContent = 'Speed color';
-    const speedColorInput = document.createElement('input');
-    speedColorInput.type  = 'color';
-    speedColorInput.value = '#ffffff';
-    speedColorInput.addEventListener('input', () => queue('speedColor', speedColorInput.value));
-    speedColorBlock.appendChild(speedColorLbl);
-    speedColorBlock.appendChild(speedColorInput);
-    controlsEl.appendChild(speedColorBlock);
-
-    // ── Speed + Turn rate ─────────────────────────────────────────────────────
+    // ── Speed ─────────────────────────────────────────────────────────────────
     controlsEl.appendChild(mkLabel('Motion'));
     const motionBlock = document.createElement('div');
     motionBlock.className = 'ctrl-block';
-    motionBlock.appendChild(mkSlider('Speed',     'stepLen',  2.0, 0.1, 8,   0.1));
-    motionBlock.appendChild(mkSlider('Turn rate', 'turnRate', 0.04, 0.005, 0.3, 0.005));
+    motionBlock.appendChild(mkSlider('Speed', 'stepLen', 2.0, 0.1, 8, 0.1));
     controlsEl.appendChild(motionBlock);
 
-    // ── Presets ───────────────────────────────────────────────────────────────
+    // ── Formula presets ───────────────────────────────────────────────────────
     controlsEl.appendChild(mkLabel('Formula presets'));
     const grid = document.createElement('div');
     grid.className = 'preset-grid';
@@ -216,42 +285,6 @@ function buildUI() {
         grid.appendChild(btn);
     });
     controlsEl.appendChild(grid);
-
-    // ── Trace text ────────────────────────────────────────────────────────────
-    controlsEl.appendChild(mkLabel('Trace text'));
-    const textBlock = document.createElement('div');
-    textBlock.className = 'ctrl-block';
-
-    const textInput = document.createElement('textarea');
-    textInput.className   = 'trace-textarea';
-    textInput.placeholder = 'type text to send…';
-    textInput.rows        = 3;
-    textBlock.appendChild(textInput);
-
-    const textBtnRow = document.createElement('div');
-    textBtnRow.className = 'text-btn-row';
-
-    const sendTextBtn = document.createElement('button');
-    sendTextBtn.className   = 'btn-text-send';
-    sendTextBtn.textContent = '→  send';
-    sendTextBtn.addEventListener('click', () => {
-        const val = textInput.value.trim();
-        if (!val) return;
-        send({ traceText: val });
-    });
-
-    const clearTextBtn = document.createElement('button');
-    clearTextBtn.className   = 'btn-text-clear';
-    clearTextBtn.textContent = '✕  clear text';
-    clearTextBtn.addEventListener('click', () => {
-        textInput.value = '';
-        send({ clearText: true });
-    });
-
-    textBtnRow.appendChild(sendTextBtn);
-    textBtnRow.appendChild(clearTextBtn);
-    textBlock.appendChild(textBtnRow);
-    controlsEl.appendChild(textBlock);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -262,10 +295,28 @@ function mkLabel(text) {
     return el;
 }
 
+function mkBtnGroup(options) {
+    const group = document.createElement('div');
+    group.className = 'btn-group';
+    let activeBtn = null;
+    options.forEach(({ label, action }) => {
+        const btn = document.createElement('button');
+        btn.className   = 'btn-group-btn';
+        btn.textContent = label;
+        btn.addEventListener('click', () => {
+            if (activeBtn) activeBtn.classList.remove('active');
+            btn.classList.add('active');
+            activeBtn = btn;
+            action();
+        });
+        group.appendChild(btn);
+    });
+    return group;
+}
+
 function mkSlider(label, key, def, min, max, step) {
     const wrap = document.createElement('div');
-
-    const row = document.createElement('div');
+    const row  = document.createElement('div');
     row.className = 'ctrl-row';
 
     const lbl = document.createElement('span');
@@ -285,7 +336,6 @@ function mkSlider(label, key, def, min, max, step) {
     input.max   = max;
     input.step  = step;
     input.value = def;
-
     input.addEventListener('input', () => {
         const v = parseFloat(input.value);
         val.textContent = +v.toFixed(3);

@@ -118,6 +118,38 @@ html, body {
     width: 100%;
 }
 
+/* ── Spectator count ────────────────────────────────────────────────────────── */
+.stat-block {
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 14px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.stat-label {
+    font-size: 0.72rem;
+    color: #52525b;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+.stat-count {
+    font-size: 1.6rem;
+    color: #e4e4e7;
+    letter-spacing: -0.02em;
+}
+
+/* ── Section label ──────────────────────────────────────────────────────────── */
+.section-label {
+    font-size: 0.62rem;
+    color: #52525b;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 0 2px;
+    margin-top: 4px;
+}
+
 /* ── Big action buttons ─────────────────────────────────────────────────────── */
 .btn-big {
     width: 100%;
@@ -135,20 +167,70 @@ html, body {
 }
 .btn-big:active { opacity: 0.7; transform: scale(0.98); }
 
-.btn-reset   { background: #27272a; color: #e4e4e7; border: 1px solid #3f3f46; }
-.btn-clear   { background: #27272a; color: #a1a1aa; border: 1px solid #3f3f46; }
-.btn-qr-on   { background: #e4e4e7; color: #09090b; }
-.btn-qr-off  { background: #27272a; color: #71717a; border: 1px solid #3f3f46; }
+.btn-reset       { background: #27272a; color: #e4e4e7; border: 1px solid #3f3f46; }
+.btn-clear       { background: #27272a; color: #a1a1aa; border: 1px solid #3f3f46; }
+.btn-danger      { background: #3f1212; color: #fca5a5; border: 1px solid #7f1d1d; }
+.btn-mute        { background: #27272a; color: #a1a1aa; border: 1px solid #3f3f46; }
+.btn-mute-active { background: #2d1b00; color: #fbbf24; border: 1px solid #78350f; }
+.btn-heartbeat   { background: #0f172a; color: #7dd3fc; border: 1px solid #1e3a5f; }
+.btn-qr-on       { background: #e4e4e7; color: #09090b; }
+.btn-qr-off      { background: #27272a; color: #71717a; border: 1px solid #3f3f46; }
 
-/* ── Section label ──────────────────────────────────────────────────────────── */
-.section-label {
-    font-size: 0.62rem;
-    color: #52525b;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    padding: 0 2px;
-    margin-top: 4px;
+/* ── Button row (two side-by-side buttons) ───────────────────────────────────── */
+.btn-row {
+    display: flex;
+    gap: 8px;
 }
+.btn-row .btn-big {
+    flex: 1;
+    padding: 20px 10px;
+    font-size: 0.78rem;
+}
+
+/* ── Button group (mode / step status) ──────────────────────────────────────── */
+.btn-group {
+    display: flex;
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 14px;
+    overflow: hidden;
+}
+.btn-group-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    border-right: 1px solid #27272a;
+    padding: 18px 10px;
+    font-family: inherit;
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #52525b;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+}
+.btn-group-btn:last-child { border-right: none; }
+.btn-group-btn:active { background: #27272a; color: #a1a1aa; }
+.btn-group-btn.active { background: #27272a; color: #e4e4e7; }
+
+/* ── QR location grid ───────────────────────────────────────────────────────── */
+.qr-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+.qr-cell {
+    aspect-ratio: 1;
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+}
+.qr-cell:active  { background: #27272a; }
+.qr-cell.active  { background: #27272a; border-color: #52525b; box-shadow: inset 0 0 0 2px #52525b; }
 
 /* ── Slider control ─────────────────────────────────────────────────────────── */
 .ctrl-block {
@@ -194,68 +276,6 @@ input[type="range"]::-moz-range-thumb {
     border: none;
 }
 
-/* ── Color picker ───────────────────────────────────────────────────────────── */
-.color-block {
-    background: #18181b;
-    border: 1px solid #27272a;
-    border-radius: 14px;
-    padding: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-input[type="color"] {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 48px;
-    height: 48px;
-    border: 2px solid #3f3f46;
-    border-radius: 12px;
-    cursor: pointer;
-    padding: 3px;
-    background: #18181b;
-}
-input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; border-radius: 8px; }
-input[type="color"]::-webkit-color-swatch { border: none; border-radius: 8px; }
-
-/* ── Trace text ─────────────────────────────────────────────────────────────── */
-.trace-textarea {
-    width: 100%;
-    background: #09090b;
-    border: 1px solid #3f3f46;
-    border-radius: 10px;
-    padding: 12px;
-    font-family: inherit;
-    font-size: 0.85rem;
-    color: #e4e4e7;
-    resize: none;
-    outline: none;
-    -webkit-appearance: none;
-}
-.trace-textarea:focus { border-color: #71717a; }
-.text-btn-row {
-    display: flex;
-    gap: 8px;
-    margin-top: 8px;
-}
-.btn-text-send, .btn-text-clear {
-    flex: 1;
-    border: none;
-    border-radius: 12px;
-    padding: 14px 10px;
-    font-family: inherit;
-    font-size: 0.78rem;
-    font-weight: 500;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: opacity 0.15s, transform 0.1s;
-    -webkit-tap-highlight-color: transparent;
-}
-.btn-text-send:active, .btn-text-clear:active { opacity: 0.7; transform: scale(0.98); }
-.btn-text-send  { background: #e4e4e7; color: #09090b; }
-.btn-text-clear { background: #27272a; color: #a1a1aa; border: 1px solid #3f3f46; }
-
 /* ── Preset grid ────────────────────────────────────────────────────────────── */
 .preset-grid {
     display: grid;
@@ -276,5 +296,5 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 8px; }
     -webkit-tap-highlight-color: transparent;
     text-align: center;
 }
-.btn-preset:active  { background: #27272a; color: #e4e4e7; }
-.btn-preset.active  { background: #27272a; color: #e4e4e7; border-color: #52525b; }
+.btn-preset:active { background: #27272a; color: #e4e4e7; }
+.btn-preset.active { background: #27272a; color: #e4e4e7; border-color: #52525b; }

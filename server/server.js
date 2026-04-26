@@ -230,7 +230,10 @@ io.on('connection', (socket) => {
         adminToken      = token;
         assignedRoom    = targetRoom;
         socket.join(targetRoom);
+        socket.join(`${targetRoom}:admin`);
         socket.emit('admin-registered', { room: targetRoom });
+        const existingRoom = rooms.get(targetRoom);
+        socket.emit('spectator-count', { count: existingRoom?.connections.size ?? 0 });
         console.log('[socket] admin registered  room:', targetRoom);
     });
 
@@ -266,6 +269,7 @@ io.on('connection', (socket) => {
             io.to(`${room}:hosts`).emit('spectator-joined', { userCount, spectatorId: sid });
         }
         socket.to(`${room}:spectators`).emit('peer-joined', { userCount });
+        io.to(`${room}:admin`).emit('spectator-count', { count: userCount });
 
         callN8nSpectator(room, 'spectator-joined', sid, userCount, roomData.n8nTestMode);
     });
@@ -347,6 +351,7 @@ io.on('connection', (socket) => {
                     io.to(`${assignedRoom}:hosts`).emit('spectator-left', { userCount: remaining, spectatorId });
                 }
                 io.to(`${assignedRoom}:spectators`).emit('peer-left', { userCount: remaining });
+                io.to(`${assignedRoom}:admin`).emit('spectator-count', { count: remaining });
                 console.log('[socket] spectator left    room:', assignedRoom, '| remaining:', remaining);
 
                 if (spectatorId !== undefined) {

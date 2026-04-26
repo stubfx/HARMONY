@@ -66,13 +66,14 @@ These keys trigger immediate side-effects and are **not** stored in `params`.
 | `status` | `"NORMAL"` \| `"FREEROAM"` \| `"DOT"` | Switches the simulation state. `FREEROAM` suspends formula steering and wind; `DOT` applies a fixed inward-spiral attractor. |
 | `showQR` | `true` \| `false` | `true` — enables the QR layer on the trace canvas (drawn on top of any user content). `false` — hides the QR layer; user content remains unaffected. |
 | `restart` | `true` | Re-seeds all agents at random positions with fresh velocities. |
-| `clearTrace` | `true` | Clears the magnet image AND the text trace layer. |
-| `clearText` | `true` | Clears only the text trace layer, leaving any QR/image untouched. |
+| `clearTrace` | `true` | Clears the magnet image, the text trace layer, and the caption. |
+| `clearText` | `true` | Clears the text trace layer and the caption, leaving any QR/image untouched. |
 | `traceText` | `string` | Renders a text string onto the trace canvas. QR remains visible on top if `qrStatus` is `SHOW`. |
 | `traceImage` | `string` (URL) | Fetches an image from the given URL and composites it onto the trace canvas. QR remains visible on top if `qrStatus` is `SHOW`. Supports any format the browser can decode (PNG, JPEG, WebP, etc.). |
 | `dir` | `string` | Sets the direction formula (WGSL math expression in `x, y, t, cx, cy, PI, TWO_PI`). Applied immediately. |
 | `wind` | `string` | Sets the wind formula (same variable set as `dir`). Applied immediately. |
 | `avoidMap` | `string` \| `null` | URL of an image to use as the avoidance map. `null` clears the current map. |
+| `triggerHeartbeat` | `true` | Fires an immediate out-of-cycle heartbeat call to n8n (`/webhook/heartbeat`). Useful for manually re-syncing n8n state from the admin panel without waiting for the next scheduled tick. |
 | `audio` | `string` \| `null` | Base64-encoded audio for the **voiceover track** (plays once, then stops). Decoded and routed through the Web Audio analyser — drives particle brightness via RMS. `null` or `""` stops any running voiceover immediately. Absent key = no-op. |
 | `audiobg` | `string` \| `null` | Base64-encoded audio for the **background music track** (loops continuously). Same analyser routing as `audio`. `null` or `""` stops the loop immediately. Absent key = no-op. |
 | `audioFormat` | `string` | MIME type for the `audio` payload. Defaults to `"audio/webm;codecs=opus"` when omitted. |
@@ -144,8 +145,8 @@ The trace canvas is always full-screen (scaled by `traceScale`). QR and user con
 | `imageY` | `0.5` | `0 – 1` | User content center Y in screen-space (0 = top, 1 = bottom). |
 | `qrSize` | `0.25` | `0 – 1` | QR size as a fraction of `min(traceW, traceH)`. |
 | `qrMargin` | `0.02` | `0 – 0.1` | Uniform margin from the aligned edge, as a fraction of `min(traceW, traceH)`. Applied equally on both axes. |
-| `qrAlignX` | `"right"` | `"left"` \| `"right"` | Horizontal edge the QR is anchored to. |
-| `qrAlignY` | `"bottom"` | `"top"` \| `"bottom"` | Vertical edge the QR is anchored to. |
+| `qrAlignX` | `"center"` | `"left"` \| `"center"` \| `"right"` | Horizontal position of the QR code. |
+| `qrAlignY` | `"center"` | `"top"` \| `"center"` \| `"bottom"` | Vertical position of the QR code. |
 | `qrQuietZone` | `0` | `0 – 8` | White border around the QR in modules. `0` = none (tightest), `4` = spec minimum (most scannable). Triggers QR regeneration. |
 | `qrInvert` | `false` | bool | Swap dark/light channels: transparent modules on white background instead of white modules on transparent. Triggers QR regeneration. |
 

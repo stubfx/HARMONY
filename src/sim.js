@@ -912,6 +912,7 @@ function clearMagnetImage() {
 function clearTraceText() {
     const input = document.querySelector('#trace-text-input');
     if (input) input.value = '';
+    captionText = '';
     clearTimeout(autoClearTimer);
     autoClearTimer = null;
     renderTraceCanvas();
@@ -1411,6 +1412,7 @@ function applySimParams(data) {
     else if (typeof avoidMap === 'string') loadAvoidMap(avoidMap);
     if (clearTrace) {
         imageBitmap = null;
+        captionText = '';
         clearTimeout(autoClearTimer);
         autoClearTimer = null;
         const clearInput = document.querySelector('#trace-text-input');
@@ -1440,6 +1442,7 @@ function applySimParams(data) {
         if (k in params) params[k] = v;
     });
     if ('heartbeatInterval' in rest) restartHeartbeat();
+    if (rest.triggerHeartbeat)       callN8nHeartbeat();
     if ('duckLevel'         in rest) setDuckLevel(params.duckLevel);
     if ('n8nTestMode'       in rest) socket.emit('set-n8n-test-mode', params.n8nTestMode);
     if ('agentCount'        in rest || 'weightSpread' in rest) seedAgents();

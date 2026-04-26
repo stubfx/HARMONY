@@ -699,8 +699,11 @@ thesis-sim/
 │   └── motion.js            Motion smoothing
 │
 ├── admin/
-│   ├── index.html           Admin controller panel (password-protected)
-│   ├── main.js              GUI controls: sim params, restart, QR toggle, trace text send/clear
+│   ├── index.html           Admin controller panel (password-protected; URL: /admin/?s=<uuid>)
+│   ├── main.js              Show operator panel: live spectator count, restart + full reset,
+│   │                        mute audio, mode (STORY/SHOWCASE), step status (IDLE/DRAW/VOTE),
+│   │                        QR show/hide (two independent buttons), QR location 3×3 grid,
+│   │                        clear trace, n8n heartbeat trigger, speed slider, formula presets
 │   └── style.css
 │
 ├── server/
