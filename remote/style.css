@@ -345,3 +345,27 @@ html, body {
     color: rgba(255, 255, 255, 0.2);
     transition: color 0.5s ease;
 }
+
+/* Tap confirmation: scale pop + bright glow flash */
+.vote-btn.tapped {
+    color: #fff;
+    transition: color 0s;
+    animation: vote-btn-tap 0.34s ease-out forwards;
+}
+
+.vote-btn.tapped::before {
+    background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.38) 0%, rgba(255, 255, 255, 0.08) 55%, transparent 80%);
+    opacity: 1;
+    transition: none;
+    animation: vote-tap-flash 0.34s ease-out forwards;
+}
+
+@keyframes vote-btn-tap {
+    0%   { transform: scale(1.04); }
+    100% { transform: scale(1); }
+}
+
+@keyframes vote-tap-flash {
+    0%   { opacity: 1; }
+    100% { opacity: 0; }
+}

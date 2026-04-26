@@ -157,8 +157,8 @@ function setRemoteUI({ stepStatus, optionA, optionB } = {}) {
 
     if (votePanelEl) {
         if (isVote) {
-            voteBtnA?.classList.remove('voted', 'vote-dimmed');
-            voteBtnB?.classList.remove('voted', 'vote-dimmed');
+            voteBtnA?.classList.remove('voted', 'vote-dimmed', 'tapped');
+            voteBtnB?.classList.remove('voted', 'vote-dimmed', 'tapped');
             if (voteBtnA) voteBtnA.textContent = _storyOptionA ?? 'A';
             if (voteBtnB) voteBtnB.textContent = _storyOptionB ?? 'B';
             votePanelEl.classList.add('visible');
@@ -177,14 +177,22 @@ function setRemoteUI({ stepStatus, optionA, optionB } = {}) {
 
 voteBtnA?.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    if (_storyOptionA) socket.emit('story-vote', { choice: _storyOptionA });
-    setRemoteUI(); // return to controller immediately
+    if (_storyOptionA) {
+        navigator.vibrate?.(45);
+        voteBtnA.classList.add('tapped');
+        socket.emit('story-vote', { choice: _storyOptionA });
+        setTimeout(() => setRemoteUI(), 340);
+    }
 }, { passive: false });
 
 voteBtnB?.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    if (_storyOptionB) socket.emit('story-vote', { choice: _storyOptionB });
-    setRemoteUI(); // return to controller immediately
+    if (_storyOptionB) {
+        navigator.vibrate?.(45);
+        voteBtnB.classList.add('tapped');
+        socket.emit('story-vote', { choice: _storyOptionB });
+        setTimeout(() => setRemoteUI(), 340);
+    }
 }, { passive: false });
 
 socket.on('remote-ui', (data) => setRemoteUI(data));
