@@ -22,6 +22,13 @@ const socketUrl = import.meta.env.DEV
     ? `http://localhost:${import.meta.env.VITE_SERVER_PORT ?? 3000}`
     : (import.meta.env.VITE_SOCKET_URL || '/');
 
+// In dev the Vite proxy forwards /admin-auth → Express, so a relative URL works.
+// In production the fetch must hit the Express server directly (same host as Socket.IO)
+// rather than the static CDN/Caddy layer, which doesn't know about the route.
+const _authBase = import.meta.env.DEV
+    ? ''
+    : (import.meta.env.VITE_SOCKET_URL || '').replace(/\/$/, '');
+
 let socket     = null;
 let adminToken = sessionStorage.getItem('admin-token');
 
@@ -29,7 +36,7 @@ let adminToken = sessionStorage.getItem('admin-token');
 authForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
     try {
-        const res = await fetch('/admin-auth', {
+        const res = await fetch(`${_authBase}/admin-auth`, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ password: passwordInput.value.trim() }),
