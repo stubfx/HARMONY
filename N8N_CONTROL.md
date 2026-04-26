@@ -62,6 +62,7 @@ These keys trigger immediate side-effects and are **not** stored in `params`.
 
 | Key | Type | Effect |
 |-----|------|--------|
+| `mode` | `"STORY"` \| `"SHOWCASE"` | Top-level session mode. `STORY` — narrative-driven; n8n sequences steps, votes, and content. `SHOWCASE` — ambient / exhibition; no story sequencing. Default: `STORY`. |
 | `status` | `"NORMAL"` \| `"FREEROAM"` \| `"DOT"` | Switches the simulation state. `FREEROAM` suspends formula steering and wind; `DOT` applies a fixed inward-spiral attractor. |
 | `showQR` | `true` \| `false` | `true` — enables the QR layer on the trace canvas (drawn on top of any user content). `false` — hides the QR layer; user content remains unaffected. |
 | `restart` | `true` | Re-seeds all agents at random positions with fresh velocities. |

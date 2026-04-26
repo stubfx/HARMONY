@@ -267,6 +267,7 @@ export function initGUI({
 
     gui.add({ restart: () => seedAgents() }, 'restart').name('↺  Restart');
 
+    const modeCtrl    = gui.add(simState, 'mode',      ['STORY', 'SHOWCASE']).name('mode');
     const stateCtrl   = gui.add(simState, 'status',   ['NORMAL', 'FREEROAM', 'DOT']).name('status');
     const qrStateCtrl = gui.add(simState, 'qrStatus', ['SHOW', 'HIDE']).name('qr');
 
@@ -278,6 +279,7 @@ export function initGUI({
     return {
         gui,
         swarmDebug,
+        modeCtrl,
         stateCtrl,
         qrStateCtrl,
         dbgUsers,

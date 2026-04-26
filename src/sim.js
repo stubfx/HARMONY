@@ -1019,10 +1019,13 @@ const rndPick   = arr => arr[Math.floor(Math.random() * arr.length)];
 /// qrStatus: 'SHOW' — QR is drawn as the topmost layer on the trace canvas.
 //                    Independent of user content — both can be visible simultaneously.
 //           'HIDE' — QR layer is skipped; only user content (image/text) is drawn.
+// mode:     'STORY'    — narrative-driven session; n8n sequences steps, votes, and content
+//           'SHOWCASE' — ambient / exhibition mode; no story sequencing
 // status:   'NORMAL' — formula steering + wind active, auto-cycling runs
 //           'FREEROAM' — no formula, no wind; particles drift freely on momentum
 //           'DOT'    — fixed inward-spiral formulas; wind + formula forced on regardless of params
 const simState = {
+    mode:              'STORY',
     qrStatus:          'HIDE',
     status:            'DOT',
     storyStep:         null,   // echoed from n8n step ID; null = not in story mode
@@ -1036,10 +1039,12 @@ const simState = {
 // GUI handles — assigned by initGUI() at the bottom of this file.
 let stateCtrl   = null;
 let qrStateCtrl = null;
+let modeCtrl    = null;
 let gui, swarmDebug, dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence;
 let applyGUIVisibility, toggleGUI, updateGizmo;
 
 function updateStateDisplay() {
+    modeCtrl?.updateDisplay();
     stateCtrl?.updateDisplay();
     qrStateCtrl?.updateDisplay();
 }
@@ -1116,6 +1121,7 @@ async function callN8nHeartbeat() {
             body:    JSON.stringify({
                 type:              'heartbeat',
                 room:              sessionRoom,
+                mode:              simState.mode,
                 status:            simState.status,
                 qrStatus:          simState.qrStatus,
                 step:              simState.storyStep,
@@ -1387,7 +1393,7 @@ let socket;
 function applySimParams(data) {
     const { dir, wind, restart, clearTrace, showQR, traceText, clearText, traceImage, status, avoidMap,
             step, stepDuration, stepStatus, optionA, optionB, caption,
-            audio, audioFormat, audiobg, audiobgFormat, ...rest } = data;
+            audio, audioFormat, audiobg, audiobgFormat, mode, ...rest } = data;
 
     if (audio    !== undefined) playAudio(audio    || null, audioFormat)   .catch(e => console.warn('[audio]',    e));
     if (audiobg  !== undefined) playAudioBg(audiobg || null, audiobgFormat).catch(e => console.warn('[audiobg]',  e));
@@ -1412,6 +1418,10 @@ function applySimParams(data) {
         if (optionA !== undefined) simState.optionA = optionA;
         if (optionB !== undefined) simState.optionB = optionB;
         socket.emit('story-ui', { stepStatus: simState.stepStatus, optionA: simState.optionA, optionB: simState.optionB });
+    }
+    if (mode === 'SHOWCASE' || mode === 'STORY') {
+        simState.mode = mode;
+        updateStateDisplay();
     }
     if (status === 'NORMAL' || status === 'FREEROAM' || status === 'DOT') {
         simState.status = status;
@@ -1473,7 +1483,7 @@ function applySimParams(data) {
 // ── GUI ───────────────────────────────────────────────────────────────────────
 ({
     gui, swarmDebug,
-    stateCtrl, qrStateCtrl,
+    modeCtrl, stateCtrl, qrStateCtrl,
     dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence,
     applyGUIVisibility, toggleGUI, updateGizmo,
 } = initGUI({
