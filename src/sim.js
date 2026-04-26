@@ -1062,8 +1062,11 @@ let lastRemoteActivity = Date.now(); // timestamp of last remote-event (touch or
 // The sim appends /webhook/sim-event or /webhook-test/sim-event based on
 // params.n8nTestMode. An in-flight guard prevents queuing — if a call is already
 // running the new event is skipped. A 5 s timeout clears the guard if n8n is slow.
-const N8N_BASE       = (import.meta.env.VITE_N8N_BASE_URL ?? '').replace(/\/$/, '');
-const N8N_TIMEOUT_MS = 5_000;
+const N8N_BASE            = (import.meta.env.VITE_N8N_BASE_URL ?? '').replace(/\/$/, '');
+const N8N_USER_TIMEOUT_MS = 15_000; // timeout for user-event calls (text submit, etc.)
+// Heartbeat timeout scales with the interval so heavy n8n responses don't get aborted.
+// 90% of the interval, minimum 5 s — recomputed each call so GUI/n8n changes take effect.
+function n8nHeartbeatTimeoutMs() { return Math.max(params.heartbeatInterval * 900, 5_000); }
 let   n8nInFlight          = false;
 let   n8nHeartbeatInFlight = false;
 
@@ -1072,7 +1075,7 @@ async function callN8n(event) {
     n8nInFlight = true;
     const path = params.n8nTestMode ? '/webhook-test/sim-event' : '/webhook/sim-event';
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), N8N_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), N8N_USER_TIMEOUT_MS);
     try {
         const res = await fetch(N8N_BASE + path, {
             method:  'POST',
@@ -1104,7 +1107,7 @@ async function callN8nHeartbeat() {
     n8nHeartbeatInFlight = true;
     const path = params.n8nTestMode ? '/webhook-test/heartbeat' : '/webhook/heartbeat';
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), N8N_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), n8nHeartbeatTimeoutMs());
     try {
         const res = await fetch(N8N_BASE + path, {
             method:  'POST',
