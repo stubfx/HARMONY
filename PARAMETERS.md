@@ -847,7 +847,7 @@ A vote step:
 | `"DRAW"` | Default atmospheric surface | Active — joystick moves spawner, tilt/color all live |
 | `"VOTE"` | Two full-screen buttons labelled `optionA` / `optionB` | Hidden behind vote panel |
 
-When `stepStatus` changes the server broadcasts a `story-ui` Socket.IO event to all spectators in the room. The remote page switches its interface immediately.
+When `stepStatus` changes the server broadcasts a `remote-ui` Socket.IO event to all spectators in the room. The remote page switches its interface immediately.
 
 ### Vote mechanics
 
@@ -856,7 +856,7 @@ When `stepStatus` changes the server broadcasts a `story-ui` Socket.IO event to 
 - The sim tracks the current leader in `storyVoteResult`
 - When `stepDuration` expires, `storyVoteResult` holds whichever option was leading; `null` on a tie
 - n8n reads `storyVoteResult` from the immediate out-of-cycle heartbeat and branches accordingly
-- Votes are cleared automatically when a new `story-ui` event is broadcast (i.e. when a new step arrives)
+- Votes are cleared automatically when a new `remote-ui` event is broadcast (i.e. when a new step arrives)
 
 ### Caption
 

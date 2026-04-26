@@ -149,7 +149,7 @@ const voteBtnA    = document.querySelector('#vote-btn-a');
 const voteBtnB    = document.querySelector('#vote-btn-b');
 let _storyOptionA = null;
 let _storyOptionB = null;
-function setStoryUI({ stepStatus, optionA, optionB } = {}) {
+function setRemoteUI({ stepStatus, optionA, optionB } = {}) {
     _storyOptionA = optionA ?? null;
     _storyOptionB = optionB ?? null;
     const isVote = stepStatus === 'VOTE';
@@ -178,16 +178,16 @@ function setStoryUI({ stepStatus, optionA, optionB } = {}) {
 voteBtnA?.addEventListener('touchstart', (e) => {
     e.preventDefault();
     if (_storyOptionA) socket.emit('story-vote', { choice: _storyOptionA });
-    setStoryUI(); // return to controller immediately
+    setRemoteUI(); // return to controller immediately
 }, { passive: false });
 
 voteBtnB?.addEventListener('touchstart', (e) => {
     e.preventDefault();
     if (_storyOptionB) socket.emit('story-vote', { choice: _storyOptionB });
-    setStoryUI(); // return to controller immediately
+    setRemoteUI(); // return to controller immediately
 }, { passive: false });
 
-socket.on('story-ui', (data) => setStoryUI(data));
+socket.on('remote-ui', (data) => setRemoteUI(data));
 
 // Re-join when the host sim reconnects so it immediately knows about this spectator.
 socket.on('host-reconnected', () => {

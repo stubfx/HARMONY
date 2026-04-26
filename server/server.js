@@ -282,15 +282,15 @@ io.on('connection', (socket) => {
         io.to(room).emit('remote-event', { type, spectatorId, data, timestamp: Date.now() });
     });
 
-    // ── Story UI — host broadcasts step status to all spectators ─────────────────
-    socket.on('story-ui', (data) => {
+    // ── Remote UI — host broadcasts step status to all spectators ────────────────
+    socket.on('remote-ui', (data) => {
         const room = rooms.get(assignedRoom);
         if (!room?.hostSockets.has(socket.id)) return;
         room.votes.clear();
         room.storyOptions.a = data?.optionA ?? null;
         room.storyOptions.b = data?.optionB ?? null;
-        io.to(`${assignedRoom}:spectators`).emit('story-ui', data);
-        console.log('[socket] story-ui          room:', assignedRoom, '| status:', data?.stepStatus);
+        io.to(`${assignedRoom}:spectators`).emit('remote-ui', data);
+        console.log('[socket] remote-ui         room:', assignedRoom, '| status:', data?.stepStatus);
     });
 
     // ── Story vote — spectator casts one vote; host gets running tally ───────────

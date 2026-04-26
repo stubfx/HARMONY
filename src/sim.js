@@ -1389,13 +1389,13 @@ function applySimParams(data) {
         simState.stepStatus = stepStatus ?? 'IDLE';
         simState.optionA    = optionA    ?? null;
         simState.optionB    = optionB    ?? null;
-        socket.emit('story-ui', { stepStatus: simState.stepStatus, optionA: simState.optionA, optionB: simState.optionB });
+        socket.emit('remote-ui', { stepStatus: simState.stepStatus, optionA: simState.optionA, optionB: simState.optionB });
     } else if (stepStatus !== undefined) {
         // Mid-step status change (no new step ID).
         simState.stepStatus = stepStatus;
         if (optionA !== undefined) simState.optionA = optionA;
         if (optionB !== undefined) simState.optionB = optionB;
-        socket.emit('story-ui', { stepStatus: simState.stepStatus, optionA: simState.optionA, optionB: simState.optionB });
+        socket.emit('remote-ui', { stepStatus: simState.stepStatus, optionA: simState.optionA, optionB: simState.optionB });
     }
     if (mode === 'SHOWCASE' || mode === 'STORY') {
         simState.mode = mode;
