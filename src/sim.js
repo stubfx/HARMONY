@@ -95,7 +95,8 @@ const params = {
     // Auto-clear
     clearDelay:    0,     // seconds before auto-clearing user trace content (0 = disabled)
     // DOT mode
-    dotCenterRadius: 50,  // px — agents within this radius of centre are respawned to edges (0 = disabled)
+    dotCenterRadius:     50,   // px — agents within this radius of centre are candidates for respawn (0 = disabled)
+    dotRespawnChance:    0.01, // per-frame probability that a centre-zone agent is respawned to an edge
     // Spectator partitioning
     spectatorAgentShare:       100,  // % of agents assigned to spectators (0 = sim only, 100 = full user control)
     spectatorSpawnChance:      0.01, // base per-frame spawn probability (scaled by user count × multiplier)
@@ -1728,6 +1729,7 @@ function writeSoloUB(dt, time) {
     f[35] = params.spectatorAgentShare / 100.0;
     u[36] = isDot ? 1 : 0;
     f[37] = params.dotCenterRadius;
+    f[38] = params.dotRespawnChance;
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 

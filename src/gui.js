@@ -55,7 +55,8 @@ export function initGUI({
     fMotion.add(params, 'autoDir').name('auto-cycle formula');
     fMotion.add(params, 'bounceEdges').name('bounce edges');
     fMotion.add(params, 'useDeltaTime').name('delta time');
-    fMotion.add(params, 'dotCenterRadius', 0, 500, 1).name('DOT center radius (px)');
+    fMotion.add(params, 'dotCenterRadius',  0, 500,  1    ).name('DOT center radius (px)');
+    fMotion.add(params, 'dotRespawnChance', 0,   1,  0.005).name('DOT respawn chance');
 
     // ── Wind ──────────────────────────────────────────────────────────────────
     const fWind = gui.addFolder('Wind');
