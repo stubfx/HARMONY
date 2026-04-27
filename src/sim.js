@@ -1445,9 +1445,10 @@ let socket;
 const voteCountdownEl = document.querySelector('#vote-countdown');
 
 function _remoteUiPayload() {
-    const isVote = simState.stepStatus === 'VOTE';
+    const isVote      = simState.stepStatus === 'VOTE';
+    const stepStatus  = simState.storyStep != null ? simState.stepStatus : null;
     return {
-        stepStatus:    simState.stepStatus,
+        stepStatus,
         optionA:       simState.optionA,
         optionB:       simState.optionB,
         ...(isVote && { voteDuration: params.voteDuration }),
