@@ -1446,10 +1446,10 @@ let socket;
 function applySimParams(data) {
     const { dir, wind, restart, clearTrace, showQR, traceText, clearText, traceImage, status, avoidMap,
             step, stepStatus, optionA, optionB, caption,
-            audio, audioFormat, audiobg, audiobgFormat, mode, ...rest } = data;
+            audio, audioFormat, audiobg, audiobgFormat, audiobgLoop, mode, ...rest } = data;
 
-    if (audio    !== undefined) playAudio(audio    || null, audioFormat)   .catch(e => console.warn('[audio]',    e));
-    if (audiobg  !== undefined) playAudioBg(audiobg || null, audiobgFormat).catch(e => console.warn('[audiobg]',  e));
+    if (audio    !== undefined) playAudio(audio    || null, audioFormat)                              .catch(e => console.warn('[audio]',    e));
+    if (audiobg  !== undefined) playAudioBg(audiobg || null, audiobgFormat, audiobgLoop !== false)    .catch(e => console.warn('[audiobg]',  e));
 
     // Story step — a new step ID resets all completion state then applies the step's UI mode.
     if (step !== undefined) {

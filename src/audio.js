@@ -120,16 +120,25 @@ export async function playAudio(base64, mimeType = 'audio/webm;codecs=opus') {
     _voiceSrc.start();
 }
 
-// Background track — loops until stopped. Null/empty stops the loop.
-export async function playAudioBg(base64, mimeType = 'audio/webm;codecs=opus') {
+// Background track. loop=true (default) loops forever; loop=false plays once then stops.
+// Null/empty stops and clears the track immediately.
+export async function playAudioBg(base64, mimeType = 'audio/webm;codecs=opus', loop = true) {
     _stopSrc(_bgSrc);
     _bgSrc = null;
-    if (!base64) return;
+    if (!base64) {
+        if (_bgGain) {
+            const now = _ctx?.currentTime ?? 0;
+            _bgGain.gain.cancelScheduledValues(now);
+            _bgGain.gain.setValueAtTime(1.0, now);
+        }
+        return;
+    }
     const audioBuffer = await _decode(base64);
     _bgSrc            = _ctx.createBufferSource();
     _bgSrc.buffer     = audioBuffer;
-    _bgSrc.loop       = true;
-    _bgSrc.connect(_bgGain); // routed through the gain node for ducking
+    _bgSrc.loop       = loop;
+    _bgSrc.connect(_bgGain);
+    if (!loop) _bgSrc.onended = () => { _bgSrc = null; };
     _bgSrc.start();
 }
 

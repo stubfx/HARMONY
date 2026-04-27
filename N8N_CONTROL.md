@@ -75,7 +75,8 @@ These keys trigger immediate side-effects and are **not** stored in `params`.
 | `avoidMap` | `string` \| `null` | URL of an image to use as the avoidance map. `null` clears the current map. |
 | `triggerHeartbeat` | `true` | Fires an immediate out-of-cycle heartbeat call to n8n (`/webhook/heartbeat`). Useful for manually re-syncing n8n state from the admin panel without waiting for the next scheduled tick. |
 | `audio` | `string` \| `null` | Base64-encoded audio for the **voiceover track** (plays once, then stops). Decoded and routed through the Web Audio analyser — drives particle brightness via RMS. `null` or `""` stops any running voiceover immediately. Absent key = no-op. |
-| `audiobg` | `string` \| `null` | Base64-encoded audio for the **background music track** (loops continuously). Same analyser routing as `audio`. `null` or `""` stops the loop immediately. Absent key = no-op. |
+| `audiobg` | `string` \| `null` | Base64-encoded audio for the **background music track**. `null` or `""` stops and clears it immediately. Absent key = no-op. |
+| `audiobgLoop` | `true` | When `true` (default) the track loops forever. Set to `false` to play once and stop at the end. |
 | `audioFormat` | `string` | MIME type for the `audio` payload. Defaults to `"audio/webm;codecs=opus"` when omitted. |
 | `audiobgFormat` | `string` | MIME type for the `audiobg` payload. Defaults to `"audio/webm;codecs=opus"` when omitted. |
 
