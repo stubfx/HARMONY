@@ -193,7 +193,7 @@ The trace canvas is always full-screen (scaled by `traceScale`). QR and user con
 | `qrFadeZone` | `false` | Fades free agents near the QR rect to keep it scannable. |
 | `remoteTimeout` | `0` | Seconds of silence from all remotes before the QR is restored. `0` = disabled. |
 | `clearDelay` | `0` | Seconds before auto-clearing user-submitted trace content. `0` = disabled. |
-| `heartbeatInterval` | `20` | Seconds between heartbeat calls. `0` = off. The fetch timeout scales automatically with this value (90% of the interval, minimum 5 s), so heavy n8n responses are not aborted when the interval is long. |
+| `heartbeatInterval` | `10` | Seconds between heartbeat calls. `0` = off. The fetch timeout scales automatically with this value (90% of the interval, minimum 5 s), so heavy n8n responses are not aborted when the interval is long. |
 | `n8nTestMode` | `false` | Routes all n8n calls (sim and server) to `/webhook-test/` endpoints. Server follows automatically via socket sync. |
 
 ---

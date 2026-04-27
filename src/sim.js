@@ -82,7 +82,7 @@ const params = {
     // Avoidance
     avoidForceStr:   1.0, // multiplier on image-trace avoidance forces
     avoidMapScale:   1.0, // avoidance map coverage as fraction of canvas (1.0 = full)
-    qrOverlay:       false, // true = QR on a 2D overlay canvas; agents freed from QR area
+    qrOverlay:       true,  // true = QR on a 2D overlay canvas; agents freed from QR area
     qrAvoidMargin:   0.01,  // extra padding around QR in the avoid zone, as fraction of minDim
     qrAvoidFade:     0.01,  // blur radius of the avoid zone edge, as fraction of minDim
     // Primed-spot probe (free agents only)
@@ -110,7 +110,7 @@ const params = {
     maxSpectators:  1,    // sim QR hides when connected count reaches this threshold
     qrFadeZone:     false, // fade free agents near the QR rect to keep it scannable
     n8nTestMode:       false, // true = /webhook-test/sim-event, false = /webhook/sim-event
-    heartbeatInterval: 20,   // seconds between periodic param snapshots sent to n8n (0 = off)
+    heartbeatInterval: 10,   // seconds between periodic param snapshots sent to n8n (0 = off)
     // Weight
     weightSpread: 0.8,    // 0 = all equal; 1 = weights span [0.05 … 1.95]
     // Motion behaviour
