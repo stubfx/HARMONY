@@ -580,6 +580,17 @@ let imageNaturalH = 1;
 let imageBitmap   = null;   // retained ImageBitmap so text changes can re-composite
 let traceCanvas   = null;   // offscreen 2D canvas used for compositing
 
+// ── Animated image state ──────────────────────────────────────────────────────
+let gifFrames        = null;   // ImageBitmap[] | null — trace GIF frames
+let gifDurations     = null;   // number[]      | null — per-frame delay (ms)
+let gifFrameIdx      = 0;
+let gifNextFrameAt   = 0;      // performance.now() timestamp for next advance
+
+let avoidGifFrames    = null;  // same for avoidance map
+let avoidGifDurations = null;
+let avoidGifFrameIdx  = 0;
+let avoidGifNextFrameAt = 0;
+
 // Rebuilds particle render bind group — called after pipeline creation and on image change
 function rebuildRenderBG() {
     const texView = (hasImage && imageTexView) ? imageTexView : placeholderTexView;
@@ -884,8 +895,49 @@ function scheduleAutoClear() {
     }, params.clearDelay * 1000);
 }
 
+// Decodes every frame of an animated image (GIF, animated WebP/AVIF) via the
+// ImageDecoder API. Returns { frames: ImageBitmap[], durations: number[] } or
+// null if the image is static, the API is unavailable, or decoding fails.
+async function decodeAnimatedImage(blob) {
+    if (typeof ImageDecoder === 'undefined') return null;
+    let decoder;
+    try {
+        decoder = new ImageDecoder({ data: blob.stream(), type: blob.type || 'image/gif' });
+        await decoder.tracks.ready;
+        const frameCount = decoder.tracks.selectedTrack?.frameCount ?? 1;
+        if (frameCount <= 1) return null;
+        const frames = [], durations = [];
+        for (let i = 0; i < frameCount; i++) {
+            const { image } = await decoder.decode({ frameIndex: i });
+            frames.push(await createImageBitmap(image));
+            durations.push(Math.max(50, (image.duration ?? 100_000) / 1000)); // µs→ms, min 50 ms
+            image.close();
+        }
+        return { frames, durations };
+    } catch { return null; }
+    finally { decoder?.close(); }
+}
+
+function clearGif() {
+    if (gifFrames) gifFrames.forEach(b => b.close());
+    gifFrames = null; gifDurations = null; gifFrameIdx = 0; gifNextFrameAt = 0;
+}
+
+function clearAvoidGif() {
+    if (avoidGifFrames) avoidGifFrames.forEach(b => b.close());
+    avoidGifFrames = null; avoidGifDurations = null; avoidGifFrameIdx = 0; avoidGifNextFrameAt = 0;
+}
+
 async function loadMagnetImage(file) {
-    imageBitmap = await createImageBitmap(file, { colorSpaceConversion: 'none' });
+    clearGif();
+    const anim = await decodeAnimatedImage(file);
+    if (anim) {
+        gifFrames = anim.frames; gifDurations = anim.durations;
+        gifFrameIdx = 0; gifNextFrameAt = performance.now() + gifDurations[0];
+        imageBitmap = gifFrames[0];
+    } else {
+        imageBitmap = await createImageBitmap(file, { colorSpaceConversion: 'none' });
+    }
     renderTraceCanvas();
     scheduleAutoClear();
 }
@@ -894,7 +946,15 @@ async function loadTraceImageFromUrl(url) {
     try {
         const res  = await fetch(url);
         const blob = await res.blob();
-        imageBitmap = await createImageBitmap(blob, { colorSpaceConversion: 'none' });
+        clearGif();
+        const anim = await decodeAnimatedImage(blob);
+        if (anim) {
+            gifFrames = anim.frames; gifDurations = anim.durations;
+            gifFrameIdx = 0; gifNextFrameAt = performance.now() + gifDurations[0];
+            imageBitmap = gifFrames[0];
+        } else {
+            imageBitmap = await createImageBitmap(blob, { colorSpaceConversion: 'none' });
+        }
         renderTraceCanvas();
         scheduleAutoClear();
     } catch (err) {
@@ -903,6 +963,7 @@ async function loadTraceImageFromUrl(url) {
 }
 
 function clearMagnetImage() {
+    clearGif();
     imageBitmap = null;
     clearTimeout(autoClearTimer);
     autoClearTimer = null;
@@ -1411,6 +1472,7 @@ function applySimParams(data) {
     if (avoidMap === null)    clearAvoidMap();
     else if (typeof avoidMap === 'string') loadAvoidMap(avoidMap);
     if (clearTrace) {
+        clearGif();
         imageBitmap = null;
         captionText = '';
         clearTimeout(autoClearTimer);
@@ -1561,13 +1623,18 @@ document.querySelector('#image-input').addEventListener('change', e => {
 // ── Avoidance map upload ──────────────────────────────────────────────────────
 async function loadAvoidMap(source) {
     _qrOwnedAvoidMap = false; // user-loaded map; QR must not clear it
+    const blob = typeof source === 'string'
+        ? await fetch(source).then(r => r.blob())
+        : source; // File is a Blob
+    clearAvoidGif();
+    const anim = await decodeAnimatedImage(blob);
     let bmp;
-    if (typeof source === 'string') {
-        const res  = await fetch(source);
-        const blob = await res.blob();
-        bmp = await createImageBitmap(blob, { colorSpaceConversion: 'none' });
+    if (anim) {
+        avoidGifFrames = anim.frames; avoidGifDurations = anim.durations;
+        avoidGifFrameIdx = 0; avoidGifNextFrameAt = performance.now() + avoidGifDurations[0];
+        bmp = avoidGifFrames[0];
     } else {
-        bmp = await createImageBitmap(source, { colorSpaceConversion: 'none' });
+        bmp = await createImageBitmap(blob, { colorSpaceConversion: 'none' });
     }
     if (avoidMapTex) avoidMapTex.destroy();
     avoidMapTex = device.createTexture({
@@ -1583,6 +1650,7 @@ async function loadAvoidMap(source) {
 }
 
 function clearAvoidMap() {
+    clearAvoidGif();
     if (avoidMapTex) { avoidMapTex.destroy(); avoidMapTex = null; }
     avoidMapTexView = null;
     hasAvoidMap     = false;
@@ -1894,6 +1962,27 @@ function frame(ts) {
             }
         }
         if (dirty) uploadSpectatorSlots();
+    }
+
+    // ── Advance animated GIF frames ───────────────────────────────────────────
+    {
+        const perfNow = performance.now();
+        if (gifFrames && perfNow >= gifNextFrameAt) {
+            gifFrameIdx    = (gifFrameIdx + 1) % gifFrames.length;
+            gifNextFrameAt = perfNow + gifDurations[gifFrameIdx];
+            imageBitmap    = gifFrames[gifFrameIdx];
+            renderTraceCanvas();
+        }
+        if (avoidGifFrames && avoidMapTex && perfNow >= avoidGifNextFrameAt) {
+            avoidGifFrameIdx    = (avoidGifFrameIdx + 1) % avoidGifFrames.length;
+            avoidGifNextFrameAt = perfNow + avoidGifDurations[avoidGifFrameIdx];
+            const bmp = avoidGifFrames[avoidGifFrameIdx];
+            device.queue.copyExternalImageToTexture(
+                { source: bmp },
+                { texture: avoidMapTex },
+                [bmp.width, bmp.height],
+            );
+        }
     }
 
     writeSoloUB(dt, now);
