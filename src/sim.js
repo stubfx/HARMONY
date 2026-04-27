@@ -1459,8 +1459,12 @@ function applySimParams(data) {
         simState.optionA    = optionA    ?? null;
         simState.optionB    = optionB    ?? null;
         socket.emit('remote-ui', { stepStatus: simState.stepStatus, optionA: simState.optionA, optionB: simState.optionB });
-    } else if (stepStatus !== undefined) {
-        // Mid-step status change (no new step ID).
+    } else if (stepStatus !== undefined && (
+        stepStatus !== simState.stepStatus ||
+        optionA    !== simState.optionA    ||
+        optionB    !== simState.optionB
+    )) {
+        // Mid-step status change — only emit when something actually changed.
         simState.stepStatus = stepStatus;
         if (optionA !== undefined) simState.optionA = optionA;
         if (optionB !== undefined) simState.optionB = optionB;
