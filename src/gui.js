@@ -124,7 +124,8 @@ export function initGUI({
     // ── QR & Layout ───────────────────────────────────────────────────────────
     const fContent = gui.addFolder('QR & Layout');
     fContent.add(params, 'qrOverlay').name('QR overlay').onChange(renderTraceCanvas);
-    fContent.add(params, 'qrFadeZone').name('QR fade zone');
+    fContent.add(params, 'respawnOnQR').name('respawn on QR');
+    fContent.add(params, 'qrRespawnChance', 0, 0.1, 0.001).name('QR respawn chance');
     fContent.add(params, 'qrSize',      0.05, 0.5,  0.01).name('QR size').onChange(renderTraceCanvas);
     fContent.add(params, 'qrMargin',    0,    0.1,  0.005).name('QR margin').onChange(renderTraceCanvas);
     fContent.add(params, 'qrAlignX',    ['left', 'center', 'right']).name('QR align H').onChange(renderTraceCanvas);
@@ -137,9 +138,7 @@ export function initGUI({
 
     // ── Avoidance map ─────────────────────────────────────────────────────────
     const fAvoid = gui.addFolder('Avoidance map');
-    fAvoid.add(params, 'avoidMapScale', 0.05, 1.0,  0.01 ).name('scale');
-    fAvoid.add(params, 'qrAvoidMargin', 0,    0.3,  0.005).name('QR margin').onChange(renderTraceCanvas);
-    fAvoid.add(params, 'qrAvoidFade',   0,    0.15, 0.005).name('QR fade').onChange(renderTraceCanvas);
+    fAvoid.add(params, 'avoidMapScale', 0.05, 1.0, 0.01).name('scale');
     fAvoid.add({ load: () => document.querySelector('#avoid-map-input').click() }, 'load').name('Load map…');
     fAvoid.add({ clear: clearAvoidMap }, 'clear').name('Clear map');
 
