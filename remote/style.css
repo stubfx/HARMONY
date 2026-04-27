@@ -83,7 +83,7 @@ html, body {
 }
 
 
-/* ── Top bar — text input + color picker, always visible ────────────────────── */
+/* ── Top bar — color picker, always visible ─────────────────────────────────── */
 #top-bar {
     position: fixed;
     top: max(env(safe-area-inset-top), 0.75rem);
@@ -93,7 +93,6 @@ html, body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
     width: min(80vw, 320px);
     pointer-events: auto;
 }
@@ -200,33 +199,61 @@ html, body {
     transform: scale(0.88);
 }
 
+/* ── Text panel — centered overlay, visible only on TEXT step ───────────────── */
+#text-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.35);
+}
+
+#text-panel.visible {
+    display: flex;
+    animation: vote-panel-in 0.5s ease both;
+}
+
 #input-form {
-    width: 100%;
+    width: min(80vw, 340px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    animation: text-input-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
+}
+
+@keyframes text-input-in {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
 #input-form input {
     width: 100%;
     background: transparent;
     border: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.5);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.75);
     font-family: ui-monospace, monospace;
-    font-size: 0.75rem;
-    letter-spacing: 0.04em;
-    padding: 0.5rem 0;
+    font-size: clamp(1.1rem, 5vw, 1.5rem);
+    letter-spacing: 0.08em;
+    padding: 0.6rem 0;
     text-align: center;
     outline: none;
-    caret-color: rgba(255, 255, 255, 0.4);
+    caret-color: rgba(255, 255, 255, 0.5);
     transition: border-color 0.3s, color 0.3s;
+    -webkit-user-select: text;
+    user-select: text;
 }
 
 #input-form input::placeholder {
-    color: rgba(255, 255, 255, 0.18);
+    color: rgba(255, 255, 255, 0.2);
 }
 
 #input-form input:focus {
-    border-bottom-color: rgba(255, 255, 255, 0.3);
-    color: rgba(255, 255, 255, 0.75);
+    border-bottom-color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.9);
 }
 
 /* ── Story vote panel ────────────────────────────────────────────────────────── */

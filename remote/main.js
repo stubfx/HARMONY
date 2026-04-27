@@ -147,12 +147,15 @@ socket.on('device-message', (data) => {
 const votePanelEl = document.querySelector('#vote-panel');
 const voteBtnA    = document.querySelector('#vote-btn-a');
 const voteBtnB    = document.querySelector('#vote-btn-b');
+const textPanelEl = document.querySelector('#text-panel');
+const textInputEl = document.querySelector('#input-form input');
 let _storyOptionA = null;
 let _storyOptionB = null;
 function setRemoteUI({ stepStatus, optionA, optionB } = {}) {
     _storyOptionA = optionA ?? null;
     _storyOptionB = optionB ?? null;
     const isVote = stepStatus === 'VOTE';
+    const isText = stepStatus === 'TEXT';
     const showJoystick = !stepStatus || stepStatus === 'DRAW';
 
     if (votePanelEl) {
@@ -164,6 +167,16 @@ function setRemoteUI({ stepStatus, optionA, optionB } = {}) {
             votePanelEl.classList.add('visible');
         } else {
             votePanelEl.classList.remove('visible');
+        }
+    }
+
+    if (textPanelEl) {
+        if (isText) {
+            textPanelEl.classList.add('visible');
+            setTimeout(() => textInputEl?.focus(), 350);
+        } else {
+            textPanelEl.classList.remove('visible');
+            textInputEl?.blur();
         }
     }
 
@@ -484,5 +497,6 @@ formEl?.addEventListener('submit', (e) => {
     if (!data.text1?.trim()) return;
     sendEvent('text', { text: data.text1.trim() });
     formEl.reset();
-    console.log('[remote] → text', data.text1.trim());
+    navigator.vibrate?.(45);
+    setTimeout(() => setRemoteUI(), 340);
 });

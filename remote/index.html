@@ -39,11 +39,15 @@
             <button id="vote-btn-b" class="vote-btn"></button>
         </div>
 
-        <!-- Text input + color picker — always visible at top -->
+        <!-- Color picker — always visible at top -->
         <div id="top-bar">
             <div id="color-picker"></div>
+        </div>
+
+        <!-- Text input panel — centered overlay, visible only on stepStatus TEXT -->
+        <div id="text-panel">
             <form id="input-form" autocomplete="off">
-                <input name="text1" type="text" placeholder="write to the swarm…" autocomplete="off" autocorrect="off" spellcheck="false">
+                <input name="text1" type="text" placeholder="write to the swarm…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
             </form>
         </div>
     </body>
