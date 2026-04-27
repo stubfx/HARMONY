@@ -1402,8 +1402,6 @@ let socket;
                 const pitch = event.data?.pitch ?? 0.75;
                 // Portrait upright = (roll≈0.5, pitch≈0.75) → windX/Y = 0.
                 // Tilt maps to ±1 at ±90° from portrait, then scaled by windStr in shader.
-                slot.windX = Math.max(-2, Math.min(2, (roll  - 0.5 ) * 4));
-                slot.windY = Math.max(-2, Math.min(2, (pitch - 0.75) * 8));
                 uploadSpectatorSlots();
             }
         }

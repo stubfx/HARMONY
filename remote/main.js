@@ -91,18 +91,13 @@ const palette = Array.from({ length: PALETTE_SIZE }, (_, i) => {
 
 let selectedSwatchIdx = Math.random() * PALETTE_SIZE | 0;
 
-const colorPickerEl = document.querySelector('#color-picker');
-
 function pickColor(idx, send = true) {
     selectedSwatchIdx = idx;
     pushedColor = palette[idx].css;
     updateAura();
     document.querySelectorAll('.color-swatch').forEach((el, i) =>
         el.classList.toggle('selected', i === idx));
-    if (send) {
-        sendEvent('color-pick', { color: palette[idx].hex });
-        colorPickerEl?.classList.add('picked');
-    }
+    if (send) sendEvent('color-pick', { color: palette[idx].hex });
 }
 
 function renderSwatches() {

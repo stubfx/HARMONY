@@ -247,14 +247,6 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let windAngle = evalWindFormula(x, y, t, idx, cx, cy);
     var wind = vec2<f32>(cos(windAngle), sin(windAngle)) * params.windStr
              + vec2<f32>(params.windBiasX, params.windBiasY);
-    // Per-spectator tilt override: assigned agents use the spectator's personal wind.
-    // windX/Y are portrait-zeroed bias values (±1 at ±90° tilt) scaled by windStr.
-    if (params.spectatorCount > 0u && i < u32(f32(params.agentCount) * params.spectatorAgentShare)) {
-        let tiltSlot = spectatorSlots[i % params.spectatorCount];
-        if (tiltSlot.isActive != 0u) {
-            wind = vec2<f32>(tiltSlot.windX, tiltSlot.windY) * 5.0;
-        }
-    }
 
     // ── Trace layer: image-alpha-driven homing ─────────────────────────────────
     // homeInImg true  → agent drives toward its fixed home position (homing mode)
