@@ -746,7 +746,7 @@ Per-frame probability that a free agent inside the QR bounding box is respawned.
 ### vote duration (s) (`voteDuration`)
 **Range:** 5 – 120 | **Default:** 30
 
-Seconds the vote panel stays open on spectator phones. Both the remote devices and the simulation's main display show a live countdown. When the timer expires the sim fires a `vote-result` event to n8n (`/webhook/story`) containing the winning option label and whether it was A or B, then the remote devices automatically revert to their rest state (joystick).
+Seconds the vote panel stays open on spectator phones. Both the remote devices and the simulation's main display show a live countdown. When the timer expires the sim fires a `vote-result` event to n8n (`/webhook/sim-event`) containing the winning option label and whether it was A or B, then the remote devices automatically revert to their rest state (joystick).
 
 ### idle restore QR (s) (`remoteTimeout`)
 **Range:** 0 – 180 | **Default:** 0 (disabled)
@@ -804,7 +804,7 @@ The response is handled identically to `sim-event` — any recognised keys are a
 
 Story mode layers a scripted, sequential narrative on top of the simulation. The sim has no built-in story state machine — n8n owns sequencing and branching; the sim just plays the current step and reports back when interactions complete.
 
-When the sim starts (or when the mode switches to `STORY` from `SHOWCASE`), it fires a `session-ready` event to `/webhook/story`. n8n responds with step 1 to begin the story, or with an empty body to hold. From that point on, story advancement happens entirely through n8n responding to `/webhook/story` events — no heartbeat polling needed for story flow.
+n8n drives story progression entirely through heartbeat responses and `sim-event` reactions. The heartbeat payload includes `mode` and `step`, so n8n can detect when the sim is in story mode and when a step has or hasn't started, and respond accordingly. Event-driven moments (vote results) arrive via `/webhook/sim-event` and n8n responds with the next step.
 
 ### Step fields (sent by n8n in any `applySimParams` response)
 
@@ -848,7 +848,7 @@ When `stepStatus` changes, the sim broadcasts a `remote-ui` Socket.IO event to a
 - Server counts A vs B votes and emits a running `story-vote-update` tally to the host sim after every change
 - The sim tracks the current leader in `storyVoteResult`
 - Both the simulation display and each remote phone show a live countdown (`voteDuration` seconds)
-- When the timer expires, the sim POSTs `{ "type": "vote-result", "winner": "A"|"B"|null, "winning_option": "..." }` to `/webhook/story`. n8n uses this to advance the story to the next step
+- When the timer expires, the sim POSTs `{ "type": "vote-result", "winner": "A"|"B"|null, "winning_option": "..." }` to `/webhook/sim-event`. n8n uses this to advance the story to the next step
 - Remote phones revert to rest state automatically when the timer ends
 - Votes are cleared when a new `step` is received
 
