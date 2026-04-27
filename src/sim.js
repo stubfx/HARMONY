@@ -1127,15 +1127,16 @@ let lastRemoteActivity = Date.now(); // timestamp of last remote-event (touch or
 
 // ── n8n direct integration ────────────────────────────────────────────────────
 // VITE_N8N_BASE_URL is the bare n8n origin (e.g. http://localhost:5678).
-// The sim appends /webhook/sim-event or /webhook-test/sim-event based on
-// params.n8nTestMode. An in-flight guard prevents queuing — if a call is already
-// running the new event is skipped. A 5 s timeout clears the guard if n8n is slow.
+// Three separate fetch paths, each with its own in-flight guard:
+//   /webhook/sim-event   — generic user gestures (text input, etc.)
+//   /webhook/story       — story progression triggers (vote-result, etc.)
+//   /webhook/heartbeat   — periodic full state snapshot
+// In test mode all paths switch to /webhook-test/*.
 const N8N_BASE            = (import.meta.env.VITE_N8N_BASE_URL ?? '').replace(/\/$/, '');
-const N8N_USER_TIMEOUT_MS = 15_000; // timeout for user-event calls (text submit, etc.)
-// Heartbeat timeout scales with the interval so heavy n8n responses don't get aborted.
-// 90% of the interval, minimum 5 s — recomputed each call so GUI/n8n changes take effect.
+const N8N_USER_TIMEOUT_MS = 15_000;
 function n8nHeartbeatTimeoutMs() { return Math.min(Math.max(params.heartbeatInterval * 900, 5_000), 30_000); }
 let   n8nInFlight          = false;
+let   n8nStoryInFlight     = false;
 let   n8nHeartbeatInFlight = false;
 
 async function callN8n(event) {
@@ -1161,6 +1162,34 @@ async function callN8n(event) {
         if (err.name !== 'AbortError') console.warn('[n8n]', err.message);
     } finally {
         n8nInFlight = false;
+    }
+}
+
+// Story progression endpoint — separate from sim-event so the n8n story workflow
+// is fully isolated. Always expects a step-advance payload in the response.
+async function callN8nStory(event) {
+    if (!N8N_BASE || n8nStoryInFlight) return;
+    n8nStoryInFlight = true;
+    const path = params.n8nTestMode ? '/webhook-test/story' : '/webhook/story';
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), N8N_USER_TIMEOUT_MS);
+    try {
+        const res = await fetch(N8N_BASE + path, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ ...event, room: sessionRoom }),
+            signal:  controller.signal,
+        });
+        clearTimeout(timer);
+        if (res.ok) {
+            const data = await res.json();
+            if (data && typeof data === 'object') applySimParams(data);
+        }
+    } catch (err) {
+        clearTimeout(timer);
+        if (err.name !== 'AbortError') console.warn('[n8n story]', err.message);
+    } finally {
+        n8nStoryInFlight = false;
     }
 }
 
@@ -2022,7 +2051,7 @@ function frame(ts) {
             const winner         = simState.storyVoteResult === simState.optionA ? 'A'
                                  : simState.storyVoteResult === simState.optionB ? 'B'
                                  : null;
-            callN8n({ type: 'vote-result', winner, winning_option: simState.storyVoteResult ?? null });
+            callN8nStory({ type: 'vote-result', winner, winning_option: simState.storyVoteResult ?? null });
         }
     } else if (voteCountdownEl) {
         voteCountdownEl.classList.remove('visible');

@@ -746,7 +746,7 @@ Per-frame probability that a free agent inside the QR bounding box is respawned.
 ### vote duration (s) (`voteDuration`)
 **Range:** 5 – 120 | **Default:** 30
 
-Seconds the vote panel stays open on spectator phones. Both the remote devices and the simulation's main display show a live countdown. When the timer expires the sim fires a `vote-result` event to n8n (`/webhook/sim-event`) containing the winning option label and whether it was A or B, then the remote devices automatically revert to their rest state (joystick).
+Seconds the vote panel stays open on spectator phones. Both the remote devices and the simulation's main display show a live countdown. When the timer expires the sim fires a `vote-result` event to n8n (`/webhook/story`) containing the winning option label and whether it was A or B, then the remote devices automatically revert to their rest state (joystick).
 
 ### idle restore QR (s) (`remoteTimeout`)
 **Range:** 0 – 180 | **Default:** 0 (disabled)
@@ -846,7 +846,7 @@ When `stepStatus` changes, the sim broadcasts a `remote-ui` Socket.IO event to a
 - Server counts A vs B votes and emits a running `story-vote-update` tally to the host sim after every change
 - The sim tracks the current leader in `storyVoteResult`
 - Both the simulation display and each remote phone show a live countdown (`voteDuration` seconds)
-- When the timer expires, the sim POSTs `{ "type": "vote-result", "winner": "A"|"B"|null, "winning_option": "..." }` to `/webhook/sim-event`. n8n should listen for this event to advance the story
+- When the timer expires, the sim POSTs `{ "type": "vote-result", "winner": "A"|"B"|null, "winning_option": "..." }` to `/webhook/story`. n8n uses this to advance the story to the next step
 - Remote phones revert to rest state automatically when the timer ends
 - Votes are cleared when a new `step` is received
 
