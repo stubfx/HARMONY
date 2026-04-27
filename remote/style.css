@@ -176,6 +176,13 @@ html, body {
     justify-content: center;
     gap: 8px;
     padding: 0.25rem 0 0.6rem;
+    transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+#color-picker.picked {
+    opacity: 0;
+    transform: translateY(-6px);
+    pointer-events: none;
 }
 
 .color-swatch {

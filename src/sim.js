@@ -1415,6 +1415,14 @@ let socket;
                 uploadSpectatorSlots();
             }
         }
+        if (event.type === 'shake') {
+            const slot = activeSlots.find(s => s.spectatorId === event.spectatorId);
+            if (slot) {
+                const [r, g, b] = hexToF(params.color);
+                slot.colorR = r; slot.colorG = g; slot.colorB = b;
+                uploadSpectatorSlots();
+            }
+        }
         if (event.type === 'text' && event.data?.text && !N8N_BASE) {
             const input = document.querySelector('#trace-text-input');
             if (input) input.value = event.data.text;

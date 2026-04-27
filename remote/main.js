@@ -91,13 +91,18 @@ const palette = Array.from({ length: PALETTE_SIZE }, (_, i) => {
 
 let selectedSwatchIdx = Math.random() * PALETTE_SIZE | 0;
 
+const colorPickerEl = document.querySelector('#color-picker');
+
 function pickColor(idx, send = true) {
     selectedSwatchIdx = idx;
     pushedColor = palette[idx].css;
     updateAura();
     document.querySelectorAll('.color-swatch').forEach((el, i) =>
         el.classList.toggle('selected', i === idx));
-    if (send) sendEvent('color-pick', { color: palette[idx].hex });
+    if (send) {
+        sendEvent('color-pick', { color: palette[idx].hex });
+        colorPickerEl?.classList.add('picked');
+    }
 }
 
 function renderSwatches() {
@@ -149,9 +154,11 @@ const voteBtnA    = document.querySelector('#vote-btn-a');
 const voteBtnB    = document.querySelector('#vote-btn-b');
 const textPanelEl = document.querySelector('#text-panel');
 const textInputEl = document.querySelector('#input-form input');
-let _storyOptionA = null;
-let _storyOptionB = null;
+let _storyOptionA    = null;
+let _storyOptionB    = null;
+let _currentStepStatus = null;
 function setRemoteUI({ stepStatus, optionA, optionB } = {}) {
+    _currentStepStatus = stepStatus ?? null;
     _storyOptionA = optionA ?? null;
     _storyOptionB = optionB ?? null;
     const isVote = stepStatus === 'VOTE';
@@ -409,9 +416,35 @@ function releaseJoystick() {
     sendEvent('spawner', { dx: 0, dy: 0, magnitude: 0, velocity: 0, active: false });
 }
 
+// ── Shake detection ───────────────────────────────────────────────────────────
+let _shaken        = false;
+let _shakeLastTime = 0;
+const SHAKE_THRESHOLD = 22; // m/s²
+const SHAKE_COOLDOWN  = 1200; // ms between shakes
+
+window.addEventListener('devicemotion', (e) => {
+    if (!motionEnabled) return;
+    const showJoystick = !_currentStepStatus || _currentStepStatus === 'DRAW';
+    if (!showJoystick) return;
+    const a = e.accelerationIncludingGravity;
+    if (!a) return;
+    const mag = Math.sqrt((a.x ?? 0) ** 2 + (a.y ?? 0) ** 2 + (a.z ?? 0) ** 2);
+    const now = Date.now();
+    if (mag > SHAKE_THRESHOLD && now - _shakeLastTime > SHAKE_COOLDOWN) {
+        _shakeLastTime = now;
+        _shaken = true;
+        navigator.vibrate?.(60);
+        sendEvent('shake', {});
+    }
+});
+
 joystickBaseEl?.addEventListener('touchstart', (e) => {
     e.preventDefault();
     if (joystickIsActive) return;
+    if (_shaken) {
+        _shaken = false;
+        sendEvent('color-pick', { color: palette[selectedSwatchIdx].hex });
+    }
     const touch = e.changedTouches[0];
     joystickTouchId  = touch.identifier;
     joystickIsActive = true;
