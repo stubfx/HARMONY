@@ -34,26 +34,26 @@ C'è qualcosa di fisicamente accurato in questo comportamento: così funziona la
 
 ## 7.3 — Il colore come voce
 
-Ogni partecipante sceglie un colore quando si connette al sistema. Quel colore, assegnato alle proprie particelle, è la propria voce nel sistema: non nel senso del suono, ma nel senso di una presenza riconoscibile, di un contributo che porta una firma.
+Ogni partecipante sceglie un colore. Non uno username, non un avatar, non un numero. Un colore.
 
-Nell'insieme dello sciame, i colori si mescolano. Un rosso acceso si attenua quando si trova vicino al bianco degli altri, si intensifica quando si addensa. Il risultato visivo è uno strato cromatico sempre in movimento, mai piatto, che porta traccia di tutte le presenze attive nel sistema.
+La scelta non è casuale. Il colore è il solo identificatore che funziona sia su uno schermo personale da pochi centimetri sia su una proiezione grande come una parete, senza richiedere lettura né interpretazione. Esiste come qualità percettiva pura: chi guarda lo sciame non deve cercare un'etichetta, basta seguire una tinta.
 
 > **[IMG]** Screenshot con più colori distinti visibili nel flusso — tinte individuali riconoscibili all'interno del movimento collettivo, come fili colorati in un tessuto.
 
-Questa scelta ha un significato preciso: l'identità individuale non scompare nel collettivo. Non si diventa anonimi nel senso di irriconoscibili. Si diventa anonimi nel senso di non nominati, ma si è ancora percettivamente presenti. Il proprio colore è lì, visibile a chi guarda sapendo cosa cercare.
+Tecnicamente, i colori nel sistema si comportano come la luce, non come la pittura. Il rendering usa un metodo di miscelazione additivo: dove le particelle di due partecipanti si sovrappongono, i loro colori si sommano. Due tinte sovrapposte producono una terza, più luminosa. Una folla di colori tende al bagliore bianco. L'effetto è che nessun colore copre un altro: si mescolano verso qualcosa di comune senza perdere la propria origine.
 
-La scelta del colore è anche il primo gesto creativo che il partecipante compie nel sistema, prima ancora di muovere il joystick. È una scelta estetica pura, senza conseguenze funzionali: il rosso e il blu muovono le particelle esattamente allo stesso modo. Ma il colore resta. E resta nello sciame fino a quando quella persona è connessa, come un filo che attraversa il tessuto collettivo.
+La scelta del colore è anche il primo gesto che il partecipante compie nel sistema, prima ancora di muovere il joystick. È una scelta puramente estetica, senza conseguenze funzionali: rosso e blu muovono le particelle esattamente allo stesso modo. Ma il colore resta nello sciame per tutta la durata della connessione. È la firma di una presenza — non nominata, ma percepibile.
 
 ---
 
 ## 7.4 — L'interfaccia che scompare
 
-Il telefono, nell'esperienza, deve sembrare quasi vuoto. Lo schermo mostra il minimo necessario: il joystick, il selettore del colore, qualche elemento di stato. Niente tutorial, niente spiegazioni, niente istruzioni su cosa fare.
+Il telefono mostra tre cose: il joystick, il selettore del colore, un punto di stato nell'angolo. Nient'altro.
 
-Questa scelta ha un costo: alcune persone non capiranno immediatamente come funziona. Muoveranno il joystick senza vedere subito la risposta sullo schermo grande, o sceglieranno un colore senza capire subito dove va a finire. Ma questo costo è accettato consapevolmente. La scoperta progressiva, il momento in cui si capisce la connessione tra il gesto e il risultato, vale più di qualsiasi spiegazione preliminare. La comprensione che si guadagna da soli si ricorda meglio di quella che si riceve passivamente.
+Nel corso del progetto, questa schermata ha perso elementi. Un testo introduttivo, rimosso. Icone di stato, ridotte a un punto. Un bottone di aiuto, eliminato. A ogni iterazione ci si chiedeva: questo elemento serve all'esperienza, o serve a rassicurare chi ha progettato il sistema che l'utente non si perderà? La seconda risposta ha sempre portato alla rimozione.
 
 > **[IMG]** Schermata del telefono — interfaccia quasi vuota, sfondo scuro, elementi minimi: il meno possibile tra la persona e l'esperienza.
 
-Il principio che guida questa scelta si trova in quasi tutta l'arte interattiva che funziona davvero: l'interfaccia deve sparire. Più l'interfaccia è visibile, più l'attenzione rimane sull'interfaccia invece che sull'esperienza. Un controller complesso, pieno di pulsanti e istruzioni, dice: impara prima, poi vivi. Un'interfaccia quasi vuota dice: vivi, e capisci mentre lo fai.
+Il costo è misurabile. In alcune sessioni di test, non tutti hanno capito subito dove guardare: alcuni hanno fissato il telefono invece di alzare gli occhi verso lo schermo grande, cercando sull'oggetto piccolo la risposta che stava accadendo su quello grande. Questa latenza — qualche secondo, raramente di più — è il prezzo del minimalismo.
 
-C'è una tensione tra questo principio e la realtà dell'esperienza con pubblici diversi. Non tutti hanno la stessa disposizione alla scoperta; non tutti reagiscono allo stesso modo alla mancanza di istruzioni. Alcuni si bloccano, altri si annoiano, altri trovano la libertà stimolante. Questa variabilità è parte del progetto: non esiste una versione dell'esperienza che funziona per tutti allo stesso modo. Il sistema è abbastanza aperto da contenere risposte diverse.
+Non è un problema che si vuole risolvere. Il momento in cui qualcuno smette di guardare il telefono e alza gli occhi verso la proiezione è esattamente il momento in cui l'interfaccia scompare. Non si può accelerarlo con le istruzioni. Bisogna aspettare che accada da solo.

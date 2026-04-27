@@ -70,4 +70,4 @@ Non tutti i progetti di questo tipo vogliono essere così radicali. Ma quasi tut
 
 È una posizione che questo progetto fa propria. Niente spiega come funziona il sistema. Si scopre usandolo.
 
-Ma perché qualcuno voglia scoprirlo, deve avere qualcosa in mano. Il capitolo che segue riguarda quello strumento: il corpo, il gesto, e il dispositivo che in questo progetto li connette al sistema.
+Ma cosa rende un sistema capace di questo tipo di risposta — la risposta a molte persone insieme, distribuita, senza un centro che la governi? Non un motore centralizzato, ma qualcosa di strutturalmente diverso. Il capitolo che segue riguarda quella logica: il modo in cui l'intelligenza collettiva emerge senza che nessuno la pianifichi.

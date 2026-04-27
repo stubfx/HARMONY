@@ -36,11 +36,13 @@ Questa trasformazione ha un effetto preciso: rende osservabile quello che normal
 
 ## 9.3 — La macchina che propone
 
-Tutti i sistemi descritti fin qui, le particelle, le modalità, la narrativa, condividono una caratteristica che non è mai stata nominata direttamente: il sistema non aspetta. Quando le persone entrano nella stanza, il sistema ha già qualcosa in corso. Non si attiva in risposta a qualcuno: esiste prima che qualcuno arrivi, e continuerà a esistere dopo che se ne sarà andato.
-
-Questo cambia tutto nel tipo di relazione che si stabilisce. Di fronte a un ambiente già in movimento, la prima domanda non è "come lo uso?" ma "cosa sta facendo?". Si osserva prima di agire. Si cerca di capire la logica prima di intervenire. È una postura radicalmente diversa da quella di chi usa uno strumento.
+Tutti i sistemi descritti fin qui, le particelle, le modalità, la narrativa, condividono una caratteristica che non è mai stata nominata direttamente: il sistema non aspetta.
 
 > **[IMG]** Screenshot della modalità DOT o FREEROAM — il sistema in uno stato attivo senza input esterno, le particelle che si muovono secondo una propria logica visibile.
+
+Quando le persone entrano nella stanza, il sistema ha già qualcosa in corso. Non si attiva in risposta a qualcuno: esiste prima che qualcuno arrivi, e continuerà a esistere dopo che se ne sarà andato.
+
+Questo cambia tutto nel tipo di relazione che si stabilisce. Di fronte a un ambiente già in movimento, la prima domanda non è "come lo uso?" ma "cosa sta facendo?". Si osserva prima di agire. Si cerca di capire la logica prima di intervenire. È una postura radicalmente diversa da quella di chi usa uno strumento.
 
 In un certo senso, il sistema propone. Propone un comportamento, un ritmo, una qualità dell'esperienza. I partecipanti rispondono a quella proposta con la propria. Il dialogo è già iniziato quando si connette il telefono: si entra in una conversazione in corso, non si apre una conversazione nuova.
 

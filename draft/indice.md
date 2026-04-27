@@ -18,23 +18,6 @@
 ## Parte I — Il contesto
 *Prima di descrivere il progetto, costruire gli strumenti per capirlo. Tre capitoli che si muovono dal generale al particolare: la storia dell'arte interattiva, la logica dello sciame, il corpo come interfaccia.*
 
-### 2. La logica dello sciame
-*Il capitolo più vicino al cuore del progetto. Si stabilisce qui il concetto centrale: intelligenza che emerge senza nessuno che la coordina.*
-
-- **2.1 — In natura**
-  Il comportamento collettivo come fenomeno osservabile: la murmuration degli storni, le colonie di formiche, il Physarum polycephalum. Cosa hanno in comune questi sistemi. Perché affascinano.
-
-- **2.2 — Le regole semplici**
-  Come dalla semplicità nasce la complessità. Il concetto di agente autonomo: nessuno vede il quadro intero, eppure il quadro intero esiste. Il paradosso dell'intelligenza distribuita.
-
-- **2.3 — Dallo sciame biologico a quello digitale**
-  Come questi principi sono stati tradotti in algoritmi. Craig Reynolds e i Boids. Il Physarum come modello computazionale. La simulazione come modo di studiare e replicare comportamenti emergenti.
-
-- **2.4 — Lo sciame come metafora**
-  Cosa significa usare lo sciame per parlare di persone. Il corpo sociale, la folla, il pubblico. Il senso di appartenenza a un movimento che nessuno ha deciso ma tutti hanno contribuito a creare.
-
----
-
 ### 1. L'arte che risponde
 *Il progetto si inserisce in una tradizione. Questo capitolo la racconta senza fare un elenco, ma seguendo il filo di una domanda: quando ha smesso di bastare guardare?*
 
@@ -49,6 +32,23 @@
 
 - **1.4 — Il mistero come scelta estetica**
   Opere in cui non capire subito è parte dell'esperienza. Il senso di scoperta, l'interfaccia che non si spiega. Perché la chiarezza non è sempre una virtù.
+
+---
+
+### 2. La logica dello sciame
+*Il capitolo più vicino al cuore del progetto. Si stabilisce qui il concetto centrale: intelligenza che emerge senza nessuno che la coordina.*
+
+- **2.1 — In natura**
+  Il comportamento collettivo come fenomeno osservabile: la murmuration degli storni, le colonie di formiche, il Physarum polycephalum. Cosa hanno in comune questi sistemi. Perché affascinano.
+
+- **2.2 — Le regole semplici**
+  Come dalla semplicità nasce la complessità. Il concetto di agente autonomo: nessuno vede il quadro intero, eppure il quadro intero esiste. Il paradosso dell'intelligenza distribuita.
+
+- **2.3 — Dallo sciame biologico a quello digitale**
+  Come questi principi sono stati tradotti in algoritmi. Craig Reynolds e i Boids. Il Physarum come modello computazionale. La simulazione come modo di studiare e replicare comportamenti emergenti.
+
+- **2.4 — Lo sciame come metafora**
+  Cosa significa usare lo sciame per parlare di persone. Il corpo sociale, la folla, il pubblico. Il senso di appartenenza a un movimento che nessuno ha deciso ma tutti hanno contribuito a creare.
 
 ---
 

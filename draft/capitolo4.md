@@ -14,9 +14,9 @@ Un organismo ha una logica propria. Si comporta in un certo modo perché è fatt
 
 Da questo punto di vista, l'obiettivo del progetto era costruire un sistema che potesse essere percepito come organismo: qualcosa che ha intenzioni proprie (anche se sono soltanto formule matematiche), che segue un ritmo proprio (anche se è generato algoritmicamente), che risponde al contesto (anche se il contesto è ridotto a pochi parametri misurabili). Non si trattava di simulare la vita: si trattava di produrre la sensazione di trovarsi davanti a qualcosa di vivo.
 
-> **[IMG]** Screenshot del sistema in movimento a piena risoluzione — le particelle come organismo fluido, senza elementi grafici sovrapposti, solo il sistema e il nero.
-
 La scelta di lavorare con particelle ha una ragione precisa. Una particella singola è quasi niente: un punto luminoso con una direzione e una velocità. Ma migliaia di particelle che si influenzano a vicenda seguendo regole semplici producono qualcosa di molto più ricco di quello che chiunque avrebbe potuto progettare intenzionalmente. Il sistema trova forme che nessuno aveva previsto. È qui che risiede la qualità organica dell'esperienza: non nel fatto che le particelle somiglino a qualcosa di biologico, ma nel fatto che il sistema si comporti in modo che non è completamente controllato da chi lo ha costruito.
+
+> **[IMG]** Screenshot del sistema in movimento a piena risoluzione — le particelle come organismo fluido, senza elementi grafici sovrapposti, solo il sistema e il nero.
 
 ---
 

@@ -67,10 +67,12 @@ Usare lo sciame come modello per parlare di persone è una scelta con implicazio
 
 Queste dinamiche non sono belle o brutte in sé. Sono reali. E il fatto che funzionino secondo principi simili a quelli degli storni o delle colonie di formiche dice qualcosa di interessante: che l'intelligenza collettiva non è un privilegio di sistemi biologici complessi, ma un fenomeno che emerge ogni volta che agenti sufficientemente semplici si trovano abbastanza vicini e abbastanza a lungo.
 
+> **[IMG]** Fotografia di una folla o di un pubblico vista dall'alto — la struttura collettiva visibile, i singoli individui distinguibili ma parte di un pattern più grande.
+
 Steven Johnson, nel suo saggio *Emergence* (2001), osserva che le città funzionano in modo analogo alle colonie di formiche: nessuno progetta dall'alto i quartieri creativi, i mercati, le vie del commercio. Emergono da migliaia di decisioni individuali che si accumulano e si rinforzano a vicenda. La differenza con una colonia di formiche è che gli esseri umani, a differenza delle formiche, sanno di farne parte. Possono osservare il sistema di cui sono elementi. Possono persino scegliere di comportarsi diversamente una volta che ne riconoscono la logica.
 
 È questa consapevolezza il punto che interessa questo progetto. Non cosa succede quando le persone si comportano come uno sciame senza saperlo. Ma cosa succede quando lo sanno. Quando qualcuno mostra loro che il loro comportamento collettivo ha una forma, che quella forma è visibile in tempo reale, che si può osservare mentre si contribuisce a crearla.
 
 Cosa cambia, nell'esperienza di far parte di qualcosa, quando si riesce a vederlo dall'interno?
 
-Per rispondere a questa domanda, vale la pena guardare prima a come altri hanno costruito le condizioni di quella visibilità: cosa significa fare un'opera che ha bisogno del pubblico per esistere, e cosa hanno già capito gli artisti che ci hanno provato prima.
+Capire la logica di uno sciame è una cosa. Diventarne parte è un'altra. Il capitolo che segue riguarda il punto di contatto tra la persona e il sistema: il corpo, il gesto, e il dispositivo che in questo progetto li mette in relazione.

@@ -2,7 +2,7 @@
 
 Costruire questo progetto ha insegnato cose che non avrei potuto imparare in nessun altro modo. Non nel senso tecnico, imparare un'API grafica, imparare a gestire connessioni in tempo reale, ma nel senso più profondo: capire come si comporta un sistema complesso non guardandolo dall'esterno, ma standoci dentro mentre prende forma.
 
-Esiste una forma di conoscenza che nasce soltanto dal fare. Non è inferiore a quella che nasce dallo studio, ma è diversa: è più difficile da trasmettere, più difficile da documentare, strettamente legata all'esperienza diretta di costruire qualcosa che non è mai esistito nella forma in cui lo si immagina. Rick Rubin, nel libro *The Creative Act: A Way of Being*, scrive che il lavoro creativo non è tanto produrre qualcosa quanto ricevere qualcosa: stare in ascolto di quello che il progetto stesso vuole diventare. L'idea che il lavoro possa avere una propria direzione, che spinga verso qualcosa che il creatore non aveva previsto, corrisponde esattamente a quello che è successo qui.
+Esiste una forma di conoscenza che nasce soltanto dal fare. Non è inferiore a quella che nasce dallo studio, ma è diversa: è più difficile da trasmettere, più difficile da documentare, strettamente legata all'esperienza diretta di costruire qualcosa che non è mai esistito nella forma in cui lo si immagina. C'è chi dice che il lavoro creativo non è tanto produrre qualcosa quanto ricevere qualcosa: stare in ascolto di quello che il progetto stesso vuole diventare. L'idea che il lavoro possa avere una propria direzione, che spinga verso qualcosa che il creatore non aveva previsto, corrisponde esattamente a quello che è successo qui.
 
 ---
 
@@ -24,9 +24,9 @@ La distinzione che è emersa da questo processo è importante: c'è una differen
 
 C'è un momento difficile da descrivere ma facile da riconoscere: il momento in cui un sistema smette di sembrare un esperimento e comincia a sembrare un'esperienza.
 
-Per questo progetto, quel momento è arrivato la prima volta che ho visto le particelle rispondere all'input audio della stanza. Il sistema era già funzionante: le particelle si muovevano, i colori dei partecipanti erano visibili, il joystick funzionava. Ma quando ho capito che la luminosità dello sciame cambiava ogni volta che alzavo la voce, qualcosa ha cambiato qualità. Non stavo più guardando un programma che funzionava. Stavo guardando qualcosa che ascoltava.
-
 > **[IMG]** Screenshot di un momento particolarmente significativo della simulazione — composizione visiva intensa, luce e movimento in equilibrio, il sistema che sembra avere una propria presenza.
+
+Per questo progetto, quel momento è arrivato la prima volta che ho visto le particelle rispondere all'input audio della stanza. Il sistema era già funzionante: le particelle si muovevano, i colori dei partecipanti erano visibili, il joystick funzionava. Ma quando ho capito che la luminosità dello sciame cambiava ogni volta che alzavo la voce, qualcosa ha cambiato qualità. Non stavo più guardando un programma che funzionava. Stavo guardando qualcosa che ascoltava.
 
 Questa differenza è difficile da codificare in criteri oggettivi. Non si misura in frame rate o in numero di particelle. Si percepisce: c'è un momento in cui il sistema comincia ad avere una presenza, un carattere, qualcosa che lo rende riconoscibile come sé stesso invece che come una variante di qualcosa che esiste già. Riconoscere quel momento, e poi lavorare per preservare quella qualità nelle iterazioni successive, è uno degli obiettivi impliciti di qualsiasi processo creativo.
 

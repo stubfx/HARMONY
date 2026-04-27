@@ -24,9 +24,9 @@ In modalità FREEROAM, non c'è nessuna direzione imposta al sistema. Le partice
 
 Il sistema, in questa modalità, respira da solo. Se ci sono partecipanti connessi, le loro particelle seguono ancora il loro input, ma il flusso generale non ha una forma complessiva riconoscibile: è diffuso, casuale nell'aspetto, sempre in cambiamento. È la modalità più aperta in senso costruttivo: produce configurazioni sempre diverse, mai prevedibili.
 
-> **[IMG]** Screenshot della modalità FREEROAM — particelle distribuite liberamente nello schermo, traiettorie multiple senza direzione dominante, movimento organico senza struttura imposta.
-
 È anche la modalità che il sistema assume quando nessuno ha ancora connesso il telefono: lo stato di attesa non è vuoto, ma vivo. Lo schermo non è mai fermo. C'è sempre qualcosa che si muove, qualcosa che succede. Questo era importante nella fase di progettazione: il sistema non doveva sembrare spento quando non veniva usato. Doveva sembrare in attesa, nel senso più attivo del termine. Come un organismo che continua a vivere anche quando nessuno lo sta guardando.
+
+> **[IMG]** Screenshot della modalità FREEROAM — particelle distribuite liberamente nello schermo, traiettorie multiple senza direzione dominante, movimento organico senza struttura imposta.
 
 ---
 
