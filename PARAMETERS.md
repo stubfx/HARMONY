@@ -810,8 +810,8 @@ n8n drives story progression entirely through heartbeat responses and `sim-event
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `step` | any | Step identifier — echoed back in every heartbeat so n8n can correlate. Receiving a new `step` resets vote state and sets `stepStatus` to `"IDLE"` unless overridden |
-| `stepStatus` | `"IDLE"` \| `"DRAW"` \| `"VOTE"` \| `"TEXT"` | Spectator interaction mode for this step (see below). Defaults to `"IDLE"` when a new step arrives without an explicit value |
+| `step` | any | Step identifier — echoed back in every heartbeat so n8n can correlate. Receiving a new `step` resets vote state and sets `stepStatus` to `"IDLE"` unless overridden. When no step is active (`null`), the remote always shows the joystick regardless of `stepStatus` |
+| `stepStatus` | `"IDLE"` \| `"DRAW"` \| `"VOTE"` \| `"TEXT"` | Spectator interaction mode for this step. Only meaningful while a step is active — if no step is set, the remote keeps the joystick visible. Defaults to `"IDLE"` when a new step arrives without an explicit value |
 | `optionA` | string | Label for the first vote option — required when `stepStatus` is `"VOTE"` |
 | `optionB` | string | Label for the second vote option — required when `stepStatus` is `"VOTE"` |
 | `caption` | string \| null | Subtitle text drawn at the bottom of the simulation canvas as a particle attractor (white glyphs, same pipeline as `traceText`). Word-wrapped to 80 % canvas width. `null` or `""` clears it |
