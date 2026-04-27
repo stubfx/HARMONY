@@ -7,7 +7,7 @@
 // Speed drives brightness. A fading trail accumulates on an offscreen texture.
 
 import { initGUI }      from './gui.js';
-import { startMic, stopAudio, isActive, getVolume, playAudio, playAudioBg, unlockAudio, setDuckLevel } from './audio.js';
+import { startMic, stopAudio, isActive, getVolume, playAudio, playAudioBg, unlockAudio, setDuckLevel, isAudioLocked, onAudioStateChange } from './audio.js';
 import QRCode           from 'qrcode';
 import { io as ioConnect } from 'socket.io-client';
 import soloSimTemplate  from './shaders/compute.wgsl?raw';
@@ -1272,6 +1272,10 @@ let socket;
         : (import.meta.env.VITE_SOCKET_URL || '/');
     socket = ioConnect(socketUrl, { reconnectionDelay: 2000 });
 
+    onAudioStateChange(() => {
+        if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
+    });
+
     // Identify this socket as the host simulation so the server can distinguish
     // it from remote spectator sockets and assign a UUID session room.
     // Pass _forcedSession if ?s= is in the URL — server will use it as the room ID.
@@ -1308,6 +1312,7 @@ let socket;
         // ── Large QR bitmap — pre-rendered via generateQR(), stored for later activation.
         // Activation is driven by n8n via heartbeat response { showQR: true }.
         await generateQR();
+        socket.emit('audio-state', { locked: isAudioLocked() });
     });
 
     socket.on('sim-params', (data) => {
@@ -1612,6 +1617,7 @@ PRESETS.forEach(({ label, dir, wind }) => {
 document.querySelector('#audio-unlock').addEventListener('click', async () => {
     await unlockAudio();
     document.querySelector('#audio-unlock').classList.add('unlocked');
+    if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
 });
 
 document.querySelector('#image-input').addEventListener('change', e => {

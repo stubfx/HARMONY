@@ -18,6 +18,10 @@ export function setDuckLevel(v) { _duckLevel = Math.max(0, Math.min(1, v)); }
 const DUCK_ATTACK  = 0.3;  // seconds to ramp down
 const DUCK_RELEASE = 1.0;  // seconds to ramp back up after voice ends
 
+let _onStateChange = null;
+export function onAudioStateChange(cb) { _onStateChange = cb; }
+export function isAudioLocked() { return _ctx !== null && _ctx.state === 'suspended'; }
+
 let _ctx       = null;
 let _analyser  = null;
 let _buf       = null;
@@ -30,7 +34,10 @@ let _bgGain    = null; // GainNode on the bg path — used for ducking
 let _voiceGen  = 0;    // increments each time a voiceover starts; guards onended
 
 function _ensureCtx() {
-    if (!_ctx) _ctx = new AudioContext();
+    if (!_ctx) {
+        _ctx = new AudioContext();
+        _ctx.onstatechange = () => _onStateChange?.();
+    }
 }
 
 function _ensureAnalyser() {

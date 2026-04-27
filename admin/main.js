@@ -18,6 +18,7 @@ const adminUI       = document.querySelector('#admin-ui');
 const connDot       = document.querySelector('#conn-dot');
 const sessionLabel  = document.querySelector('#session-label');
 const controlsEl    = document.querySelector('#controls');
+const audioWarning  = document.querySelector('#audio-warning');
 
 const socketUrl = import.meta.env.DEV
     ? `http://localhost:${import.meta.env.VITE_SERVER_PORT ?? 3000}`
@@ -73,6 +74,9 @@ function connectSocket() {
     });
     socket.on('spectator-count', ({ count }) => {
         if (_spectatorCountEl) _spectatorCountEl.textContent = count;
+    });
+    socket.on('audio-state', ({ locked }) => {
+        audioWarning?.classList.toggle('hidden', !locked);
     });
     socket.on('disconnect',    () => connDot?.classList.remove('connected'));
     socket.on('connect_error', () => connDot?.classList.remove('connected'));
@@ -163,21 +167,6 @@ function buildUI() {
     actionRow.appendChild(restartBtn);
     actionRow.appendChild(fullResetBtn);
     controlsEl.appendChild(actionRow);
-
-    // ── Mute audio ────────────────────────────────────────────────────────────
-    let muted = false;
-    const muteBtn = document.createElement('button');
-    const updateMuteBtn = () => {
-        muteBtn.className   = `btn-big ${muted ? 'btn-mute-active' : 'btn-mute'}`;
-        muteBtn.textContent = muted ? '♪  audio muted' : '✕  mute audio';
-    };
-    updateMuteBtn();
-    muteBtn.addEventListener('click', () => {
-        muted = !muted;
-        if (muted) send({ audio: null, audiobg: null });
-        updateMuteBtn();
-    });
-    controlsEl.appendChild(muteBtn);
 
     // ── Mode ──────────────────────────────────────────────────────────────────
     controlsEl.appendChild(mkLabel('Mode'));

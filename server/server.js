@@ -92,6 +92,7 @@ function getOrCreateRoom(roomId) {
             n8nTestMode:  false,
             votes:        new Map(), // socketId  → choice string (one vote per spectator)
             storyOptions: { a: null, b: null }, // current VOTE step options
+            audioLocked:  null,      // null = unknown; true/false reported by sim
         });
     }
     return rooms.get(roomId);
@@ -215,6 +216,14 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Sim reports its AudioContext lock state so the admin panel can show a warning.
+    socket.on('audio-state', ({ locked }) => {
+        const room = assignedRoom ? rooms.get(assignedRoom) : null;
+        if (!room?.hostSockets.has(socket.id)) return;
+        room.audioLocked = !!locked;
+        io.to(`${assignedRoom}:admin`).emit('audio-state', { locked: room.audioLocked });
+    });
+
     // ── Admin controller ──────────────────────────────────────────────────────
     let adminAuthorized = false;
     let adminToken      = null;
@@ -234,6 +243,7 @@ io.on('connection', (socket) => {
         socket.emit('admin-registered', { room: targetRoom });
         const existingRoom = rooms.get(targetRoom);
         socket.emit('spectator-count', { count: existingRoom?.connections.size ?? 0 });
+        if (existingRoom?.audioLocked != null) socket.emit('audio-state', { locked: existingRoom.audioLocked });
         console.log('[socket] admin registered  room:', targetRoom);
     });
 
