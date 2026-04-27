@@ -1,0 +1,119 @@
+{
+  "name": "scheletro_storia",
+  "strict": true,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "storia_titolo": {
+        "type": "string",
+        "description": "Titolo conciso e suggestivo della storia"
+      },
+      "storia_concetto": {
+        "type": "string",
+        "description": "Il concept narrativo di fondo in una frase (es. 'un architetto che ricostruisce la città che ha distrutto')"
+      },
+      "protagonista_archetipo": {
+        "type": "string",
+        "description": "L'archetipo narrativo del protagonista (es. 'l'eroe riluttante', 'il paria in cerca di redenzione')"
+      },
+      "protagonista_descrizione": {
+        "type": "string",
+        "description": "Descrizione fisica e caratteriale iniziale del protagonista, specifica e concreta"
+      },
+      "mondo_setting": {
+        "type": "string",
+        "description": "Dove e quando si svolge la storia, con atmosfera visiva dominante"
+      },
+      "conflitto_centrale": {
+        "type": "string",
+        "description": "La tensione fondamentale non risolta fino al passo 17"
+      },
+      "passi": {
+        "type": "array",
+        "description": "I 17 stadi del Viaggio dell'Eroe, in ordine",
+        "items": {
+          "type": "object",
+          "properties": {
+            "numero": {
+              "type": "integer",
+              "description": "Numero del passo, da 1 a 17"
+            },
+            "stadio_vogler": {
+              "type": "string",
+              "description": "Nome ufficiale dello stadio di Vogler/Campbell"
+            },
+            "funzione_drammatica": {
+              "type": "string",
+              "description": "Cosa DEVE accadere strutturalmente in questo passo. Immutabile. Specifica per questa storia."
+            },
+            "tono_emotivo": {
+              "type": "string",
+              "description": "Emozione dominante del passo (es. 'paura e meraviglia')"
+            },
+            "semi_narrativi": {
+              "type": "array",
+              "description": "2-3 elementi concreti su cui il Generatore di Passo può costruire la scena",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": ["numero", "stadio_vogler", "funzione_drammatica", "tono_emotivo", "semi_narrativi"],
+          "additionalProperties": false
+        }
+      },
+      "stato_memoria_iniziale": {
+        "type": "object",
+        "description": "Fatti fondamentali già noti prima che la storia inizi a essere narrata",
+        "properties": {
+          "protagonista": {
+            "type": "object",
+            "properties": {
+              "nome": { "type": "string" },
+              "descrizione": { "type": "string" },
+              "caratteristiche": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            },
+            "required": ["nome", "descrizione", "caratteristiche"],
+            "additionalProperties": false
+          },
+          "personaggi_secondari": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "nome": { "type": "string" },
+                "ruolo": { "type": "string" },
+                "descrizione": { "type": "string" }
+              },
+              "required": ["nome", "ruolo", "descrizione"],
+              "additionalProperties": false
+            }
+          },
+          "luoghi": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "oggetti_significativi": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "scelte_pubblico": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "fatti_stabiliti": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["protagonista", "personaggi_secondari", "luoghi", "oggetti_significativi", "scelte_pubblico", "fatti_stabiliti"],
+        "additionalProperties": false
+      }
+    },
+    "required": ["storia_titolo", "storia_concetto", "protagonista_archetipo", "protagonista_descrizione", "mondo_setting", "conflitto_centrale", "passi", "stato_memoria_iniziale"],
+    "additionalProperties": false
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "name": "stato_memoria",
+  "strict": true,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "passo_corrente": {
+        "type": "integer",
+        "description": "Il numero dell'ultimo passo completato"
+      },
+      "protagonista": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "description": "Nome del protagonista"
+          },
+          "descrizione": {
+            "type": "string",
+            "description": "Descrizione aggiornata del protagonista"
+          },
+          "caratteristiche": {
+            "type": "array",
+            "description": "Tratti fisici, psicologici o capacità stabiliti nel corso della storia",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["nome", "descrizione", "caratteristiche"],
+        "additionalProperties": false
+      },
+      "personaggi_secondari": {
+        "type": "array",
+        "description": "Tutti i personaggi secondari incontrati fino a questo passo",
+        "items": {
+          "type": "object",
+          "properties": {
+            "nome": { "type": "string" },
+            "ruolo": {
+              "type": "string",
+              "description": "Ruolo narrativo (es. 'mentore', 'guardiano della soglia', 'alleato', 'nemico')"
+            },
+            "descrizione": { "type": "string" }
+          },
+          "required": ["nome", "ruolo", "descrizione"],
+          "additionalProperties": false
+        }
+      },
+      "luoghi": {
+        "type": "array",
+        "description": "Tutti i luoghi visitati o menzionati, in ordine di apparizione",
+        "items": { "type": "string" }
+      },
+      "oggetti_significativi": {
+        "type": "array",
+        "description": "Oggetti narrativamente importanti introdotti nel corso della storia",
+        "items": { "type": "string" }
+      },
+      "scelte_pubblico": {
+        "type": "array",
+        "description": "Registro di tutte le scelte di voto del pubblico",
+        "items": {
+          "type": "object",
+          "properties": {
+            "passo": {
+              "type": "integer",
+              "description": "Il passo in cui è avvenuta la scelta"
+            },
+            "scelta": {
+              "type": "string",
+              "description": "Il testo dell'opzione scelta"
+            }
+          },
+          "required": ["passo", "scelta"],
+          "additionalProperties": false
+        }
+      },
+      "fatti_stabiliti": {
+        "type": "array",
+        "description": "Fatti narrativi importanti che devono essere ricordati nei passi futuri e non rientrano nelle categorie precedenti",
+        "items": { "type": "string" }
+      }
+    },
+    "required": [
+      "passo_corrente",
+      "protagonista",
+      "personaggi_secondari",
+      "luoghi",
+      "oggetti_significativi",
+      "scelte_pubblico",
+      "fatti_stabiliti"
+    ],
+    "additionalProperties": false
+  }
+}
