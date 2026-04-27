@@ -1501,21 +1501,27 @@ function applySimParams(data) {
         renderTraceCanvas();
         if (traceText) scheduleAutoClear();
     }
+    const changed = (k) => k in rest && rest[k] !== params[k];
+    const needsRetrace = ['traceScale','qrSize','qrMargin','qrAlignX','qrAlignY',
+                          'imageX','imageY','imageSize'].some(changed);
+    const needsQRReseed = !params.qrOverlay &&
+        ['qrAlignX','qrAlignY','qrSize','qrMargin'].some(changed);
+    const needsQRRegen  = ['qrQuietZone','qrInvert'].some(changed);
+    const needsReseed   = ['agentCount','weightSpread'].some(changed);
+    const needsRebuild  = changed('renderScale');
+
     Object.entries(rest).forEach(([k, v]) => {
         if (k in params) params[k] = v;
     });
     if ('heartbeatInterval' in rest) restartHeartbeat();
     if (rest.triggerHeartbeat)       callN8nHeartbeat();
-    if ('duckLevel'         in rest) setDuckLevel(params.duckLevel);
-    if ('n8nTestMode'       in rest) socket.emit('set-n8n-test-mode', params.n8nTestMode);
-    if ('agentCount'        in rest || 'weightSpread' in rest) seedAgents();
-    if ('renderScale'       in rest) { setSize(); rebuildOffscreen(); seedAgents(); }
-    if ('traceScale' in rest || 'qrSize'   in rest || 'qrMargin' in rest ||
-        'qrAlignX'   in rest || 'qrAlignY' in rest ||
-        'imageX'     in rest || 'imageY'   in rest || 'imageSize' in rest) renderTraceCanvas();
-    if (!params.qrOverlay && ('qrAlignX' in rest || 'qrAlignY' in rest ||
-        'qrSize' in rest || 'qrMargin' in rest)) seedAgents();
-    if ('qrQuietZone' in rest || 'qrInvert' in rest) generateQR().then(renderTraceCanvas);
+    if ('duckLevel'  in rest) setDuckLevel(params.duckLevel);
+    if ('n8nTestMode' in rest) socket.emit('set-n8n-test-mode', params.n8nTestMode);
+    if (needsReseed)  seedAgents();
+    if (needsRebuild) { setSize(); rebuildOffscreen(); seedAgents(); }
+    if (needsRetrace) renderTraceCanvas();
+    if (needsQRReseed) seedAgents();
+    if (needsQRRegen)  generateQR().then(renderTraceCanvas);
     gui.controllersRecursive().forEach(c => c.updateDisplay());
     if (dir !== undefined || wind !== undefined) {
         const newDir  = dir  ?? dirInput.value;
