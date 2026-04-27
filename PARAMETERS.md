@@ -401,20 +401,6 @@ The force magnitude uses the same `avoid force` multiplier as image-trace avoida
 
 The map is always centered on the canvas. This value controls what fraction of the canvas it covers. At 1.0 the map spans the full canvas. At 0.5 it occupies the central half.
 
-### QR margin (`qrAvoidMargin`)
-**Range:** 0 – 0.3 | **Default:** 0.01
-
-Extra padding added around the QR bounding rectangle when the QR avoid zone is built. Given as a fraction of `min(canvasWidth, canvasHeight)`. At 0.01 (default) the repulsion field extends ~1% of the shorter canvas dimension beyond each edge of the QR, providing a small buffer so agents don't graze the finder-pattern corners. Increase for a wider cleared zone; at large values (0.1+) the cleared area becomes noticeably larger than the QR itself.
-
-Only active when `QR overlay` is on and the QR is currently shown.
-
-### QR fade (`qrAvoidFade`)
-**Range:** 0 – 0.15 | **Default:** 0.01
-
-Blur radius applied to the QR avoid zone canvas before it is uploaded as the repulsion texture, given as a fraction of `min(canvasWidth, canvasHeight)`. The blur merges the per-module white halos into a continuous repulsion field and softens the zone boundary. At 0 each individual QR module is a discrete repulsion pixel; at larger values the entire QR rectangle becomes a smooth, solid obstacle with soft edges.
-
-Only active when `QR overlay` is on and the QR is currently shown.
-
 ### Delivering via n8n
 
 The `applySimParams` response accepts an `avoidMap` key:
@@ -428,7 +414,6 @@ Supported formats:
 - **HTTPS URL** (`https://...`) — sim fetches the image directly
 - **`null`** — clears the active avoidance map
 
-> **QR overlay interaction:** when `QR overlay` is on and the QR is showing, `updateQROverlay()` owns the avoidance map. Any external `clearAvoidMap()` or `loadAvoidMap()` call will trigger a re-apply so the QR avoid zone always wins on top. To load an external avoid map while the QR is showing, first turn `QR overlay` off.
 
 ---
 
@@ -484,28 +469,18 @@ Re-seeds all agents: positions are randomised from screen centre, home coordinat
 
 ## Remote / Swarm Inputs
 
-Spectators open `/remote/?s=<uuid>` on their phones. The page features a virtual joystick centered on screen, a color picker and text input always visible at the top, and tilt support. Temperature and coherence are no longer sent from the remote page. Tilt is personal. A star field canvas (65 stars drifting counter to joystick direction, streaking on fast moves) is visible only in DRAW mode (story mode). The join button reads "swarm" and the device message is shown large and centered.
+Spectators open `/remote/?s=<uuid>` on their phones. The page features a virtual joystick centered on screen and a color picker always visible at the top. A star field canvas (65 stars drifting counter to joystick direction, streaking on fast moves) is visible only in DRAW step status. The join button reads "swarm" and the device message is shown large and centered.
 
-The server maintains a per-room state table (one entry per connected spectator, pruned after 15 s of inactivity). Every 300 ms it computes averages and emits `collective-state` to the host simulation for tilt, where values are smoothed with an exponential moving average (~0.8 s time constant) before being applied.
+The server maintains a per-room state table (one entry per connected spectator, pruned after 15 s of inactivity).
 
 ---
 
-### Tilt — personal wind
+### Tilt — aura feedback only
 
 **Phone gesture:** hold the phone upright in portrait orientation (neutral) and tilt in any direction.
-**Data sent:** `pitch` (0–1, from vertical axis) and `roll` (0–1, from lateral axis). Portrait upright = `pitch ≈ 0.75`, `roll ≈ 0.5` (hardware calibration — these map to zero force).
-**Routing:** forwarded directly to the sim as `remote-event` (not aggregated server-side).
-**Effect:** tilt controls the wind **only for the spectator's own assigned agents**. Formula wind and global wind are replaced for that slice:
-
-```
-windX = clamp((roll  − 0.5)  × 2, −1, 1)   // ±1 at ±90° roll  from portrait
-windY = clamp((pitch − 0.75) × 4, −1, 1)   // ±1 at ±90° pitch from portrait
-wind  = vec2(windX, windY) × windStr
-```
-
-Portrait = zero wind for that spectator's particles. The effect scales with the current `windStr` GUI value. Other spectators' agents and free (unassigned) agents are unaffected.
-
-This value is stored per-slot in `SpectatorSlot.windX` / `.windY` in the GPU storage buffer (bytes [32] and [36] within each 48-byte slot).
+**Data sent:** `pitch` and `roll` (0–1 each). Portrait upright = `pitch ≈ 0.75`, `roll ≈ 0.5`.
+**Routing:** forwarded directly to the sim as `remote-event`.
+**Effect:** tilt shifts the anchor point of the atmospheric gradient on the spectator's own phone screen — the radial glow follows the physical lean of the device, giving tactile visual feedback. Tilt does **not** affect the particle simulation — no wind or directional force is applied to any agent.
 
 ---
 
@@ -518,11 +493,19 @@ This value is stored per-slot in `SpectatorSlot.windX` / `.windY` in the GPU sto
 
 ---
 
-### Text — trace attractor
+### Text — story input
 
-**Phone gesture:** type in the bottom input field and submit.
-**Data sent:** `text` string, forwarded directly to the simulation as a `remote-event`.
-**Effect:** if `VITE_N8N_BASE_URL` is set, the text is forwarded to n8n via `callN8n()` — n8n processes it and responds with what to apply (e.g. `traceText`, formulas, `status`). If n8n is not configured, the text is applied directly as the trace attractor. The last received text wins.
+**Phone gesture:** a centered text input panel appears on the phone screen.
+**When shown:** only when `stepStatus` is `"TEXT"` (sent by n8n via the `remote-ui` socket event). Hidden at all other times — spectators cannot open it manually.
+**Data sent:** `text` string via `story-text` socket event. Forwarded to n8n as a `sim-event` of type `"text-input"`.
+**After submit:** the panel collapses automatically and the phone returns to its rest state.
+
+### Shake — color reset
+
+**Phone gesture:** shake the phone sharply.
+**Detection:** acceleration magnitude > 22 m/s² with a 1.2 s cooldown. Only active in DRAW step status.
+**Effect:** resets the spectator's particle color to the simulation's current base color, temporarily blending their slice of the field back into the swarm. The personal color is restored the next time the spectator touches the joystick.
+**Feedback:** 60 ms haptic vibration.
 
 ---
 
@@ -541,7 +524,6 @@ When a spectator joins, the server emits `spectator-joined` with their persisten
   dx, dy, magnitude,                 // last joystick direction + magnitude
   velocity,                          // normalized finger speed (0–1)
   _smoothDx, _smoothDy,              // sim-side smoothed direction (not uploaded to GPU)
-  windX, windY,                      // tilt bias (0,0 = portrait neutral)
   lastInputTime                      // timestamp of last joystick event (ms)
 }
 ```
@@ -576,7 +558,7 @@ The GPU SpectatorSlot struct now has `spawnerX`, `spawnerY`, `spawnerLocationAct
 
 #### What each shader does with the slot
 
-- **compute.wgsl** — reads `windX`/`windY` to override wind for that agent, and reads `spawnerX`/`spawnerY`/`spawnerLocationActive` to probabilistically teleport the agent to the spawner position. Homing agents (primed = 1) are exempt from teleport.
+- **compute.wgsl** — reads `spawnerX`/`spawnerY`/`spawnerLocationActive` to probabilistically teleport the agent to the spawner position. Homing agents (primed = 1) are exempt from teleport.
 - **render.wgsl** — reads `colorR`/`colorG`/`colorB` to replace the base color for that agent. The color blends toward the global `fast color` at high speed, exactly as the base color would.
 
 #### Per-spectator interactions
@@ -585,7 +567,7 @@ The GPU SpectatorSlot struct now has `spawnerX`, `spawnerY`, `spawnerLocationAct
 
 **Joystick-spawn**: while a spectator's spawner is active (joystick in use and not timed out), a fraction of their assigned agents teleport to the spawner position each frame. The effective spawn chance is `spectatorSpawnChance × activeUsers × spectatorSpawnMultiplier` (capped at 1.0). When the joystick is idle for `spawnerInactiveTimeout` seconds the spawner deactivates and spawning stops.
 
-**Tilt-wind**: when a spectator tilts their phone, the wind force for their assigned agents is overridden with a personal tilt-derived vector. Portrait upright = zero wind. Tilting in any direction pushes their slice of the field proportionally. Other spectators' agents and unassigned agents follow the normal wind formula unchanged.
+**Shake-color**: when a spectator shakes the phone, their assigned agents' color is temporarily reset to the simulation's base color. The personal color is restored when the spectator next uses the joystick.
 
 ---
 
@@ -639,7 +621,7 @@ When on (default), the QR is displayed on a **separate 2D canvas overlay** (`pos
 
 The overlay fades in and out with a 0.6 s CSS `opacity` transition. When the QR is hidden, the overlay is transparent and the simulation runs unaffected.
 
-An avoidance zone is automatically built from `qrBitmap` and uploaded as the repulsion texture whenever the overlay is visible, so agents naturally clear the area where the QR code appears. The zone is destroyed when the QR hides. See **QR margin** and **QR fade** in the Avoidance map section above.
+When `respawnOnQR` is on (default), free agents that stray into the QR bounding box are stochastically teleported to a random canvas edge each frame, keeping the code area clear of visual noise. Homing agents are exempt. See `respawnOnQR` and `qrRespawnChance` in the Session section.
 
 When `QR overlay` is **off**, the original behaviour is restored: the QR is baked into the trace texture and agents home to the white modules, forming the QR pattern collectively.
 
@@ -651,9 +633,7 @@ QR mode is a rendering state, not a physics state. It is active only while the Q
 
 1. **Homing** works through the standard alpha pipeline — agents whose home falls on a white QR module (`alpha ≥ alphaThreshold`) converge there at `homing speed`. Agents assigned to transparent gaps are free.
 
-2. **Fade zone** *(optional, controlled by `QR fade zone` in Session)* — the render shader computes the signed distance from each free agent's *current position* to the QR bounding rectangle. Agents are faded to invisible over an 80 px falloff inward from the rect edge, clearing visual noise around the QR so it remains scannable. Disabled by default.
-
-3. **No edge vignette** — the normal `vignetteEdge` smoothstep is bypassed in QR mode so the finder-pattern squares in the corners render at full brightness (they would otherwise be faded out at the image boundary and the QR would fail to decode).
+2. **No edge vignette** — the normal `vignetteEdge` smoothstep is bypassed in QR mode so the finder-pattern squares in the corners render at full brightness (they would otherwise be faded out at the image boundary and the QR would fail to decode).
 
 4. **Nearest-neighbour sampling** — the render shader switches from bilinear (`textureSampleLevel`) to exact nearest-neighbour (`textureLoad`) for the home-pixel lookup. This matches the compute shader's `imgAlphaAt` function exactly, eliminating a sampler mismatch that would otherwise produce phantom white dots (see the `alphaThreshold` note above).
 
@@ -753,10 +733,20 @@ Seconds of joystick silence before the spawner deactivates. On re-activation aft
 
 ---
 
-### QR fade zone (`qrFadeZone`)
-**Default:** off
+### respawn on QR (`respawnOnQR`)
+**Default:** on
 
-When on and QR mode is active, free agents near the QR rectangle are faded toward invisible over an 80 canvas-pixel falloff from the rect edge. This suppresses visual noise around the code to help phone cameras get a clean scan. When off, free agents render at full brightness everywhere — the QR modules are still formed correctly by homing agents, but the surrounding particle field is not cleared. Has no effect outside QR mode.
+When on, free agents that wander into the QR code bounding box are stochastically teleported to a random canvas edge each frame, keeping the code area clear of drifting particles. Homing agents (those forming the QR pattern when `qrOverlay` is off) are exempt. Has no visible effect when `qrOverlay` is on and the QR is hidden.
+
+### QR respawn chance (`qrRespawnChance`)
+**Range:** 0 – 0.1 | **Default:** 0.01
+
+Per-frame probability that a free agent inside the QR bounding box is respawned. Only active when `respawnOnQR` is on.
+
+### vote duration (s) (`voteDuration`)
+**Range:** 5 – 120 | **Default:** 30
+
+Seconds the vote panel stays open on spectator phones. Both the remote devices and the simulation's main display show a live countdown. When the timer expires the sim fires a `vote-result` event to n8n (`/webhook/sim-event`) containing the winning option label and whether it was A or B, then the remote devices automatically revert to their rest state (joystick).
 
 ### idle restore QR (s) (`remoteTimeout`)
 **Range:** 0 – 180 | **Default:** 0 (disabled)
@@ -783,34 +773,30 @@ The fetch timeout for each heartbeat request scales automatically with this valu
 **Payload:**
 ```json
 {
-  "type":              "heartbeat",
-  "room":              "<session-uuid>",
-  "spectators":        3,
-  "status":            "NORMAL",
-  "qrStatus":          "HIDE",
-  "step":              2,
-  "storyStepComplete": false,
-  "storyVoteResult":   null,
-  "stepStatus":        "VOTE",
-  "params":            { ...all current tunable params... }
+  "type":            "heartbeat",
+  "room":            "<session-uuid>",
+  "mode":            "STORY",
+  "status":          "NORMAL",
+  "qrStatus":        "HIDE",
+  "step":            2,
+  "stepStatus":      "VOTE",
+  "storyVoteResult": null,
+  "params":          { ...all current tunable params... }
 }
 ```
 
 | Field | Description |
 |-------|-------------|
 | `room` | Session UUID assigned at socket connect — stable for the page lifetime |
-| `spectators` | Live connected-device count synced from the server |
-| `status` | Simulation state machine: `"NORMAL"`, `"FREEROAM"`, or `"DOT"` |
+| `mode` | Top-level session mode: `"STORY"` or `"SHOWCASE"` |
+| `status` | Simulation state: `"NORMAL"`, `"FREEROAM"`, or `"DOT"` |
 | `qrStatus` | QR visibility: `"SHOW"` or `"HIDE"` |
 | `step` | Current story step ID as sent by n8n; `null` when not in story mode |
-| `storyStepComplete` | `true` once the step's duration has elapsed or a vote has settled |
-| `storyVoteResult` | Winning option label (e.g. `"Garden"`) when a VOTE step completes; `null` otherwise |
-| `stepStatus` | Current spectator interaction mode: `"IDLE"`, `"DRAW"`, or `"VOTE"` |
+| `stepStatus` | Current spectator interaction mode: `"IDLE"`, `"DRAW"`, `"VOTE"`, or `"TEXT"` |
+| `storyVoteResult` | Winning option label (e.g. `"Garden"`) while a vote is running; `null` if tied or no vote active |
 | `params` | Full snapshot of every tunable parameter in the GUI |
 
 The response is handled identically to `sim-event` — any recognised keys are applied via `applySimParams`. This is the primary channel through which n8n drives all content lifecycle: QR show/hide, trace images, formula changes, parameter adjustments, and story step delivery.
-
-When a story step completes (`storyStepComplete` flips to `true`), an **out-of-cycle heartbeat** fires immediately — the sim does not wait for the next scheduled tick. n8n should listen for this signal and send the next step as the response.
 
 ---
 
@@ -822,41 +808,47 @@ Story mode layers a scripted, sequential narrative on top of the simulation. Ste
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `step` | any | Step identifier — echoed back in every heartbeat so n8n can correlate. Receiving a new `step` resets all completion state |
-| `stepDuration` | number | Seconds until the step auto-completes. When elapsed, `storyStepComplete` flips to `true` and an immediate out-of-cycle heartbeat fires |
-| `stepStatus` | `"IDLE"` \| `"DRAW"` \| `"VOTE"` | Spectator interaction mode for this step (see below). Defaults to `"IDLE"` when a new step arrives without an explicit value |
+| `step` | any | Step identifier — echoed back in every heartbeat so n8n can correlate. Receiving a new `step` resets vote state and sets `stepStatus` to `"IDLE"` unless overridden |
+| `stepStatus` | `"IDLE"` \| `"DRAW"` \| `"VOTE"` \| `"TEXT"` | Spectator interaction mode for this step (see below). Defaults to `"IDLE"` when a new step arrives without an explicit value |
 | `optionA` | string | Label for the first vote option — required when `stepStatus` is `"VOTE"` |
 | `optionB` | string | Label for the second vote option — required when `stepStatus` is `"VOTE"` |
 | `caption` | string \| null | Subtitle text drawn at the bottom of the simulation canvas as a particle attractor (white glyphs, same pipeline as `traceText`). Word-wrapped to 80 % canvas width. `null` or `""` clears it |
 
 A minimal narration step:
 ```json
-{ "step": 1, "stepDuration": 10, "stepStatus": "IDLE", "caption": "I am a voice from the future.", "status": "FREEROAM" }
+{ "step": 1, "stepStatus": "IDLE", "caption": "I am a voice from the future.", "status": "FREEROAM" }
 ```
 
 A vote step:
 ```json
-{ "step": 2, "stepDuration": 30, "stepStatus": "VOTE", "optionA": "House", "optionB": "Garden", "caption": "Where do we look?" }
+{ "step": 2, "stepStatus": "VOTE", "optionA": "House", "optionB": "Garden", "caption": "Where do we look?" }
+```
+
+A text input step:
+```json
+{ "step": 3, "stepStatus": "TEXT", "caption": "Scrivi una parola." }
 ```
 
 ### `stepStatus` — spectator interaction modes
 
 | Value | Remote UI | Gesture surface |
 |-------|-----------|-----------------|
-| `"IDLE"` | Default atmospheric surface | Disabled (no touch events sent) |
-| `"DRAW"` | Default atmospheric surface | Active — joystick moves spawner, tilt/color all live |
-| `"VOTE"` | Two full-screen buttons labelled `optionA` / `optionB` | Hidden behind vote panel |
+| `"IDLE"` | Atmospheric surface, no interaction | All gestures passive |
+| `"DRAW"` | Atmospheric surface, full interaction | Joystick, color picker, shake all active |
+| `"VOTE"` | Two full-screen buttons labelled `optionA` / `optionB` with live countdown | Joystick hidden; vote buttons active |
+| `"TEXT"` | Centered text input panel | Keyboard active; joystick and vote panel hidden |
 
-When `stepStatus` changes the server broadcasts a `remote-ui` Socket.IO event to all spectators in the room. The remote page switches its interface immediately.
+When `stepStatus` changes, the sim broadcasts a `remote-ui` Socket.IO event to all spectators. The remote page switches its interface immediately.
 
 ### Vote mechanics
 
-- Each spectator can vote once per step (subsequent taps overwrite their previous vote)
-- Server counts A vs B votes and emits a running `story-vote-update` tally to the host sim after every vote change
+- Each spectator can vote once per step; subsequent taps overwrite their previous vote
+- Server counts A vs B votes and emits a running `story-vote-update` tally to the host sim after every change
 - The sim tracks the current leader in `storyVoteResult`
-- When `stepDuration` expires, `storyVoteResult` holds whichever option was leading; `null` on a tie
-- n8n reads `storyVoteResult` from the immediate out-of-cycle heartbeat and branches accordingly
-- Votes are cleared automatically when a new `remote-ui` event is broadcast (i.e. when a new step arrives)
+- Both the simulation display and each remote phone show a live countdown (`voteDuration` seconds)
+- When the timer expires, the sim POSTs `{ "type": "vote-result", "winner": "A"|"B"|null, "winning_option": "..." }` to `/webhook/sim-event`. n8n should listen for this event to advance the story
+- Remote phones revert to rest state automatically when the timer ends
+- Votes are cleared when a new `step` is received
 
 ### Caption
 
@@ -872,7 +864,7 @@ The simulation uses the Web Audio API to route sound through an `AnalyserNode`. 
 
 ### Audio unlock button
 
-Browser autoplay policy prevents `AudioContext` from starting without a prior user gesture. A small muted-speaker icon (bottom-right corner, `#ffffff35` opacity) lets visitors unlock audio before any sound arrives. Clicking it resumes the `AudioContext` and the icon fades out. If the user has already interacted with the page for another reason (e.g. formula editing), the context may already be running and the button tap is a no-op.
+Browser autoplay policy prevents `AudioContext` from starting without a prior user gesture. A subtle dark bar fixed to the bottom of the screen reads "tap to enable audio". Any interaction anywhere on the page (pointer down) also counts — the bar is simply a visible affordance in case no other interaction has occurred. Once the `AudioContext` is confirmed running the bar fades out automatically. If the context is already running on page load, the bar never appears.
 
 ### Voiceover track (`audio`)
 

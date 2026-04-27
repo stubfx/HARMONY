@@ -16,31 +16,37 @@ This is the sensation we are designing for: participation without authorship.
 
 ## How the body speaks to the swarm
 
-### Tilt — your personal wind
+### Tilt — the phone knows where it is
 
-Hold the phone still and the swarm breathes on its own. Tilt it — forward, sideways, anywhere — and the portion of the field that belongs to you bends with it.
+The atmospheric glow behind the screen follows the physical lean of the device. Tip the phone and the light shifts — the gradient anchors itself to the direction of gravity.
 
-This is deliberately personal. Tilt is not averaged with anyone else's. Your orientation steers only your assigned slice of the field — the particles that carry your color. The rest of the swarm is untouched. You cannot move the whole field. You can only move your part of it.
+This is private and immediate. The swarm on the main screen does not change. The tilt is only felt here, on this glass, in this hand. A small confirmation that the phone is alive to the body holding it.
 
-Portrait is neutral. The moment you tip the phone, a current runs through your particles. Put it flat and they drift back into the shared current.
+### Touch — your own swarm
 
-The phone is a plumb line. Your fragment of the swarm is the weather. You are somewhere in between.
+Each person who joins is assigned a color and a slice of the particle field. Those particles are yours in color only: they live everywhere, mixed into the whole. When you move the joystick, a small fraction of them teleport to wherever the spawner is heading, as though the field is orienting toward you. Hold still and they collect. Move quickly and they scatter and regroup. Lift your finger and they drift back into the current.
 
-### Touch — warmth, cold, and your own swarm
+The color picker at the top of the screen changes which hue your slice carries. You are choosing which fragment of the swarm is recognizably yours — for as long as you hold it.
 
-Where you press your finger on the screen does two things at once.
-
-The **vertical position** determines the temperature of your presence. The top of the screen is cold — blue, distant, crystalline. The bottom is warm — amber, slow, close. Every active touch sends a temperature into the room. The swarm's color is the average of everyone's warmth. If the crowd is pressing down, the field glows amber. If they are pressed up high, it shifts toward ice. You are choosing a feeling, not a color. The swarm translates.
-
-The **position itself** — not just the height — calls a piece of the swarm to you. Each person who joins is assigned a color and a slice of the particle field. Those particles are yours in color only: they live everywhere, mixed into the whole. But when you touch the screen, a small fraction of them teleport to wherever your finger is, as though the field is orienting toward you. Hold still and they collect. Move quickly and they scatter and regroup. Lift your finger and they drift back into the current.
+Shake the phone and your particles lose their color. They dissolve back into the base tone of the field, indistinguishable from everything else. Touch the joystick again and the color returns.
 
 You cannot isolate your swarm from the others. You can only pull it toward you, temporarily, in one place.
 
 ### Words — the ghostwriting
 
+At certain moments in the story, the phone opens a space to write. A single input field appears on the screen, and for a few seconds it is yours.
+
 Type something and the swarm will write it. Not immediately, not cleanly — the letters form the way fog forms, density emerging from drift. The text is a landscape the particles inhabit, not a message they display.
 
-Multiple people can write. The last word wins. What it means for the swarm to "write" a word someone typed on a phone in the dark — that is the question this piece lives inside.
+Then the field closes. The phone returns to what it was. What remains on the screen is not a transcript — it is a trace. What it means for the swarm to "write" a word someone typed on a phone in the dark — that is the question this piece lives inside.
+
+### The vote — a choice that doesn't feel like a choice
+
+At certain moments, the field splits into two. Two options appear on the screen and a countdown begins.
+
+The options feel like a fork in the story. They are not. Both paths lead to the same next moment — the same structural beat in the narrative arc. What the vote decides is the texture of how we arrive there. The detail that makes the story feel personal.
+
+Nobody knows what anyone else voted. Nobody knows if their vote swayed the result. The story continues regardless. This is the sensation we are designing for: agency without certainty.
 
 ---
 
