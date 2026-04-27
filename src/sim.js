@@ -83,8 +83,6 @@ const params = {
     avoidForceStr:   1.0, // multiplier on image-trace avoidance forces
     avoidMapScale:   1.0, // avoidance map coverage as fraction of canvas (1.0 = full)
     qrOverlay:       false, // true = QR on a 2D overlay canvas; agents freed from QR area
-    qrAvoidMargin:   0.01,  // extra padding around QR in the avoid zone, as fraction of minDim
-    qrAvoidFade:     0.01,  // blur radius of the avoid zone edge, as fraction of minDim
     // Primed-spot probe (free agents only)
     probeLen:          15.0, // probe cast distance in canvas pixels
     probeForceStr:     150.0, // steering force multiplier when probe hits a primed pixel
@@ -108,7 +106,8 @@ const params = {
     // Session / QR restore
     remoteTimeout:  0,    // seconds of silence from all remotes before QR is restored (0 = disabled)
     maxSpectators:  1,    // sim QR hides when connected count reaches this threshold
-    qrFadeZone:     false, // fade free agents near the QR rect to keep it scannable
+    respawnOnQR:      false, // respawn free agents inside the QR rect to a random edge
+    qrRespawnChance:  0.01,  // per-frame probability [0–1] for the respawn
     n8nTestMode:       false, // true = /webhook-test/sim-event, false = /webhook/sim-event
     heartbeatInterval: 10,   // seconds between periodic param snapshots sent to n8n (0 = off)
     // Weight
@@ -282,7 +281,7 @@ const agentBuf = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 const soloUB = device.createBuffer({
-    size: 160, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 192, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
     size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -684,11 +683,7 @@ function updateQROverlay() {
     avoidCanvas.width  = canvas.width;
     avoidCanvas.height = canvas.height;
     const actx   = avoidCanvas.getContext('2d');
-    const pad    = params.qrAvoidMargin * minDim;
-    const blurPx = params.qrAvoidFade   * minDim;
-    if (blurPx > 0) actx.filter = `blur(${blurPx}px)`;
-    actx.drawImage(qrBitmap, cx - size / 2 - pad, cy - size / 2 - pad, size + 2 * pad, size + 2 * pad);
-    if (blurPx > 0) actx.filter = 'none';
+    actx.drawImage(qrBitmap, cx - size / 2, cy - size / 2, size, size);
 
     if (avoidMapTex) avoidMapTex.destroy();
     avoidMapTex = device.createTexture({
@@ -1801,6 +1796,26 @@ function writeSoloUB(dt, time) {
     u[36] = isDot ? 1 : 0;
     f[37] = params.dotCenterRadius;
     f[38] = params.dotRespawnChance;
+    u[39] = params.respawnOnQR ? 1 : 0;
+    f[40] = params.qrRespawnChance;
+    const isQRActive = simState.qrStatus === 'SHOW';
+    if (isQRActive) {
+        const _minDim = Math.min(canvas.width, canvas.height);
+        const _sz     = params.qrSize   * _minDim;
+        const _margin = params.qrMargin * _minDim + _sz / 2;
+        const _cx = params.qrAlignX === 'left'   ? _margin
+                  : params.qrAlignX === 'right'  ? canvas.width  - _margin
+                  :                                canvas.width  / 2;
+        const _cy = params.qrAlignY === 'top'    ? _margin
+                  : params.qrAlignY === 'bottom' ? canvas.height - _margin
+                  :                                canvas.height / 2;
+        f[41] = _cx - _sz / 2;
+        f[42] = _cy - _sz / 2;
+        f[43] = _cx + _sz / 2;
+        f[44] = _cy + _sz / 2;
+    } else {
+        f[41] = 0; f[42] = 0; f[43] = 0; f[44] = 0;
+    }
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
@@ -1845,12 +1860,11 @@ function writeRenderUB() {
     f[18] = params.blackThreshold;
     f[19] = simState.qrStatus === 'SHOW' ? 0 : params.vignetteEdge;
     u[20] = simState.qrStatus === 'SHOW' ? 1 : 0;
-    u[21] = params.qrFadeZone ? 1 : 0;
-    f[22] = params.homingProximityRange;
-    f[23] = params.homingMinAlpha;
-    u[24] = activeSlots.length;
-    u[25] = params.additiveBlend ? 1 : 0;
-    f[26] = params.spectatorAgentShare / 100.0;
+    f[21] = params.homingProximityRange;
+    f[22] = params.homingMinAlpha;
+    u[23] = activeSlots.length;
+    u[24] = params.additiveBlend ? 1 : 0;
+    f[25] = params.spectatorAgentShare / 100.0;
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 
@@ -1930,7 +1944,7 @@ function writeContamUB() {
 }
 
 // ── Pre-allocated uniform buffers (reused every frame to avoid GC pressure) ──
-const _soloAB  = new ArrayBuffer(160); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
+const _soloAB  = new ArrayBuffer(192); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
 const _renderAB= new ArrayBuffer(112); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
 const _fadeAB  = new ArrayBuffer(16);  const _fadeF  = new Float32Array(_fadeAB);
 const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB);

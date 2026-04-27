@@ -43,6 +43,12 @@
 //   [144] dotMode              u32   (1 when status = DOT; enables centre-respawn)
 //   [148] dotCenterRadius      f32   (px radius around canvas centre; free agents inside are respawned to edges)
 //   [152] dotRespawnChance     f32   (per-frame probability [0–1] that a centre-zone agent is respawned)
+//   [156] respawnOnQR          u32   (1 = respawn free agents inside the QR rect to a random edge)
+//   [160] qrRespawnChance      f32   (per-frame probability [0–1])
+//   [164] qrX0                 f32   (QR rect left edge in canvas pixels)
+//   [168] qrY0                 f32   (QR rect top edge)
+//   [172] qrX1                 f32   (QR rect right edge)
+//   [176] qrY1                 f32   (QR rect bottom edge)
 
 struct SoloParams {
     agentCount:     u32,
@@ -84,6 +90,12 @@ struct SoloParams {
     dotMode:              u32,
     dotCenterRadius:      f32,
     dotRespawnChance:     f32,
+    respawnOnQR:          u32,
+    qrRespawnChance:      f32,
+    qrX0:                 f32,
+    qrY0:                 f32,
+    qrX1:                 f32,
+    qrY1:                 f32,
 }
 
 // Per-spectator partition data — color, joystick spawner position, personal wind.
@@ -510,6 +522,33 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             let rng_    = hash(i ^ (u32(params.time * 137.0) + 53u));
             if (rng_ < params.dotRespawnChance) {
                 let posRng = hash(i ^ (u32(params.time * 97.0)  + 71u)); // separate hash for position
+                let perim_ = 2.0 * (params.canvasW + params.canvasH);
+                let t_     = posRng * perim_;
+                var ep     = vec2<f32>(0.0, 0.0);
+                if (t_ < params.canvasW) {
+                    ep = vec2<f32>(t_, 0.0);
+                } else if (t_ < params.canvasW + params.canvasH) {
+                    ep = vec2<f32>(params.canvasW, t_ - params.canvasW);
+                } else if (t_ < 2.0 * params.canvasW + params.canvasH) {
+                    ep = vec2<f32>(t_ - params.canvasW - params.canvasH, params.canvasH);
+                } else {
+                    ep = vec2<f32>(0.0, t_ - 2.0 * params.canvasW - params.canvasH);
+                }
+                agents[i].pos    = ep;
+                agents[i].vel    = vec2<f32>(0.0, 0.0);
+                agents[i].primed = 0.0;
+                return;
+            }
+        }
+    }
+
+    // QR respawn: free agents inside the QR rect are stochastically scattered to edges.
+    if (params.qrMode != 0u && params.respawnOnQR != 0u && !homeInImg) {
+        if (np.x >= params.qrX0 && np.x <= params.qrX1 &&
+            np.y >= params.qrY0 && np.y <= params.qrY1) {
+            let rng_ = hash(i ^ (u32(params.time * 173.0) + 91u));
+            if (rng_ < params.qrRespawnChance) {
+                let posRng = hash(i ^ (u32(params.time * 113.0) + 83u));
                 let perim_ = 2.0 * (params.canvasW + params.canvasH);
                 let t_     = posRng * perim_;
                 var ep     = vec2<f32>(0.0, 0.0);

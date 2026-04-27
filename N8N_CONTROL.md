@@ -190,7 +190,8 @@ The trace canvas is always full-screen (scaled by `traceScale`). QR and user con
 | `maxSpectators` | `1` | Connected spectator count at which the QR is hidden. Used by n8n logic to decide when to call `showQR: false`. The sim does not act on this directly — n8n reads it from the heartbeat and acts accordingly. |
 | `spectatorAgentShare` | `100` | Percentage of agents (by index) that are assigned to spectators (0–100). The top `(100 − share)%` of agents always behave as pure sim agents — default color, formula/global wind, no joystick spawner — leaving them free to form trace images undisturbed. Changes take effect on the next frame with no re-seeding. |
 | `spectatorSpawnChance` | `0.01` | Per-frame probability that an agent in a spectator's partition teleports to that spectator's touch position (0–1). Only fires while the spectator is actively touching; homing agents are exempt. |
-| `qrFadeZone` | `false` | Fades free agents near the QR rect to keep it scannable. |
+| `respawnOnQR` | `false` | When `true`, free agents that wander into the QR bounding box are stochastically respawned to a random canvas edge, keeping the code scannable. Homing agents (those forming the QR pattern) are exempt. |
+| `qrRespawnChance` | `0.01` | Per-frame probability `[0–1]` that a free agent inside the QR rect is respawned. Only active when `respawnOnQR` is `true`. |
 | `remoteTimeout` | `0` | Seconds of silence from all remotes before the QR is restored. `0` = disabled. |
 | `clearDelay` | `0` | Seconds before auto-clearing user-submitted trace content. `0` = disabled. |
 | `heartbeatInterval` | `10` | Seconds between heartbeat calls. `0` = off. The fetch timeout scales automatically with this value (90% of the interval, minimum 5 s), so heavy n8n responses are not aborted when the interval is long. |

@@ -21,12 +21,11 @@
 //   [72] blackThreshold      f32
 //   [76] vignetteEdge        f32
 //   [80] qrMode              u32   (1 = QR active)
-//   [84] qrFadeZone          u32   (1 = fade free agents near the QR rect)
-//   [88] homingProximityRange f32  (canvas px over which homing agents fade in)
-//   [92] homingMinAlpha       f32  (minimum alpha for a homing agent at max distance)
-//   [96] spectatorCount       u32  (active spectators; 0 = use global params.color)
-//   [100] additiveBlend       u32  (1 = additive; 0 = max blend with pre-multiplied alpha)
-//   [104] spectatorAgentShare f32  (0–1 fraction of agents assigned to spectators; rest use global color)
+//   [84] homingProximityRange f32  (canvas px over which homing agents fade in)
+//   [88] homingMinAlpha       f32  (minimum alpha for a homing agent at max distance)
+//   [92] spectatorCount       u32  (active spectators; 0 = use global params.color)
+//   [96] additiveBlend        u32  (1 = additive; 0 = max blend with pre-multiplied alpha)
+//   [100] spectatorAgentShare f32  (0–1 fraction of agents assigned to spectators; rest use global color)
 
 struct SoloRenderParams {
     agentCount:           u32,
@@ -50,7 +49,6 @@ struct SoloRenderParams {
     blackThreshold:       f32,
     vignetteEdge:         f32,
     qrMode:               u32,
-    qrFadeZone:           u32,
     homingProximityRange: f32,
     homingMinAlpha:       f32,
     spectatorCount:       u32,
@@ -181,15 +179,6 @@ fn hash(n: u32) -> f32 {
         // max comparison sees distance-scaled colours instead of raw image values.
         if (params.additiveBlend == 0u) { return vec4<f32>(imgSample.rgb * a, a); }
         return vec4<f32>(imgSample.rgb, a);
-    }
-    // QR mode: optionally fade free agents near the QR rect to keep it scannable.
-    // Signed distance to the rect edge → smoothstep over 80px falloff.
-    if (params.qrMode != 0u && params.qrFadeZone != 0u) {
-        let dx   = max(max(params.imgX0 - in.agentPos.x, in.agentPos.x - params.imgX1), 0.0);
-        let dy   = max(max(params.imgY0 - in.agentPos.y, in.agentPos.y - params.imgY1), 0.0);
-        let dist = length(vec2<f32>(dx, dy));
-        let fade = smoothstep(0.0, 80.0, dist);
-        return vec4<f32>(in.color, params.brightness * fade);
     }
     return vec4<f32>(in.color, params.brightness);
 }
