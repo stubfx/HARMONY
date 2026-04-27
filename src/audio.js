@@ -20,7 +20,8 @@ const DUCK_RELEASE = 1.0;  // seconds to ramp back up after voice ends
 
 let _onStateChange = null;
 export function onAudioStateChange(cb) { _onStateChange = cb; }
-export function isAudioLocked() { return _ctx !== null && _ctx.state === 'suspended'; }
+export function isAudioLocked()  { return _ctx !== null && _ctx.state === 'suspended'; }
+export function isAudioReady()   { return _ctx !== null && _ctx.state === 'running'; }
 
 let _ctx       = null;
 let _analyser  = null;

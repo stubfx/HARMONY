@@ -7,7 +7,7 @@
 // Speed drives brightness. A fading trail accumulates on an offscreen texture.
 
 import { initGUI }      from './gui.js';
-import { startMic, stopAudio, isActive, getVolume, playAudio, playAudioBg, unlockAudio, setDuckLevel, isAudioLocked, onAudioStateChange } from './audio.js';
+import { startMic, stopAudio, isActive, getVolume, playAudio, playAudioBg, unlockAudio, setDuckLevel, isAudioLocked, isAudioReady, onAudioStateChange } from './audio.js';
 import QRCode           from 'qrcode';
 import { io as ioConnect } from 'socket.io-client';
 import soloSimTemplate  from './shaders/compute.wgsl?raw';
@@ -1274,6 +1274,7 @@ let socket;
 
     onAudioStateChange(() => {
         if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
+        _syncAudioBanner();
     });
 
     // Identify this socket as the host simulation so the server can distinguish
@@ -1614,13 +1615,20 @@ PRESETS.forEach(({ label, dir, wind }) => {
     presetsEl?.appendChild(btn);
 });
 
-// ── File input for trace image ────────────────────────────────────────────────
-// ── Audio unlock button ───────────────────────────────────────────────────────
-document.querySelector('#audio-unlock').addEventListener('click', async () => {
+// ── Audio unlock — any interaction anywhere ───────────────────────────────────
+const _audioBanner = document.querySelector('#audio-unlock');
+
+function _syncAudioBanner() {
+    _audioBanner?.classList.toggle('unlocked', isAudioReady());
+}
+
+document.addEventListener('pointerdown', async () => {
     await unlockAudio();
-    document.querySelector('#audio-unlock').classList.add('unlocked');
     if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
-});
+    _syncAudioBanner();
+}, { once: true });
+
+// ── File input for trace image ────────────────────────────────────────────────
 
 document.querySelector('#image-input').addEventListener('change', e => {
     const file = e.target.files[0];
