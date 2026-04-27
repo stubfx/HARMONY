@@ -214,14 +214,24 @@ The trace canvas is always full-screen (scaled by `traceScale`). QR and user con
 
 ## `/webhook/story` — Story progression (sim → n8n)
 
-The sim POSTs here when a story-gated interaction completes. Keeping this path separate from `/webhook/sim-event` lets you build a dedicated story-sequencing workflow in n8n without filtering generic event types.
+The sim POSTs here for all story lifecycle events. Keeping this path separate from `/webhook/sim-event` lets you build a dedicated story-sequencing workflow in n8n without filtering generic event types.
 
 ### Payload fields
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `type` | `string` | Event type. Currently: `"vote-result"` |
+| `type` | `string` | Event type. See event types below. |
 | `room` | `string` | Session room UUID |
+
+#### `session-ready`
+
+Fired once when the sim first gets its session room (on page load) if `mode` is `STORY`, and again any time the mode switches to `STORY` from `SHOWCASE`. This is the entry point for your story workflow — respond with step 1 to begin, or with nothing to hold.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | `"session-ready"` | |
+| `room` | `string` | Session room UUID |
+| `step` | `string` \| `null` | Current story step, or `null` if none yet |
 
 #### `vote-result`
 

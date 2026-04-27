@@ -1341,6 +1341,7 @@ let socket;
         // Activation is driven by n8n via heartbeat response { showQR: true }.
         await generateQR();
         socket.emit('audio-state', { locked: isAudioLocked() });
+        if (simState.mode === 'STORY') callN8nStory({ type: 'session-ready', step: simState.storyStep });
     });
 
     socket.on('sim-params', (data) => {
@@ -1526,8 +1527,10 @@ function applySimParams(data) {
         socket.emit('remote-ui', _remoteUiPayload());
     }
     if (mode === 'SHOWCASE' || mode === 'STORY') {
+        const wasStory = simState.mode === 'STORY';
         simState.mode = mode;
         updateStateDisplay();
+        if (mode === 'STORY' && !wasStory) callN8nStory({ type: 'session-ready', step: simState.storyStep });
     }
     if (status === 'NORMAL' || status === 'FREEROAM' || status === 'DOT') {
         simState.status = status;

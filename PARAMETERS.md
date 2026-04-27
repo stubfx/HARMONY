@@ -802,7 +802,9 @@ The response is handled identically to `sim-event` — any recognised keys are a
 
 ## Story Mode
 
-Story mode layers a scripted, sequential narrative on top of the simulation. Steps are generated on-the-fly by an LLM via n8n and delivered through the existing `applySimParams` channel (heartbeat response). The sim has no built-in story state machine — n8n owns sequencing and branching; the sim just plays the current step and reports when it is done.
+Story mode layers a scripted, sequential narrative on top of the simulation. The sim has no built-in story state machine — n8n owns sequencing and branching; the sim just plays the current step and reports back when interactions complete.
+
+When the sim starts (or when the mode switches to `STORY` from `SHOWCASE`), it fires a `session-ready` event to `/webhook/story`. n8n responds with step 1 to begin the story, or with an empty body to hold. From that point on, story advancement happens entirely through n8n responding to `/webhook/story` events — no heartbeat polling needed for story flow.
 
 ### Step fields (sent by n8n in any `applySimParams` response)
 
