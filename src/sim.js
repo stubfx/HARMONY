@@ -82,7 +82,7 @@ const params = {
     // Avoidance
     avoidForceStr:   1.0, // multiplier on image-trace avoidance forces
     avoidMapScale:   1.0, // avoidance map coverage as fraction of canvas (1.0 = full)
-    qrOverlay:       true,  // true = QR on a 2D overlay canvas; agents freed from QR area
+    qrOverlay:       false, // true = QR on a 2D overlay canvas; agents freed from QR area
     qrAvoidMargin:   0.01,  // extra padding around QR in the avoid zone, as fraction of minDim
     qrAvoidFade:     0.01,  // blur radius of the avoid zone edge, as fraction of minDim
     // Primed-spot probe (free agents only)
@@ -1517,6 +1517,8 @@ function applySimParams(data) {
     if ('traceScale' in rest || 'qrSize'   in rest || 'qrMargin' in rest ||
         'qrAlignX'   in rest || 'qrAlignY' in rest ||
         'imageX'     in rest || 'imageY'   in rest || 'imageSize' in rest) renderTraceCanvas();
+    if (!params.qrOverlay && ('qrAlignX' in rest || 'qrAlignY' in rest ||
+        'qrSize' in rest || 'qrMargin' in rest)) seedAgents();
     if ('qrQuietZone' in rest || 'qrInvert' in rest) generateQR().then(renderTraceCanvas);
     gui.controllersRecursive().forEach(c => c.updateDisplay());
     if (dir !== undefined || wind !== undefined) {
