@@ -4,90 +4,90 @@
   "schema": {
     "type": "object",
     "properties": {
-      "passo_corrente": {
+      "current_step": {
         "type": "integer",
         "description": "Il numero dell'ultimo passo completato"
       },
-      "protagonista": {
+      "protagonist": {
         "type": "object",
         "properties": {
-          "nome": {
+          "name": {
             "type": "string",
             "description": "Nome del protagonista"
           },
-          "descrizione": {
+          "description": {
             "type": "string",
             "description": "Descrizione aggiornata del protagonista"
           },
-          "caratteristiche": {
+          "traits": {
             "type": "array",
             "description": "Tratti fisici, psicologici o capacità stabiliti nel corso della storia",
             "items": { "type": "string" }
           }
         },
-        "required": ["nome", "descrizione", "caratteristiche"],
+        "required": ["name", "description", "traits"],
         "additionalProperties": false
       },
-      "personaggi_secondari": {
+      "secondary_characters": {
         "type": "array",
         "description": "Tutti i personaggi secondari incontrati fino a questo passo",
         "items": {
           "type": "object",
           "properties": {
-            "nome": { "type": "string" },
-            "ruolo": {
+            "name": { "type": "string" },
+            "role": {
               "type": "string",
               "description": "Ruolo narrativo (es. 'mentore', 'guardiano della soglia', 'alleato', 'nemico')"
             },
-            "descrizione": { "type": "string" }
+            "description": { "type": "string" }
           },
-          "required": ["nome", "ruolo", "descrizione"],
+          "required": ["name", "role", "description"],
           "additionalProperties": false
         }
       },
-      "luoghi": {
+      "locations": {
         "type": "array",
         "description": "Tutti i luoghi visitati o menzionati, in ordine di apparizione",
         "items": { "type": "string" }
       },
-      "oggetti_significativi": {
+      "significant_objects": {
         "type": "array",
         "description": "Oggetti narrativamente importanti introdotti nel corso della storia",
         "items": { "type": "string" }
       },
-      "scelte_pubblico": {
+      "audience_choices": {
         "type": "array",
         "description": "Registro di tutte le scelte di voto del pubblico",
         "items": {
           "type": "object",
           "properties": {
-            "passo": {
+            "step": {
               "type": "integer",
               "description": "Il passo in cui è avvenuta la scelta"
             },
-            "scelta": {
+            "choice": {
               "type": "string",
               "description": "Il testo dell'opzione scelta"
             }
           },
-          "required": ["passo", "scelta"],
+          "required": ["step", "choice"],
           "additionalProperties": false
         }
       },
-      "fatti_stabiliti": {
+      "established_facts": {
         "type": "array",
-        "description": "Fatti narrativi importanti che devono essere ricordati nei passi futuri e non rientrano nelle categorie precedenti",
+        "description": "Fatti narrativi importanti che devono essere ricordati nei passi futuri",
         "items": { "type": "string" }
       }
     },
     "required": [
-      "passo_corrente",
-      "protagonista",
-      "personaggi_secondari",
-      "luoghi",
-      "oggetti_significativi",
-      "scelte_pubblico",
-      "fatti_stabiliti"
+      "current_step",
+      "protagonist",
+      "secondary_characters",
+      "locations",
+      "significant_objects",
+      "audience_choices",
+      "established_facts"
     ],
     "additionalProperties": false
   }

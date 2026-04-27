@@ -4,15 +4,15 @@
   "schema": {
     "type": "object",
     "properties": {
-      "passo_completato": {
+      "step_completed": {
         "type": "integer",
-        "description": "Il numero del passo appena generato (1-17)"
+        "description": "Il numero del passo appena generato"
       },
-      "testo_narrativo": {
+      "narrative_text": {
         "type": "string",
         "description": "Il testo narrativo del passo: 2-4 frasi evocative, in italiano, che compiono la funzione drammatica dello stadio"
       },
-      "didascalia": {
+      "caption": {
         "type": "string",
         "description": "Una frase brevissima (max 8 parole) da visualizzare sull'installazione come sottotitolo del passo"
       },
@@ -26,39 +26,39 @@
         "description": "Colore secondario dell'immagine come esadecimale (es. '#FFD700')",
         "pattern": "^#[A-Fa-f0-9]{6}$"
       },
-      "prompt_immagine": {
+      "image_prompt": {
         "type": "string",
         "description": "Prompt dettagliato per generatore di immagini AI: menziona esplicitamente i nomi dei colori primary/secondary, descrive composizione e atmosfera, specifica uno stile visivo"
       },
-      "domanda_voto": {
+      "vote_question": {
         "type": ["string", "null"],
-        "description": "Domanda da mostrare al pubblico per votare il passo successivo. Null se questo è il passo 17."
+        "description": "Domanda da mostrare al pubblico per votare il passo successivo. Null se questo è l'ultimo passo."
       },
-      "opzione_a": {
+      "option_a": {
         "type": ["string", "null"],
-        "description": "Prima opzione di voto. Null se questo è il passo 17."
+        "description": "Prima opzione di voto. Null se questo è l'ultimo passo."
       },
-      "opzione_b": {
+      "option_b": {
         "type": ["string", "null"],
-        "description": "Seconda opzione di voto. Null se questo è il passo 17."
+        "description": "Seconda opzione di voto. Null se questo è l'ultimo passo."
       },
-      "tipo_interazione_prossima": {
+      "next_interaction_type": {
         "type": "string",
         "enum": ["VOTE", "TEXT", "DRAW", "IDLE"],
-        "description": "Tipo di interazione richiesta al pubblico per il passo successivo. IDLE per il passo 17."
+        "description": "Tipo di interazione richiesta al pubblico per il passo successivo. IDLE per l'ultimo passo."
       }
     },
     "required": [
-      "passo_completato",
-      "testo_narrativo",
-      "didascalia",
+      "step_completed",
+      "narrative_text",
+      "caption",
       "primary_color",
       "secondary_color",
-      "prompt_immagine",
-      "domanda_voto",
-      "opzione_a",
-      "opzione_b",
-      "tipo_interazione_prossima"
+      "image_prompt",
+      "vote_question",
+      "option_a",
+      "option_b",
+      "next_interaction_type"
     ],
     "additionalProperties": false
   }

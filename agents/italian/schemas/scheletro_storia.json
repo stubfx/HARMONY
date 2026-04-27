@@ -4,53 +4,53 @@
   "schema": {
     "type": "object",
     "properties": {
-      "storia_titolo": {
+      "story_title": {
         "type": "string",
         "description": "Titolo conciso e suggestivo della storia"
       },
-      "storia_concetto": {
+      "story_concept": {
         "type": "string",
         "description": "Il concept narrativo di fondo in una frase (es. 'un architetto che ricostruisce la città che ha distrutto')"
       },
-      "protagonista_archetipo": {
+      "protagonist_archetype": {
         "type": "string",
         "description": "L'archetipo narrativo del protagonista (es. 'l'eroe riluttante', 'il paria in cerca di redenzione')"
       },
-      "protagonista_descrizione": {
+      "protagonist_description": {
         "type": "string",
         "description": "Descrizione fisica e caratteriale iniziale del protagonista, specifica e concreta"
       },
-      "mondo_setting": {
+      "world_setting": {
         "type": "string",
         "description": "Dove e quando si svolge la storia, con atmosfera visiva dominante"
       },
-      "conflitto_centrale": {
+      "central_conflict": {
         "type": "string",
-        "description": "La tensione fondamentale non risolta fino al passo 17"
+        "description": "La tensione fondamentale non risolta fino all'ultimo passo"
       },
-      "passi": {
+      "steps": {
         "type": "array",
-        "description": "I 17 stadi del Viaggio dell'Eroe, in ordine",
+        "description": "Gli stadi del Viaggio dell'Eroe, in ordine",
         "items": {
           "type": "object",
           "properties": {
-            "numero": {
+            "number": {
               "type": "integer",
-              "description": "Numero del passo, da 1 a 17"
+              "description": "Numero del passo"
             },
-            "stadio_vogler": {
+            "vogler_stage": {
               "type": "string",
               "description": "Nome ufficiale dello stadio di Vogler/Campbell"
             },
-            "funzione_drammatica": {
+            "dramatic_function": {
               "type": "string",
               "description": "Cosa DEVE accadere strutturalmente in questo passo. Immutabile. Specifica per questa storia."
             },
-            "tono_emotivo": {
+            "emotional_tone": {
               "type": "string",
               "description": "Emozione dominante del passo (es. 'paura e meraviglia')"
             },
-            "semi_narrativi": {
+            "narrative_seeds": {
               "type": "array",
               "description": "2-3 elementi concreti su cui il Generatore di Passo può costruire la scena",
               "items": {
@@ -58,62 +58,62 @@
               }
             }
           },
-          "required": ["numero", "stadio_vogler", "funzione_drammatica", "tono_emotivo", "semi_narrativi"],
+          "required": ["number", "vogler_stage", "dramatic_function", "emotional_tone", "narrative_seeds"],
           "additionalProperties": false
         }
       },
-      "stato_memoria_iniziale": {
+      "initial_memory_state": {
         "type": "object",
         "description": "Fatti fondamentali già noti prima che la storia inizi a essere narrata",
         "properties": {
-          "protagonista": {
+          "protagonist": {
             "type": "object",
             "properties": {
-              "nome": { "type": "string" },
-              "descrizione": { "type": "string" },
-              "caratteristiche": {
+              "name": { "type": "string" },
+              "description": { "type": "string" },
+              "traits": {
                 "type": "array",
                 "items": { "type": "string" }
               }
             },
-            "required": ["nome", "descrizione", "caratteristiche"],
+            "required": ["name", "description", "traits"],
             "additionalProperties": false
           },
-          "personaggi_secondari": {
+          "secondary_characters": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "nome": { "type": "string" },
-                "ruolo": { "type": "string" },
-                "descrizione": { "type": "string" }
+                "name": { "type": "string" },
+                "role": { "type": "string" },
+                "description": { "type": "string" }
               },
-              "required": ["nome", "ruolo", "descrizione"],
+              "required": ["name", "role", "description"],
               "additionalProperties": false
             }
           },
-          "luoghi": {
+          "locations": {
             "type": "array",
             "items": { "type": "string" }
           },
-          "oggetti_significativi": {
+          "significant_objects": {
             "type": "array",
             "items": { "type": "string" }
           },
-          "scelte_pubblico": {
+          "audience_choices": {
             "type": "array",
             "items": { "type": "string" }
           },
-          "fatti_stabiliti": {
+          "established_facts": {
             "type": "array",
             "items": { "type": "string" }
           }
         },
-        "required": ["protagonista", "personaggi_secondari", "luoghi", "oggetti_significativi", "scelte_pubblico", "fatti_stabiliti"],
+        "required": ["protagonist", "secondary_characters", "locations", "significant_objects", "audience_choices", "established_facts"],
         "additionalProperties": false
       }
     },
-    "required": ["storia_titolo", "storia_concetto", "protagonista_archetipo", "protagonista_descrizione", "mondo_setting", "conflitto_centrale", "passi", "stato_memoria_iniziale"],
+    "required": ["story_title", "story_concept", "protagonist_archetype", "protagonist_description", "world_setting", "central_conflict", "steps", "initial_memory_state"],
     "additionalProperties": false
   }
 }
