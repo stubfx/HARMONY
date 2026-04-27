@@ -140,6 +140,23 @@
         }
         #audio-unlock:hover { color: rgba(255, 255, 255, 0.65); }
         #audio-unlock.unlocked { opacity: 0; pointer-events: none; }
+
+        /* ── Vote countdown — large number shown on the main display during VOTE ── */
+        #vote-countdown {
+            position: fixed;
+            bottom: 2.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 15;
+            font-family: ui-monospace, monospace;
+            font-size: 2rem;
+            letter-spacing: 0.25em;
+            color: rgba(255, 255, 255, 0.25);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+        #vote-countdown.visible { opacity: 1; }
     </style>
 </head>
 <body>
@@ -170,6 +187,7 @@
         <canvas id="qr-canvas" style="display:none;opacity:0.7;border-radius:4px;"></canvas>
     </div>
 
+    <div id="vote-countdown"></div>
     <button id="audio-unlock">tap to enable audio</button>
 
     <input id="image-input"     type="file" accept="image/*" style="display:none;">

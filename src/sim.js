@@ -110,6 +110,7 @@ const params = {
     qrRespawnChance:  0.01,  // per-frame probability [0–1] for the respawn
     n8nTestMode:       false, // true = /webhook-test/sim-event, false = /webhook/sim-event
     heartbeatInterval: 10,   // seconds between periodic param snapshots sent to n8n (0 = off)
+    voteDuration:      30,   // seconds the vote panel stays open before the sim fires the result
     // Weight
     weightSpread: 0.8,    // 0 = all equal; 1 = weights span [0.05 … 1.95]
     // Motion behaviour
@@ -1090,6 +1091,8 @@ const simState = {
     stepStatus:        'IDLE', // 'IDLE' | 'DRAW' | 'VOTE' — spectator interaction mode
     optionA:           null,
     optionB:           null,
+    voteEndTime:       null,   // wall-clock ms when the current vote closes; null = no active vote
+    voteResultSent:    false,  // guard: prevents firing the vote-result call more than once
 };
 
 // GUI handles — assigned by initGUI() at the bottom of this file.
@@ -1440,6 +1443,27 @@ let socket;
     socket.on('connect_error', () => console.warn('[socket] connection failed, will retry…'));
 }
 
+const voteCountdownEl = document.querySelector('#vote-countdown');
+
+function _remoteUiPayload() {
+    const isVote = simState.stepStatus === 'VOTE';
+    return {
+        stepStatus:    simState.stepStatus,
+        optionA:       simState.optionA,
+        optionB:       simState.optionB,
+        ...(isVote && { voteDuration: params.voteDuration }),
+    };
+}
+
+function _startVoteTimer(status) {
+    if (status === 'VOTE') {
+        simState.voteEndTime    = Date.now() + params.voteDuration * 1000;
+        simState.voteResultSent = false;
+    } else {
+        simState.voteEndTime = null;
+    }
+}
+
 // Merge n8n-provided params into the live simulation.
 // Only numeric/boolean keys present in the payload are applied;
 // if formulas are included they re-trigger pipeline compilation.
@@ -1453,12 +1477,13 @@ function applySimParams(data) {
 
     // Story step — a new step ID resets all completion state then applies the step's UI mode.
     if (step !== undefined) {
-        simState.storyStep  = step;
+        simState.storyStep       = step;
         simState.storyVoteResult = null;
-        simState.stepStatus = stepStatus ?? 'IDLE';
-        simState.optionA    = optionA    ?? null;
-        simState.optionB    = optionB    ?? null;
-        socket.emit('remote-ui', { stepStatus: simState.stepStatus, optionA: simState.optionA, optionB: simState.optionB });
+        simState.stepStatus      = stepStatus ?? 'IDLE';
+        simState.optionA         = optionA    ?? null;
+        simState.optionB         = optionB    ?? null;
+        _startVoteTimer(simState.stepStatus);
+        socket.emit('remote-ui', _remoteUiPayload());
     } else if (stepStatus !== undefined && (
         stepStatus !== simState.stepStatus ||
         optionA    !== simState.optionA    ||
@@ -1468,7 +1493,8 @@ function applySimParams(data) {
         simState.stepStatus = stepStatus;
         if (optionA !== undefined) simState.optionA = optionA;
         if (optionB !== undefined) simState.optionB = optionB;
-        socket.emit('remote-ui', { stepStatus: simState.stepStatus, optionA: simState.optionA, optionB: simState.optionB });
+        _startVoteTimer(simState.stepStatus);
+        socket.emit('remote-ui', _remoteUiPayload());
     }
     if (mode === 'SHOWCASE' || mode === 'STORY') {
         simState.mode = mode;
@@ -1984,6 +2010,23 @@ function frame(ts) {
     const rawDt  = Math.min(Math.max(now - prevTime, TIME_MULT), 0.05);
     const dt     = params.useDeltaTime ? rawDt : (1 / 60);
     prevTime     = now;
+
+    // Vote countdown — update display and fire result when timer expires.
+    if (simState.stepStatus === 'VOTE' && simState.voteEndTime) {
+        const wallNow   = Date.now();
+        const remaining = Math.max(0, Math.ceil((simState.voteEndTime - wallNow) / 1000));
+        if (voteCountdownEl) { voteCountdownEl.textContent = remaining; voteCountdownEl.classList.add('visible'); }
+        if (wallNow >= simState.voteEndTime && !simState.voteResultSent) {
+            simState.voteResultSent = true;
+            simState.voteEndTime    = null;
+            const winner         = simState.storyVoteResult === simState.optionA ? 'A'
+                                 : simState.storyVoteResult === simState.optionB ? 'B'
+                                 : null;
+            callN8n({ type: 'vote-result', winner, winning_option: simState.storyVoteResult ?? null });
+        }
+    } else if (voteCountdownEl) {
+        voteCountdownEl.classList.remove('visible');
+    }
 
     // Move each spectator's spawner along the last joystick direction, check inactivity timeout.
     if (activeSlots.length) {

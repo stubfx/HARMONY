@@ -256,6 +256,21 @@ html, body {
     color: rgba(255, 255, 255, 0.9);
 }
 
+/* ── Vote timer — countdown shown at the top center of the vote panel ───────── */
+#vote-timer {
+    position: absolute;
+    top: max(env(safe-area-inset-top), 1.25rem);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1;
+    font-family: ui-monospace, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    color: rgba(255, 255, 255, 0.3);
+    pointer-events: none;
+    transition: color 0.3s;
+}
+
 /* ── Story vote panel ────────────────────────────────────────────────────────── */
 #vote-panel {
     position: fixed;

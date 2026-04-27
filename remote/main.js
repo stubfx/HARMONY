@@ -147,12 +147,36 @@ socket.on('device-message', (data) => {
 const votePanelEl = document.querySelector('#vote-panel');
 const voteBtnA    = document.querySelector('#vote-btn-a');
 const voteBtnB    = document.querySelector('#vote-btn-b');
+const voteTimerEl = document.querySelector('#vote-timer');
 const textPanelEl = document.querySelector('#text-panel');
 const textInputEl = document.querySelector('#input-form input');
 let _storyOptionA    = null;
 let _storyOptionB    = null;
 let _currentStepStatus = null;
-function setRemoteUI({ stepStatus, optionA, optionB } = {}) {
+let _voteTimerInterval = null;
+
+function _startVoteCountdown(seconds) {
+    clearInterval(_voteTimerInterval);
+    let remaining = Math.max(0, Math.round(seconds));
+    if (voteTimerEl) voteTimerEl.textContent = remaining;
+    _voteTimerInterval = setInterval(() => {
+        remaining--;
+        if (voteTimerEl) voteTimerEl.textContent = Math.max(0, remaining);
+        if (remaining <= 0) {
+            clearInterval(_voteTimerInterval);
+            _voteTimerInterval = null;
+            setRemoteUI(); // revert to rest state
+        }
+    }, 1000);
+}
+
+function _clearVoteCountdown() {
+    clearInterval(_voteTimerInterval);
+    _voteTimerInterval = null;
+    if (voteTimerEl) voteTimerEl.textContent = '';
+}
+
+function setRemoteUI({ stepStatus, optionA, optionB, voteDuration } = {}) {
     _currentStepStatus = stepStatus ?? null;
     _storyOptionA = optionA ?? null;
     _storyOptionB = optionB ?? null;
@@ -167,8 +191,10 @@ function setRemoteUI({ stepStatus, optionA, optionB } = {}) {
             if (voteBtnA) voteBtnA.textContent = _storyOptionA ?? 'A';
             if (voteBtnB) voteBtnB.textContent = _storyOptionB ?? 'B';
             votePanelEl.classList.add('visible');
+            if (voteDuration) _startVoteCountdown(voteDuration);
         } else {
             votePanelEl.classList.remove('visible');
+            _clearVoteCountdown();
         }
     }
 

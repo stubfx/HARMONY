@@ -83,6 +83,7 @@ These keys trigger immediate side-effects and are **not** stored in `params`.
 | `optionB` | `string` \| `null` | Label for the second vote option. Shown on the right half of the spectator vote panel when `stepStatus` is `"VOTE"`. |
 | `caption` | `string` \| `null` | Text drawn as a subtitle at the bottom of the trace canvas (story mode captions, voiceover subtitles, etc.). Empty string or `null` clears it. |
 | `triggerHeartbeat` | `true` | Fires an immediate out-of-cycle heartbeat call to n8n (`/webhook/heartbeat`). Useful for manually re-syncing n8n state from the admin panel without waiting for the next scheduled tick. |
+| `vote-result` event | — | **Sent by the sim** (not a response key). When the `voteDuration` timer expires, the sim POSTs to `/webhook/sim-event` with `{ "type": "vote-result", "room": "...", "winner": "A" \| "B" \| null, "winning_option": "option text" \| null }`. `winner` is `null` on a tie. Use this in n8n to advance the story step. |
 | `audio` | `string` \| `null` | Base64-encoded audio for the **voiceover track** (plays once, then stops). Decoded and routed through the Web Audio analyser — drives particle brightness via RMS. `null` or `""` stops any running voiceover immediately. Absent key = no-op. |
 | `audiobg` | `string` \| `null` | Base64-encoded audio for the **background music track**. `null` or `""` stops and clears it immediately. Absent key = no-op. |
 | `audiobgLoop` | `true` | When `true` (default) the track loops forever. Set to `false` to play once and stop at the end. |
@@ -206,6 +207,7 @@ The trace canvas is always full-screen (scaled by `traceScale`). QR and user con
 | `remoteTimeout` | `0` | Seconds of silence from all remotes before the QR is restored. `0` = disabled. |
 | `clearDelay` | `0` | Seconds before auto-clearing user-submitted trace content. `0` = disabled. |
 | `heartbeatInterval` | `10` | Seconds between heartbeat calls. `0` = off. The fetch timeout scales automatically with this value (90% of the interval, minimum 5 s), so heavy n8n responses are not aborted when the interval is long. |
+| `voteDuration` | `30` | Seconds the vote panel stays open. When the timer expires the sim fires a `vote-result` event to `/webhook/sim-event` and the remote reverts to the rest state (joystick). Both displays show a live countdown during the vote. |
 | `n8nTestMode` | `false` | Routes all n8n calls (sim and server) to `/webhook-test/` endpoints. Server follows automatically via socket sync. |
 
 ---
