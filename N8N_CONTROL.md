@@ -46,8 +46,12 @@ The sim sends this every `heartbeatInterval` seconds (default: 20 s). Use it to 
 |-------|------|-------------|
 | `type` | `"heartbeat"` | Always `"heartbeat"` |
 | `room` | `string` | Session room UUID |
+| `mode` | `"STORY"` \| `"SHOWCASE"` | Current top-level session mode |
 | `status` | `"NORMAL"` \| `"FREEROAM"` \| `"DOT"` | Current simulation state |
 | `qrStatus` | `"SHOW"` \| `"HIDE"` | Whether the QR code is the active magnet image |
+| `step` | `string` \| `null` | Current story step ID, or `null` if none |
+| `stepStatus` | `"IDLE"` \| `"DRAW"` \| `"VOTE"` \| `"TEXT"` | Current step phase |
+| `storyVoteResult` | `string` \| `null` | Leading vote option label, or `null` if tied / no vote |
 | `params` | `object` | Full snapshot of all current sim params (see below) |
 
 ### Response
@@ -73,6 +77,11 @@ These keys trigger immediate side-effects and are **not** stored in `params`.
 | `dir` | `string` | Sets the direction formula (WGSL math expression in `x, y, t, cx, cy, PI, TWO_PI`). Applied immediately. |
 | `wind` | `string` | Sets the wind formula (same variable set as `dir`). Applied immediately. |
 | `avoidMap` | `string` \| `null` | URL of an image to use as the avoidance map. `null` clears the current map. |
+| `step` | `string` \| `null` | Advances the story to a new step. Setting this resets `stepStatus` to `"IDLE"` (or the value provided), clears `optionA`/`optionB`, and emits `remote-ui` to all spectators. `null` clears the current step. Always send as a top-level key, not inside `params`. |
+| `stepStatus` | `"IDLE"` \| `"DRAW"` \| `"VOTE"` \| `"TEXT"` | Updates the current step phase mid-step without resetting other story state. Emitted to spectators via `remote-ui`: `"DRAW"` — joystick active; `"VOTE"` — binary vote panel shown; `"TEXT"` — text input panel shown; `"IDLE"` — no interaction. Ignored if identical to the current phase (no-op emit suppressed). |
+| `optionA` | `string` \| `null` | Label for the first vote option. Shown on the left half of the spectator vote panel when `stepStatus` is `"VOTE"`. |
+| `optionB` | `string` \| `null` | Label for the second vote option. Shown on the right half of the spectator vote panel when `stepStatus` is `"VOTE"`. |
+| `caption` | `string` \| `null` | Text drawn as a subtitle at the bottom of the trace canvas (story mode captions, voiceover subtitles, etc.). Empty string or `null` clears it. |
 | `triggerHeartbeat` | `true` | Fires an immediate out-of-cycle heartbeat call to n8n (`/webhook/heartbeat`). Useful for manually re-syncing n8n state from the admin panel without waiting for the next scheduled tick. |
 | `audio` | `string` \| `null` | Base64-encoded audio for the **voiceover track** (plays once, then stops). Decoded and routed through the Web Audio analyser — drives particle brightness via RMS. `null` or `""` stops any running voiceover immediately. Absent key = no-op. |
 | `audiobg` | `string` \| `null` | Base64-encoded audio for the **background music track**. `null` or `""` stops and clears it immediately. Absent key = no-op. |
@@ -148,6 +157,7 @@ The trace canvas is always full-screen (scaled by `traceScale`). QR and user con
 | `qrMargin` | `0.02` | `0 – 0.1` | Uniform margin from the aligned edge, as a fraction of `min(traceW, traceH)`. Applied equally on both axes. |
 | `qrAlignX` | `"center"` | `"left"` \| `"center"` \| `"right"` | Horizontal position of the QR code. |
 | `qrAlignY` | `"center"` | `"top"` \| `"center"` \| `"bottom"` | Vertical position of the QR code. |
+| `qrOverlay` | `false` | bool | When `true`, the QR is rendered on a separate 2D canvas overlay instead of being baked into the trace texture. Agents no longer home to the QR pattern; the overlay sits above the particle layer at full resolution. Use when you want a crisp, scannable code that doesn't interfere with swarm formation. |
 | `qrQuietZone` | `0` | `0 – 8` | White border around the QR in modules. `0` = none (tightest), `4` = spec minimum (most scannable). Triggers QR regeneration. |
 | `qrInvert` | `false` | bool | Swap dark/light channels: transparent modules on white background instead of white modules on transparent. Triggers QR regeneration. |
 
@@ -191,7 +201,7 @@ The trace canvas is always full-screen (scaled by `traceScale`). QR and user con
 | `maxSpectators` | `1` | Connected spectator count at which the QR is hidden. Used by n8n logic to decide when to call `showQR: false`. The sim does not act on this directly — n8n reads it from the heartbeat and acts accordingly. |
 | `spectatorAgentShare` | `100` | Percentage of agents (by index) that are assigned to spectators (0–100). The top `(100 − share)%` of agents always behave as pure sim agents — default color, formula/global wind, no joystick spawner — leaving them free to form trace images undisturbed. Changes take effect on the next frame with no re-seeding. |
 | `spectatorSpawnChance` | `0.01` | Per-frame probability that an agent in a spectator's partition teleports to that spectator's touch position (0–1). Only fires while the spectator is actively touching; homing agents are exempt. |
-| `respawnOnQR` | `false` | When `true`, free agents that wander into the QR bounding box are stochastically respawned to a random canvas edge, keeping the code scannable. Homing agents (those forming the QR pattern) are exempt. |
+| `respawnOnQR` | `true` | When `true`, free agents that wander into the QR bounding box are stochastically respawned to a random canvas edge, keeping the code scannable. Homing agents (those forming the QR pattern) are exempt. |
 | `qrRespawnChance` | `0.01` | Per-frame probability `[0–1]` that a free agent inside the QR rect is respawned. Only active when `respawnOnQR` is `true`. |
 | `remoteTimeout` | `0` | Seconds of silence from all remotes before the QR is restored. `0` = disabled. |
 | `clearDelay` | `0` | Seconds before auto-clearing user-submitted trace content. `0` = disabled. |
@@ -274,7 +284,7 @@ The `device-message` socket event is received by the spectator's browser.
 - **`data.text`** — rendered in a pill-shaped notification anchored to the top of the screen. Slides in from above, auto-dismisses after 5 s. Consecutive messages restart the timer. Does not block touch interaction.
 - **`data.color`** — immediately updates the aura background color, overriding the temperature-driven hue. The tilt anchor and coherence shape still respond to the device. Persists until the next push. Send `null` to restore temperature-driven color.
 
-The text input on the remote is hidden by default and revealed by a double-tap on the gesture surface. After submitting text it collapses automatically.
+The text input panel on the remote is hidden by default. It appears automatically when `stepStatus` is set to `"TEXT"` via the `remote-ui` socket event and collapses after the spectator submits their input. It cannot be opened manually — it is driven entirely by n8n via the `stepStatus` action flag.
 
 ---
 
