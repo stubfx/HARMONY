@@ -38,7 +38,7 @@ Return any sim params to push to the host immediately. The server forwards the r
 
 ## `/webhook/heartbeat` — Periodic sim snapshot (sim → n8n)
 
-The sim sends this every `heartbeatInterval` seconds (default: 20 s). Use it to keep n8n in sync with the current state and to push changes back proactively.
+The sim sends this every `heartbeatInterval` seconds (default: 10 s). Use it to keep n8n in sync with the current state and to push changes back proactively.
 
 ### Payload
 
@@ -207,7 +207,8 @@ The trace canvas is always full-screen (scaled by `traceScale`). QR and user con
 | `qrRespawnChance` | `0.01` | Per-frame probability `[0–1]` that a free agent inside the QR rect is respawned. Only active when `respawnOnQR` is `true`. |
 | `remoteTimeout` | `0` | Seconds of silence from all remotes before the QR is restored. `0` = disabled. |
 | `clearDelay` | `0` | Seconds before auto-clearing user-submitted trace content. `0` = disabled. |
-| `heartbeatInterval` | `10` | Seconds between heartbeat calls. `0` = off. The fetch timeout scales automatically with this value (90% of the interval, minimum 5 s), so heavy n8n responses are not aborted when the interval is long. |
+| `heartbeatInterval` | `10` | Seconds between heartbeat calls. `0` = off. |
+| `heartbeatTimeout` | `60` | Seconds before a heartbeat fetch is aborted. If a heartbeat is still in flight when the next tick fires, the tick is skipped and logged to the console. Increase this when n8n workflows take a long time to respond. |
 | `voteDuration` | `30` | Seconds the vote panel stays open. When the timer expires the sim fires a `vote-result` event to `/webhook/sim-event` and the remote reverts to the rest state (joystick). Both displays show a live countdown during the vote. |
 | `n8nTestMode` | `false` | Routes all n8n calls (sim and server) to `/webhook-test/` endpoints. Server follows automatically via socket sync. |
 

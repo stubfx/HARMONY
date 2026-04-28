@@ -154,7 +154,8 @@ export function initGUI({
     fSession.add(params, 'remoteTimeout',            0, 180,  5   ).name('idle restore QR (s)');
     fSession.add(params, 'maxSpectators',            1,  50,  1   ).name('QR hides at N users');
     fSession.add(params, 'n8nTestMode').name('n8n test mode').onChange(v => socket.emit('set-n8n-test-mode', v));
-    fSession.add(params, 'heartbeatInterval', 0, 120, 5).name('heartbeat (s)').onChange(() => restartHeartbeat());
+    fSession.add(params, 'heartbeatInterval', 0, 120,  5).name('heartbeat (s)').onChange(() => restartHeartbeat());
+    fSession.add(params, 'heartbeatTimeout',  5, 300, 5).name('heartbeat timeout (s)');
 
     // ── Audio ─────────────────────────────────────────────────────────────────
     const fAudio = gui.addFolder('Audio');

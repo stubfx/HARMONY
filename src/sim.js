@@ -110,6 +110,7 @@ const params = {
     qrRespawnChance:  0.01,  // per-frame probability [0–1] for the respawn
     n8nTestMode:       false, // true = /webhook-test/sim-event, false = /webhook/sim-event
     heartbeatInterval: 10,   // seconds between periodic param snapshots sent to n8n (0 = off)
+    heartbeatTimeout:  60,   // seconds before a heartbeat fetch is aborted
     voteDuration:      30,   // seconds the vote panel stays open before the sim fires the result
     // Weight
     weightSpread: 0.8,    // 0 = all equal; 1 = weights span [0.05 … 1.95]
@@ -1134,7 +1135,6 @@ let lastRemoteActivity = Date.now(); // timestamp of last remote-event (touch or
 // In test mode all paths switch to /webhook-test/*.
 const N8N_BASE            = (import.meta.env.VITE_N8N_BASE_URL ?? '').replace(/\/$/, '');
 const N8N_USER_TIMEOUT_MS = 15_000;
-function n8nHeartbeatTimeoutMs() { return Math.min(Math.max(params.heartbeatInterval * 900, 5_000), 30_000); }
 let   n8nInFlight          = false;
 let   n8nHeartbeatInFlight = false;
 
@@ -1169,11 +1169,12 @@ async function callN8n(event) {
 // params.heartbeatInterval seconds. Response is handled identically to sim-event.
 // In-flight guard: any heartbeat requested while one is running is dropped (no queue).
 async function callN8nHeartbeat() {
-    if (!N8N_BASE || n8nHeartbeatInFlight) return;
+    if (!N8N_BASE) return;
+    if (n8nHeartbeatInFlight) { console.log('[n8n heartbeat] skipped — previous call still in flight'); return; }
     n8nHeartbeatInFlight = true;
     const path = params.n8nTestMode ? '/webhook-test/heartbeat' : '/webhook/heartbeat';
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), n8nHeartbeatTimeoutMs());
+    const timer = setTimeout(() => controller.abort(), params.heartbeatTimeout * 1000);
     try {
         const res = await fetch(N8N_BASE + path, {
             method:  'POST',
