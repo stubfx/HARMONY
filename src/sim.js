@@ -1091,6 +1091,7 @@ const simState = {
     stepStatus:        'IDLE', // 'IDLE' | 'DRAW' | 'VOTE' — spectator interaction mode
     optionA:           null,
     optionB:           null,
+    userCount:         0,      // live spectator count — updated via spectator-joined/-left
     voteEndTime:       null,   // wall-clock ms when the current vote closes; null = no active vote
     voteResultSent:    false,  // guard: prevents firing the vote-result call more than once
 };
@@ -1152,7 +1153,8 @@ async function callN8n(event) {
         });
         clearTimeout(timer);
         if (res.ok) {
-            const data = await res.json();
+            const raw  = await res.json();
+            const data = Array.isArray(raw) ? raw[0] : raw;
             if (data && typeof data === 'object') applySimParams(data);
         }
     } catch (err) {
@@ -1185,13 +1187,15 @@ async function callN8nHeartbeat() {
                 step:              simState.storyStep,
                 storyVoteResult:   simState.storyVoteResult,
                 stepStatus:        simState.stepStatus,
+                userCount:         simState.userCount,
                 params:            { ...params },
             }),
             signal:  controller.signal,
         });
         clearTimeout(timer);
         if (res.ok) {
-            const data = await res.json();
+            const raw  = await res.json();
+            const data = Array.isArray(raw) ? raw[0] : raw;
             if (data && typeof data === 'object') applySimParams(data);
         }
     } catch (err) {
@@ -1340,7 +1344,8 @@ let socket;
     });
 
     // A spectator joined — assign a slot, send them their color, brightness burst.
-    socket.on('spectator-joined', ({ spectatorId } = {}) => {
+    socket.on('spectator-joined', ({ spectatorId, userCount } = {}) => {
+        if (userCount !== undefined) simState.userCount = userCount;
         lastRemoteActivity = Date.now();
         burstBrightness    = BURST_BRIGHTNESS;
         if (spectatorId && activeSlots.length < MAX_SPECTATOR_SLOTS) {
@@ -1351,7 +1356,8 @@ let socket;
         }
     });
 
-    socket.on('spectator-left', ({ spectatorId } = {}) => {
+    socket.on('spectator-left', ({ spectatorId, userCount } = {}) => {
+        if (userCount !== undefined) simState.userCount = userCount;
         if (spectatorId) {
             const idx = activeSlots.findIndex(s => s.spectatorId === spectatorId);
             if (idx !== -1) {

@@ -49,9 +49,10 @@ The sim sends this every `heartbeatInterval` seconds (default: 20 s). Use it to 
 | `mode` | `"STORY"` \| `"SHOWCASE"` | Current top-level session mode |
 | `status` | `"NORMAL"` \| `"FREEROAM"` \| `"DOT"` | Current simulation state |
 | `qrStatus` | `"SHOW"` \| `"HIDE"` | Whether the QR code is the active magnet image |
-| `step` | `string` \| `null` | Current story step ID, or `null` if none |
+| `step` | `number` \| `null` | Current story step ID, or `null` if none |
 | `stepStatus` | `"IDLE"` \| `"DRAW"` \| `"VOTE"` \| `"TEXT"` | Current step phase |
 | `storyVoteResult` | `string` \| `null` | Leading vote option label, or `null` if tied / no vote |
+| `userCount` | `number` | Live connected spectator count |
 | `params` | `object` | Full snapshot of all current sim params (see below) |
 
 ### Response
