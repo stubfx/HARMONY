@@ -1,0 +1,94 @@
+{
+  "name": "memory_state",
+  "strict": true,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "current_step": {
+        "type": "integer",
+        "description": "The number of the last completed step"
+      },
+      "protagonist": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Protagonist's name"
+          },
+          "description": {
+            "type": "string",
+            "description": "Updated description of the protagonist"
+          },
+          "traits": {
+            "type": "array",
+            "description": "Physical, psychological traits or abilities established during the story",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["name", "description", "traits"],
+        "additionalProperties": false
+      },
+      "secondary_characters": {
+        "type": "array",
+        "description": "All secondary characters encountered up to this step",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "role": {
+              "type": "string",
+              "description": "Narrative role (e.g. 'mentor', 'threshold guardian', 'ally', 'enemy')"
+            },
+            "description": { "type": "string" }
+          },
+          "required": ["name", "role", "description"],
+          "additionalProperties": false
+        }
+      },
+      "locations": {
+        "type": "array",
+        "description": "All places visited or mentioned, in order of appearance",
+        "items": { "type": "string" }
+      },
+      "significant_objects": {
+        "type": "array",
+        "description": "Narratively important objects introduced during the story",
+        "items": { "type": "string" }
+      },
+      "audience_choices": {
+        "type": "array",
+        "description": "Record of all audience vote choices",
+        "items": {
+          "type": "object",
+          "properties": {
+            "step": {
+              "type": "integer",
+              "description": "The step at which the choice was made"
+            },
+            "choice": {
+              "type": "string",
+              "description": "The text of the chosen option"
+            }
+          },
+          "required": ["step", "choice"],
+          "additionalProperties": false
+        }
+      },
+      "established_facts": {
+        "type": "array",
+        "description": "Important narrative facts that must be remembered in future steps",
+        "items": { "type": "string" }
+      }
+    },
+    "required": [
+      "current_step",
+      "protagonist",
+      "secondary_characters",
+      "locations",
+      "significant_objects",
+      "audience_choices",
+      "established_facts"
+    ],
+    "additionalProperties": false
+  }
+}

@@ -1,0 +1,119 @@
+{
+  "name": "story_skeleton",
+  "strict": true,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "story_title": {
+        "type": "string",
+        "description": "A concise and evocative title for the story"
+      },
+      "story_concept": {
+        "type": "string",
+        "description": "The underlying narrative concept in one sentence (e.g. 'an architect who rebuilds the city they destroyed')"
+      },
+      "protagonist_archetype": {
+        "type": "string",
+        "description": "The narrative archetype of the protagonist (e.g. 'the reluctant hero', 'the outcast seeking redemption')"
+      },
+      "protagonist_description": {
+        "type": "string",
+        "description": "Specific and concrete initial physical and character description of the protagonist"
+      },
+      "world_setting": {
+        "type": "string",
+        "description": "Where and when the story takes place, with dominant visual atmosphere"
+      },
+      "central_conflict": {
+        "type": "string",
+        "description": "The fundamental tension unresolved until the final step"
+      },
+      "steps": {
+        "type": "array",
+        "description": "The stages of the Hero's Journey, in order",
+        "items": {
+          "type": "object",
+          "properties": {
+            "number": {
+              "type": "integer",
+              "description": "Step number"
+            },
+            "vogler_stage": {
+              "type": "string",
+              "description": "Official name of the Vogler/Campbell stage"
+            },
+            "dramatic_function": {
+              "type": "string",
+              "description": "What MUST happen structurally in this step. Immutable. Specific to this story."
+            },
+            "emotional_tone": {
+              "type": "string",
+              "description": "Dominant emotion of the step (e.g. 'fear and wonder')"
+            },
+            "narrative_seeds": {
+              "type": "array",
+              "description": "2–3 concrete elements the Step Generator can use to build the scene",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": ["number", "vogler_stage", "dramatic_function", "emotional_tone", "narrative_seeds"],
+          "additionalProperties": false
+        }
+      },
+      "initial_memory_state": {
+        "type": "object",
+        "description": "Fundamental facts already known before the story begins to be narrated",
+        "properties": {
+          "protagonist": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "description": { "type": "string" },
+              "traits": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            },
+            "required": ["name", "description", "traits"],
+            "additionalProperties": false
+          },
+          "secondary_characters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "role": { "type": "string" },
+                "description": { "type": "string" }
+              },
+              "required": ["name", "role", "description"],
+              "additionalProperties": false
+            }
+          },
+          "locations": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "significant_objects": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "audience_choices": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "established_facts": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["protagonist", "secondary_characters", "locations", "significant_objects", "audience_choices", "established_facts"],
+        "additionalProperties": false
+      }
+    },
+    "required": ["story_title", "story_concept", "protagonist_archetype", "protagonist_description", "world_setting", "central_conflict", "steps", "initial_memory_state"],
+    "additionalProperties": false
+  }
+}

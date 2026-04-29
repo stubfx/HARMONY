@@ -1,0 +1,65 @@
+{
+  "name": "step_output",
+  "strict": true,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "step_completed": {
+        "type": "integer",
+        "description": "The number of the step just generated"
+      },
+      "narrative_text": {
+        "type": "string",
+        "description": "The narrative text of the step: 2–4 evocative sentences that fulfil the dramatic function of the stage"
+      },
+      "caption": {
+        "type": "string",
+        "description": "A very short sentence (max 8 words) displayed on the installation as a subtitle for the step"
+      },
+      "primary_color": {
+        "type": "string",
+        "description": "Dominant color of the image as hexadecimal (e.g. '#1A237E')",
+        "pattern": "^#[A-Fa-f0-9]{6}$"
+      },
+      "secondary_color": {
+        "type": "string",
+        "description": "Secondary color of the image as hexadecimal (e.g. '#FFD700')",
+        "pattern": "^#[A-Fa-f0-9]{6}$"
+      },
+      "image_prompt": {
+        "type": "string",
+        "description": "Detailed prompt for an AI image generator: explicitly names the primary/secondary colors, describes composition and atmosphere, specifies a visual style"
+      },
+      "vote_question": {
+        "type": ["string", "null"],
+        "description": "Question shown to the audience to vote on the next step. Null if this is the last step."
+      },
+      "option_a": {
+        "type": ["string", "null"],
+        "description": "First vote option. Null if this is the last step."
+      },
+      "option_b": {
+        "type": ["string", "null"],
+        "description": "Second vote option. Null if this is the last step."
+      },
+      "next_interaction_type": {
+        "type": "string",
+        "enum": ["VOTE", "TEXT", "DRAW", "IDLE"],
+        "description": "Type of audience interaction required for the next step. IDLE for the last step."
+      }
+    },
+    "required": [
+      "step_completed",
+      "narrative_text",
+      "caption",
+      "primary_color",
+      "secondary_color",
+      "image_prompt",
+      "vote_question",
+      "option_a",
+      "option_b",
+      "next_interaction_type"
+    ],
+    "additionalProperties": false
+  }
+}

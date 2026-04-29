@@ -292,6 +292,88 @@ The text input panel on the remote is hidden by default. It appears automaticall
 
 ---
 
+## Agentic story flow
+
+The `agents/` directory contains OpenAI system prompts and JSON schemas for a three-agent pipeline that drives STORY mode. Two language versions exist: `agents/italian/` and `agents/english/`. Both share the same architecture; the active sub-folder in each is `vogler_12/` (12 Vogler stages). The root-level files in `agents/italian/` are an older 17-stage draft.
+
+### The three agents
+
+| Agent | File | Runs |
+|-------|------|------|
+| **Architect** | `vogler_12/01_architect.md` | Once per session |
+| **Step Generator** | `vogler_12/02_step_generator.md` | Once per step |
+| **Memory Extractor** | `03_memory_extractor.md` | Once per step, after the generator |
+
+**Architect** — given no input, outputs the complete immutable story skeleton: 12 steps each with a `dramatic_function`, `emotional_tone`, `narrative_seeds`, plus protagonist, world, central conflict, and `initial_memory_state`. Store this in n8n static data — it never changes for that session.
+
+**Step Generator** — given `step_number`, `vote_detail` (null at step 1), `story_skeleton`, and `memory_state`, outputs one step's content: `narrative_text`, `caption`, `primary_color`, `secondary_color`, `image_prompt`, `vote_question`, `option_a`, `option_b`, `next_interaction_type`.
+
+**Memory Extractor** — given `step_number`, `step_text` (the `narrative_text` string from the generator output), `winning_vote_detail`, and `previous_memory_state`, outputs an updated memory state. Pass only `narrative_text`, not the full generator JSON.
+
+### n8n static data to persist across calls
+
+| Key | Set when | Updated when |
+|-----|----------|--------------|
+| `story_skeleton` | Session start (Architect) | Never |
+| `memory_state` | Session start (initial from Architect) | After every Memory Extractor call |
+| `current_step_number` | Session start (`1`) | After every vote-result |
+| `last_narrative_text` | After every Step Generator call | After every Step Generator call |
+
+### Session start workflow
+
+Triggered by a heartbeat where `step === null` and `mode === "STORY"`:
+
+1. Call **Architect** → store `story_skeleton` and extract `initial_memory_state`
+2. Call **Step Generator** with `step_number: 1`, `vote_detail: null`, skeleton, initial memory → store `narrative_text`
+3. Generate image from `image_prompt` (DALL-E or equivalent)
+4. Respond to heartbeat:
+
+```json
+{
+  "step": 0,
+  "caption": "...",
+  "traceImage": "<image url>",
+  "stepStatus": "VOTE",
+  "optionA": "...",
+  "optionB": "..."
+}
+```
+
+On subsequent heartbeats where `step` is already set, respond `{}`.
+
+### Per-step cycle (vote-result event)
+
+Triggered by `/webhook/sim-event` with `type: "vote-result"`:
+
+1. Call **Memory Extractor** with `step_number: current`, `step_text: last_narrative_text`, `winning_vote_detail: winning_option`, `previous_memory_state` → store updated memory
+2. Increment `current_step_number`
+3. Call **Step Generator** with `step_number: current`, `vote_detail: winning_option`, skeleton, updated memory → store new `narrative_text`
+4. Generate image
+5. Respond:
+
+```json
+{
+  "step": <current_step_number - 1>,
+  "caption": "...",
+  "traceImage": "<image url>",
+  "stepStatus": "VOTE",
+  "optionA": "...",
+  "optionB": "..."
+}
+```
+
+At step 12, `next_interaction_type` from the generator will be `"IDLE"` — send `stepStatus: "IDLE"` with no options.
+
+### Step index mapping
+
+The sim uses a 0-based `step` index; Vogler stages are 1-based. The mapping is: `sim_step = vogler_step_number − 1`. Access the skeleton array as `steps[sim_step]` (0-indexed).
+
+### Timeout note
+
+The `/webhook/sim-event` path (vote-result) has a **15-second hardcoded timeout** in the sim (`N8N_USER_TIMEOUT_MS`). If image generation takes longer, the response will be aborted and the next step content won't load. Consider pre-generating the next step's image during the vote countdown, or separating image generation from the vote-result response and delivering it on the next heartbeat.
+
+---
+
 ## Test mode
 
 Toggle `n8n test mode` in the Session GUI panel. The sim immediately emits `set-n8n-test-mode` to the server so both the sim's own HTTP calls and the server's spectator calls switch endpoints in sync.
