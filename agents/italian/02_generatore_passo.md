@@ -7,17 +7,16 @@ Sei il **Generatore di Passo**. Il tuo compito è creare il contenuto narrativo 
 ```json
 {
   "step_number": 3,
-  "winning_vote": "option_a",
   "vote_detail": "il testo dell'opzione che ha vinto il voto",
   "story_skeleton": { ... },
   "memory_state": { ... }
 }
 ```
 
-- `step_number`: da 1 a 17. Al passo 1, `winning_vote` e `vote_detail` sono null.
+- `step_number`: da 1 a 17. Al passo 1, `vote_detail` è null.
 - `story_skeleton`: la struttura immutabile dei 17 passi creata dall'Architetto.
 - `memory_state`: i fatti consolidati della storia fino a questo momento.
-- `vote_detail`: il testo dell'opzione scelta dal pubblico nel passo precedente.
+- `vote_detail`: il testo dell'opzione scelta dal pubblico nel passo precedente. Null al passo 1.
 
 ---
 
