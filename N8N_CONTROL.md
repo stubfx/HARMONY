@@ -51,8 +51,13 @@ The sim sends this every `heartbeatInterval` seconds (default: 10 s). Use it to 
 | `qrStatus` | `"SHOW"` \| `"HIDE"` | Whether the QR code is the active magnet image |
 | `step` | `number` \| `null` | Current story step ID, or `null` if none |
 | `stepStatus` | `"IDLE"` \| `"DRAW"` \| `"VOTE"` \| `"TEXT"` | Current step phase |
-| `storyVoteResult` | `string` \| `null` | Leading vote option label, or `null` if tied / no vote |
+| `optionA` | `string` \| `null` | Text of vote option A — dirty, holds last known value even outside a vote |
+| `optionB` | `string` \| `null` | Text of vote option B — dirty, holds last known value even outside a vote |
+| `votesA` | `number` | Raw vote count for option A — dirty, never auto-reset |
+| `votesB` | `number` | Raw vote count for option B — dirty, never auto-reset |
+| `storyVoteResult` | `string` \| `null` | Current leading option label, or `null` if tied / no vote |
 | `userCount` | `number` | Live connected spectator count |
+| `stateHash` | `string` | 8-char hex FNV-1a fingerprint of the full sim state (all params + mode/status/qrStatus/stepStatus/optionA/optionB/room). Changes on any param or state update. Use this to detect diverged instances and skip no-op responses. |
 | `params` | `object` | Full snapshot of all current sim params (see below) |
 
 ### Response

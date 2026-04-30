@@ -1089,6 +1089,8 @@ const simState = {
     status:            'DOT',
     storyStep:         null,   // echoed from n8n step ID; null = not in story mode
     storyVoteResult:   null,
+    votesA:            0,      // raw vote count for optionA — dirty, never auto-reset
+    votesB:            0,      // raw vote count for optionB — dirty, never auto-reset
     stepStatus:        'IDLE', // 'IDLE' | 'DRAW' | 'VOTE' — spectator interaction mode
     optionA:           null,
     optionB:           null,
@@ -1133,6 +1135,35 @@ let lastRemoteActivity = Date.now(); // timestamp of last remote-event (touch or
 //   /webhook/sim-event   — real-time events (vote-result, text input, etc.)
 //   /webhook/heartbeat   — periodic full state snapshot; n8n uses this to drive story
 // In test mode all paths switch to /webhook-test/*.
+
+// ── State hash ────────────────────────────────────────────────────────────────
+// FNV-1a 32-bit over a deterministically serialised snapshot of all sim state.
+// Included in every heartbeat so n8n can detect stale/diverged instances and
+// skip no-op responses. Any param change or simState change produces a new hash.
+function _sortedJSON(v) {
+    if (v === null || typeof v !== 'object') return JSON.stringify(v);
+    if (Array.isArray(v)) return '[' + v.map(_sortedJSON).join(',') + ']';
+    return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + _sortedJSON(v[k])).join(',') + '}';
+}
+function computeStateHash() {
+    const h0 = 0x811c9dc5;
+    const str = _sortedJSON({
+        room:       sessionRoom,
+        mode:       simState.mode,
+        status:     simState.status,
+        qrStatus:   simState.qrStatus,
+        stepStatus: simState.stepStatus,
+        optionA:    simState.optionA,
+        optionB:    simState.optionB,
+        params,
+    });
+    let h = h0;
+    for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h.toString(16).padStart(8, '0');
+}
 const N8N_BASE            = (import.meta.env.VITE_N8N_BASE_URL ?? '').replace(/\/$/, '');
 const N8N_USER_TIMEOUT_MS = 15_000;
 let   n8nInFlight          = false;
@@ -1186,9 +1217,14 @@ async function callN8nHeartbeat() {
                 status:            simState.status,
                 qrStatus:          simState.qrStatus,
                 step:              simState.storyStep,
-                storyVoteResult:   simState.storyVoteResult,
                 stepStatus:        simState.stepStatus,
+                optionA:           simState.optionA,
+                optionB:           simState.optionB,
+                votesA:            simState.votesA,
+                votesB:            simState.votesB,
+                storyVoteResult:   simState.storyVoteResult,
                 userCount:         simState.userCount,
+                stateHash:         computeStateHash(),
                 params:            { ...params },
             }),
             signal:  controller.signal,
@@ -1441,6 +1477,8 @@ let socket;
 
     // Running vote tally from server — update storyVoteResult to current leader.
     socket.on('story-vote-update', ({ optionA, votesA, optionB, votesB }) => {
+        simState.votesA = votesA ?? 0;
+        simState.votesB = votesB ?? 0;
         if      (votesA > votesB) simState.storyVoteResult = optionA;
         else if (votesB > votesA) simState.storyVoteResult = optionB;
         else                      simState.storyVoteResult = null;
