@@ -1104,7 +1104,7 @@ let stateCtrl   = null;
 let qrStateCtrl = null;
 let modeCtrl    = null;
 let gui, swarmDebug, dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence;
-let applyGUIVisibility, toggleGUI, updateGizmo;
+let applyGUIVisibility, toggleGUI, updateGizmo, setStateHash;
 
 function updateStateDisplay() {
     modeCtrl?.updateDisplay();
@@ -1224,7 +1224,7 @@ async function callN8nHeartbeat() {
                 votesB:            simState.votesB,
                 storyVoteResult:   simState.storyVoteResult,
                 userCount:         simState.userCount,
-                stateHash:         computeStateHash(),
+                stateHash:         (() => { const h = computeStateHash(); setStateHash?.(h); return h; })(),
                 params:            { ...params },
             }),
             signal:  controller.signal,
@@ -1618,7 +1618,7 @@ function applySimParams(data) {
     gui, swarmDebug,
     modeCtrl, stateCtrl, qrStateCtrl,
     dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence,
-    applyGUIVisibility, toggleGUI, updateGizmo,
+    applyGUIVisibility, toggleGUI, updateGizmo, setStateHash,
 } = initGUI({
     params, socket, simState, MAX_AGENTS,
     seedAgents, setSize, rebuildOffscreen,
