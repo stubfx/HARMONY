@@ -513,19 +513,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         if (length(np - vec2<f32>(cx, cy)) < params.dotCenterRadius) {
             let rng_    = hash(i ^ (u32(params.time * 137.0) + 53u));
             if (rng_ < params.dotRespawnChance) {
-                let posRng = hash(i ^ (u32(params.time * 97.0)  + 71u)); // separate hash for position
-                let perim_ = 2.0 * (params.canvasW + params.canvasH);
-                let t_     = posRng * perim_;
-                var ep     = vec2<f32>(0.0, 0.0);
-                if (t_ < params.canvasW) {
-                    ep = vec2<f32>(t_, 0.0);
-                } else if (t_ < params.canvasW + params.canvasH) {
-                    ep = vec2<f32>(params.canvasW, t_ - params.canvasW);
-                } else if (t_ < 2.0 * params.canvasW + params.canvasH) {
-                    ep = vec2<f32>(t_ - params.canvasW - params.canvasH, params.canvasH);
-                } else {
-                    ep = vec2<f32>(0.0, t_ - 2.0 * params.canvasW - params.canvasH);
-                }
+                let rx = hash(i ^ (u32(params.time * 97.0)  + 71u));
+                let ry = hash(i ^ (u32(params.time * 131.0) + 97u));
+                let ep = vec2<f32>(rx * params.canvasW, ry * params.canvasH);
                 agents[i].pos    = ep;
                 agents[i].vel    = vec2<f32>(0.0, 0.0);
                 agents[i].primed = 0.0;
