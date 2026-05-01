@@ -780,8 +780,14 @@ The fetch timeout for each heartbeat request scales automatically with this valu
   "qrStatus":        "HIDE",
   "step":            2,
   "stepStatus":      "VOTE",
-  "storyVoteResult": null,
-  "params":          { ...all current tunable params... }
+  "optionA":         "Casa",
+  "optionB":         "Giardino",
+  "votesA":          3,
+  "votesB":          1,
+  "storyVoteResult": "Casa",
+  "userCount":       4,
+  "params":          { "...": "all current tunable params" },
+  "...serverEchoFields": "any lightweight fields from the last heartbeat response are spread here"
 }
 ```
 
@@ -792,9 +798,13 @@ The fetch timeout for each heartbeat request scales automatically with this valu
 | `status` | Simulation state: `"NORMAL"`, `"FREEROAM"`, or `"DOT"` |
 | `qrStatus` | QR visibility: `"SHOW"` or `"HIDE"` |
 | `step` | Current story step ID as sent by n8n; `null` when not in story mode |
-| `stepStatus` | Current spectator interaction mode: `"IDLE"`, `"DRAW"`, `"VOTE"`, or `"TEXT"` |
-| `storyVoteResult` | Winning option label (e.g. `"Garden"`) while a vote is running; `null` if tied or no vote active |
+| `stepStatus` | Current spectator interaction mode: `"IDLE"`, `"DRAW"`, `"VOTE"`, `"TEXT"`, `"RAISE"`, `"PULSE"`, or `"WAVE"` |
+| `optionA` / `optionB` | Vote option labels; dirty — hold last known value even outside a vote |
+| `votesA` / `votesB` | Raw vote counts; dirty, never auto-reset |
+| `storyVoteResult` | Winning option label while a vote is running; `null` if tied or no vote active |
+| `userCount` | Live connected spectator count |
 | `params` | Full snapshot of every tunable parameter in the GUI |
+| *(echo fields)* | Lightweight fields from the server's last heartbeat response spread at root. Media fields excluded. Cleared on page reload. |
 
 The response is handled identically to `sim-event` — any recognised keys are applied via `applySimParams`. This is the primary channel through which n8n drives all content lifecycle: QR show/hide, trace images, formula changes, parameter adjustments, and story step delivery.
 
@@ -839,6 +849,9 @@ A text input step:
 | `"DRAW"` | Atmospheric surface, full interaction | Joystick, color picker, shake all active |
 | `"VOTE"` | Two full-screen buttons labelled `optionA` / `optionB` with live countdown | Joystick hidden; vote buttons active |
 | `"TEXT"` | Centered text input panel | Keyboard active; joystick and vote panel hidden |
+| `"RAISE"` | Swipe-up panel with ring animation | Swipe upward on the panel to trigger (one-shot) |
+| `"PULSE"` | Full-screen tap surface with pulsing ring | Tap anywhere to send pulse energy to the swarm |
+| `"WAVE"` | Shake panel with ring animation | Shake the phone to trigger (magnitude > 22 m/s²) |
 
 When `stepStatus` changes, the sim broadcasts a `remote-ui` Socket.IO event to all spectators. The remote page switches its interface immediately.
 

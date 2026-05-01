@@ -554,21 +554,27 @@ The **n8n test mode** toggle in the GUI switches between production and test pat
 
 ```json
 {
-  "type":              "heartbeat",
-  "room":              "session-UUID",
-  "status":            "NORMAL",
-  "qrStatus":          "HIDE",
-  "step":              2,
-  "storyStepComplete": false,
-  "storyVoteResult":   null,
-  "stepStatus":        "IDLE",
+  "type":            "heartbeat",
+  "room":            "session-UUID",
+  "mode":            "STORY",
+  "status":          "NORMAL",
+  "qrStatus":        "HIDE",
+  "step":            2,
+  "stepStatus":      "IDLE",
+  "optionA":         null,
+  "optionB":         null,
+  "votesA":          0,
+  "votesB":          0,
+  "storyVoteResult": null,
+  "userCount":       3,
   "params": {
     "agentCount": 1200000,
     "stepLen": 2.0,
     "turnRate": 0.04,
     "windStr": 0.2,
     "...": "all current simulation params"
-  }
+  },
+  "...serverEchoFields": "any fields the server returned in its last heartbeat response are spread here at the root"
 }
 ```
 
@@ -591,7 +597,7 @@ Both endpoints consume the same response format. Return a JSON object with any c
 | `wind` | `string` | New wind formula (WGSL expression returning radians) |
 | `step` | any | Story step ID — resets `storyStepComplete`, `storyVoteResult`, and `stepStatus` for a new step |
 | `stepDuration` | number | Seconds until the step auto-completes and an out-of-cycle heartbeat fires |
-| `stepStatus` | `"IDLE" \| "DRAW" \| "VOTE"` | Spectator interaction mode — relayed to all remote devices via Socket.IO |
+| `stepStatus` | `"IDLE" \| "DRAW" \| "VOTE" \| "TEXT" \| "RAISE" \| "PULSE" \| "WAVE"` | Spectator interaction mode — relayed to all remote devices via Socket.IO |
 | `optionA` | string | First vote option label (required with `VOTE` steps) |
 | `optionB` | string | Second vote option label (required with `VOTE` steps) |
 | `caption` | `string \| null` | Subtitle text drawn at the bottom of the canvas as a particle attractor; `null` clears it |

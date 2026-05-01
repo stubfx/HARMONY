@@ -50,15 +50,15 @@ The sim sends this every `heartbeatInterval` seconds (default: 10 s). Use it to 
 | `status` | `"NORMAL"` \| `"FREEROAM"` \| `"DOT"` | Current simulation state |
 | `qrStatus` | `"SHOW"` \| `"HIDE"` | Whether the QR code is the active magnet image |
 | `step` | `number` \| `null` | Current story step ID, or `null` if none |
-| `stepStatus` | `"IDLE"` \| `"DRAW"` \| `"VOTE"` \| `"TEXT"` | Current step phase |
+| `stepStatus` | `"IDLE"` \| `"DRAW"` \| `"VOTE"` \| `"TEXT"` \| `"RAISE"` \| `"PULSE"` \| `"WAVE"` | Current step phase |
 | `optionA` | `string` \| `null` | Text of vote option A — dirty, holds last known value even outside a vote |
 | `optionB` | `string` \| `null` | Text of vote option B — dirty, holds last known value even outside a vote |
 | `votesA` | `number` | Raw vote count for option A — dirty, never auto-reset |
 | `votesB` | `number` | Raw vote count for option B — dirty, never auto-reset |
 | `storyVoteResult` | `string` \| `null` | Current leading option label, or `null` if tied / no vote |
 | `userCount` | `number` | Live connected spectator count |
-| `stateHash` | `string` | 8-char hex FNV-1a fingerprint of the full sim state (all params + mode/status/qrStatus/stepStatus/optionA/optionB/room). Changes on any param or state update. Use this to detect diverged instances and skip no-op responses. |
 | `params` | `object` | Full snapshot of all current sim params (see below) |
+| *(server echo fields)* | any | Any fields the server returned in its previous heartbeat response are spread at the root of the next payload. This lets n8n detect stale clients: send a `stateToken` (or any identifier) in the response, and if the next heartbeat echoes a different value the client missed an update. Media fields (`audio`, `audiobg`, `traceImage`, `avoidMap`, etc.) are never echoed. Echo is session-only — cleared on page reload. |
 
 ### Response
 
@@ -84,7 +84,7 @@ These keys trigger immediate side-effects and are **not** stored in `params`.
 | `wind` | `string` | Sets the wind formula (same variable set as `dir`). Applied immediately. |
 | `avoidMap` | `string` \| `null` | URL of an image to use as the avoidance map. `null` clears the current map. |
 | `step` | `string` \| `null` | Advances the story to a new step. Setting this resets `stepStatus` to `"IDLE"` (or the value provided), clears `optionA`/`optionB`, and emits `remote-ui` to all spectators. `null` clears the current step — when no step is active the remote always shows the joystick regardless of `stepStatus`. Always send as a top-level key, not inside `params`. |
-| `stepStatus` | `"IDLE"` \| `"DRAW"` \| `"VOTE"` \| `"TEXT"` | Updates the current step phase mid-step without resetting other story state. Only meaningful while a step is active — if no step is set, the remote ignores this and keeps the joystick visible. Emitted to spectators via `remote-ui`: `"DRAW"` — joystick active; `"VOTE"` — binary vote panel shown; `"TEXT"` — text input panel shown; `"IDLE"` — no interaction, joystick hidden. Ignored if identical to the current phase (no-op emit suppressed). |
+| `stepStatus` | `"IDLE"` \| `"DRAW"` \| `"VOTE"` \| `"TEXT"` \| `"RAISE"` \| `"PULSE"` \| `"WAVE"` | Updates the current step phase mid-step without resetting other story state. Only meaningful while a step is active — if no step is set, the remote ignores this and keeps the joystick visible. Emitted to spectators via `remote-ui`: `"DRAW"` — joystick active; `"VOTE"` — binary vote panel shown; `"TEXT"` — text input panel shown; `"IDLE"` — no interaction, joystick hidden; `"RAISE"` — swipe-up gesture panel; `"PULSE"` — full-screen tap surface; `"WAVE"` — shake gesture panel. Ignored if identical to the current phase (no-op emit suppressed). |
 | `optionA` | `string` \| `null` | Label for the first vote option. Shown on the left half of the spectator vote panel when `stepStatus` is `"VOTE"`. |
 | `optionB` | `string` \| `null` | Label for the second vote option. Shown on the right half of the spectator vote panel when `stepStatus` is `"VOTE"`. |
 | `caption` | `string` \| `null` | Text drawn as a subtitle at the bottom of the trace canvas (story mode captions, voiceover subtitles, etc.). Empty string or `null` clears it. |
@@ -299,19 +299,28 @@ The text input panel on the remote is hidden by default. It appears automaticall
 
 ## Agentic story flow
 
-The `agents/` directory contains OpenAI system prompts and JSON schemas for a three-agent pipeline that drives STORY mode. Two language versions exist: `agents/italian/` and `agents/english/`. Both share the same architecture; the active sub-folder in each is `vogler_12/` (12 Vogler stages). The root-level files in `agents/italian/` are an older 17-stage draft.
+The `agents/` directory contains system prompts and JSON schemas for a three-agent pipeline that drives STORY mode. Two language versions exist: `agents/italian/` and `agents/english/`. Both share the same architecture; the active sub-folder in each is `vogler_12/` (12 Vogler stages). The root-level files in `agents/italian/` are an older 17-stage draft.
+
+### Story skeleton: generated vs. static
+
+The story skeleton can be produced in two ways:
+
+1. **Generated** — call the **Architect** agent once at session start. It outputs the full 12-step skeleton from scratch. Use for generative, session-unique narratives.
+2. **Static** — load a pre-written skeleton JSON directly into n8n static data (e.g. `stories/segnale.json`). Skips the Architect entirely. The Step Generator and Memory Extractor work identically regardless of which approach was used.
+
+`stories/segnale.json` is a fully authored skeleton for the story *Una storia per Tav* (an entity from Sistema RT-7 searches for her lost cat through the swarm). Its `narrative_seeds` contain near-verbatim example lines in the entity's voice, so the Step Generator has a concrete model to follow without any additional prompt engineering.
 
 ### The three agents
 
 | Agent | File | Runs |
 |-------|------|------|
-| **Architect** | `vogler_12/01_architect.md` | Once per session |
+| **Architect** | `vogler_12/01_architect.md` | Once per session (skip if using a static skeleton) |
 | **Step Generator** | `vogler_12/02_step_generator.md` | Once per step |
 | **Memory Extractor** | `03_memory_extractor.md` | Once per step, after the generator |
 
 **Architect** — given no input, outputs the complete immutable story skeleton: 12 steps each with a `dramatic_function`, `emotional_tone`, `narrative_seeds`, plus protagonist, world, central conflict, and `initial_memory_state`. Store this in n8n static data — it never changes for that session.
 
-**Step Generator** — given `step_number`, `vote_detail` (null at step 1), `story_skeleton`, and `memory_state`, outputs one step's content: `narrative_text`, `caption`, `primary_color`, `secondary_color`, `image_prompt`, `vote_question`, `option_a`, `option_b`, `next_interaction_type`.
+**Step Generator** — given `step_number`, `vote_detail` (null at step 1), `story_skeleton`, and `memory_state`, outputs one step's content: `narrative_text`, `caption`, `primary_color`, `secondary_color`, `image_prompt`, `vote_question`, `option_a`, `option_b`, `next_interaction_type`. Reads `protagonist_description` and `protagonist.traits` from the skeleton as mandatory style rules.
 
 **Memory Extractor** — given `step_number`, `step_text` (the `narrative_text` string from the generator output), `winning_vote_detail`, and `previous_memory_state`, outputs an updated memory state. Pass only `narrative_text`, not the full generator JSON.
 
