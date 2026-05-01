@@ -1218,7 +1218,10 @@ async function callN8nHeartbeat() {
             const raw  = await res.json();
             const data = Array.isArray(raw) ? raw[0] : raw;
             if (data && typeof data === 'object') {
-                _serverEcho = { ...data };
+                const { audio, audioFormat, audiobg, audiobgFormat, audiobgLoop,
+                        traceImage, avoidMap, traceText, clearText, clearTrace,
+                        restart, dir, wind, ...echoable } = data;
+                _serverEcho = echoable;
                 applySimParams(data);
             }
         }
