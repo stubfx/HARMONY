@@ -1466,6 +1466,9 @@ let socket;
                 uploadSpectatorSlots();
             }
         }
+        if (event.type === 'pulse-tap') {
+            pulseEnergy = Math.min(pulseEnergy + PULSE_INCREMENT, PULSE_MAX);
+        }
         if (event.type === 'text' && event.data?.text && !N8N_BASE) {
             const input = document.querySelector('#trace-text-input');
             if (input) input.value = event.data.text;
@@ -1811,10 +1814,16 @@ let smoothCoherence   = 0.5;
 
 // ── Join burst state ──────────────────────────────────────────────────────────
 // When a spectator joins, a single brightness pulse fires across the field.
-const BURST_BRIGHTNESS = 0.4;  // peak brightness boost added to params.brightness
-const BURST_DECAY      = 0.88; // per frame — fully dissipated in ~0.5 s at 60 fps
+const BURST_BRIGHTNESS = 0.4;   // peak brightness boost added to params.brightness
+const BURST_DECAY      = 0.88;  // per frame — fully dissipated in ~0.5 s at 60 fps
 const BURST_THRESHOLD  = 0.001;
 let burstBrightness = 0;
+
+const PULSE_INCREMENT  = 0.015; // brightness added per tap event
+const PULSE_MAX        = 0.5;   // cap so a full crowd at full speed doesn't blow out
+const PULSE_DECAY      = 0.96;  // per frame — dissipates in ~1.5 s at 60 fps
+const PULSE_THRESHOLD  = 0.001;
+let pulseEnergy = 0;
 
 // ── Uniform writers ───────────────────────────────────────────────────────────
 function writeSoloUB(dt, time) {
@@ -1828,6 +1837,10 @@ function writeSoloUB(dt, time) {
     // Decay join brightness pulse exponentially each frame
     burstBrightness *= BURST_DECAY;
     if (burstBrightness < BURST_THRESHOLD) burstBrightness = 0;
+
+    // Decay collective pulse energy from PULSE step taps
+    pulseEnergy *= PULSE_DECAY;
+    if (pulseEnergy < PULSE_THRESHOLD) pulseEnergy = 0;
 
     // Coherence multiplier for turnRate:
     //   0.0 (chaos / left)  → 0.08× (agents barely steer, each follows own momentum)
@@ -1942,7 +1955,7 @@ function writeRenderUB() {
     const audioMult = isActive()
         ? params.audioFloor + (1 - params.audioFloor) * getVolume()
         : 1.0;
-    f[16] = (params.brightness + burstBrightness) * audioMult;
+    f[16] = (params.brightness + burstBrightness + pulseEnergy) * audioMult;
     f[17] = params.alphaThreshold;
     f[18] = params.blackThreshold;
     f[19] = simState.qrStatus === 'SHOW' ? 0 : params.vignetteEdge;

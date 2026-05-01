@@ -276,6 +276,8 @@ export function initGUI({
     const modeCtrl    = gui.add(simState, 'mode',      ['STORY', 'SHOWCASE']).name('mode');
     const stateCtrl   = gui.add(simState, 'status',   ['NORMAL', 'FREEROAM', 'DOT']).name('status');
     const qrStateCtrl = gui.add(simState, 'qrStatus', ['SHOW', 'HIDE']).name('qr');
+    gui.add(simState, 'stepStatus', ['IDLE', 'DRAW', 'VOTE', 'PULSE', 'TEXT']).name('step status (test)')
+        .onChange(v => socket.emit('remote-ui', { stepStatus: v }));
 
     fMotion.open();
     fWind.open();

@@ -144,11 +144,12 @@ socket.on('device-message', (data) => {
 // IDLE — joystick disabled
 // DRAW — joystick active (default when no story step is running)
 // VOTE — vote panel shown; joystick hidden
-const votePanelEl = document.querySelector('#vote-panel');
-const voteBtnA    = document.querySelector('#vote-btn-a');
-const voteBtnB    = document.querySelector('#vote-btn-b');
-const voteTimerEl = document.querySelector('#vote-timer');
-const textPanelEl = document.querySelector('#text-panel');
+const votePanelEl  = document.querySelector('#vote-panel');
+const voteBtnA     = document.querySelector('#vote-btn-a');
+const voteBtnB     = document.querySelector('#vote-btn-b');
+const voteTimerEl  = document.querySelector('#vote-timer');
+const textPanelEl  = document.querySelector('#text-panel');
+const pulsePanelEl = document.querySelector('#pulse-panel');
 const textInputEl = document.querySelector('#input-form input');
 let _storyOptionA    = null;
 let _storyOptionB    = null;
@@ -180,8 +181,9 @@ function setRemoteUI({ stepStatus, optionA, optionB, voteDuration } = {}) {
     _currentStepStatus = stepStatus ?? null;
     _storyOptionA = optionA ?? null;
     _storyOptionB = optionB ?? null;
-    const isVote = stepStatus === 'VOTE';
-    const isText = stepStatus === 'TEXT';
+    const isVote  = stepStatus === 'VOTE';
+    const isText  = stepStatus === 'TEXT';
+    const isPulse = stepStatus === 'PULSE';
     const showJoystick = !stepStatus || stepStatus === 'DRAW';
 
     if (votePanelEl) {
@@ -206,6 +208,10 @@ function setRemoteUI({ stepStatus, optionA, optionB, voteDuration } = {}) {
             textPanelEl.classList.remove('visible');
             textInputEl?.blur();
         }
+    }
+
+    if (pulsePanelEl) {
+        pulsePanelEl.classList.toggle('visible', isPulse);
     }
 
     if (joystickBaseEl) {
@@ -234,6 +240,19 @@ voteBtnB?.addEventListener('touchstart', (e) => {
         socket.emit('story-vote', { choice: _storyOptionB });
         setTimeout(() => setRemoteUI(), 340);
     }
+}, { passive: false });
+
+// ── Pulse tap ─────────────────────────────────────────────────────────────────
+let _lastPulseEmit = 0;
+pulsePanelEl?.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const now = Date.now();
+    if (now - _lastPulseEmit < 80) return;
+    _lastPulseEmit = now;
+    navigator.vibrate?.(30);
+    socket.emit('user-event', { type: 'pulse-tap' });
+    pulsePanelEl.classList.add('tapped');
+    setTimeout(() => pulsePanelEl.classList.remove('tapped'), 120);
 }, { passive: false });
 
 socket.on('remote-ui', (data) => setRemoteUI(data));
