@@ -264,27 +264,24 @@ voteBtnB?.addEventListener('touchstart', (e) => {
 }, { passive: false });
 
 // ── Raise detection ───────────────────────────────────────────────────────────
-// Phone tilted back from portrait (screen angled away from face) for RAISE_HOLD_MS.
-let _raiseDone      = false;
-let _raiseHoldStart = null;
-const RAISE_PITCH_THRESHOLD = 0.60; // pitchNorm < this (beta < ~36°) = phone tilted back
-const RAISE_HOLD_MS         = 1200;
+// Detects upward arm lift via accelerometer: net upward force > threshold (single spike).
+let _raiseDone = false;
+const RAISE_ACCEL_THRESHOLD = 5; // m/s² net upward acceleration (gravity stripped)
 
 function triggerRaise() {
     if (_raiseDone) return;
     _raiseDone = true;
-    _raiseHoldStart = null;
     navigator.vibrate?.([30, 40, 60]);
     raisePanelEl?.classList.add('completed');
     socket.emit('user-event', { type: 'raise' });
 }
 
 // ── Wave detection ────────────────────────────────────────────────────────────
-// Significant rotational motion detected via AGC-normalized motion value from gyro.
+// Detects side-to-side swing via horizontal acceleration magnitude.
 let _waveDone     = false;
 let _waveLastEmit = 0;
-const WAVE_MOTION_THRESHOLD = 0.82;
-const WAVE_COOLDOWN         = 2000;
+const WAVE_ACCEL_THRESHOLD = 10;  // m/s² horizontal acceleration (x² + z²)
+const WAVE_COOLDOWN        = 2000;
 
 function triggerWave() {
     if (_waveDone) return;
@@ -295,20 +292,27 @@ function triggerWave() {
 }
 
 // ── Sensor unsupported check ──────────────────────────────────────────────────
-// Shows a note after 3 s if orientation data never arrived.
-let _orientationReceived = false;
-let _sensorCheckTimer    = null;
+// Immediate check on state change; delayed fallback for permission-denied cases.
+let _motionReceived  = false;
+let _sensorCheckTimer = null;
 
 function checkSensorSupport(noteEl) {
     clearTimeout(_sensorCheckTimer);
     if (!noteEl) return;
     noteEl.classList.remove('visible');
+
+    if (typeof DeviceMotionEvent === 'undefined') {
+        noteEl.textContent = 'questo dispositivo non supporta il sensore — aspetta il passo successivo';
+        noteEl.classList.add('visible');
+        return;
+    }
+
     _sensorCheckTimer = setTimeout(() => {
-        if (!_orientationReceived) {
+        if (!_motionReceived) {
             noteEl.textContent = 'questo dispositivo non supporta il sensore — aspetta il passo successivo';
             noteEl.classList.add('visible');
         }
-    }, 3000);
+    }, 2500);
 }
 
 // ── Pulse tap ─────────────────────────────────────────────────────────────────
@@ -533,17 +537,36 @@ const SHAKE_COOLDOWN  = 1200; // ms between shakes
 
 window.addEventListener('devicemotion', (e) => {
     if (!motionEnabled) return;
-    const showJoystick = !_currentStepStatus || _currentStepStatus === 'DRAW';
-    if (!showJoystick) return;
+    _motionReceived = true;
     const a = e.accelerationIncludingGravity;
     if (!a) return;
-    const mag = Math.sqrt((a.x ?? 0) ** 2 + (a.y ?? 0) ** 2 + (a.z ?? 0) ** 2);
     const now = Date.now();
-    if (mag > SHAKE_THRESHOLD && now - _shakeLastTime > SHAKE_COOLDOWN) {
-        _shakeLastTime = now;
-        _shaken = true;
-        navigator.vibrate?.(60);
-        sendEvent('shake', {});
+
+    // Shake — only active in DRAW mode
+    const showJoystick = !_currentStepStatus || _currentStepStatus === 'DRAW';
+    if (showJoystick) {
+        const mag = Math.sqrt((a.x ?? 0) ** 2 + (a.y ?? 0) ** 2 + (a.z ?? 0) ** 2);
+        if (mag > SHAKE_THRESHOLD && now - _shakeLastTime > SHAKE_COOLDOWN) {
+            _shakeLastTime = now;
+            _shaken = true;
+            navigator.vibrate?.(60);
+            sendEvent('shake', {});
+        }
+    }
+
+    // RAISE: net upward acceleration (a.y at rest ≈ −9.8 in portrait; strip gravity)
+    if (_currentStepStatus === 'RAISE' && !_raiseDone) {
+        const ay = e.acceleration?.y != null ? e.acceleration.y : (a.y ?? 0) + 9.8;
+        if (ay > RAISE_ACCEL_THRESHOLD) triggerRaise();
+    }
+
+    // WAVE: horizontal swing — x and z are gravity-free in portrait
+    if (_currentStepStatus === 'WAVE' && !_waveDone) {
+        const hMag = Math.sqrt((a.x ?? 0) ** 2 + (a.z ?? 0) ** 2);
+        if (hMag > WAVE_ACCEL_THRESHOLD && now - _waveLastEmit > WAVE_COOLDOWN) {
+            _waveLastEmit = now;
+            triggerWave();
+        }
     }
 });
 
@@ -607,31 +630,10 @@ function startTilt() {
 
     startDeviceTilt(20, (d) => {
         if (!d.enabled) return;
-        _orientationReceived = true;
         currentRoll  = d.g;
         currentPitch = d.b;
         updateAura();
         updateTiltDot(currentRoll, currentPitch);
-
-        // RAISE: phone tilted back from portrait → pitchNorm drops below threshold
-        if (_currentStepStatus === 'RAISE' && !_raiseDone) {
-            if (currentPitch < RAISE_PITCH_THRESHOLD) {
-                if (!_raiseHoldStart) _raiseHoldStart = Date.now();
-                else if (Date.now() - _raiseHoldStart > RAISE_HOLD_MS) triggerRaise();
-            } else {
-                _raiseHoldStart = null;
-            }
-        }
-
-        // WAVE: significant rotational motion burst
-        if (_currentStepStatus === 'WAVE' && !_waveDone) {
-            const now = Date.now();
-            if (d.motion > WAVE_MOTION_THRESHOLD && now - _waveLastEmit > WAVE_COOLDOWN) {
-                _waveLastEmit = now;
-                triggerWave();
-            }
-        }
-
         if (tiltThrottle || !motionEnabled) return;
         tiltThrottle = setTimeout(() => {
             tiltThrottle = null;

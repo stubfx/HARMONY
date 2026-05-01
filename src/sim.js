@@ -127,12 +127,17 @@ const params = {
 // ── URL param overrides ───────────────────────────────────────────────────────
 // ?s=<uuid>      — pin the sim to a specific session room (survives reloads via URL)
 // ?amount=<n>    — override the starting agent count (still adjustable in the GUI)
+// ?test=1        — start with n8n test mode enabled (mirrors GUI toggle, survives reloads)
 const _urlParams     = new URLSearchParams(location.search);
 const _forcedSession = _urlParams.get('s') || null;
 {
     const n = parseInt(_urlParams.get('amount') ?? '', 10);
     if (Number.isFinite(n) && n > 0)
         params.agentCount = Math.max(1_000, Math.min(MAX_AGENTS, n));
+}
+{
+    const t = _urlParams.get('test');
+    if (t === '1' || t === 'true') params.n8nTestMode = true;
 }
 
 const DEFAULT_DIR  = 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI';

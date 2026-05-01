@@ -153,7 +153,13 @@ export function initGUI({
     fSession.add(params, 'spawnerInactiveTimeout',   1,  30,  1   ).name('spawner timeout (s)');
     fSession.add(params, 'remoteTimeout',            0, 180,  5   ).name('idle restore QR (s)');
     fSession.add(params, 'maxSpectators',            1,  50,  1   ).name('QR hides at N users');
-    fSession.add(params, 'n8nTestMode').name('n8n test mode').onChange(v => socket.emit('set-n8n-test-mode', v));
+    fSession.add(params, 'n8nTestMode').name('n8n test mode').onChange(v => {
+        socket.emit('set-n8n-test-mode', v);
+        const url = new URL(location.href);
+        if (v) url.searchParams.set('test', '1');
+        else url.searchParams.delete('test');
+        history.replaceState(null, '', url);
+    });
     fSession.add(params, 'heartbeatInterval', 0, 120,  5).name('heartbeat (s)').onChange(() => restartHeartbeat());
     fSession.add(params, 'heartbeatTimeout',  5, 300, 5).name('heartbeat timeout (s)');
 
