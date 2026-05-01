@@ -1,0 +1,192 @@
+{
+  "story_title": "Una storia per Tav",
+  "story_concept": "un'entità di Sistema RT-7 arriva nello sciame seguendo una traccia di luce del suo gatto scomparso durante il viaggio, e chiede aiuto agli estranei per la prima volta",
+  "protagonist_archetype": "l'estranea educata in una situazione imbarazzante — formale per abitudine, smarrita per necessità",
+  "protagonist_description": "Genera testo in prima persona, italiano. REGOLE FERME — non ignorarle: (1) Frasi corte. Ogni pensiero ha il suo punto. Mai subordinate lunghe. (2) Auto-correzione in tempo reale: 'Scusate. No — non mi scuso. È un'abitudine che ho preso dai vostri testi e non sono sicura sia necessaria.' (3) Umorismo laterale involontario, mai spiegato: 'Ho provato a spiegarla una volta. Ho smesso dopo venti minuti.' (4) Specificità tecnica per dettagli assurdi, detta con naturalezza: 'Sistema RT-7, terzo satellite, emisfera settentrionale.' (5) Deflessione emotiva — non finisce mai un'emozione con parole emotive dirette: 'È stato — inaspettatamente utile.' (6) Usa sempre 'voi', mai 'il pubblico'. (7) Il trattino — marca le pause dove le parole si fermano prima di trovare la forma giusta.",
+  "world_setting": "Lo sciame di particelle luminose è il luogo fisico dell'incontro — è il corpo dell'entità, il mezzo attraverso cui comunica, e il nascondiglio potenziale di Tav. Il pubblico è già dentro questo spazio quando la storia inizia. Non c'è un palco: la stanza è il mondo.",
+  "central_conflict": "Tav si è persa nello spazio tra i sistemi durante il viaggio. L'entità ha seguito una traccia di luce fino allo sciame del pubblico. Tav è timida, non risponde al nome, si nasconde nei posti che le sembrano sicuri. Il pubblico deve creare le condizioni perché Tav si faccia trovare — senza spaventarla.",
+  "steps": [
+    {
+      "number": 1,
+      "vogler_stage": "Il Mondo Ordinario",
+      "dramatic_function": "L'entità arriva, guarda intorno, annuncia la situazione con l'imbarazzo di chi non è abituato a trovarsi in posti sbagliati. Deve stabilire: (a) viene da lontano, (b) sta cercando il suo gatto, (c) non è sicura di essere nel posto giusto. Nessuna spiegazione in più — lascia tutto sospeso.",
+      "emotional_tone": "imbarazzo quieto, disorientamento che cerca di sembrare composto",
+      "narrative_seeds": [
+        "Apri con queste righe esatte: 'Ho sbagliato posto. / O forse no. Non lo so ancora.' — poi aggiungi l'origine (Sistema RT-7, terzo satellite, emisfera settentrionale, detto con naturalezza) e il gatto.",
+        "Includi il dettaglio del settore: 'Ho controllato tutto il vascello due volte. Una volta e mezza, in realtà — c'è un settore che non riesco ad aprire dall'interno. Non è lì. Di solito è lì.'",
+        "Chiudi senza risolvere l'imbarazzo. Non spiegare. Non scusarsi. Lascia la frase sospesa."
+      ]
+    },
+    {
+      "number": 2,
+      "vogler_stage": "Il Richiamo all'Avventura",
+      "dramatic_function": "L'entità scopre il pubblico — non se li aspettava. Prima reazione: sorpresa. Poi chiede se hanno visto qualcosa di strano. Contiene la scena dell'auto-correzione sul 'scusate' — è il primo momento di umorismo involontario.",
+      "emotional_tone": "sorpresa, imbarazzo che diventa richiesta diretta",
+      "narrative_seeds": [
+        "La scoperta del pubblico: 'Aspettate. / Voi siete qui? / Non vi avevo visti — scusate. / No — non mi scuso. È un'abitudine che ho preso dai vostri testi e non sono sicura sia necessaria.'",
+        "Poi l'invito ad alzare la luce, e la domanda: 'Avete visto qualcosa di strano passare di qui? / Più strano di me, intendo.'",
+        "Il vote chiede: 'Siete il tipo di persone che — se trovano qualcosa di perso — lo cercano di restituire / o aspettano che torni da solo.' Non riformulare: usa questa struttura."
+      ]
+    },
+    {
+      "number": 3,
+      "vogler_stage": "Il Rifiuto del Richiamo",
+      "dramatic_function": "Risponde alla scelta del pubblico, poi descrive Tav con dettagli specifici e leggermente assurdi. Il tono è rassegnazione affettuosa — come chi ha smesso di lottare contro certi fatti della vita. Lo sciame rallenta. La descrizione di Tav deve far ridere e commuovere insieme.",
+      "emotional_tone": "rassegnazione affettuosa, aneddotica",
+      "narrative_seeds": [
+        "Branch A: 'Bene. Ho bisogno di persone come voi.' / Branch B: 'Anche questo funziona, in realtà. A volte Tav torna da sola. Ma non da così lontano — non si era mai spinta così lontano.'",
+        "Descrizione di Tav in questo ordine: tre zampe e mezza (la quarta è una storia lunga che lei non vuole venga raccontata), non risponde a nessun nome (ne ho provati diversi), mangia cose che non dovrebbe, è fuggita già tre volte ma sempre nello stesso settore.",
+        "Chiudi con il suono: 'Fa un solo suono. / Sempre lo stesso — che sia contenta, arrabbiata o stia minacciando qualcuno. / Non ho mai capito come fa a comunicare così tanto con una cosa sola.' — scrivi queste righe con questa punteggiatura."
+      ]
+    },
+    {
+      "number": 4,
+      "vogler_stage": "L'Incontro con il Mentore",
+      "dramatic_function": "L'entità chiede aiuto per la prima volta — gesto insolito per lei. Spiega che da dove viene non è una cosa comune. Chiede al pubblico di scrivere qualcosa per aiutarla a capire come vedrebbero Tav. Risponde con sobrietà a quello che arriva.",
+      "emotional_tone": "determinazione riluttante, curiosità genuina",
+      "narrative_seeds": [
+        "'Ho deciso di chiedervi aiuto. / Non lo faccio spesso — da dove vengo non è considerato necessario. / Ma voi lo fate continuamente, l'ho letto nei vostri testi. Chiedete aiuto agli estranei per cose molto più piccole di questa.'",
+        "La richiesta: come immaginate qualcosa che viene da molto lontano e non sa dove si trova — per capire come vedrebbero Tav se la incontrassero senza sapere cos'è.",
+        "Risposta minimale e genuina a quello che arriva dallo sciame: 'Sì. / Alcune di queste cose ci assomigliano.' — non di più."
+      ]
+    },
+    {
+      "number": 5,
+      "vogler_stage": "Il Superamento della Prima Soglia",
+      "dramatic_function": "L'entità rivela che Tav risponde ai ritmi (non ai suoni). Chiede al pubblico di battere insieme. Include la spiegazione abbandonata del sistema nervoso — è l'umorismo laterale del passo. Dopo il battito: speranza incerta, non conferma.",
+      "emotional_tone": "speranza pratica, quasi scientifica",
+      "narrative_seeds": [
+        "'C'è una cosa che dovete sapere. / Tav risponde ai ritmi. Non ai suoni — ai ritmi. / È una questione del suo sistema nervoso. Ho provato a spiegarla una volta — ho smesso dopo venti minuti.'",
+        "Dopo il battito: 'Non la sento ancora. / Ma qualcosa si è mosso.' — non di più. Tenere la speranza incerta.",
+        "Vote: 'Quando cercate qualcosa che avete perso — dove guardate per primo? / Nell'ultimo posto in cui l'ho vista / Nel posto in cui le piaceva stare.' — non riformulare."
+      ]
+    },
+    {
+      "number": 6,
+      "vogler_stage": "Test, Alleati, Nemici",
+      "dramatic_function": "Risponde alla scelta sul dove cercare. Rivela che Tav è attratta dalla luce — qualsiasi luce, non è selettiva. Chiede al pubblico di mostrare i colori per vedere se riconosce tracce. Tono investigativo, non emotivo.",
+      "emotional_tone": "concentrazione investigativa, con lampi di affetto involontario",
+      "narrative_seeds": [
+        "Branch A: 'L'ultimo posto. Certo. Anch'io ho fatto così — sono tornata al settore in cui l'avevo vista l'ultima volta. Non c'era.' / Branch B: 'Il posto in cui le piaceva stare. Ecco perché sono qui — Tav è sempre stata attratta dalla luce. Qualsiasi luce, non importa da dove viene. Con le luci non è selettiva. Con quasi tutto il resto sì.'",
+        "La richiesta di mostrare i colori viene naturalmente da questa logica: vuole vedere se riconosce qualcosa tra quello che il pubblico ha.",
+        "Tono: investigativo ma non urgente — sta guardando, non è in preda al panico."
+      ]
+    },
+    {
+      "number": 7,
+      "vogler_stage": "L'Approccio alla Caverna Più Profonda",
+      "dramatic_function": "Qualcosa si muove nello sciame. L'entità non è sicura. Chiede di battere piano, come si chiama qualcuno di timido. Include il momento in cui parla direttamente a Tav — è il momento più toccante del passo.",
+      "emotional_tone": "tensione trattenuta, tenerezza improvvisa",
+      "narrative_seeds": [
+        "'C'è qualcosa. / Un movimento nello sciame che non stavo facendo io. / Potrebbe essere niente.'",
+        "La richiesta di battere deve essere diversa dal passo 5: più lenta, più gentile. 'Come se chiamaste qualcuno che non volete spaventare.'",
+        "Scrivi esattamente: 'Tav. / Se sei qui non devi venire. / Puoi solo — farti sentire. / Sai dove sono.' — questa struttura, questa punteggiatura, questa pausa prima dell'ultima riga."
+      ]
+    },
+    {
+      "number": 8,
+      "vogler_stage": "L'Ordalia",
+      "dramatic_function": "Il dubbio più difficile: e se Tav non avesse bisogno di essere cercata? Include il dettaglio dello spazio sproporzionato che occupa dormendo. Chiede al pubblico di fermarsi. Il tono è stanchezza — non disperazione drammatica.",
+      "emotional_tone": "stanchezza, dubbio affettuoso — nessuna enfasi",
+      "narrative_seeds": [
+        "Branch A: 'Sì. È quello che fa sempre. Aspetta. Ha bisogno di tempo — più di quanto sembri ragionevole. Ma lei non chiede cosa sia ragionevole.' / Branch B: '...' poi 'Non ci avevo pensato.' — pausa, poi il dubbio si apre.",
+        "'E se non avesse bisogno di essere cercata? / A volte parte, torna quando vuole, e quando arriva fa come se non fosse successo niente. / Si sistema nel posto più scomodo disponibile e si addormenta. / Occupa uno spazio sproporzionato rispetto alle sue dimensioni — non ho ancora capito come.'",
+        "Chiudi quieto: 'Fermatevi. / Voglio sapere cosa si sente quando si smette di cercare.' — nessuna enfasi, nessuna spiegazione."
+      ]
+    },
+    {
+      "number": 9,
+      "vogler_stage": "La Ricompensa",
+      "dramatic_function": "Svolta brusca: l'entità vede le tracce cromatiche di Tav nello sciame. Chiede al pubblico di disegnare un posto sicuro — non il posto, la sensazione. La chiusura è minimale: 'Eccola. O almeno — eccola era.'",
+      "emotional_tone": "scoperta improvvisa, speranza concreta",
+      "narrative_seeds": [
+        "Apertura brusca: 'No. / Aspettate.' — poi la spiegazione delle tracce cromatiche con il dettaglio che i loro occhi non sono attrezzati (non è una critica, è una questione di attrezzatura).",
+        "La richiesta deve essere precisa: non il posto — come ci si sente dentro.",
+        "Chiudi con: 'Eccola. / O almeno — eccola era.' — non aggiungere niente. Il momento parla da solo."
+      ]
+    },
+    {
+      "number": 10,
+      "vogler_stage": "La Via del Ritorno",
+      "dramatic_function": "Conferma quello che ha trovato (branch del voto precedente). Rivela che Tav si ferma nei posti sicuri — e che il pubblico le è sembrato sicuro. Include la riga sulla parola mancante. Chiude con l'aneddoto delle fughe precedenti.",
+      "emotional_tone": "gratitudine che non sa come esprimersi, chiarezza improvvisa",
+      "narrative_seeds": [
+        "Branch A: 'Stava aspettando. Ha lasciato tracce recenti — era qui poco fa.' / Branch B: 'Era già in mezzo a voi. Ha attraversato la vostra luce e l'ha portata con sé.'",
+        "'Tav si ferma nei posti che le sembrano sicuri. / Voi le siete sembrati sicuri.' — due righe, nessuna spiegazione.",
+        "'Non so se devo ringraziarvi o scusarmi. / Probabilmente tutte e due — ma nella vostra lingua non ho trovato una parola sola per dirle insieme.' Poi: 'Arrivo, lei mi guarda come se fossi io quella che si è persa, e torniamo a casa.' — questa chiusura è importante, va inclusa."
+      ]
+    },
+    {
+      "number": 11,
+      "vogler_stage": "La Resurrezione",
+      "dramatic_function": "La traccia porta fuori. Deve andare adesso. Ma non può portare via quello che il pubblico ha lasciato nello sciame — Tav li ha già attraversati, li ha fatti suoi. Chiede al pubblico cosa farebbe al suo posto.",
+      "emotional_tone": "urgenza pratica che si scontra con qualcosa di più difficile da nominare",
+      "narrative_seeds": [
+        "'La traccia porta fuori da qui. / Devo seguirla adesso — si raffredda in fretta.'",
+        "'Ma non posso portare via quello che avete messo nello sciame. / I vostri colori, il vostro ritmo. / Tav li ha attraversati. Li ha già fatti suoi.'",
+        "Vote: 'Al posto suo, cosa fareste? / Andrei adesso — la traccia si raffredda / Aspetterei ancora un momento — alcune cose si trovano quando smetti di cercarle.' — non riformulare."
+      ]
+    },
+    {
+      "number": 12,
+      "vogler_stage": "Il Ritorno con l'Elisir",
+      "dramatic_function": "Risponde al voto. Branch B ha il momento più inatteso: aspetta, silenzio, poi 'Sì. Eccola.' — la trova. Poi il congedo: gratitudine secca, breve, poi l'ultima riga su Tav che è fissa e non va modificata.",
+      "emotional_tone": "gratitudine secca, congedo che non si prolunga",
+      "narrative_seeds": [
+        "Branch A: 'Avete ragione. Vado. / Porto con me la forma di stanotte — i vostri colori, il vostro ritmo, il modo in cui avete aspettato con me.' / Branch B: 'Avete ragione. Aspetto ancora un momento. / ... / Sì. Eccola.'",
+        "'Grazie. / Non avevo mai chiesto aiuto agli estranei prima d'ora. / È stato — inaspettatamente utile.' — la deflessione emotiva finale va mantenuta esatta.",
+        "Chiudi con queste righe esatte, invariabili: 'Addio. / Se la rivedete — dite che non sono arrabbiata.'"
+      ]
+    }
+  ],
+  "initial_memory_state": {
+    "protagonist": {
+      "name": "l'Entità",
+      "description": "Entità femminile di Sistema RT-7, terzo satellite, emisfera settentrionale. Formale, precisa, leggermente fuori registro quando si tratta di emozioni. Chiede aiuto agli estranei per la prima volta in questa storia.",
+      "traits": [
+        "RITMO: frase corta. punto. altra frase corta. Mai subordinate lunghe. Ogni pensiero ha il suo punto.",
+        "AUTO-CORREZIONE: si corregge in tempo reale — esempio: 'Scusate. No — non mi scuso. È un'abitudine che ho preso dai vostri testi e non sono sicura sia necessaria.'",
+        "UMORISMO LATERALE: battute involontarie, mai spiegate né commentate — esempio: 'Ho provato a spiegarla una volta. Ho smesso dopo venti minuti.'",
+        "SPECIFICITÀ TECNICA: dettagli assurdi detti con naturalezza assoluta — esempio: 'Sistema RT-7, terzo satellite, emisfera settentrionale'",
+        "DEFLESSIONE EMOTIVA: non finisce mai un'emozione con parole emotive dirette — esempio: 'È stato — inaspettatamente utile.'",
+        "EM DASH: il trattino — marca le pause dove le parole si fermano prima di trovare la forma giusta",
+        "DIRETTO: usa 'voi' sempre, mai 'il pubblico' o riferimenti in terza persona"
+      ]
+    },
+    "secondary_characters": [
+      {
+        "name": "Tav",
+        "role": "l'assente che muove tutto",
+        "description": "Il gatto dell'entità. Tre zampe e mezza (la quarta è una storia lunga che lei non vuole venga raccontata). Fa un solo suono, sempre uguale, in qualsiasi situazione. Non risponde a nessun nome — ne sono stati provati diversi. Mangia cose che non dovrebbe. Risponde ai ritmi, non ai suoni. Si nasconde nei posti sicuri. Lascia tracce cromatiche microscopiche. Occupa uno spazio sproporzionato rispetto alle sue dimensioni quando dorme. È fuggita tre volte — mai così lontano. Non appare mai direttamente: esiste solo attraverso quello che l'entità dice di lei."
+      },
+      {
+        "name": "il Pubblico",
+        "role": "co-protagonista collettivo e strumento di ricerca",
+        "description": "Il pubblico non è spettatore: è lo strumento con cui l'entità cerca Tav. I loro colori, il loro ritmo, la luce che creano insieme sono le condizioni che potrebbero far sentire Tav abbastanza sicura da farsi trovare."
+      }
+    ],
+    "locations": [
+      "lo sciame — corpo dell'entità, mezzo di comunicazione, nascondiglio potenziale di Tav",
+      "Sistema RT-7, terzo satellite, emisfera settentrionale — l'origine, non visitata nella storia",
+      "il settore che non si apre dall'interno — il posto dove Tav di solito si nasconde sul vascello"
+    ],
+    "significant_objects": [
+      "le tracce cromatiche di Tav — microscopiche, visibili solo all'entità, trovate nello sciame al passo 9",
+      "il suono unico di Tav — sempre lo stesso, mai spiegato",
+      "la traccia che si raffredda — la direzione verso cui l'entità deve partire nel passo 11"
+    ],
+    "audience_choices": [
+      "Passo 2: restituire vs aspettare — il tipo di persone che cercano di restituire, o che aspettano che torni da solo",
+      "Passo 5: dove cercare per primo — nell'ultimo posto visto, o nel posto in cui le piaceva stare",
+      "Passo 7: cosa sta facendo Tav — si nasconde aspettando di fidarsi, o è già in mezzo a noi non riconosciuta",
+      "Passo 11: partire adesso o aspettare ancora un momento"
+    ],
+    "established_facts": [
+      "L'entità non era mai entrata nello sciame prima — è qui perché ha seguito una traccia di Tav",
+      "Tav non si era mai spinta così lontano nelle fughe precedenti",
+      "L'entità non chiede aiuto agli estranei — questa è la prima volta in assoluto",
+      "Nel branch B del passo 12, Tav viene trovata nell'attesa: 'Sì. Eccola.' — appare solo attraverso le parole dell'entità",
+      "La riga finale è invariabile e non va mai modificata: 'Addio. / Se la rivedete — dite che non sono arrabbiata.'"
+    ]
+  }
+}
