@@ -144,13 +144,19 @@ socket.on('device-message', (data) => {
 // IDLE — joystick disabled
 // DRAW — joystick active (default when no story step is running)
 // VOTE — vote panel shown; joystick hidden
-const votePanelEl  = document.querySelector('#vote-panel');
-const voteBtnA     = document.querySelector('#vote-btn-a');
-const voteBtnB     = document.querySelector('#vote-btn-b');
-const voteTimerEl  = document.querySelector('#vote-timer');
-const textPanelEl  = document.querySelector('#text-panel');
-const pulsePanelEl = document.querySelector('#pulse-panel');
-const textInputEl = document.querySelector('#input-form input');
+const votePanelEl    = document.querySelector('#vote-panel');
+const voteBtnA       = document.querySelector('#vote-btn-a');
+const voteBtnB       = document.querySelector('#vote-btn-b');
+const voteTimerEl    = document.querySelector('#vote-timer');
+const textPanelEl    = document.querySelector('#text-panel');
+const pulsePanelEl   = document.querySelector('#pulse-panel');
+const raisePanelEl   = document.querySelector('#raise-panel');
+const raiseNoteEl    = document.querySelector('#raise-note');
+const wavePanelEl    = document.querySelector('#wave-panel');
+const waveNoteEl     = document.querySelector('#wave-note');
+const holdPanelEl    = document.querySelector('#hold-panel');
+const silencePanelEl = document.querySelector('#silence-panel');
+const textInputEl    = document.querySelector('#input-form input');
 let _storyOptionA    = null;
 let _storyOptionB    = null;
 let _currentStepStatus = null;
@@ -181,10 +187,20 @@ function setRemoteUI({ stepStatus, optionA, optionB, voteDuration } = {}) {
     _currentStepStatus = stepStatus ?? null;
     _storyOptionA = optionA ?? null;
     _storyOptionB = optionB ?? null;
-    const isVote  = stepStatus === 'VOTE';
-    const isText  = stepStatus === 'TEXT';
-    const isPulse = stepStatus === 'PULSE';
+    const isVote    = stepStatus === 'VOTE';
+    const isText    = stepStatus === 'TEXT';
+    const isPulse   = stepStatus === 'PULSE';
+    const isRaise   = stepStatus === 'RAISE';
+    const isWave    = stepStatus === 'WAVE';
+    const isHold    = stepStatus === 'HOLD';
+    const isSilence = stepStatus === 'SILENCE';
     const showJoystick = !stepStatus || stepStatus === 'DRAW';
+
+    // Reset one-shot state on mode enter
+    if (isRaise) { _raiseDone = false; _raiseHoldStart = null; raisePanelEl?.classList.remove('completed'); }
+    if (isWave)  { _waveDone  = false; wavePanelEl?.classList.remove('completed'); }
+    // Clear unsupported check when leaving sensor modes
+    if (!isRaise && !isWave) clearTimeout(_sensorCheckTimer);
 
     if (votePanelEl) {
         if (isVote) {
@@ -210,9 +226,14 @@ function setRemoteUI({ stepStatus, optionA, optionB, voteDuration } = {}) {
         }
     }
 
-    if (pulsePanelEl) {
-        pulsePanelEl.classList.toggle('visible', isPulse);
-    }
+    pulsePanelEl?.classList.toggle('visible', isPulse);
+    raisePanelEl?.classList.toggle('visible', isRaise);
+    wavePanelEl?.classList.toggle('visible', isWave);
+    holdPanelEl?.classList.toggle('visible', isHold);
+    silencePanelEl?.classList.toggle('visible', isSilence);
+
+    if (isRaise) checkSensorSupport(raiseNoteEl);
+    if (isWave)  checkSensorSupport(waveNoteEl);
 
     if (joystickBaseEl) {
         joystickBaseEl.style.opacity       = showJoystick ? '1' : '0';
@@ -241,6 +262,54 @@ voteBtnB?.addEventListener('touchstart', (e) => {
         setTimeout(() => setRemoteUI(), 340);
     }
 }, { passive: false });
+
+// ── Raise detection ───────────────────────────────────────────────────────────
+// Phone tilted back from portrait (screen angled away from face) for RAISE_HOLD_MS.
+let _raiseDone      = false;
+let _raiseHoldStart = null;
+const RAISE_PITCH_THRESHOLD = 0.60; // pitchNorm < this (beta < ~36°) = phone tilted back
+const RAISE_HOLD_MS         = 1200;
+
+function triggerRaise() {
+    if (_raiseDone) return;
+    _raiseDone = true;
+    _raiseHoldStart = null;
+    navigator.vibrate?.([30, 40, 60]);
+    raisePanelEl?.classList.add('completed');
+    socket.emit('user-event', { type: 'raise' });
+}
+
+// ── Wave detection ────────────────────────────────────────────────────────────
+// Significant rotational motion detected via AGC-normalized motion value from gyro.
+let _waveDone     = false;
+let _waveLastEmit = 0;
+const WAVE_MOTION_THRESHOLD = 0.82;
+const WAVE_COOLDOWN         = 2000;
+
+function triggerWave() {
+    if (_waveDone) return;
+    _waveDone = true;
+    navigator.vibrate?.([20, 30, 20, 30, 60]);
+    wavePanelEl?.classList.add('completed');
+    socket.emit('user-event', { type: 'wave' });
+}
+
+// ── Sensor unsupported check ──────────────────────────────────────────────────
+// Shows a note after 3 s if orientation data never arrived.
+let _orientationReceived = false;
+let _sensorCheckTimer    = null;
+
+function checkSensorSupport(noteEl) {
+    clearTimeout(_sensorCheckTimer);
+    if (!noteEl) return;
+    noteEl.classList.remove('visible');
+    _sensorCheckTimer = setTimeout(() => {
+        if (!_orientationReceived) {
+            noteEl.textContent = 'questo dispositivo non supporta il sensore — aspetta il passo successivo';
+            noteEl.classList.add('visible');
+        }
+    }, 3000);
+}
 
 // ── Pulse tap ─────────────────────────────────────────────────────────────────
 let _lastPulseEmit = 0;
@@ -538,10 +607,31 @@ function startTilt() {
 
     startDeviceTilt(20, (d) => {
         if (!d.enabled) return;
+        _orientationReceived = true;
         currentRoll  = d.g;
         currentPitch = d.b;
         updateAura();
         updateTiltDot(currentRoll, currentPitch);
+
+        // RAISE: phone tilted back from portrait → pitchNorm drops below threshold
+        if (_currentStepStatus === 'RAISE' && !_raiseDone) {
+            if (currentPitch < RAISE_PITCH_THRESHOLD) {
+                if (!_raiseHoldStart) _raiseHoldStart = Date.now();
+                else if (Date.now() - _raiseHoldStart > RAISE_HOLD_MS) triggerRaise();
+            } else {
+                _raiseHoldStart = null;
+            }
+        }
+
+        // WAVE: significant rotational motion burst
+        if (_currentStepStatus === 'WAVE' && !_waveDone) {
+            const now = Date.now();
+            if (d.motion > WAVE_MOTION_THRESHOLD && now - _waveLastEmit > WAVE_COOLDOWN) {
+                _waveLastEmit = now;
+                triggerWave();
+            }
+        }
+
         if (tiltThrottle || !motionEnabled) return;
         tiltThrottle = setTimeout(() => {
             tiltThrottle = null;

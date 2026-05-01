@@ -303,6 +303,174 @@ html, body {
     box-shadow: 0 0 40px rgba(255, 255, 255, 0.3);
 }
 
+/* ── Shared panel note — small fallback text for unsupported sensors ─────────── */
+.panel-note {
+    position: absolute;
+    bottom: 3rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.6rem;
+    letter-spacing: 0.07em;
+    color: rgba(255, 255, 255, 0.3);
+    text-align: center;
+    width: 82vw;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+}
+
+.panel-note.visible { opacity: 1; }
+
+/* ── Raise panel — phone tilted back ────────────────────────────────────────── */
+#raise-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.15);
+    touch-action: none;
+    position: relative;
+}
+
+#raise-panel.visible {
+    display: flex;
+    animation: vote-panel-in 0.5s ease both;
+}
+
+#raise-ring {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.22);
+    pointer-events: none;
+    animation: raise-float 2.8s ease-in-out infinite;
+}
+
+@keyframes raise-float {
+    0%, 100% { transform: translateY(0);     opacity: 0.45; }
+    50%       { transform: translateY(-28px); opacity: 1; }
+}
+
+#raise-panel.completed #raise-ring {
+    animation: raise-burst 0.65s ease-out forwards;
+    border-color: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 60px rgba(255, 255, 255, 0.45);
+}
+
+@keyframes raise-burst {
+    0%   { transform: translateY(0)     scale(1);   opacity: 1; }
+    100% { transform: translateY(-50px) scale(2.6); opacity: 0; }
+}
+
+/* ── Wave panel — swing phone ────────────────────────────────────────────────── */
+#wave-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.15);
+    touch-action: none;
+    position: relative;
+}
+
+#wave-panel.visible {
+    display: flex;
+    animation: vote-panel-in 0.5s ease both;
+}
+
+#wave-ring {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.22);
+    pointer-events: none;
+    animation: wave-oscillate 1.5s ease-in-out infinite;
+}
+
+@keyframes wave-oscillate {
+    0%, 100% { transform: translateX(0)      scaleX(1);    opacity: 0.4; }
+    25%       { transform: translateX(20px)  scaleX(1.07); opacity: 0.9; }
+    75%       { transform: translateX(-20px) scaleX(1.07); opacity: 0.9; }
+}
+
+#wave-panel.completed #wave-ring {
+    animation: wave-burst 0.55s ease-out forwards;
+    border-color: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 60px rgba(255, 255, 255, 0.45);
+}
+
+@keyframes wave-burst {
+    0%   { transform: scale(1);   opacity: 1; }
+    100% { transform: scale(3.2); opacity: 0; }
+}
+
+/* ── Hold panel — stay still ─────────────────────────────────────────────────── */
+#hold-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.15);
+    touch-action: none;
+}
+
+#hold-panel.visible {
+    display: flex;
+    animation: vote-panel-in 0.5s ease both;
+}
+
+#hold-ring {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    pointer-events: none;
+    animation: hold-breathe 7s ease-in-out infinite;
+}
+
+@keyframes hold-breathe {
+    0%, 100% { transform: scale(1);    opacity: 0.25; }
+    50%       { transform: scale(1.05); opacity: 0.6; }
+}
+
+/* ── Silence panel — make it quiet ──────────────────────────────────────────── */
+#silence-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.15);
+    touch-action: none;
+}
+
+#silence-panel.visible {
+    display: flex;
+    animation: vote-panel-in 0.5s ease both;
+}
+
+#silence-ring {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    pointer-events: none;
+    animation: silence-pulse 5s ease-in-out infinite;
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+}
+
+@keyframes silence-pulse {
+    0%, 100% { transform: scale(1);    opacity: 0.2; box-shadow: 0 0 0  0   rgba(255,255,255,0);    }
+    50%       { transform: scale(1.03); opacity: 0.4; box-shadow: 0 0 18px 0px rgba(255,255,255,0.06); }
+}
+
 /* ── Story vote panel ────────────────────────────────────────────────────────── */
 #vote-panel {
     position: fixed;
