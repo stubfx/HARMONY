@@ -1208,7 +1208,7 @@ async function callN8nHeartbeat() {
                 votesB:            simState.votesB,
                 storyVoteResult:   simState.storyVoteResult,
                 userCount:         simState.userCount,
-                echo:              _serverEcho,
+                ..._serverEcho,
                 params:            { ...params },
             }),
             signal:  controller.signal,
