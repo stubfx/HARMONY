@@ -154,8 +154,6 @@ const raisePanelEl   = document.querySelector('#raise-panel');
 const raiseNoteEl    = document.querySelector('#raise-note');
 const wavePanelEl    = document.querySelector('#wave-panel');
 const waveNoteEl     = document.querySelector('#wave-note');
-const holdPanelEl    = document.querySelector('#hold-panel');
-const silencePanelEl = document.querySelector('#silence-panel');
 const topBarEl       = document.querySelector('#top-bar');
 const textInputEl    = document.querySelector('#input-form input');
 let _storyOptionA    = null;
@@ -188,21 +186,18 @@ function setRemoteUI({ stepStatus, optionA, optionB, voteDuration } = {}) {
     _currentStepStatus = stepStatus ?? null;
     _storyOptionA = optionA ?? null;
     _storyOptionB = optionB ?? null;
-    const isVote    = stepStatus === 'VOTE';
-    const isText    = stepStatus === 'TEXT';
-    const isPulse   = stepStatus === 'PULSE';
-    const isRaise   = stepStatus === 'RAISE';
-    const isWave    = stepStatus === 'WAVE';
-    const isHold    = stepStatus === 'HOLD';
-    const isSilence = stepStatus === 'SILENCE';
+    const isVote  = stepStatus === 'VOTE';
+    const isText  = stepStatus === 'TEXT';
+    const isPulse = stepStatus === 'PULSE';
+    const isRaise = stepStatus === 'RAISE';
+    const isWave  = stepStatus === 'WAVE';
     const showJoystick = !stepStatus || stepStatus === 'DRAW';
     const showColors   = !stepStatus || stepStatus === 'IDLE' || stepStatus === 'DRAW';
 
     // Reset one-shot state on mode enter
-    if (isRaise) { _raiseDone = false; _raiseHoldStart = null; raisePanelEl?.classList.remove('completed'); }
+    if (isRaise) { _raiseDone = false; _raiseSwipeStartY = null; raisePanelEl?.classList.remove('completed'); }
     if (isWave)  { _waveDone  = false; wavePanelEl?.classList.remove('completed'); }
-    // Clear unsupported check when leaving sensor modes
-    if (!isRaise && !isWave) clearTimeout(_sensorCheckTimer);
+    if (!isWave) clearTimeout(_sensorCheckTimer);
 
     if (votePanelEl) {
         if (isVote) {
@@ -231,8 +226,6 @@ function setRemoteUI({ stepStatus, optionA, optionB, voteDuration } = {}) {
     pulsePanelEl?.classList.toggle('visible', isPulse);
     raisePanelEl?.classList.toggle('visible', isRaise);
     wavePanelEl?.classList.toggle('visible', isWave);
-    holdPanelEl?.classList.toggle('visible', isHold);
-    silencePanelEl?.classList.toggle('visible', isSilence);
 
     if (isWave) checkSensorSupport(waveNoteEl);
 
@@ -272,7 +265,7 @@ voteBtnB?.addEventListener('touchstart', (e) => {
 // Swipe upward on the screen past threshold — pure touch, no sensors needed.
 let _raiseDone        = false;
 let _raiseSwipeStartY = null;
-const RAISE_SWIPE_THRESHOLD = 80; // px upward drag to trigger
+const RAISE_SWIPE_THRESHOLD = 60; // px upward drag to trigger
 
 function triggerRaise() {
     if (_raiseDone) return;

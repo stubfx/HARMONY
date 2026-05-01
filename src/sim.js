@@ -1872,15 +1872,8 @@ function writeSoloUB(dt, time) {
     const isDot  = simState.status === 'DOT';
     f[6] = isIdle ? 0.0 : (isDot || params.windEnabled ? params.windStr : 0.0);
     f[7] = params.turnRate * coherenceMult;  // coherence scales how sharply agents follow the formula
-    // HOLD: fade speed to zero as input goes stale; SILENCE: speed tracks room quiet
-    const isHold    = simState.stepStatus === 'HOLD';
-    const isSilence = simState.stepStatus === 'SILENCE';
-    const staleness    = (Date.now() - lastRemoteActivity) / 1000;
-    const holdFactor    = isHold    ? Math.max(0.0,  1 - staleness / 4)    : 1;
-    const silenceFactor = isSilence ? Math.max(0.05, 1 - getVolume() * 8)  : 1;
-    const speedFactor   = holdFactor * silenceFactor;
-    f[8] = params.maxSpeed * speedFactor;
-    f[9] = params.minSpeed * speedFactor;
+    f[8] = params.maxSpeed;
+    f[9] = params.minSpeed;
     u[10] = hasImage ? 1 : 0;
     f[11] = params.magnetStr;
     f[12] = x0;
