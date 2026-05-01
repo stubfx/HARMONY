@@ -156,6 +156,7 @@ const wavePanelEl    = document.querySelector('#wave-panel');
 const waveNoteEl     = document.querySelector('#wave-note');
 const holdPanelEl    = document.querySelector('#hold-panel');
 const silencePanelEl = document.querySelector('#silence-panel');
+const topBarEl       = document.querySelector('#top-bar');
 const textInputEl    = document.querySelector('#input-form input');
 let _storyOptionA    = null;
 let _storyOptionB    = null;
@@ -195,6 +196,7 @@ function setRemoteUI({ stepStatus, optionA, optionB, voteDuration } = {}) {
     const isHold    = stepStatus === 'HOLD';
     const isSilence = stepStatus === 'SILENCE';
     const showJoystick = !stepStatus || stepStatus === 'DRAW';
+    const showColors   = !stepStatus || stepStatus === 'IDLE' || stepStatus === 'DRAW';
 
     // Reset one-shot state on mode enter
     if (isRaise) { _raiseDone = false; _raiseHoldStart = null; raisePanelEl?.classList.remove('completed'); }
@@ -234,6 +236,10 @@ function setRemoteUI({ stepStatus, optionA, optionB, voteDuration } = {}) {
 
     if (isWave) checkSensorSupport(waveNoteEl);
 
+    if (topBarEl) {
+        topBarEl.style.opacity       = showColors ? '1' : '0';
+        topBarEl.style.pointerEvents = showColors ? 'auto' : 'none';
+    }
     if (joystickBaseEl) {
         joystickBaseEl.style.opacity       = showJoystick ? '1' : '0';
         joystickBaseEl.style.pointerEvents = showJoystick ? 'auto' : 'none';
