@@ -232,8 +232,7 @@ function setRemoteUI({ stepStatus, optionA, optionB, voteDuration } = {}) {
     holdPanelEl?.classList.toggle('visible', isHold);
     silencePanelEl?.classList.toggle('visible', isSilence);
 
-    if (isRaise) checkSensorSupport(raiseNoteEl);
-    if (isWave)  checkSensorSupport(waveNoteEl);
+    if (isWave) checkSensorSupport(waveNoteEl);
 
     if (joystickBaseEl) {
         joystickBaseEl.style.opacity       = showJoystick ? '1' : '0';
@@ -264,9 +263,10 @@ voteBtnB?.addEventListener('touchstart', (e) => {
 }, { passive: false });
 
 // ── Raise detection ───────────────────────────────────────────────────────────
-// Detects upward arm lift via accelerometer: net upward force > threshold (single spike).
-let _raiseDone = false;
-const RAISE_ACCEL_THRESHOLD = 5; // m/s² net upward acceleration (gravity stripped)
+// Swipe upward on the screen past threshold — pure touch, no sensors needed.
+let _raiseDone        = false;
+let _raiseSwipeStartY = null;
+const RAISE_SWIPE_THRESHOLD = 80; // px upward drag to trigger
 
 function triggerRaise() {
     if (_raiseDone) return;
@@ -276,12 +276,25 @@ function triggerRaise() {
     socket.emit('user-event', { type: 'raise' });
 }
 
+raisePanelEl?.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (_raiseDone) return;
+    _raiseSwipeStartY = e.changedTouches[0].clientY;
+}, { passive: false });
+
+raisePanelEl?.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (_raiseDone || _raiseSwipeStartY == null) return;
+    const dy = _raiseSwipeStartY - e.changedTouches[0].clientY;
+    if (dy > RAISE_SWIPE_THRESHOLD) triggerRaise();
+    _raiseSwipeStartY = null;
+}, { passive: false });
+
 // ── Wave detection ────────────────────────────────────────────────────────────
-// Detects side-to-side swing via horizontal acceleration magnitude.
+// Reuses shake magnitude threshold — same gesture, different step context.
 let _waveDone     = false;
 let _waveLastEmit = 0;
-const WAVE_ACCEL_THRESHOLD = 10;  // m/s² horizontal acceleration (x² + z²)
-const WAVE_COOLDOWN        = 2000;
+const WAVE_COOLDOWN = 2000;
 
 function triggerWave() {
     if (_waveDone) return;
@@ -541,29 +554,20 @@ window.addEventListener('devicemotion', (e) => {
     const a = e.accelerationIncludingGravity;
     if (!a) return;
     const now = Date.now();
+    const mag = Math.sqrt((a.x ?? 0) ** 2 + (a.y ?? 0) ** 2 + (a.z ?? 0) ** 2);
 
-    // Shake — only active in DRAW mode
+    // Shake — DRAW mode only
     const showJoystick = !_currentStepStatus || _currentStepStatus === 'DRAW';
-    if (showJoystick) {
-        const mag = Math.sqrt((a.x ?? 0) ** 2 + (a.y ?? 0) ** 2 + (a.z ?? 0) ** 2);
-        if (mag > SHAKE_THRESHOLD && now - _shakeLastTime > SHAKE_COOLDOWN) {
-            _shakeLastTime = now;
-            _shaken = true;
-            navigator.vibrate?.(60);
-            sendEvent('shake', {});
-        }
+    if (showJoystick && mag > SHAKE_THRESHOLD && now - _shakeLastTime > SHAKE_COOLDOWN) {
+        _shakeLastTime = now;
+        _shaken = true;
+        navigator.vibrate?.(60);
+        sendEvent('shake', {});
     }
 
-    // RAISE: net upward acceleration (a.y at rest ≈ −9.8 in portrait; strip gravity)
-    if (_currentStepStatus === 'RAISE' && !_raiseDone) {
-        const ay = e.acceleration?.y != null ? e.acceleration.y : (a.y ?? 0) + 9.8;
-        if (ay > RAISE_ACCEL_THRESHOLD) triggerRaise();
-    }
-
-    // WAVE: horizontal swing — x and z are gravity-free in portrait
+    // WAVE — same shake magnitude, different step context
     if (_currentStepStatus === 'WAVE' && !_waveDone) {
-        const hMag = Math.sqrt((a.x ?? 0) ** 2 + (a.z ?? 0) ** 2);
-        if (hMag > WAVE_ACCEL_THRESHOLD && now - _waveLastEmit > WAVE_COOLDOWN) {
+        if (mag > SHAKE_THRESHOLD && now - _waveLastEmit > WAVE_COOLDOWN) {
             _waveLastEmit = now;
             triggerWave();
         }
