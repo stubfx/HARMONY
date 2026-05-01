@@ -1109,7 +1109,7 @@ let stateCtrl   = null;
 let qrStateCtrl = null;
 let modeCtrl    = null;
 let gui, swarmDebug, dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence;
-let applyGUIVisibility, toggleGUI, updateGizmo, setStateHash;
+let applyGUIVisibility, toggleGUI, updateGizmo;
 
 function updateStateDisplay() {
     modeCtrl?.updateDisplay();
@@ -1141,34 +1141,13 @@ let lastRemoteActivity = Date.now(); // timestamp of last remote-event (touch or
 //   /webhook/heartbeat   — periodic full state snapshot; n8n uses this to drive story
 // In test mode all paths switch to /webhook-test/*.
 
-// ── State hash ────────────────────────────────────────────────────────────────
-// FNV-1a 32-bit over a deterministically serialised snapshot of all sim state.
-// Included in every heartbeat so n8n can detect stale/diverged instances and
-// skip no-op responses. Any param change or simState change produces a new hash.
-function _sortedJSON(v) {
-    if (v === null || typeof v !== 'object') return JSON.stringify(v);
-    if (Array.isArray(v)) return '[' + v.map(_sortedJSON).join(',') + ']';
-    return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + _sortedJSON(v[k])).join(',') + '}';
-}
-function computeStateHash() {
-    const h0 = 0x811c9dc5;
-    const str = _sortedJSON({
-        room:       sessionRoom,
-        mode:       simState.mode,
-        status:     simState.status,
-        qrStatus:   simState.qrStatus,
-        stepStatus: simState.stepStatus,
-        optionA:    simState.optionA,
-        optionB:    simState.optionB,
-        params,
-    });
-    let h = h0;
-    for (let i = 0; i < str.length; i++) {
-        h ^= str.charCodeAt(i);
-        h = Math.imul(h, 0x01000193) >>> 0;
-    }
-    return h.toString(16).padStart(8, '0');
-}
+// ── Server echo ───────────────────────────────────────────────────────────────
+// Whatever the server sends back in a heartbeat response is stored here and
+// echoed verbatim in the next heartbeat. Session-only: cleared on page reload.
+// The server can compare the echoed values against its current state and decide
+// whether the client is up to date or needs a re-push.
+let _serverEcho = {};
+
 const N8N_BASE            = (import.meta.env.VITE_N8N_BASE_URL ?? '').replace(/\/$/, '');
 const N8N_USER_TIMEOUT_MS = 15_000;
 let   n8nInFlight          = false;
@@ -1229,7 +1208,7 @@ async function callN8nHeartbeat() {
                 votesB:            simState.votesB,
                 storyVoteResult:   simState.storyVoteResult,
                 userCount:         simState.userCount,
-                stateHash:         (() => { const h = computeStateHash(); setStateHash?.(h); return h; })(),
+                echo:              _serverEcho,
                 params:            { ...params },
             }),
             signal:  controller.signal,
@@ -1238,7 +1217,10 @@ async function callN8nHeartbeat() {
         if (res.ok) {
             const raw  = await res.json();
             const data = Array.isArray(raw) ? raw[0] : raw;
-            if (data && typeof data === 'object') applySimParams(data);
+            if (data && typeof data === 'object') {
+                _serverEcho = { ...data };
+                applySimParams(data);
+            }
         }
     } catch (err) {
         clearTimeout(timer);
@@ -1629,7 +1611,7 @@ function applySimParams(data) {
     gui, swarmDebug,
     modeCtrl, stateCtrl, qrStateCtrl,
     dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence,
-    applyGUIVisibility, toggleGUI, updateGizmo, setStateHash,
+    applyGUIVisibility, toggleGUI, updateGizmo,
 } = initGUI({
     params, socket, simState, MAX_AGENTS,
     seedAgents, setSize, rebuildOffscreen,

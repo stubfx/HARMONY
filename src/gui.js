@@ -163,11 +163,6 @@ export function initGUI({
     fSession.add(params, 'heartbeatInterval', 0, 120,  5).name('heartbeat (s)').onChange(() => restartHeartbeat());
     fSession.add(params, 'heartbeatTimeout',  5, 300, 5).name('heartbeat timeout (s)');
 
-    const _hashObj  = { hash: '--------' };
-    const _hashCtrl = fSession.add(_hashObj, 'hash').name('state hash').disable();
-    _hashCtrl.domElement.style.setProperty('--widget-color', '#aaff00');
-    _hashCtrl.$widget.querySelector('input').style.cssText =
-        'color:#aaff00;font-weight:700;letter-spacing:0.1em;opacity:1;';
 
     // ── Audio ─────────────────────────────────────────────────────────────────
     const fAudio = gui.addFolder('Audio');
@@ -303,10 +298,6 @@ export function initGUI({
         dbgCoherence,
         applyGUIVisibility,
         toggleGUI,
-        setStateHash(hash) {
-            _hashObj.hash = hash;
-            _hashCtrl.updateDisplay();
-        },
         updateGizmo(pitch, roll) {
             gizmoPitch = pitch;
             gizmoRoll  = roll;
