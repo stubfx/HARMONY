@@ -513,10 +513,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         if (length(np - vec2<f32>(cx, cy)) < params.dotCenterRadius) {
             let rng_    = hash(i ^ (u32(params.time * 137.0) + 53u));
             if (rng_ < params.dotRespawnChance) {
-                let rx = hash(i ^ (u32(params.time * 97.0)  + 71u));
-                let ry = hash(i ^ (u32(params.time * 131.0) + 97u));
-                let ep = vec2<f32>(rx * params.canvasW, ry * params.canvasH);
-                agents[i].pos    = ep;
+                agents[i].pos    = agents[i].home;
                 agents[i].vel    = vec2<f32>(0.0, 0.0);
                 agents[i].primed = 0.0;
                 return;
