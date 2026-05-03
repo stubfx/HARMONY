@@ -1,0 +1,175 @@
+{
+  "story_title": "Avete visto Tav?",
+  "story_concept": "Un'entità di Sistema RT-7 arriva nello sciame durante una missione di recupero. Il suo gatto Tav è scappato per la quinta volta — stavolta si è spinta troppo lontano. Il pubblico è la squadra di ricerca.",
+  "format_note": "Racconto statico pre-scritto. I passi con narrative_text come oggetto {A, B} si ramificano in base al storyVoteResult del passo precedente che contiene vote_question. Alcuni passi hanno stepStatus a due fasi (es. RAISE poi VOTE): next_stepStatus indica la transizione. n8n serve il passo direttamente senza chiamare LLM.",
+  "steps": [
+    {
+      "number": 1,
+      "stepStatus": "IDLE",
+      "narrative_text": "Ho sbagliato posto.\nO forse no. Non lo so ancora.\nVengo da Sistema RT-7, terzo satellite, emisfera settentrionale. Non è rilevante — sì, è rilevante, non me lo fate ripetere.\nSto cercando il mio gatto.\nHo controllato tutto il vascello due volte. Una volta e mezza, in realtà — c'è un settore che non riesco ad aprire dall'interno. Non è lì. Di solito è lì.\nQuindi.",
+      "caption": "Ho sbagliato posto. O forse no.",
+      "primary_color": "#12082A",
+      "secondary_color": "#6B5B95",
+      "vote_question": null,
+      "option_a": null,
+      "option_b": null,
+      "next_stepStatus": "RAISE",
+      "image_prompt": "Vast cosmic void, a solitary figure made of light particles hovering uncertain in deep indigo and purple space, one distant satellite lit faintly in the background, photorealistic digital particle art, dominant #12082A with soft purple accents #6B5B95"
+    },
+    {
+      "number": 2,
+      "stepStatus": "RAISE",
+      "narrative_text": "Aspettate.\nVoi siete qui?\nNon vi avevo visti — scusate. No — non mi scuso. È un'abitudine che ho preso dai vostri testi e non sono sicura sia necessaria.\nAvete visto qualcosa di strano passare di qui? Più strano di me, intendo.\nAlzate la luce se mi sentite.",
+      "caption": "Avete visto qualcosa di strano?",
+      "primary_color": "#0A1628",
+      "secondary_color": "#40C4FF",
+      "vote_question": "Se trovate qualcosa di perso — cosa fate?",
+      "option_a": "Lo cerco di restituire",
+      "option_b": "Aspetto che torni",
+      "next_stepStatus": "VOTE",
+      "image_prompt": "Crowd of glowing blue-white dots rising like a constellation being born, a lone observer watching from dark cosmic space, navy blue background with bright cyan particle trails, wonder and sudden awareness, digital science fiction art"
+    },
+    {
+      "number": 3,
+      "stepStatus": "IDLE",
+      "narrative_text": {
+        "A": "Bene. Ho bisogno di persone come voi.\nSi chiama Tav. Tre zampe e mezza — la quarta è una storia lunga che lei preferisce non venga raccontata. Non risponde al nome. Ne ho provati diversi. Mangia cose che non dovrebbe. È fuggita già quattro volte, ma sempre nello stesso settore — mai così lontano.\nFa un solo suono. Sempre lo stesso — che sia contenta, arrabbiata o stia minacciando qualcuno. Non ho mai capito come fa a comunicare così tanto con una cosa sola.",
+        "B": "Anche questo funziona, in realtà. A volte Tav torna da sola. Ma non da così lontano — non si era mai spinta così lontano.\nSi chiama Tav. Tre zampe e mezza — la quarta è una storia lunga che lei preferisce non venga raccontata. Non risponde al nome. Ne ho provati diversi. Mangia cose che non dovrebbe. È fuggita già quattro volte, ma sempre nello stesso settore.\nFa un solo suono. Sempre lo stesso — che sia contenta, arrabbiata o stia minacciando qualcuno. Non ho mai capito come fa a comunicare così tanto con una cosa sola."
+      },
+      "caption": "Tre zampe e mezza.",
+      "primary_color": "#1A0A3A",
+      "secondary_color": "#D4A853",
+      "vote_question": null,
+      "option_a": null,
+      "option_b": null,
+      "next_stepStatus": "TEXT",
+      "image_prompt": "Mysterious alien creature with asymmetric limbs floating in deep indigo space, warm amber glow emanating from it, playful yet peculiar, bittersweet cosmic illustration, dominant deep indigo #1A0A3A with golden amber #D4A853 highlights"
+    },
+    {
+      "number": 4,
+      "stepStatus": "TEXT",
+      "narrative_text": "Ho deciso di chiedervi aiuto. Non lo faccio spesso — da dove vengo non è considerato necessario. Ma voi lo fate continuamente, l'ho letto nei vostri testi. Chiedete aiuto agli estranei per cose molto più piccole di questa.\nScrivete qualcosa nello sciame. Qualcosa che si perde e torna. Qualcosa che conosce la strada — ma prende sempre quella sbagliata.\nTav si nasconde nei posti che le sembrano sicuri. Ho bisogno di capire come vedete le cose che non sanno dove si trovano.",
+      "caption": "Qualcosa che si perde e torna.",
+      "primary_color": "#0D2137",
+      "secondary_color": "#81C784",
+      "vote_question": null,
+      "option_a": null,
+      "option_b": null,
+      "next_stepStatus": "PULSE",
+      "image_prompt": "Words and light traces appearing in dark teal space, collective writing forming constellations of meaning, data flowing between distant points of awareness, dark teal background with soft green luminous text particles, collaborative cosmic cartography"
+    },
+    {
+      "number": 5,
+      "stepStatus": "PULSE",
+      "narrative_text": "Sento qualcosa. Qui — no, aspettate.\nUn ritmo. Intermittente. Tre impulsi, pausa, uno. È il suo segnale — non l'ha mai cambiato in undici anni. Ho suggerito di aggiornarlo. Non ha gradito.\nVoi sentite da dove viene?",
+      "caption": "Tre impulsi, pausa, uno.",
+      "primary_color": "#0A0A1A",
+      "secondary_color": "#00E5FF",
+      "vote_question": "Da dove viene il segnale?",
+      "option_a": "Dal centro",
+      "option_b": "Dal bordo",
+      "next_stepStatus": "VOTE",
+      "image_prompt": "Pulsing electric cyan signal waves emanating from a single point in near-black cosmic space, rhythmic ripples of light, focused tension, one searching consciousness detecting a faint repeating pattern, minimalist cosmic digital art with electric cyan #00E5FF"
+    },
+    {
+      "number": 6,
+      "stepStatus": "DRAW",
+      "narrative_text": {
+        "A": "Dal centro. Sì — c'è qualcosa lì.\nDisegnate nello sciame. Tracciate un percorso verso il centro — qualcosa di caldo, qualcosa che potrebbe sembrare un rifugio a qualcuno che viene da molto lontano.\nTav si fida dei posti che sembrano abitati. L'ho imparato durante la seconda fuga. Non abbastanza durante la terza.",
+        "B": "Dal bordo. Ha senso.\nDisegnate nello sciame. Tracciate qualcosa di quieto, qualcosa ai margini — dove la luce è più morbida e le cose non fanno rumore.\nTav si nasconde dove non c'è traffico. L'ho scoperto durante la seconda fuga. Avevo sbagliato tutto durante la prima."
+      },
+      "caption": "Tracciate un rifugio.",
+      "primary_color": "#1A0D00",
+      "secondary_color": "#FF6B35",
+      "vote_question": null,
+      "option_a": null,
+      "option_b": null,
+      "next_stepStatus": "PULSE",
+      "image_prompt": "Collective light traces drawn in glowing orange and amber against deep darkness, paths converging toward warmth, hands-of-light drawing safe spaces in cosmic void, collaborative navigation in progress, dominant dark #1A0D00 with bright orange #FF6B35"
+    },
+    {
+      "number": 7,
+      "stepStatus": "PULSE",
+      "narrative_text": "Ci siamo avvicinati.\nIl segnale è più forte. Intermittente ma regolare — tre impulsi, pausa, uno. Non si è mossa da un po'. Questo può significare due cose: o si è calmata, o sta aspettando qualcosa.\nTav. Se sei qui — fai lo stesso suono.\nNiente.\nVoi — in che direzione vi sembra più forte?",
+      "caption": "Tav. Se sei qui —",
+      "primary_color": "#08001A",
+      "secondary_color": "#E040FB",
+      "vote_question": "Dove va il segnale adesso?",
+      "option_a": "Verso il calore",
+      "option_b": "Verso il silenzio",
+      "next_stepStatus": "VOTE",
+      "image_prompt": "Intense magenta pulse in near-black cosmic space, direct address to something hiding nearby, urgency and closeness, bright magenta #E040FB signal against absolute darkness, the feeling of being very close, digital particle art"
+    },
+    {
+      "number": 8,
+      "stepStatus": "IDLE",
+      "narrative_text": {
+        "A": "Il segnale è sparito.\nVerso il calore — e poi niente. Tre impulsi, pausa. Uno. Poi silenzio.\nState fermi. Tutti.\nNon si sposta se sente movimento brusco. L'ho imparato all'inizio — ci ho messo un po'. Non lo ammetto spesso.",
+        "B": "Il segnale è sparito.\nVerso il silenzio — e poi niente. Era così vicina.\nState fermi. Tutti.\nNon si sposta se sente movimento brusco. L'ho imparato all'inizio — ci ho messo un po'. Non lo ammetto spesso."
+      },
+      "caption": "State fermi. Tutti.",
+      "primary_color": "#050508",
+      "secondary_color": "#1A1A2E",
+      "vote_question": null,
+      "option_a": null,
+      "option_b": null,
+      "next_stepStatus": "DRAW",
+      "image_prompt": "Absolute stillness in near-black space, barely perceptible light traces, the moment before revelation, all motion suspended, minimal art palette near-black #050508 with dark navy #1A1A2E suggestions, the held breath before finding"
+    },
+    {
+      "number": 9,
+      "stepStatus": "DRAW",
+      "narrative_text": "Aspettate.\nQuello che avete disegnato — c'è qualcosa dentro. Non un'immagine. Una traccia.\nTre impulsi. Pausa. Uno.\nÈ qui. Era qui tutto il tempo — si è nascosta in quello che avete creato voi. L'ho trovata tre volte nelle cose che non avevo previsto. Avrei dovuto saperlo.",
+      "caption": "Era qui tutto il tempo.",
+      "primary_color": "#050508",
+      "secondary_color": "#FFD700",
+      "vote_question": null,
+      "option_a": null,
+      "option_b": null,
+      "next_stepStatus": "IDLE",
+      "image_prompt": "Golden light signal emerging from within collective drawings in near-black space, revelation moment, warm gold #FFD700 revealing hidden life within created traces, near-black background, the surprise of finding what was always there"
+    },
+    {
+      "number": 10,
+      "stepStatus": "IDLE",
+      "narrative_text": "Non sta scappando.\nQuesto non è mai successo — le prime quattro volte ha sempre scappato. Ma voi avete creato qualcosa che le sembra sicuro. Non so cosa sia esattamente. Probabilmente il calore. Probabilmente la quantità di persone che non l'hanno cercata nel modo sbagliato.\nHa funzionato.",
+      "caption": "Avete creato qualcosa che le sembra sicuro.",
+      "primary_color": "#0A1020",
+      "secondary_color": "#F4845F",
+      "vote_question": null,
+      "option_a": null,
+      "option_b": null,
+      "next_stepStatus": "VOTE",
+      "image_prompt": "Calm warmth in deep blue cosmic space, a creature at rest surrounded by soft coral and orange light, the relief of finding what was lost, gentle glow against dark ocean blue #0A1020, peaceful science fiction digital art with coral #F4845F"
+    },
+    {
+      "number": 11,
+      "stepStatus": "VOTE",
+      "narrative_text": "Posso portarla via con me. Questa era la missione. È ancora la missione — tecnicamente.\nMa è ferma. Non fa rumore. Sente qualcosa di vostro che le piace.\nVoi cosa fareste?",
+      "caption": "Voi cosa fareste?",
+      "primary_color": "#0D0829",
+      "secondary_color": "#B39DDB",
+      "vote_question": "Cosa facciamo con Tav?",
+      "option_a": "Portala via con te",
+      "option_b": "Lasciala ancora un po'",
+      "next_stepStatus": "WAVE",
+      "image_prompt": "Decision moment in deep indigo space, creature at rest between two possible futures, soft violet light suggesting choice and consequence, deep indigo #0D0829 with lavender purple #B39DDB accents, the weight of a simple question"
+    },
+    {
+      "number": 12,
+      "stepStatus": "WAVE",
+      "narrative_text": {
+        "A": "Giusto.\nÈ per questo che sono venuta — riportarla a casa. Sistema RT-7, terzo satellite, emisfera settentrionale. Dove ha il suo settore, il suo cibo sbagliato, il suo suono unico.\nHa guardato voi per un momento prima di andare. Non lo fa spesso.\nAddio.\nSe la rivedete — dite che stavamo cercando.",
+        "B": "Va bene. Ancora un po'.\nSi ferma raramente. E mai con degli estranei. Non so cosa abbiate fatto — ma qualunque cosa sia stata, ha funzionato meglio della terza missione di recupero.\nTornerò quando è pronta. O quando mi manda il suo segnale. O quando trovo il settore che non riesco ad aprire dall'interno.\nAddio.\nSe la rivedete — dite che stavamo cercando."
+      },
+      "caption": "Addio.",
+      "primary_color": "#080815",
+      "secondary_color": "#E0E0FF",
+      "vote_question": null,
+      "option_a": null,
+      "option_b": null,
+      "next_stepStatus": "IDLE",
+      "image_prompt": "Farewell in night-sky space, particles dispersing like a departing breath, soft starlight white #E0E0FF against absolute dark #080815, the quiet after an encounter that mattered, departure and what remains, minimal cosmic illustration"
+    }
+  ]
+}
