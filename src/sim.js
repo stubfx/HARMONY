@@ -128,8 +128,10 @@ const params = {
 // ?s=<uuid>      — pin the sim to a specific session room (survives reloads via URL)
 // ?amount=<n>    — override the starting agent count (still adjustable in the GUI)
 // ?test=1        — start with n8n test mode enabled (mirrors GUI toggle, survives reloads)
+// ?password=<x>  — forwarded as-is in every heartbeat payload; survives reloads via URL
 const _urlParams     = new URLSearchParams(location.search);
 const _forcedSession = _urlParams.get('s') || null;
+const _n8nPassword   = _urlParams.get('password') || null;
 {
     const n = parseInt(_urlParams.get('amount') ?? '', 10);
     if (Number.isFinite(n) && n > 0)
@@ -1208,6 +1210,7 @@ async function callN8nHeartbeat() {
                 votesB:            simState.votesB,
                 storyVoteResult:   simState.storyVoteResult,
                 userCount:         simState.userCount,
+                ...(_n8nPassword !== null && { password: _n8nPassword }),
                 ..._serverEcho,
                 params:            { ...params },
             }),
