@@ -12,7 +12,7 @@ Una limitazione simile riguarda la visione. Il sistema non vede la stanza. Non s
 
 > **[IMG]** Diagramma schematico di quello che il sistema percepisce (volume audio, input touch) rispetto a quello che non vede (posizione fisica, gesti corporei, espressioni, numero di persone presenti).
 
-Un'altra limitazione riguarda la memoria. Il sistema non ricorda. Ogni sessione comincia da zero: le particelle non sanno nulla di quello che è successo nelle sessioni precedenti, non ci sono pattern che si accumulano nel tempo, non c'è niente che cambia in modo permanente. Il sistema è potente nel brevissimo termine, ma cieco rispetto al tempo lungo. Non ha storia.
+Un'altra limitazione riguarda la memoria. Il sistema non ricorda. Ogni sessione comincia da zero: le particelle non sanno nulla di quello che è successo nelle sessioni precedenti, e niente di quello che succede in quella corrente diventa permanente. Il sistema è potente nel brevissimo termine. Sul tempo lungo, è cieco. Non ha storia.
 
 Infine, c'è una limitazione che riguarda la scala dell'esperienza. Il progetto è stato concepito e testato in condizioni controllate. Non è mai stato esposto a un pubblico reale in un contesto espositivo vero. Molte delle assunzioni che lo attraversano, su come le persone reagiscono, su quanto tempo passano connesse, su come si comporta il sistema con dieci o venti persone simultanee, rimangono ipotesi da verificare.
 
@@ -24,7 +24,7 @@ Il progetto è stato pensato per una sala di dimensioni moderate, con un numero 
 
 Ma cosa succederebbe con cento persone? Con mille? In uno spazio aperto, in una piazza, in un aeroporto?
 
-> **[IMG]** Schizzo o mock-up concettuale del sistema in uno spazio pubblico di grandi dimensioni — visualizzazione ipotetica di un'installazione in un grande auditorium, in una piazza, o in un atrio di stazione.
+> **[IMG]** Schizzo o mock-up concettuale del sistema in uno spazio pubblico di grandi dimensioni: visualizzazione ipotetica di un'installazione in un grande auditorium, in una piazza, o in un atrio di stazione.
 
 Le sfide tecniche di questa espansione sono reali ma risolvibili. Le sfide concettuali sono più interessanti. Con mille partecipanti, le dinamiche collettive cambierebbero natura: si formerebbero sottogruppi, emergerebbero strutture di influenza più complesse, la logica dello sciame diventerebbe ancora più evidente e meno controllabile. Il singolo individuo si sentirebbe ancora meno come un agente di controllo e ancora di più come parte di qualcosa che lo supera.
 
@@ -36,11 +36,11 @@ Questo potrebbe essere bellissimo. Oppure soverchiante, nell'accezione negativa 
 
 Le direzioni in cui questo progetto potrebbe crescere sono molte, e non tutte tecnologiche.
 
-Sul fronte dei sensi: il suono è già presente come input, ma potrebbe diventare anche output. Un sistema che risponde al suono della stanza producendo suono a sua volta, in una retroazione audio-visiva, aprirebbe una dimensione completamente nuova. Allo stesso modo, sistemi di visione artificiale potrebbero permettere al sistema di percepire il corpo nel suo complesso, non solo il tocco sullo schermo: la postura, il movimento, la direzione dello sguardo.
+Sul fronte dei sensi: il suono è già presente come input, ma potrebbe diventare anche output. Un sistema che risponde al suono della stanza producendo suono a sua volta, in una retroazione audio-visiva, aprirebbe una dimensione completamente nuova. Allo stesso modo, sistemi di visione artificiale potrebbero estendere la percezione del sistema dal tocco sullo schermo al corpo nel suo complesso: la postura, il movimento, la direzione dello sguardo.
 
-Sul fronte del tempo: un sistema che ricorda. Che mantiene traccia di quello che è successo nelle sessioni passate, che si modifica lentamente nel corso di settimane o mesi di esposizione. Che porta con sé la storia del pubblico che l'ha attraversato. Questa sarebbe una forma di memoria molto diversa da quella umana, ma reale: un sistema che cambia perché è stato vissuto.
+Sul fronte del tempo: un sistema che ricorda. Che mantiene traccia di quello che è successo nelle sessioni passate, che si modifica lentamente nel corso di settimane o mesi di esposizione. Che porta con sé la storia del pubblico che l'ha attraversato. Sarebbe una forma di memoria diversa da quella umana, e in tutto reale: un sistema che cambia perché è stato vissuto.
 
-> **[IMG]** Tavola concettuale con schizzi di possibili estensioni — nuovi sensi integrati (visione, temperatura), configurazioni spaziali diverse, timeline di evoluzione del sistema nel tempo.
+> **[IMG]** Tavola concettuale con schizzi di possibili estensioni: nuovi sensi integrati (visione, temperatura), configurazioni spaziali diverse, timeline di evoluzione del sistema nel tempo.
 
 Sul fronte dei luoghi: installazioni distribuite in più spazi simultaneamente, connesse in rete. Sciami che si trovano in città diverse ma si influenzano a vicenda in tempo reale. La distanza fisica che scompare nella condivisione di uno sciame comune: persone a Milano e persone a Tokyo che muovono lo stesso sistema, che vedono sullo schermo il risultato di azioni che nessuno di loro conosce completamente.
 

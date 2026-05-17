@@ -1,8 +1,8 @@
 # 9. Il dialogo tra umano e macchina
 
-Il rapporto tra una persona e un sistema interattivo non è mai semplice come sembra. Si entra in uno spazio con l'idea di controllare qualcosa, e si scopre che qualcosa ci sta anche controllando. Si pensa di essere il soggetto dell'interazione, e si realizza di essere anche il suo oggetto.
+Il rapporto tra una persona e un sistema interattivo non è mai semplice come sembra. Si entra in uno spazio con l'idea di controllare qualcosa, e si scopre che qualcosa ci sta anche controllando. Il ruolo di soggetto, che si era assunti entrando, si rivela parziale: di fronte a un sistema che risponde, si è anche oggetto.
 
-Questa circolarità è al centro di molte delle domande più interessanti che la tecnologia computazionale ha aperto negli ultimi decenni. La domanda non è chi è più intelligente, l'umano o la macchina: è come si trasforma la relazione tra i due quando il sistema è abbastanza complesso da rispondere in modi non completamente prevedibili.
+Questa circolarità è al centro di molte delle domande più interessanti che la tecnologia computazionale ha aperto negli ultimi decenni. Non interessa qui chi sia più intelligente, l'umano o la macchina. Interessa come si trasforma la relazione tra i due, quando il sistema è abbastanza complesso da rispondere in modi non completamente prevedibili.
 
 ---
 
@@ -12,7 +12,7 @@ In un sistema di particelle orientate da partecipanti, la risposta alla domanda 
 
 Alla fine, non è chiaro chi stia guidando. O meglio: tutti guidano e nessuno guida completamente. Il controllo è distribuito, come nel modello dello sciame.
 
-> **[IMG]** Diagramma della circolarità dell'influenza — partecipanti che influenzano il sistema, il sistema che modifica il comportamento dei partecipanti, la narrativa esterna come terzo elemento.
+> **[IMG]** Diagramma della circolarità dell'influenza: partecipanti che influenzano il sistema, il sistema che modifica il comportamento dei partecipanti, la narrativa esterna come terzo elemento.
 
 Alan Turing, nel suo saggio del 1950 *Computing Machinery and Intelligence*, si chiedeva se si potesse mai distinguere, in una conversazione, una risposta umana da una risposta di macchina. La domanda di Turing era sulla simulazione del linguaggio. Ma la struttura del problema si applica anche qui: quando non si riesce più a distinguere quali parti del comportamento del sistema sono state causate dai partecipanti e quali dalla logica interna, chi si può dire che stia guidando?
 
@@ -26,9 +26,9 @@ Uno degli effetti più interessanti di un sistema collettivo è che rivela strut
 
 Quando il comportamento collettivo di un gruppo è visualizzato in tempo reale su uno schermo grande, quelle strutture diventano osservabili. Si può vedere dove l'attenzione del gruppo si concentra. Si può vedere se qualcuno sta guidando il movimento degli altri, anche senza volerlo. Si può vedere il ritmo collettivo nella forma del flusso.
 
-> **[IMG]** Screenshot che mostra un pattern visivo chiaro emergente dal comportamento collettivo — una struttura nel flusso che rivela l'organizzazione implicita del gruppo in quel momento.
+> **[IMG]** Screenshot che mostra un pattern visivo chiaro emergente dal comportamento collettivo: una struttura nel flusso che rivela l'organizzazione implicita del gruppo in quel momento.
 
-La logica è la stessa che Rokeby aveva identificato nel suo lavoro, descritta nel primo capitolo: il sistema non restituisce una copia fedele di ciò che riceve. Lo traduce. E la traduzione introduce una distanza interpretativa che rende osservabile quello che altrimenti resterebbe invisibile. Su scala collettiva, questa traduzione funziona su un materiale più complesso: non il movimento di un corpo singolo, ma il comportamento aggregato di un gruppo. Quello che si vede sullo schermo è il gruppo, ma trasformato in qualcosa che il gruppo non avrebbe potuto vedere di sé stesso in nessun altro modo.
+La logica è la stessa che Rokeby aveva identificato nel suo lavoro, descritta nel primo capitolo: il sistema non restituisce una copia fedele di ciò che riceve. Lo traduce. E la traduzione introduce una distanza interpretativa che rende osservabile quello che altrimenti resterebbe invisibile. Su scala collettiva, questa traduzione opera su un materiale più complesso del movimento di un corpo singolo: opera sul comportamento aggregato di un gruppo. Quello che si vede sullo schermo è il gruppo, ma trasformato in qualcosa che il gruppo non avrebbe potuto vedere di sé stesso in nessun altro modo.
 
 Questa trasformazione ha un effetto preciso: rende osservabile quello che normalmente si sente soltanto. Si può avere la sensazione di far parte di un gruppo coeso o di un gruppo disperso; con questo sistema, quella sensazione ha una forma visiva. Si può vederla.
 
@@ -38,13 +38,13 @@ Questa trasformazione ha un effetto preciso: rende osservabile quello che normal
 
 Tutti i sistemi descritti fin qui, le particelle, le modalità, la narrativa, condividono una caratteristica che non è mai stata nominata direttamente: il sistema non aspetta.
 
-> **[IMG]** Screenshot della modalità DOT o FREEROAM — il sistema in uno stato attivo senza input esterno, le particelle che si muovono secondo una propria logica visibile.
+> **[IMG]** Screenshot della modalità DOT o FREEROAM: il sistema in uno stato attivo senza input esterno, le particelle che si muovono secondo una propria logica visibile.
 
-Quando le persone entrano nella stanza, il sistema ha già qualcosa in corso. Non si attiva in risposta a qualcuno: esiste prima che qualcuno arrivi, e continuerà a esistere dopo che se ne sarà andato.
+Quando le persone entrano nella stanza, il sistema ha già qualcosa in corso. Esiste prima che qualcuno arrivi, e continuerà a esistere dopo che se ne sarà andato.
 
-Questo cambia tutto nel tipo di relazione che si stabilisce. Di fronte a un ambiente già in movimento, la prima domanda non è "come lo uso?" ma "cosa sta facendo?". Si osserva prima di agire. Si cerca di capire la logica prima di intervenire. È una postura radicalmente diversa da quella di chi usa uno strumento.
+Questo cambia tutto nel tipo di relazione che si stabilisce. Di fronte a un ambiente già in movimento, la prima domanda non è "come lo uso?". È "cosa sta facendo?". Si osserva prima di agire. Si cerca di capire la logica prima di intervenire. È una postura radicalmente diversa da quella di chi usa uno strumento.
 
-In un certo senso, il sistema propone. Propone un comportamento, un ritmo, una qualità dell'esperienza. I partecipanti rispondono a quella proposta con la propria. Il dialogo è già iniziato quando si connette il telefono: si entra in una conversazione in corso, non si apre una conversazione nuova.
+Il sistema propone. Propone un comportamento, un ritmo, una qualità dell'esperienza. I partecipanti rispondono a quella proposta con la propria. Il dialogo è già iniziato quando si connette il telefono: si entra in una conversazione in corso, non si apre una conversazione nuova.
 
 Questo è un modello molto diverso da quello dell'assistente conversazionale, che aspetta la domanda e risponde. È più vicino a quello di un musicista che sta già suonando quando gli altri entrano nella stanza: l'interazione comincia dall'ascolto, non dall'interrogazione.
 
@@ -52,12 +52,12 @@ Questo è un modello molto diverso da quello dell'assistente conversazionale, ch
 
 ## 9.4 — Un'estetica della relazione
 
-Nicolas Bourriaud, nel suo libro *Estetica relazionale* (1998), descrive una tendenza nell'arte degli anni Novanta verso opere che producono modi di stare insieme, forme di relazione, piuttosto che oggetti da contemplare. L'opera non è più un messaggio trasmesso da un autore a un pubblico: è un contesto in cui si creano incontri tra persone, tra persone e sistemi, tra idee e corpi.
+Nicolas Bourriaud, nel suo libro *Estetica relazionale* (1998), descrive una tendenza nell'arte degli anni Novanta verso opere che producono modi di stare insieme, forme di relazione, piuttosto che oggetti da contemplare. L'opera diventa contesto: lo spazio in cui si creano incontri tra persone, tra persone e sistemi, tra idee e corpi. Smette di essere un messaggio trasmesso da un autore a un pubblico.
 
-Questo progetto appartiene a quella tradizione, ma la prolunga in una direzione che Bourriaud non poteva prevedere: la direzione in cui il sistema stesso diventa un interlocutore attivo. Non uno spazio neutro in cui le relazioni accadono, ma una presenza che partecipa alla relazione.
+Questo progetto appartiene a quella tradizione, ma la prolunga in una direzione che Bourriaud non poteva prevedere: il sistema stesso diventa un interlocutore attivo, una presenza che partecipa alla relazione invece di limitarsi a ospitarla.
 
-> **[IMG]** Fotografia o screenshot che cattura l'esperienza complessiva dell'installazione — persone nella sala, proiezione grande sullo sfondo, telefoni in mano, la dimensione collettiva dell'evento.
+> **[IMG]** Fotografia o screenshot che cattura l'esperienza complessiva dell'installazione: persone nella sala, proiezione grande sullo sfondo, telefoni in mano, la dimensione collettiva dell'evento.
 
-Quello che questo progetto propone, implicitamente, è un modello diverso per pensare il rapporto tra umani e sistemi intelligenti. Non lo strumento che si usa quando se ne ha bisogno. Non l'oracolo che risponde alle domande. Qualcosa di più vicino a una presenza: un sistema che ha una propria vita, che si modifica in risposta al contesto, che offre qualcosa e chiede qualcosa in cambio. Una relazione, invece di una funzione.
+Quello che questo progetto propone, implicitamente, è un modello diverso per pensare il rapporto tra umani e sistemi intelligenti. Un modello distante sia dallo strumento che si usa quando serve sia dall'oracolo che risponde alle domande. Più vicino a una presenza: un sistema che ha una propria vita, che si modifica in risposta al contesto, che offre qualcosa e chiede qualcosa in cambio. Una funzione che diventa relazione.
 
 Questa proposta non ha ambizioni di universalità. È un esperimento, un prototipo, una domanda formulata attraverso la forma invece che attraverso il testo. E come ogni domanda formulata bene, non esaurisce il problema che pone: lo rende più preciso, più maneggiabile, più difficile da ignorare.

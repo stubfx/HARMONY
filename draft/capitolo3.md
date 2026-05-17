@@ -2,7 +2,7 @@
 
 La mano è stata la prima interfaccia. Prima delle parole, prima della scrittura, prima di qualsiasi strumento, il corpo umano ha imparato a comunicare con il mondo attraverso il gesto, la postura, il contatto. Ogni tecnologia che è venuta dopo non ha sostituito questa relazione: l'ha mediata, trasformata, spostata su nuovi oggetti.
 
-Lo smartphone è l'ultimo di questi oggetti. È anche, in un certo senso, il più strano: uno schermo di vetro che risponde al tocco, che legge l'inclinazione del corpo, che trasmette la posizione nello spazio. In questo progetto, quello schermo diventa qualcosa di diverso da quello per cui è stato progettato. Non è più un portale verso un mondo privato: è l'estensione del proprio corpo in uno spazio collettivo.
+Lo smartphone è l'ultimo di questi oggetti, e forse il più strano: uno schermo di vetro che risponde al tocco, che legge l'inclinazione del corpo, che trasmette la posizione nello spazio. In questo progetto, quello schermo diventa qualcosa di diverso da quello per cui è stato progettato. Smette di essere un portale verso un mondo privato e diventa l'estensione del proprio corpo in uno spazio collettivo.
 
 ---
 
@@ -10,9 +10,9 @@ Lo smartphone è l'ultimo di questi oggetti. È anche, in un certo senso, il pi�
 
 Il gesto è più antico del linguaggio verbale. Gli studi sull'acquisizione del linguaggio nei bambini mostrano che i gesti di indicazione, di richiesta, di condivisione dell'attenzione precedono le prime parole di mesi. Più in generale, le scienze cognitive hanno stabilito da tempo che gran parte della comunicazione umana avviene attraverso il corpo: la postura, la distanza, il contatto, la direzione dello sguardo. Le parole sono una sovrastruttura costruita sopra un sistema più antico.
 
-Paul Dourish, nel libro *Where the Action Is* (2001), ha sviluppato il concetto di "interazione incarnata": l'idea che le tecnologie più efficaci siano quelle che si appoggiano sulla competenza corporea già acquisita, invece di richiedere l'apprendimento di nuove astrazioni. Non si impara a toccare: si sa già come si fa. Un'interfaccia che usa il tocco come linguaggio primario sta attingendo a qualcosa di molto profondo.
+Paul Dourish, nel libro *Where the Action Is* (2001), ha sviluppato il concetto di "interazione incarnata": l'idea che le tecnologie più efficaci siano quelle che si appoggiano sulla competenza corporea già acquisita, invece di richiedere l'apprendimento di nuove astrazioni. Toccare non si impara. È un gesto che il corpo conosce già. Un'interfaccia che usa il tocco come linguaggio primario sta attingendo a qualcosa di molto profondo.
 
-> **[IMG]** Studio fotografico di mani che interagiscono con una superficie tattile — gesti naturali di pressione, scorrimento, rotazione, che precedono qualsiasi istruzione.
+> **[IMG]** Studio fotografico di mani che interagiscono con una superficie tattile: gesti naturali di pressione, scorrimento, rotazione, che precedono qualsiasi istruzione.
 
 Quando il gesto diventa dato, però, qualcosa cambia. Toccare un'altra persona e toccare uno schermo sono atti fisicamente simili ma semanticamente molto diversi. Il gesto codificato in un sistema digitale perde alcune delle sue sfumature, la pressione variabile, il calore, la continuità organica del contatto, e ne acquista altre: diventa trasmissibile, registrabile, replicabile. In questo progetto, il gesto del dito su un joystick virtuale diventa un impulso che sposta migliaia di particelle su uno schermo grande. La perdita è reale. Il guadagno anche.
 
@@ -24,7 +24,7 @@ Quando si pensa a un controller per un sistema interattivo, la prima cosa che vi
 
 Lo smartphone non richiede nulla di tutto questo. È già in tasca. È già acceso. Le sue interfacce fondamentali, lo schermo touchscreen, l'accelerometro, il giroscopio, sono diventate familiari in pochi anni a quasi tutti gli adulti. Usarlo come controller non aggiunge un elemento estraneo all'esperienza: usa qualcosa che già c'è.
 
-> **[IMG]** Schermata dell'interfaccia controller su smartphone — joystick virtuale, selettore colore, sfondo scuro, interfaccia minimale del progetto.
+> **[IMG]** Schermata dell'interfaccia controller su smartphone: joystick virtuale, selettore colore, sfondo scuro, interfaccia minimale del progetto.
 
 In questo progetto, lo smartphone cambia di status nel momento in cui si scansiona il codice QR. Smette di essere un oggetto personale, il mio telefono, con le mie app, la mia musica, le mie fotografie, e diventa un dispositivo collettivo. Il colore che si sceglie entra nel sistema insieme ai colori di tutti gli altri. Il gesto che si fa non muove solo le proprie particelle: partecipa al movimento complessivo dello sciame. Questa trasformazione avviene senza che nessuno la annunci. Si scopre mentre accade.
 
@@ -38,7 +38,7 @@ Mark Weiser, nel suo saggio fondamentale *The Computer for the 21st Century* (19
 
 Quello che Weiser descriveva come una promessa del futuro, in molti contesti è già realtà. Lo smartphone è un dispositivo di presenza ubiqua: accompagna il corpo, registra la posizione, trasmette dati in continuazione. In questo progetto, questa caratteristica viene usata in modo deliberato: il telefono è il punto di contatto tra il corpo fisico della persona, seduta in una sala, e il sistema digitale proiettato sullo schermo grande.
 
-> **[IMG]** Fotografia di una persona che guarda il telefono mentre, sullo schermo in background, le particelle si muovono in risposta al suo input — la connessione tra il piccolo e il grande.
+> **[IMG]** Fotografia di una persona che guarda il telefono mentre, sullo schermo in background, le particelle si muovono in risposta al suo input: la connessione tra il piccolo e il grande.
 
 Questa forma di presenza mediata ha qualcosa di peculiare. Il corpo della persona non è direttamente visibile nel sistema: non c'è un avatar, non c'è una telecamera che riprende chi partecipa. Quello che c'è è un colore, un vettore di movimento, un impulso nel flusso collettivo. La persona è presente nello sciame, ma non è riconoscibile come tale. Esiste come effetto, non come immagine.
 
@@ -52,7 +52,7 @@ C'è un momento preciso nell'esperienza di questo progetto in cui qualcosa cambi
 
 Questa realizzazione modifica il modo in cui si agisce. Si comincia a cercare gli altri nel flusso, a interpretare i loro movimenti, a rispondere a ciò che fanno. Lo sciame smette di essere uno sfondo e diventa una conversazione.
 
-> **[IMG]** Screenshot che mostra più colori distinti mescolati nel flusso delle particelle — la traccia visibile della presenza simultanea di più partecipanti, ognuno riconoscibile dalla propria tinta.
+> **[IMG]** Screenshot che mostra più colori distinti mescolati nel flusso delle particelle: la traccia visibile della presenza simultanea di più partecipanti, ognuno riconoscibile dalla propria tinta.
 
 L'anonimato, in questo contesto, non è una limitazione. È una condizione che permette una libertà particolare: si può muovere lo sciame in qualsiasi direzione, scegliere qualsiasi colore, seguire un impulso senza dover rendere conto a nessuno. Non c'è un nome visibile. Non c'è un punteggio. Non c'è un modo sbagliato di partecipare. Questa libertà produce spesso comportamenti inaspettati: alcuni esplorano i bordi dello schermo, altri sembrano cercare di coordinarsi con il vicino di posto, altri ancora si siedono fermi e guardano cosa fanno gli altri, come se il sistema fosse qualcosa da osservare piuttosto che qualcosa da usare.
 

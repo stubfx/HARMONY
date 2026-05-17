@@ -10,6 +10,8 @@
 
 - **Aristotele** — la citazione «Il tutto è più della somma delle sue parti» è comunemente attribuita alla *Metafisica*, ma la formulazione esatta è una parafrasi moderna. Verificare se citare direttamente o usare una formulazione più cauta. [capitolo2.md, sezione 2.2]
 
+- **Rubin, Rick (2023)** — verificare la citazione esatta: «il progetto non appartiene all'artista. L'artista è il custode del progetto, non il suo creatore.» Fonte: *The Creative Act: A Way of Being*, Penguin Press, 2023. Aggiungere il numero di pagina. [capitolo8.md, sezione 8.3]
+
 ---
 
 ## Riferimenti bibliografici da controllare

@@ -119,10 +119,13 @@
   Formule matematiche invisibili guidano il flusso. Il sistema è in relazione con qualcosa, anche se non si vede con cosa.
 
 - **6.4 — Il voto**
-  Il momento in cui il gruppo decide. Due opzioni, nessuna risposta giusta. Il risultato che cambia la direzione della storia. La democrazia come meccanismo estetico.
+  Il momento in cui il gruppo decide. Due opzioni, nessuna risposta giusta. Una variazione dentro una struttura narrativa che procede comunque. La democrazia come meccanismo estetico.
 
 - **6.5 — Il disegno**
   Lasciare una traccia che gli altri seguono. Il gesto individuale che diventa orientamento collettivo. Cosa rimane dopo che la mano si è alzata.
+
+- **6.6 — La parola scritta**
+  Quando il pubblico può digitare. La parola individuale che lo sciame abita e che diventa luce condivisa. L'anonimato che, per un attimo, ha una crepa.
 
 ---
 
