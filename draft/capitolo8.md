@@ -34,7 +34,7 @@ Questa differenza è difficile da codificare in criteri oggettivi. Non si misura
 
 ## 8.3 — La distanza tra l'intenzione e il risultato
 
-Il progetto che avevo in mente all'inizio era diverso da quello che esiste adesso. La distanza non è radicale, ma riguarda molti dettagli importanti.
+Il progetto che avevo in mente all'inizio era diverso da quello che esiste adesso. Le grandi linee tengono. Sono i dettagli che si sono spostati, e in alcuni casi si sono spostati abbastanza da cambiare il senso complessivo dell'esperienza.
 
 Alcune cose sono state semplificate: aspetti che sembravano fondamentali all'inizio si sono rivelati inutili una volta provati, o impossibili da implementare nei tempi disponibili, o semplicemente meno interessanti di quanto pensassi. La narrativa originale avrebbe dovuto essere più strutturata, più lineare, con un arco preciso. Nel processo, si è frammentata, e quella frammentazione si è rivelata più adatta all'esperienza.
 
@@ -42,6 +42,6 @@ Altre cose sono emerse durante il processo e si sono rivelate centrali: la reatt
 
 > **[IMG]** Documentazione di una fase intermedia dello sviluppo: screenshot più grezzo o interfaccia meno rifinita, a confronto implicito con lo stato attuale.
 
-Questa distanza tra intenzione e risultato non è un fallimento. È parte di qualsiasi processo creativo serio. Come scrive Rick Rubin in *The Creative Act* (2023), «il progetto non appartiene all'artista. L'artista è il custode del progetto, non il suo creatore.» Il lavoro ha una sua direzione che si manifesta solo attraverso il processo, e in anticipo non si può sapere dove porta. Si può solo stare attenti a riconoscerlo quando ci si arriva.
+Questa distanza tra intenzione e risultato è una parte normale di qualsiasi processo creativo serio. È il segno che il lavoro ha avuto vita propria, e ha cambiato forma mentre era in costruzione. Chi costruisce qualcosa di non banale lo sa: l'oggetto finito raramente coincide con quello immaginato all'inizio, e quando coincide spesso è perché si è progettato in difetto, evitando di seguire le occasioni che il processo apriva strada facendo. Come scrive Rick Rubin in *The Creative Act* (2023), «il progetto non appartiene all'artista. L'artista è il custode del progetto, non il suo creatore.» Il lavoro ha una sua direzione che si manifesta solo attraverso il processo, e in anticipo non si può sapere dove porta. Si può solo stare attenti a riconoscerlo quando ci si arriva.
 
 Alla fine quello che rimane è quello che si è riusciti a fare, con i vincoli del tempo, delle competenze disponibili e di quello che il sistema stesso suggeriva di diventare. Non è esattamente quello che si voleva fare. In molti casi, è meglio.

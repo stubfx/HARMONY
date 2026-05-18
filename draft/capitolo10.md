@@ -12,7 +12,7 @@ Una limitazione simile riguarda la visione. Il sistema non vede la stanza. Non s
 
 > **[IMG]** Diagramma schematico di quello che il sistema percepisce (volume audio, input touch) rispetto a quello che non vede (posizione fisica, gesti corporei, espressioni, numero di persone presenti).
 
-Un'altra limitazione riguarda la memoria. Il sistema non ricorda. Ogni sessione comincia da zero: le particelle non sanno nulla di quello che è successo nelle sessioni precedenti, e niente di quello che succede in quella corrente diventa permanente. Il sistema è potente nel brevissimo termine. Sul tempo lungo, è cieco. Non ha storia.
+Un'altra limitazione riguarda la memoria. Il sistema non ricorda. Ogni sessione comincia da zero: le particelle non sanno nulla di quello che è successo nelle sessioni precedenti, e niente di quello che succede in quella corrente diventa permanente. Il sistema è potente nel brevissimo termine. Sul tempo lungo, è cieco. Non ha storia: il pubblico che è venuto ieri sera non lascia tracce visibili a quello di stasera, e tutto ricomincia da capo a ogni accensione, come se il sistema fosse stato appena costruito.
 
 Infine, c'è una limitazione che riguarda la scala dell'esperienza. Il progetto è stato concepito e testato in condizioni controllate. Non è mai stato esposto a un pubblico reale in un contesto espositivo vero. Molte delle assunzioni che lo attraversano, su come le persone reagiscono, su quanto tempo passano connesse, su come si comporta il sistema con dieci o venti persone simultanee, rimangono ipotesi da verificare.
 

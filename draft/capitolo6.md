@@ -1,6 +1,6 @@
 # 6. Le modalità dell'esperienza
 
-Il sistema non è sempre uguale a se stesso. Ha stati diversi, che corrispondono a qualità diverse dell'esperienza: momenti di raccoglimento, di deriva, di dialogo, di decisione collettiva, di traccia. Ogni stato ha una logica propria e produce un'atmosfera propria.
+Il sistema non è sempre uguale a se stesso. Ha stati diversi, che corrispondono a qualità diverse dell'esperienza: momenti di raccoglimento, di deriva, di dialogo, di decisione collettiva, di traccia, di scrittura condivisa. Ogni stato ha una logica propria e produce un'atmosfera propria.
 
 ---
 
@@ -34,7 +34,7 @@ Il sistema, in questa modalità, respira da solo. Se ci sono partecipanti connes
 
 La modalità NORMAL è quella in cui il sistema è più attivo nella propria logica interna. Formule matematiche invisibili guidano il flusso delle particelle, producendo correnti, vortici, pattern che cambiano lentamente. Il sistema sembra in relazione con qualcosa, anche se non è immediatamente chiaro con cosa.
 
-I partecipanti connessi possono spingere il proprio sotto-sciame in qualsiasi direzione: il risultato è una tensione tra la logica del sistema e l'impulso individuale. Chi partecipa non ha il controllo totale. Il sistema ha una propria resistenza, una propria tendenza direzionale. L'interazione è negoziazione, non comando.
+I partecipanti connessi possono spingere il proprio sotto-sciame in qualsiasi direzione: il risultato è una tensione tra la logica del sistema e l'impulso individuale. Chi partecipa non ha il controllo totale. Il sistema ha una propria resistenza, una propria tendenza direzionale. L'interazione è una forma di negoziazione: si suggerisce una direzione, il sistema accetta in parte, in parte propone qualcosa di suo, e quello che si vede sullo schermo è il risultato di una contrattazione in cui nessuno vince e nessuno perde.
 
 > **[IMG]** Screenshot della modalità NORMAL: flusso di particelle con pattern visibili, correnti e vortici emergenti, movimento strutturato ma non rigido.
 

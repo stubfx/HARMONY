@@ -10,13 +10,13 @@ Il principio che guida queste scelte ha un nome paradossale: il design dell'invi
 
 La prima scelta è stata il nero, inteso come ambiente. Lo sfondo è passivo, è ciò che c'è quando non c'è nient'altro. L'ambiente è attivo, è la condizione che rende possibile quello che contiene.
 
-Il nero assoluto del display permette alle particelle di esistere come luce pura: ogni punto luminoso emerge dal buio senza competere con altri elementi visivi. Quando le particelle si addensano, la luce si accumula, si sovrappone, produce bagliori che non sarebbero possibili su uno sfondo chiaro. Il contrasto è la condizione della visibilità.
+Il nero assoluto del display permette alle particelle di esistere come luce pura: ogni punto luminoso emerge dal buio senza competere con altri elementi visivi. Quando le particelle si addensano, la luce si accumula, si sovrappone, produce bagliori che non sarebbero possibili su uno sfondo chiaro. Il contrasto è la condizione della visibilità: senza buio attorno, le particelle perderebbero il margine vibrante che fa apparire dieci punti come cento, e cento punti come una piccola nebulosa.
 
 > **[IMG]** Screenshot del sistema su sfondo nero totale: le particelle come punti di luce in uno spazio senza riferimenti, il nero come spazio fisico e non come assenza di colore.
 
 Il buio della sala in cui si svolge l'installazione prolunga questo principio nello spazio fisico. Non c'è separazione netta tra il nero dello schermo e il nero della stanza: la proiezione sembra emergere dall'oscurità dell'ambiente, non da una superficie delimitata. Questo produce un effetto di profondità e continuità che uno schermo illuminato in una stanza normale non potrebbe avere.
 
-C'è anche una ragione storica per questa scelta. Gran parte dell'arte che lavora con la luce, da James Turrell a Bruce Nauman, usa il buio come condizione. Il buio è una forma di presenza: ricettiva, attenta, capace di accogliere quello che la attraversa. Crea una qualità di percezione diversa rispetto alla luce ordinaria.
+C'è anche una ragione storica per questa scelta. Gran parte dell'arte che lavora con la luce, da James Turrell a Bruce Nauman, usa il buio come condizione. Il buio è una forma di presenza: ricettiva, attenta, capace di accogliere quello che la attraversa. Crea una qualità di percezione diversa rispetto alla luce ordinaria: l'occhio, lasciato senza riferimenti familiari, si abitua a cercare la luce dove c'è, e una volta che ha cominciato a cercarla la trova anche dove è debole, intermittente, quasi infinitesima. È in quel momento che lo sciame, anche disperso, diventa un evento e non un effetto.
 
 ---
 
@@ -42,7 +42,7 @@ La scelta non è casuale. Il colore è il solo identificatore che funziona sia s
 
 Tecnicamente, i colori nel sistema si comportano come la luce, non come la pittura. Il rendering usa un metodo di miscelazione additivo: dove le particelle di due partecipanti si sovrappongono, i loro colori si sommano. Due tinte sovrapposte producono una terza, più luminosa. Una folla di colori tende al bagliore bianco. L'effetto è che nessun colore copre un altro: si mescolano verso qualcosa di comune senza perdere la propria origine.
 
-La scelta del colore è anche il primo gesto che il partecipante compie nel sistema, prima ancora di muovere il joystick. È una scelta puramente estetica, senza conseguenze funzionali: rosso e blu muovono le particelle esattamente allo stesso modo. Ma il colore resta nello sciame per tutta la durata della connessione. È la firma di una presenza percepibile, anche se senza nome.
+La scelta del colore è anche il primo gesto che il partecipante compie nel sistema, prima ancora di muovere il joystick. È una scelta puramente estetica, senza conseguenze funzionali: rosso e blu muovono le particelle esattamente allo stesso modo. Ma il colore resta nello sciame per tutta la durata della connessione. È la firma di una presenza percepibile, anche se senza nome: una persona che entra in sala dopo che l'installazione è già cominciata può individuare con un'occhiata la tinta di chi è arrivato per primo, e riconoscerla nei minuti successivi come si riconosce una voce sentita da lontano, senza saperne nient'altro.
 
 ---
 

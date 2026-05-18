@@ -10,7 +10,7 @@ Questa circolarità è al centro di molte delle domande più interessanti che la
 
 In un sistema di particelle orientate da partecipanti, la risposta alla domanda "chi guida?" è sempre provvisoria. I partecipanti guidano le proprie particelle: questo è ovvio. Ma il comportamento delle particelle degli altri influenza quello che si vede, e quello che si vede influenza i gesti successivi. Il sistema ha una propria logica che resiste alle direzioni individuali. La narrativa che arriva dall'esterno orienta l'attenzione.
 
-Alla fine, non è chiaro chi stia guidando. O meglio: tutti guidano e nessuno guida completamente. Il controllo è distribuito, come nel modello dello sciame.
+Alla fine, non è chiaro chi stia guidando. O meglio: tutti guidano e nessuno guida completamente. Il controllo è distribuito, come nel modello dello sciame: nessuno vede l'intero, ognuno influenza una porzione, e il risultato finale appartiene a tutti i partecipanti insieme senza appartenere a nessuno in particolare.
 
 > **[IMG]** Diagramma della circolarità dell'influenza: partecipanti che influenzano il sistema, il sistema che modifica il comportamento dei partecipanti, la narrativa esterna come terzo elemento.
 
@@ -42,7 +42,7 @@ Tutti i sistemi descritti fin qui, le particelle, le modalità, la narrativa, co
 
 Quando le persone entrano nella stanza, il sistema ha già qualcosa in corso. Esiste prima che qualcuno arrivi, e continuerà a esistere dopo che se ne sarà andato.
 
-Questo cambia tutto nel tipo di relazione che si stabilisce. Di fronte a un ambiente già in movimento, la prima domanda non è "come lo uso?". È "cosa sta facendo?". Si osserva prima di agire. Si cerca di capire la logica prima di intervenire. È una postura radicalmente diversa da quella di chi usa uno strumento.
+Questo cambia tutto nel tipo di relazione che si stabilisce. Di fronte a un ambiente già in movimento, la prima domanda non è "come lo uso?". È "cosa sta facendo?". Si osserva prima di agire. Si cerca di capire la logica prima di intervenire. È una postura radicalmente diversa da quella di chi usa uno strumento: chi usa uno strumento si avvicina con uno scopo già pronto, e cerca i tasti che servono a raggiungerlo. Chi entra in questo progetto, le prime volte, si trova senza scopo. E quel vuoto, lontano dall'essere un difetto dell'interfaccia, è esattamente ciò che il sistema cerca di produrre.
 
 Il sistema propone. Propone un comportamento, un ritmo, una qualità dell'esperienza. I partecipanti rispondono a quella proposta con la propria. Il dialogo è già iniziato quando si connette il telefono: si entra in una conversazione in corso, non si apre una conversazione nuova.
 
