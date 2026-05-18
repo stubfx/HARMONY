@@ -1,8 +1,9 @@
 # 1. L'arte che risponde
 
-C'è un momento nella storia dell'arte in cui guardare ha smesso di bastare. Non si può fissare una data, e non c'è un manifesto che lo abbia decretato. È una tensione che ha cominciato ad accumularsi a metà del Novecento: la sensazione che l'opera stesse diventando troppo separata dal mondo, troppo chiusa in sé, incapace di fare nulla con la presenza delle persone che le stavano davanti.
+{rivediamo queste due righe, mi piace il concetto, ma mi sembrano blande}
+C'è un momento nella storia dell'arte in cui guardare non era più abbastanza. È una tensione che ha cominciato ad accumularsi a metà del Novecento: la sensazione che l'opera stesse diventando troppo separata dal mondo, troppo chiusa in sé, incapace di fare nulla con la presenza delle persone che le stavano davanti.
 
-La risposta è venuta da direzioni diverse, con linguaggi diversi. Ma in quasi tutti i casi, la domanda era la stessa: cosa succede quando l'opera non è più un oggetto da guardare, ma una situazione da attraversare?
+La risposta è arrivata da direzioni diverse, con linguaggi diversi. Ma in quasi tutti i casi, la domanda era la medesima: cosa succede quando l'opera non è più un oggetto da guardare, ma un'esperienza da vivere?
 
 ---
 
@@ -10,7 +11,7 @@ La risposta è venuta da direzioni diverse, con linguaggi diversi. Ma in quasi t
 
 Negli anni Sessanta, in Europa e negli Stati Uniti, una serie di movimenti ha cominciato a mettere in discussione la separazione tra opera e pubblico. Il Groupe de Recherche d'Art Visuel, fondato a Parigi nel 1960, costruiva ambienti in cui il visitatore era chiamato a interagire fisicamente con gli elementi esposti: superfici instabili, luci che reagivano al movimento, strutture che mutavano sotto il peso o il tocco della mano. Non si trattava di arte decorativa né di intrattenimento. Era una critica alla passività dello spettatore, formulata attraverso l'esperienza diretta invece che attraverso il testo.
 
-Nello stesso periodo, Allan Kaprow negli Stati Uniti stava inventando una forma ancora più radicale di coinvolgimento. Gli Happenings erano eventi senza trama fissa, senza confine netto tra chi li organizzava e chi vi partecipava. L'opera non esisteva come oggetto: era la situazione, l'incontro, il tempo condiviso. Kaprow aveva capito qualcosa che sarebbe rimasto rilevante per decenni: che il corpo del pubblico, portato dentro uno spazio progettato, diventa esso stesso materiale dell'opera.
+Nello stesso periodo, Allan Kaprow negli Stati Uniti stava inventando una forma ancora più radicale di coinvolgimento. Gli Happenings erano eventi senza trama fissa, senza confine netto tra chi li organizzava e chi vi partecipava. {diciamo qualcosa in piu degli happenings} L'opera non esisteva come oggetto: era la situazione, l'incontro, il tempo condiviso. Kaprow aveva capito qualcosa che sarebbe rimasto rilevante per decenni: che il corpo del pubblico, portato dentro uno spazio progettato, diventa esso stesso materiale dell'opera.
 
 > **[IMG]** Fotografia di un Happening di Allan Kaprow (anni Sessanta): partecipanti in uno spazio non convenzionale, confine tra autore e pubblico dissolto.
 
