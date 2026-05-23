@@ -1092,6 +1092,7 @@ const rndPick   = arr => arr[Math.floor(Math.random() * arr.length)];
 //           'DOT'    — fixed inward-spiral formulas; wind + formula forced on regardless of params
 const simState = {
     mode:              'STORY',
+    colorMode:         'NORMAL',
     qrStatus:          'HIDE',
     status:            'DOT',
     storyStep:         null,   // echoed from n8n step ID; null = not in story mode
@@ -1107,14 +1108,16 @@ const simState = {
 };
 
 // GUI handles — assigned by initGUI() at the bottom of this file.
-let stateCtrl   = null;
-let qrStateCtrl = null;
-let modeCtrl    = null;
+let stateCtrl     = null;
+let qrStateCtrl   = null;
+let modeCtrl      = null;
+let colorModeCtrl = null;
 let gui, swarmDebug, dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence;
 let applyGUIVisibility, toggleGUI, updateGizmo;
 
 function updateStateDisplay() {
     modeCtrl?.updateDisplay();
+    colorModeCtrl?.updateDisplay();
     stateCtrl?.updateDisplay();
     qrStateCtrl?.updateDisplay();
 }
@@ -1200,6 +1203,7 @@ async function callN8nHeartbeat() {
                 type:              'heartbeat',
                 room:              sessionRoom,
                 mode:              simState.mode,
+                colorMode:         simState.colorMode,
                 status:            simState.status,
                 qrStatus:          simState.qrStatus,
                 step:              simState.storyStep,
@@ -1514,7 +1518,7 @@ function _startVoteTimer(status) {
 function applySimParams(data) {
     const { dir, wind, restart, clearTrace, showQR, traceText, clearText, traceImage, status, avoidMap,
             step, stepStatus, optionA, optionB, caption,
-            audio, audioFormat, audiobg, audiobgFormat, audiobgLoop, mode, ...rest } = data;
+            audio, audioFormat, audiobg, audiobgFormat, audiobgLoop, mode, colorMode, ...rest } = data;
 
     if (audio    !== undefined) playAudio(audio    || null, audioFormat)                              .catch(e => console.warn('[audio]',    e));
     if (audiobg  !== undefined) playAudioBg(audiobg || null, audiobgFormat, audiobgLoop !== false)    .catch(e => console.warn('[audiobg]',  e));
@@ -1542,6 +1546,10 @@ function applySimParams(data) {
     }
     if (mode === 'SHOWCASE' || mode === 'STORY') {
         simState.mode = mode;
+        updateStateDisplay();
+    }
+    if (colorMode === 'NORMAL' || colorMode === 'GRAYSCALE' || colorMode === 'GRAYSCALE_INVERTED') {
+        simState.colorMode = colorMode;
         updateStateDisplay();
     }
     if (status === 'NORMAL' || status === 'FREEROAM' || status === 'DOT') {
@@ -1615,7 +1623,7 @@ function applySimParams(data) {
 // ── GUI ───────────────────────────────────────────────────────────────────────
 ({
     gui, swarmDebug,
-    modeCtrl, stateCtrl, qrStateCtrl,
+    modeCtrl, colorModeCtrl, stateCtrl, qrStateCtrl,
     dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence,
     applyGUIVisibility, toggleGUI, updateGizmo,
 } = initGUI({
@@ -1976,6 +1984,9 @@ function writeBlitUB() {
     _blitF[2] = params.toneWhite;
     _blitF[3] = params.toneGamma;
     _blitF[4] = params.shadowBoost;
+    _blitU[5] = simState.colorMode === 'GRAYSCALE'          ? 1
+              : simState.colorMode === 'GRAYSCALE_INVERTED' ? 2
+              : 0;
     device.queue.writeBuffer(blitUB, 0, _blitAB);
 }
 
@@ -2043,7 +2054,7 @@ function writeContamUB() {
 const _soloAB  = new ArrayBuffer(192); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
 const _renderAB= new ArrayBuffer(112); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
 const _fadeAB  = new ArrayBuffer(16);  const _fadeF  = new Float32Array(_fadeAB);
-const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB);
+const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB); const _blitU  = new Uint32Array(_blitAB);
 const _contamAB= new ArrayBuffer(176); const _contamU= new Uint32Array(_contamAB); const _contamF= new Float32Array(_contamAB);
 const _shadowAB= new ArrayBuffer(32);  const _shadowF= new Float32Array(_shadowAB); const _shadowU= new Uint32Array(_shadowAB);
 const _imgDbgAB= new ArrayBuffer(32);  const _imgDbgF= new Float32Array(_imgDbgAB);
