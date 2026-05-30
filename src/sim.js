@@ -342,11 +342,12 @@ function seedAgents() {
         data[b + 1] = sy;                             // pos.y
         data[b + 2] = Math.cos(a) * s;               // vel.x
         data[b + 3] = Math.sin(a) * s;               // vel.y
-        // Home: centre of this agent's assigned grid cell
+        // Home: jittered within this agent's assigned grid cell.
+        // Keeps uniform coverage but breaks the visible grid alignment when agents home.
         const col  = i % gridW;
         const row  = Math.floor(i / gridW);
-        data[b + 4] = (col + 0.5) * cellW;          // home.x
-        data[b + 5] = (row + 0.5) * cellH;          // home.y
+        data[b + 4] = (col + Math.random()) * cellW; // home.x
+        data[b + 5] = (row + Math.random()) * cellH; // home.y
         // Weight
         data[b + 6] = Math.max(0.05, 1.0 + (Math.random() * 2 - 1) * params.weightSpread);
         data[b + 7] = 0;                             // primed — compute writes this each frame
@@ -1645,7 +1646,6 @@ window.addEventListener('keydown', e => {
     if (e.key === 's' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const t = e.target;
         if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-        console.log('[screenshot] s pressed — capture queued');
         _captureRequested = true;
     }
 });
@@ -2302,7 +2302,6 @@ function frame(ts) {
     let captureBuf = null, captureW = 0, captureH = 0, capturePadded = 0;
     if (_captureRequested) {
         _captureRequested = false;
-        console.log('[screenshot] capture consumed in frame; encoding…');
         captureW       = curTex.width;
         captureH       = curTex.height;
         capturePadded  = Math.ceil(captureW * 4 / 256) * 256;
