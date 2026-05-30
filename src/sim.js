@@ -282,7 +282,10 @@ device.lost.then(({ reason, message }) => {
 
 const canvasFormat = navigator.gpu.getPreferredCanvasFormat();
 const ctx = canvas.getContext('webgpu');
-ctx.configure({ device, format: canvasFormat, alphaMode: 'opaque' });
+ctx.configure({
+    device, format: canvasFormat, alphaMode: 'opaque',
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+});
 
 // ── Persistent GPU buffers ────────────────────────────────────────────────────
 const agentBuf = device.createBuffer({
@@ -1639,6 +1642,11 @@ qrStateCtrl.onChange(() => { updateStateDisplay(); renderTraceCanvas(); });
 
 window.addEventListener('keydown', e => {
     if (e.key === 'Control') toggleGUI();
+    if (e.key === 's' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const t = e.target;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+        _captureRequested = true;
+    }
 });
 
 // ── Formula UI wiring ─────────────────────────────────────────────────────────
@@ -2060,6 +2068,71 @@ const _shadowAB= new ArrayBuffer(32);  const _shadowF= new Float32Array(_shadowA
 const _imgDbgAB= new ArrayBuffer(32);  const _imgDbgF= new Float32Array(_imgDbgAB);
 const _windVisAB=new ArrayBuffer(32);  const _windVisF=new Float32Array(_windVisAB); const _windVisU=new Uint32Array(_windVisAB);
 
+// ── Screenshot capture ───────────────────────────────────────────────────────
+// Press 's' to capture the current frame at canvas backing-store resolution.
+// The flag is consumed inside frame() — copy happens in the same command encoder
+// as the frame, after the blit pass, so we always grab what was just on screen.
+let _captureRequested = false;
+
+async function finalizeCapture(buf, w, h, padded) {
+    try {
+        await buf.mapAsync(GPUMapMode.READ);
+        const src = new Uint8Array(buf.getMappedRange());
+        const isBGRA = canvasFormat === 'bgra8unorm';
+        const out = new Uint8ClampedArray(w * h * 4);
+        const stride = w * 4;
+        for (let y = 0; y < h; y++) {
+            const srcOff = y * padded;
+            const dstOff = y * stride;
+            if (isBGRA) {
+                for (let x = 0; x < stride; x += 4) {
+                    out[dstOff + x]     = src[srcOff + x + 2];
+                    out[dstOff + x + 1] = src[srcOff + x + 1];
+                    out[dstOff + x + 2] = src[srcOff + x];
+                    out[dstOff + x + 3] = 255;
+                }
+            } else {
+                for (let x = 0; x < stride; x += 4) {
+                    out[dstOff + x]     = src[srcOff + x];
+                    out[dstOff + x + 1] = src[srcOff + x + 1];
+                    out[dstOff + x + 2] = src[srcOff + x + 2];
+                    out[dstOff + x + 3] = 255;
+                }
+            }
+        }
+        buf.unmap();
+        buf.destroy();
+
+        const tmp = document.createElement('canvas');
+        tmp.width = w; tmp.height = h;
+        const c2d = tmp.getContext('2d');
+        c2d.putImageData(new ImageData(out, w, h), 0, 0);
+
+        // Composite the QR overlay (separate 2D canvas) if it's currently visible.
+        const qrOpacity = parseFloat(qrOverlayEl.style.opacity) || 0;
+        if (qrOpacity > 0 && qrOverlayEl.width > 0 && qrOverlayEl.height > 0) {
+            c2d.globalAlpha = qrOpacity;
+            c2d.drawImage(qrOverlayEl, 0, 0, w, h);
+            c2d.globalAlpha = 1;
+        }
+
+        tmp.toBlob(blob => {
+            if (!blob) return;
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            a.download = `thesis-sim-${ts}.png`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }, 'image/png');
+    } catch (e) {
+        console.warn('[screenshot]', e);
+    }
+}
+
 // ── Frame loop ────────────────────────────────────────────────────────────────
 const TIME_MULT = 0.001;
 let prevTime  = performance.now() * TIME_MULT;
@@ -2200,9 +2273,10 @@ function frame(ts) {
     if (params.showWindVis && windVisPipe) writeWindVisUB(now, visGridW);
 
     // Blit offscreen → canvas, then optional overlays
+    const curTex = ctx.getCurrentTexture();
     const bp = enc.beginRenderPass({
         colorAttachments: [{
-            view: ctx.getCurrentTexture().createView(),
+            view: curTex.createView(),
             loadOp: 'clear', clearValue: { r: 0, g: 0, b: 0, a: 1 }, storeOp: 'store',
         }],
     });
@@ -2222,7 +2296,28 @@ function frame(ts) {
     }
     bp.end();
 
+    // Screenshot: copy the just-blitted swap-chain texture into a staging buffer
+    // within the same encoder, then map and download asynchronously after submit.
+    let captureBuf = null, captureW = 0, captureH = 0, capturePadded = 0;
+    if (_captureRequested) {
+        _captureRequested = false;
+        captureW       = curTex.width;
+        captureH       = curTex.height;
+        capturePadded  = Math.ceil(captureW * 4 / 256) * 256;
+        captureBuf     = device.createBuffer({
+            size:  capturePadded * captureH,
+            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+        });
+        enc.copyTextureToBuffer(
+            { texture: curTex },
+            { buffer: captureBuf, bytesPerRow: capturePadded, rowsPerImage: captureH },
+            [captureW, captureH, 1],
+        );
+    }
+
     device.queue.submit([enc.finish()]);
+
+    if (captureBuf) finalizeCapture(captureBuf, captureW, captureH, capturePadded);
 
     fpsFrames++;
 }
