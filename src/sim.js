@@ -1645,6 +1645,7 @@ window.addEventListener('keydown', e => {
     if (e.key === 's' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const t = e.target;
         if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+        console.log('[screenshot] s pressed — capture queued');
         _captureRequested = true;
     }
 });
@@ -2301,6 +2302,7 @@ function frame(ts) {
     let captureBuf = null, captureW = 0, captureH = 0, capturePadded = 0;
     if (_captureRequested) {
         _captureRequested = false;
+        console.log('[screenshot] capture consumed in frame; encoding…');
         captureW       = curTex.width;
         captureH       = curTex.height;
         capturePadded  = Math.ceil(captureW * 4 / 256) * 256;
