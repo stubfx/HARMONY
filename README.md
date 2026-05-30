@@ -150,7 +150,7 @@ All computation runs on the GPU. No Three.js. No WebGL.
 | **Agent shadow visual** | `agentShadow.wgsl` | Render | Dark soft splats blended onto the offscreen accumulation texture to create depth under homing agents |
 | **Fade** | `fade.wgsl` | Render | Black fullscreen quad with alpha blend — exponential trail decay each frame |
 | **Particles** | `render.wgsl` | Render | Per-agent quads drawn into `rgba16float` offscreen texture; additive **or** max blend selectable; speed-color tinted by collective temperature |
-| **Blit** | `blit.wgsl` | Render | Tone-map offscreen → canvas swap-chain (blitUB 32 bytes): `bgBlackCutoff` clamp, tone-black/white/gamma curve, shadow boost |
+| **Blit** | `blit.wgsl` | Render | Tone-map offscreen → canvas swap-chain (blitUB 32 bytes): `bgBlackCutoff` clamp, tone-black/white/gamma curve, shadow boost, color mode (NORMAL / GRAYSCALE / GRAYSCALE_INVERTED) |
 | **Wind vis** *(debug)* | `wind-vis.wgsl` | Render | Arrow grid overlay — `evalWindFormula` prepended at pipeline build time, same pattern as `compute.wgsl` |
 | **Image debug** *(debug)* | `image-debug.wgsl` | Render | Grayscale overlay of the loaded image at its current size and position |
 
@@ -167,7 +167,7 @@ The compute uniform buffer (`soloUB`, 144 bytes) carries physics params plus:
 
 The render uniform buffer (`renderUB`, 112 bytes allocated, 104 bytes used — 26 fields) carries visual params, including `additiveBlend` (field 25) which selects between additive and max-blend render pipelines.
 
-The blit uniform buffer (`blitUB`, 32 bytes) carries 5 × f32: `cutoff`, `toneBlack`, `toneWhite`, `toneGamma`, `shadowBoost`.
+The blit uniform buffer (`blitUB`, 32 bytes) carries 5 × f32 + 1 × u32: `cutoff`, `toneBlack`, `toneWhite`, `toneGamma`, `shadowBoost`, `colorMode` (0 = NORMAL, 1 = GRAYSCALE, 2 = GRAYSCALE_INVERTED). Grayscale and inversion both run post-tone-map so the additive HDR accumulation in the offscreen target isn't affected — applying inversion per particle would map bright particles to ~zero and additive blending of zeros would collapse the image.
 
 The coherence multiplier is applied to `turnRate` in JavaScript before writing the compute buffer, so no shader change is needed for coherence.
 
@@ -332,7 +332,25 @@ The HUD is **hidden by default**. Toggle it with:
 | `?gui=true` URL parameter | Open with GUI visible |
 | `Ctrl` key | Toggle all panels on/off at runtime |
 
-The GUI has five folders. See [PARAMETERS.md](PARAMETERS.md) for a full description of every control.
+### Keyboard shortcuts
+
+| Key | Effect |
+|-----|--------|
+| `Ctrl` | Toggle the HUD on/off |
+| `s` | Capture the current frame and download it as a PNG at canvas backing-store resolution. Plain `s` only — `Ctrl+S` / `Cmd+S` still trigger the browser's "Save Page". Ignored while focus is on an input or contenteditable element. For maximum resolution, set `render scale` to `1.0` before pressing. |
+
+### Top-level state controls
+
+Four dropdowns sit at the top of the lil-gui panel, above all folders. They mirror the set the n8n heartbeat exchanges:
+
+| Control | Values | Description |
+|---------|--------|-------------|
+| mode | `STORY` / `SHOWCASE` | Top-level session mode |
+| color mode | `NORMAL` / `GRAYSCALE` / `GRAYSCALE_INVERTED` | Final-stage color treatment applied in the blit pass. Grayscale collapses RGB to luma; inverted flips black ↔ white (the empty canvas reads as white paper rather than tar). Runs post-tone-map so additive accumulation stays intact. |
+| status | `NORMAL` / `FREEROAM` / `DOT` | Simulation state |
+| qr | `SHOW` / `HIDE` | Whether the QR layer is drawn on the trace canvas |
+
+The GUI has five folders below these dropdowns. See [PARAMETERS.md](PARAMETERS.md) for a full description of every control.
 
 ### Motion
 
@@ -557,6 +575,7 @@ The **n8n test mode** toggle in the GUI switches between production and test pat
   "type":            "heartbeat",
   "room":            "session-UUID",
   "mode":            "STORY",
+  "colorMode":       "NORMAL",
   "status":          "NORMAL",
   "qrStatus":        "HIDE",
   "step":            2,
@@ -593,6 +612,7 @@ Both endpoints consume the same response format. Return a JSON object with any c
 | `avoidMap` | `string \| null` | Load a new avoidance map from a base64 data URL or HTTPS URL; `null` clears it |
 | `restart` | `bool` | Re-seed all agents |
 | `status` | `"NORMAL" \| "FREEROAM" \| "DOT"` | Set simulation state (`FREEROAM` suspends formula steering and wind; `DOT` applies a fixed inward-spiral attractor) |
+| `colorMode` | `"NORMAL" \| "GRAYSCALE" \| "GRAYSCALE_INVERTED"` | Final-stage color treatment applied in the blit pass (post-tone-map so additive accumulation isn't broken) |
 | `dir` | `string` | New direction formula (WGSL expression returning radians) |
 | `wind` | `string` | New wind formula (WGSL expression returning radians) |
 | `step` | any | Story step ID — resets `storyStepComplete`, `storyVoteResult`, and `stepStatus` for a new step |
@@ -687,7 +707,7 @@ thesis-sim/
 │       │                    (visual pass) + density probe texture (density pass)
 │       ├── fade.wgsl        Trail decay — black fullscreen quad with alpha blend
 │       ├── blit.wgsl        Offscreen→canvas tone mapping (blitUB 32 bytes):
-│       │                    cutoff clamp, tone curve, shadow boost
+│       │                    cutoff clamp, tone curve, shadow boost, color mode
 │       ├── wind-vis.wgsl    Wind arrow debug overlay (evalWindFormula prepended at runtime)
 │       └── image-debug.wgsl Grayscale image region debug overlay
 │

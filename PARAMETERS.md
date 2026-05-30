@@ -197,6 +197,23 @@ Inverse-brightness boost applied during the blit pass: `mapped × (1 − mapped)
 
 ---
 
+## Color mode (`colorMode`)
+**Values:** `NORMAL` (default) | `GRAYSCALE` | `GRAYSCALE_INVERTED`
+
+A dropdown at the top of the GUI (between `mode` and `status`, above all folders) that selects a final-stage color treatment applied in the blit pass — after tone mapping and shadow boost, just before writing to the canvas.
+
+| Value | Behaviour |
+|-------|-----------|
+| `NORMAL` | Final RGB written as tone-mapped (existing behaviour) |
+| `GRAYSCALE` | RGB collapsed to luminance via Rec. 601 weights (`0.299 R + 0.587 G + 0.114 B`); output as `(luma, luma, luma)` |
+| `GRAYSCALE_INVERTED` | Same luma, output as `(1 − luma, 1 − luma, 1 − luma)`. The `bgBlackCutoff` branch outputs **white** in this mode so the empty canvas reads as paper rather than tar |
+
+**Why the blit pass and not the particle render?** The offscreen accumulation target is `rgba16float` and accumulates HDR contributions through additive blend. Inverting per particle in `render.wgsl` would map bright particles to near-zero, and additive blending of zeros produces nothing — the inverted image would collapse to background. Running the inversion in the blit pass, after the HDR has been compressed into `[0, 1]`, keeps `1 − v` well-defined regardless of how many particles overlapped.
+
+The mode is carried over the existing `blitUB` (32-byte buffer was already only 20 bytes used; adding a `u32 colorMode` at byte offset 20 doesn't require a resize) and is mirrored to n8n via the `colorMode` field in the heartbeat. It's also accepted as a top-level `applySimParams` key, so n8n workflows can switch palettes alongside story steps.
+
+---
+
 ## Trace
 
 The trace layer loads a static image onto the GPU and uses it to redirect agents. The image is never rendered directly — it is only felt through collective agent density and color.
@@ -776,6 +793,7 @@ The fetch timeout for each heartbeat request scales automatically with this valu
   "type":            "heartbeat",
   "room":            "<session-uuid>",
   "mode":            "STORY",
+  "colorMode":       "NORMAL",
   "status":          "NORMAL",
   "qrStatus":        "HIDE",
   "step":            2,
@@ -795,6 +813,7 @@ The fetch timeout for each heartbeat request scales automatically with this valu
 |-------|-------------|
 | `room` | Session UUID assigned at socket connect — stable for the page lifetime |
 | `mode` | Top-level session mode: `"STORY"` or `"SHOWCASE"` |
+| `colorMode` | Final-stage color treatment: `"NORMAL"`, `"GRAYSCALE"`, or `"GRAYSCALE_INVERTED"` (applied in the blit pass) |
 | `status` | Simulation state: `"NORMAL"`, `"FREEROAM"`, or `"DOT"` |
 | `qrStatus` | QR visibility: `"SHOW"` or `"HIDE"` |
 | `step` | Current story step ID as sent by n8n; `null` when not in story mode |
@@ -904,3 +923,20 @@ Enabled via `startMic()` (not controllable from the GUI or n8n). When active, th
 ```
 
 Shows canvas resolution (physical pixels), the effective render scale, current frame rate, and active agent count.
+
+---
+
+## Keyboard shortcuts
+
+| Key | Effect |
+|-----|--------|
+| `Ctrl` | Toggle the HUD (lil-gui panels, formula UI, monitor) on/off |
+| `s` | Capture the current frame and download it as a PNG at canvas backing-store resolution. Plain `s` only — `Ctrl+S` / `Cmd+S` / `Alt+S` are ignored so the browser's "Save Page" still works. Ignored when focus is on an `INPUT`, `TEXTAREA`, or contenteditable element. Filename is `thesis-sim-<ISO timestamp>.png`. |
+
+### Screenshot capture path
+
+The `s` keypress just sets a flag (`_captureRequested`). The actual copy happens inside the existing render frame, in the same command encoder as the blit pass — after the swap-chain texture has been written, `copyTextureToBuffer` reads it back into a `MAP_READ` staging buffer. The canvas is configured with the extra usage flag `GPUTextureUsage.COPY_SRC` so this read-back is allowed.
+
+After submit, the buffer maps asynchronously; rows are unpadded from the 256-byte alignment requirement, channels are swapped from BGRA to RGBA if the canvas's preferred format is `bgra8unorm`, and alpha is forced to `255`. The result is drawn into a 2D canvas, the QR overlay (separate DOM canvas) is composited on top if visible, and `toBlob` + `<a download>` triggers the file download.
+
+To maximise resolution before pressing `s`, set the `render scale` slider in the GUI to `1.0` — the captured image has exactly `canvas.width × canvas.height` pixels, which equals `window.innerWidth × devicePixelRatio × renderScale`.

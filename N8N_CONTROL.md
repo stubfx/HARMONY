@@ -47,6 +47,7 @@ The sim sends this every `heartbeatInterval` seconds (default: 10 s). Use it to 
 | `type` | `"heartbeat"` | Always `"heartbeat"` |
 | `room` | `string` | Session room UUID |
 | `mode` | `"STORY"` \| `"SHOWCASE"` | Current top-level session mode |
+| `colorMode` | `"NORMAL"` \| `"GRAYSCALE"` \| `"GRAYSCALE_INVERTED"` | Current final-stage color treatment applied in the blit pass |
 | `status` | `"NORMAL"` \| `"FREEROAM"` \| `"DOT"` | Current simulation state |
 | `qrStatus` | `"SHOW"` \| `"HIDE"` | Whether the QR code is the active magnet image |
 | `step` | `number` \| `null` | Current story step ID, or `null` if none |
@@ -73,6 +74,7 @@ These keys trigger immediate side-effects and are **not** stored in `params`.
 | Key | Type | Effect |
 |-----|------|--------|
 | `mode` | `"STORY"` \| `"SHOWCASE"` | Top-level session mode. `STORY` — narrative-driven; n8n sequences steps, votes, and content. `SHOWCASE` — ambient / exhibition; no story sequencing. Default: `STORY`. |
+| `colorMode` | `"NORMAL"` \| `"GRAYSCALE"` \| `"GRAYSCALE_INVERTED"` | Final-stage color treatment applied in the blit pass (after tone-map + shadow boost, before the canvas write). `NORMAL` — RGB unchanged. `GRAYSCALE` — RGB collapsed to luminance. `GRAYSCALE_INVERTED` — luminance inverted (`1 − luma`); the background also flips to white. Inversion runs at the blit stage rather than per-particle so the offscreen's additive HDR accumulation isn't broken. Default: `NORMAL`. |
 | `status` | `"NORMAL"` \| `"FREEROAM"` \| `"DOT"` | Switches the simulation state. `FREEROAM` suspends formula steering and wind; `DOT` applies a fixed inward-spiral attractor. |
 | `showQR` | `true` \| `false` | `true` — enables the QR layer on the trace canvas (drawn on top of any user content). `false` — hides the QR layer; user content remains unaffected. |
 | `restart` | `true` | Re-seeds all agents at random positions with fresh velocities. |
