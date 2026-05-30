@@ -112,11 +112,20 @@
             flex-direction: column;
             gap: .15rem;
             font-size: .68rem;
-            color: #ffffff35;
+            color: #ffffffa0;
             pointer-events: none;
             letter-spacing: .06em;
             line-height: 1;
         }
+        #mon-params-title {
+            margin-top: .6rem;
+            opacity: .75;
+        }
+        #mon-params-list {
+            line-height: 1.4;
+            white-space: pre;
+        }
+        #mon-params-list .k { color: #b8e8ff; }
 
         /* ── Audio unlock nudge ─────────────────────────────────────────────── */
         #audio-unlock {
@@ -164,6 +173,13 @@
         <span id="mon-res"></span>
         <span id="mon-fps"></span>
         <span id="mon-agents"></span>
+        <span id="mon-params-title">URL params</span>
+        <span id="mon-params-list"><span class="k">?s=&lt;uuid&gt;</span>      session room
+<span class="k">?amount=&lt;n&gt;</span>     starting agent count
+<span class="k">?test=1</span>          n8n test mode
+<span class="k">?password=&lt;x&gt;</span>   echoed in heartbeat
+<span class="k">?gui=true</span>        open with HUD visible
+<span class="k">?n8n=off</span>         disable all n8n calls</span>
     </div>
 
     <div id="ui">

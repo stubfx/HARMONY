@@ -129,9 +129,11 @@ const params = {
 // ?amount=<n>    — override the starting agent count (still adjustable in the GUI)
 // ?test=1        — start with n8n test mode enabled (mirrors GUI toggle, survives reloads)
 // ?password=<x>  — forwarded as-is in every heartbeat payload; survives reloads via URL
+// ?n8n=off       — disable all n8n traffic (heartbeat + sim-event); takes precedence over VITE_N8N_BASE_URL
 const _urlParams     = new URLSearchParams(location.search);
 const _forcedSession = _urlParams.get('s') || null;
 const _n8nPassword   = _urlParams.get('password') || null;
+const _n8nDisabled   = ['off', 'false', '0', 'disabled'].includes(_urlParams.get('n8n') ?? '');
 {
     const n = parseInt(_urlParams.get('amount') ?? '', 10);
     if (Number.isFinite(n) && n > 0)
@@ -1157,7 +1159,9 @@ let lastRemoteActivity = Date.now(); // timestamp of last remote-event (touch or
 // whether the client is up to date or needs a re-push.
 let _serverEcho = {};
 
-const N8N_BASE            = (import.meta.env.VITE_N8N_BASE_URL ?? '').replace(/\/$/, '');
+// `?n8n=off` short-circuits to empty string so every existing `if (!N8N_BASE)` guard
+// already gates correctly — no call-site changes needed.
+const N8N_BASE            = _n8nDisabled ? '' : (import.meta.env.VITE_N8N_BASE_URL ?? '').replace(/\/$/, '');
 const N8N_USER_TIMEOUT_MS = 15_000;
 let   n8nInFlight          = false;
 let   n8nHeartbeatInFlight = false;
