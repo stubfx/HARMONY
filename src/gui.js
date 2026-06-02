@@ -12,6 +12,7 @@ export function initGUI({
     seedAgents,
     setSize,
     rebuildOffscreen,
+    rebuildGridTex,
     renderTraceCanvas,
     generateQR,
     clearMagnetImage,
@@ -84,6 +85,8 @@ export function initGUI({
     fVis.addColor(params, 'speedColor').name('fast color');
     fVis.add(params, 'brightness', 0.01, 0.5, 0.005).name('brightness');
     fVis.add(params, 'additiveBlend').name('additive blend');
+    fVis.add(params, 'pixelGrid').name('pixel grid');
+    fVis.add(params, 'pixelGridCells', 20, 400, 1).name('grid cells').onChange(() => rebuildGridTex());
 
     // ── Trace ─────────────────────────────────────────────────────────────────
     const fMagnet = gui.addFolder('Trace');

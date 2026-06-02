@@ -14,6 +14,7 @@ import soloSimTemplate  from './shaders/compute.wgsl?raw';
 import soloRenderWGSL   from './shaders/render.wgsl?raw';
 import fadeWGSL         from './shaders/fade.wgsl?raw';
 import blitWGSL         from './shaders/blit.wgsl?raw';
+import downsampleWGSL   from './shaders/downsample.wgsl?raw';
 import windVisWGSL      from './shaders/wind-vis.wgsl?raw';
 import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
 import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
@@ -48,6 +49,8 @@ const params = {
     toneWhite:   1.0,         // input level mapped to white (HDR saturation point)
     toneGamma:   1.0,         // power curve: <1 boosts darks, >1 crushes darks
     shadowBoost: 0.0,         // inverse-brightness boost: peaks at ~12% luminance, negligible above 60%
+    pixelGrid:      false,    // chunky low-res grid (downsample → nearest-sample blit) — final stage before canvas
+    pixelGridCells: 120,      // cell count along the X axis; Y count is derived from canvas aspect ratio
     // Magnet
     magnetStr:      30.0, // homing speed: px/frame agents move toward their home position
     alphaThreshold: 0.1,  // min image alpha to trigger homing (0–1)
@@ -130,10 +133,15 @@ const params = {
 // ?test=1        — start with n8n test mode enabled (mirrors GUI toggle, survives reloads)
 // ?password=<x>  — forwarded as-is in every heartbeat payload; survives reloads via URL
 // ?n8n=off       — disable all n8n traffic (heartbeat + sim-event); takes precedence over VITE_N8N_BASE_URL
+// ?pixelGrid=true — start with the chunky low-res pixel-grid mode enabled
 const _urlParams     = new URLSearchParams(location.search);
 const _forcedSession = _urlParams.get('s') || null;
 const _n8nPassword   = _urlParams.get('password') || null;
 const _n8nDisabled   = ['off', 'false', '0', 'disabled'].includes(_urlParams.get('n8n') ?? '');
+{
+    const v = _urlParams.get('pixelGrid');
+    if (v === 'true' || v === '1') params.pixelGrid = true;
+}
 {
     const n = parseInt(_urlParams.get('amount') ?? '', 10);
     if (Number.isFinite(n) && n > 0)
@@ -306,6 +314,9 @@ const fadeUB = device.createBuffer({
 const blitUB = device.createBuffer({
     size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
+const downsampleUB = device.createBuffer({
+    size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+});
 const windVisUB = device.createBuffer({
     size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
@@ -361,6 +372,13 @@ seedAgents();
 // ── Static pipelines & resources ──────────────────────────────────────────────
 const screenSmp = device.createSampler({
     magFilter: 'linear', minFilter: 'linear',
+    addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge',
+});
+
+// Nearest sampler — used by the blit when pixelGrid mode is on so the small
+// gridTex stretches across the canvas as chunky cells instead of being smoothed.
+const nearestSmp = device.createSampler({
+    magFilter: 'nearest', minFilter: 'nearest',
     addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge',
 });
 
@@ -468,6 +486,19 @@ const blitPipe = device.createRenderPipeline({
     primitive: { topology: 'triangle-list' },
 });
 
+// Downsample: full-res offscreen → small gridTex with per-cell area average.
+// Used only when params.pixelGrid is on.
+const downsampleMod = device.createShaderModule({ code: downsampleWGSL });
+const downsamplePipe = device.createRenderPipeline({
+    layout: 'auto',
+    vertex:   { module: downsampleMod, entryPoint: 'vs' },
+    fragment: {
+        module: downsampleMod, entryPoint: 'fs',
+        targets: [{ format: 'rgba16float' }],
+    },
+    primitive: { topology: 'triangle-list' },
+});
+
 // Agent shadow: per-homing-agent soft dark splat blended onto offscreen texture
 const agentShadowUB = device.createBuffer({
     size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -532,6 +563,48 @@ let blitBG             = null;
 let shadowDensityTex   = null;
 let shadowDensityView  = null;
 
+// Pixel-grid mode resources — rebuilt on canvas resize or grid-cell-count change.
+let gridTex      = null;
+let gridTexView  = null;
+let gridBlitBG   = null;   // blit reads gridTex with nearest sampler when pixelGrid on
+let downsampleBG = null;   // downsample pass reads offscreen with linear sampler
+
+function gridCellDims() {
+    const cellsW = Math.max(8, Math.floor(params.pixelGridCells));
+    const aspect = canvas.height / canvas.width;
+    const cellsH = Math.max(8, Math.round(cellsW * aspect));
+    return [cellsW, cellsH];
+}
+
+function rebuildGridTex() {
+    if (gridTex) gridTex.destroy();
+    const [cellsW, cellsH] = gridCellDims();
+    gridTex = device.createTexture({
+        size:   [cellsW, cellsH],
+        format: 'rgba16float',
+        usage:  GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    });
+    gridTexView = gridTex.createView();
+
+    downsampleBG = device.createBindGroup({
+        layout: downsamplePipe.getBindGroupLayout(0),
+        entries: [
+            { binding: 0, resource: { buffer: downsampleUB } },
+            { binding: 1, resource: screenSmp },
+            { binding: 2, resource: offscreenView },
+        ],
+    });
+
+    gridBlitBG = device.createBindGroup({
+        layout: blitPipe.getBindGroupLayout(0),
+        entries: [
+            { binding: 0, resource: { buffer: blitUB } },
+            { binding: 1, resource: nearestSmp },
+            { binding: 2, resource: gridTexView },
+        ],
+    });
+}
+
 function rebuildOffscreen() {
     if (offscreenTex) offscreenTex.destroy();
     offscreenTex = device.createTexture({
@@ -566,6 +639,9 @@ function rebuildOffscreen() {
     });
     rp.end();
     device.queue.submit([enc.finish()]);
+
+    // Grid resources depend on offscreenView, so rebuild them whenever offscreen changes.
+    rebuildGridTex();
 }
 rebuildOffscreen();
 
@@ -1636,7 +1712,7 @@ function applySimParams(data) {
     applyGUIVisibility, toggleGUI, updateGizmo,
 } = initGUI({
     params, socket, simState, MAX_AGENTS,
-    seedAgents, setSize, rebuildOffscreen,
+    seedAgents, setSize, rebuildOffscreen, rebuildGridTex,
     renderTraceCanvas, generateQR,
     clearMagnetImage, clearTraceText, clearAvoidMap,
     restartHeartbeat,
@@ -1991,6 +2067,12 @@ function writeFadeUB() {
     device.queue.writeBuffer(fadeUB, 0, _fadeAB);
 }
 
+function writeDownsampleUB(cellsW, cellsH) {
+    _downsampleF[0] = cellsW;
+    _downsampleF[1] = cellsH;
+    device.queue.writeBuffer(downsampleUB, 0, _downsampleAB);
+}
+
 function writeBlitUB() {
     _blitF[0] = params.bgBlackCutoff;
     _blitF[1] = params.toneBlack;
@@ -2068,6 +2150,7 @@ const _soloAB  = new ArrayBuffer(192); const _soloU  = new Uint32Array(_soloAB);
 const _renderAB= new ArrayBuffer(112); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
 const _fadeAB  = new ArrayBuffer(16);  const _fadeF  = new Float32Array(_fadeAB);
 const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB); const _blitU  = new Uint32Array(_blitAB);
+const _downsampleAB = new ArrayBuffer(16); const _downsampleF = new Float32Array(_downsampleAB);
 const _contamAB= new ArrayBuffer(176); const _contamU= new Uint32Array(_contamAB); const _contamF= new Float32Array(_contamAB);
 const _shadowAB= new ArrayBuffer(32);  const _shadowF= new Float32Array(_shadowAB); const _shadowU= new Uint32Array(_shadowAB);
 const _imgDbgAB= new ArrayBuffer(32);  const _imgDbgF= new Float32Array(_imgDbgAB);
@@ -2277,7 +2360,25 @@ function frame(ts) {
     const visGridH = Math.ceil(canvas.height / visStep) + 1;
     if (params.showWindVis && windVisPipe) writeWindVisUB(now, visGridW);
 
-    // Blit offscreen → canvas, then optional overlays
+    // Pixel-grid: downsample offscreen → gridTex (per-cell area average) before the blit.
+    // The blit then reads gridTex with a nearest sampler, producing the chunky look
+    // while still going through tone-map / shadow-boost / colour-mode in blit.wgsl.
+    if (params.pixelGrid && gridTexView && downsampleBG) {
+        const [cellsW, cellsH] = gridCellDims();
+        writeDownsampleUB(cellsW, cellsH);
+        const dp = enc.beginRenderPass({
+            colorAttachments: [{
+                view: gridTexView, loadOp: 'clear',
+                clearValue: { r: 0, g: 0, b: 0, a: 1 }, storeOp: 'store',
+            }],
+        });
+        dp.setPipeline(downsamplePipe);
+        dp.setBindGroup(0, downsampleBG);
+        dp.draw(3);
+        dp.end();
+    }
+
+    // Blit offscreen (or gridTex when pixelGrid on) → canvas, then optional overlays
     const curTex = ctx.getCurrentTexture();
     const bp = enc.beginRenderPass({
         colorAttachments: [{
@@ -2286,7 +2387,7 @@ function frame(ts) {
         }],
     });
     bp.setPipeline(blitPipe);
-    bp.setBindGroup(0, blitBG);
+    bp.setBindGroup(0, params.pixelGrid && gridBlitBG ? gridBlitBG : blitBG);
     bp.draw(3);
     if (params.showWindVis && windVisPipe) {
         bp.setPipeline(windVisPipe);
