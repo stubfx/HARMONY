@@ -2045,9 +2045,9 @@ function writeRenderUB() {
     f[13] = tinted[0];
     f[14] = tinted[1];
     f[15] = tinted[2];
-    const audioMult = isActive()
-        ? params.audioFloor + (1 - params.audioFloor) * getVolume()
-        : 1.0;
+    // Treat "audio not yet unlocked" as full silence so the pre/post-unlock
+    // brightness step disappears — audioFloor stays exactly as tuned.
+    const audioMult = params.audioFloor + (1 - params.audioFloor) * (isActive() ? getVolume() : 0);
     f[16] = (params.brightness + burstBrightness + pulseEnergy) * audioMult;
     f[17] = params.alphaThreshold;
     f[18] = params.blackThreshold;
