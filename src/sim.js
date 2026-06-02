@@ -41,16 +41,16 @@ const params = {
     trailDecay:     0.04,
     bgBlackCutoff:  0.05, // luminance below which trail pixels are clamped to 0 at display time
     pointSize:      1.3,
-    color:       '#1a0099',
-    speedColor:  '#ff4400',   // color approached at max speed
+    color:       '#00ff00',
+    speedColor:  '#0000ff',   // color approached at max speed
     brightness:  0.06,        // per-particle alpha; prevents additive saturation to white
     additiveBlend: true,      // true = additive (glow, accumulates); false = max blend (no over-brightness)
     toneBlack:   0.0,         // input level mapped to black (lifts lone-particle visibility)
     toneWhite:   1.0,         // input level mapped to white (HDR saturation point)
     toneGamma:   1.0,         // power curve: <1 boosts darks, >1 crushes darks
     shadowBoost: 0.0,         // inverse-brightness boost: peaks at ~12% luminance, negligible above 60%
-    pixelGrid:      false,    // chunky low-res grid (downsample → nearest-sample blit) — final stage before canvas
-    pixelGridCells: 120,      // cell count along the X axis; Y count is derived from canvas aspect ratio
+    pixelGrid:      true,     // chunky low-res grid (downsample → nearest-sample blit) — final stage before canvas
+    pixelGridCells: 400,      // cell count along the X axis; Y count is derived from canvas aspect ratio
     // Magnet
     magnetStr:      30.0, // homing speed: px/frame agents move toward their home position
     alphaThreshold: 0.1,  // min image alpha to trigger homing (0–1)
@@ -63,7 +63,7 @@ const params = {
     // Trace canvas
     traceScale:   0.5,   // trace canvas resolution relative to main canvas (perf control)
     // QR placement on trace canvas
-    qrSize:       0.25,   // QR size as fraction of min(traceW, traceH)
+    qrSize:       0.5,    // QR size as fraction of min(traceW, traceH)
     qrMargin:     0.02,  // uniform margin from the aligned edge, as fraction of min(traceW, traceH)
     qrAlignX:     'center', // 'left' | 'center' | 'right'
     qrAlignY:     'center', // 'top'  | 'center' | 'bottom'
