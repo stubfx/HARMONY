@@ -89,6 +89,7 @@ const params = {
     avoidMapInvert:  false, // true = read the map as 1 - r, so light areas become non-avoid and dark areas become the avoid signal
     avoidMapSampleColor: false, // true = non-homing particles take their base color from the avoid map sample at their position
     avoidMapFixedColor:  false, // true (paired with sampleColor) = use the sampled pixel exactly; false = use it as base color then mix with speed color
+    avoidMapBlackCutoff: 0.05,  // luminance floor for the color sample: pixels below this are skipped (particle keeps base color) — mirrors trace blackThreshold
     qrOverlay:       false, // true = QR on a 2D overlay canvas; agents freed from QR area
     // Primed-spot probe (free agents only)
     probeLen:          15.0, // probe cast distance in canvas pixels
@@ -2096,6 +2097,7 @@ function writeRenderUB() {
     u[32] = params.avoidMapInvert ? 1 : 0;
     u[33] = params.avoidMapSampleColor ? 1 : 0;
     u[34] = params.avoidMapFixedColor  ? 1 : 0;
+    f[35] = params.avoidMapBlackCutoff;
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 

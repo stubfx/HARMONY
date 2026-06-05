@@ -35,6 +35,7 @@
 //   [128] avoidMapInvert       u32   (1 = sample as vec3(1 - r, 1 - g, 1 - b))
 //   [132] avoidMapSampleColor  u32   (1 = non-homing particles take their base color from the avoid-map sample)
 //   [136] avoidMapFixedColor   u32   (paired with sampleColor: 1 = use the exact pixel, 0 = use it as base then mix with speed color)
+//   [140] avoidMapBlackCutoff  f32   (luminance floor on the sample: below this the sample is skipped, particle keeps base color)
 
 struct SoloRenderParams {
     agentCount:           u32,
@@ -72,6 +73,7 @@ struct SoloRenderParams {
     avoidMapInvert:       u32,
     avoidMapSampleColor:  u32,
     avoidMapFixedColor:   u32,
+    avoidMapBlackCutoff:  f32,
 }
 
 struct Agent {
@@ -137,9 +139,14 @@ fn avoidMapColorAt(canvasPx: vec2<f32>) -> vec4<f32> {
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { return vec4<f32>(0.0); }
     let tx = u32(clamp(uv.x, 0.0, 1.0) * f32(dims.x - 1u));
     let ty = u32(clamp(uv.y, 0.0, 1.0) * f32(dims.y - 1u));
-    let s  = textureLoad(avoidMapTex, vec2<u32>(tx, ty), 0u);
+    let s   = textureLoad(avoidMapTex, vec2<u32>(tx, ty), 0u);
     let rgb = select(s.rgb, vec3<f32>(1.0) - s.rgb, params.avoidMapInvert != 0u);
-    return vec4<f32>(rgb, 1.0);
+    // Skip samples darker than the cutoff so near-black pixels don't paint
+    // particles invisible; caller falls back to the default base color. Rec. 601
+    // luma — same weighting the blit shader uses for grayscale.
+    let luma = dot(rgb, vec3<f32>(0.299, 0.587, 0.114));
+    let valid = select(0.0, 1.0, luma > params.avoidMapBlackCutoff);
+    return vec4<f32>(rgb, valid);
 }
 
 @vertex fn vs(@builtin(vertex_index) vi: u32) -> VsOut {

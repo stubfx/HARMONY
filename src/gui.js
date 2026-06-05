@@ -146,6 +146,7 @@ export function initGUI({
     fAvoid.add(params, 'avoidMapInvert').name('invert colors');
     fAvoid.add(params, 'avoidMapSampleColor').name('sample color');
     fAvoid.add(params, 'avoidMapFixedColor').name('fixed color');
+    fAvoid.add(params, 'avoidMapBlackCutoff', 0, 0.5, 0.005).name('color black cutoff');
     fAvoid.add({ load: () => document.querySelector('#avoid-map-input').click() }, 'load').name('Load map…');
     fAvoid.add({ clear: clearAvoidMap }, 'clear').name('Clear map');
 
