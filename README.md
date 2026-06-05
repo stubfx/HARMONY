@@ -86,6 +86,11 @@ Host browser — simulation display (WebGPU)
     │
     │  HTTPS POST /webhook/heartbeat  ──→  n8n  (every heartbeatInterval seconds)
     │  ←── JSON response ─────────────────────  applySimParams()
+    │
+    │  HTTPS POST /openai/transcribe  ──→  Express → OpenAI Whisper    (per voice turn, if openaiVoiceEnabled)
+    │  HTTPS POST /openai/chat        ──→  Express → OpenAI Chat       (per voice turn)
+    │  HTTPS POST /openai/tts         ──→  Express → OpenAI TTS        (per voice turn)
+    │  ←── reply audio ────  playAudio()  (shares voiceover channel with n8n audio, including bg ducking)
     ▼
 Display / projection
 
@@ -654,6 +659,10 @@ Example story step response:
 | `VITE_SOCKET_URL` | — | Socket.IO server origin used by browser clients **in production**. Set to your public API domain (e.g. `https://api.stubfx.io`). In dev this is ignored — clients always connect directly to Express. Falls back to `'/'` (page origin) if unset. |
 | `SERVER_ASSETS_DIR` | `prev-images` | Directory for cached random images |
 | `EXTRA_ORIGINS` | — | Comma-separated extra CORS origins |
+| `OPENAI_API_KEY` | — | Required for the existing `chat` / `imagine` helpers in `openai-api.js` **and** the new turn-based voice pipeline (`/openai/transcribe`, `/openai/chat`, `/openai/tts`). Server-side only; the browser never sees the key. |
+| `OPENAI_VOICE_TRANSCRIBE_MODEL` | `gpt-4o-mini-transcribe` | Override the Whisper-class model used by `/openai/transcribe`. |
+| `OPENAI_VOICE_CHAT_MODEL` | `gpt-4o-mini` | Override the chat-completions model used by `/openai/chat`. |
+| `OPENAI_VOICE_TTS_MODEL` | `gpt-4o-mini-tts` | Override the TTS model used by `/openai/tts`. |
 
 ### Split-domain production setup
 
