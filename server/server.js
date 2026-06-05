@@ -31,6 +31,7 @@ import path              from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID }    from 'node:crypto';
 import * as Utils        from './server-utils.js';
+import { voiceTranscribe, voiceChat, voiceTts } from './openai-voice.js';
 
 dotenv.config();
 
@@ -418,6 +419,55 @@ app.post('/spectator-push', (req, res) => {
     io.to(`${roomId}:spectators`).emit('device-message', payload);
     console.log('[push] → all spectators  room:', roomId, '| count:', room.connections.size);
     return res.json({ delivered: true, target: 'broadcast', count: room.connections.size });
+});
+
+// ── OpenAI voice proxy ────────────────────────────────────────────────────────
+// Three endpoints back the browser-side turn-based voice pipeline. The API key
+// is server-side only; the sim posts JSON (audio base64 / messages / text) and
+// gets text or base64 audio back.
+//
+// /transcribe needs a larger JSON body limit because the audio blob is sent
+// base64-encoded inline — a 30 s opus clip is comfortably under a few hundred
+// kB but well above the default 100 kB limit.
+const voiceJson = express.json({ limit: '10mb' });
+
+app.post('/openai/transcribe', voiceJson, async (req, res) => {
+    try {
+        const { audio, mimeType } = req.body || {};
+        if (!audio) return res.status(400).json({ error: 'audio (base64) required' });
+        const buf  = Buffer.from(audio, 'base64');
+        const text = await voiceTranscribe(buf, mimeType || 'audio/webm');
+        res.json({ text });
+    } catch (e) {
+        console.error('[openai/transcribe]', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/openai/chat', async (req, res) => {
+    try {
+        const { messages } = req.body || {};
+        if (!Array.isArray(messages) || messages.length === 0) {
+            return res.status(400).json({ error: 'messages (array) required' });
+        }
+        const text = await voiceChat(messages);
+        res.json({ text });
+    } catch (e) {
+        console.error('[openai/chat]', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/openai/tts', async (req, res) => {
+    try {
+        const { text, voice } = req.body || {};
+        if (!text) return res.status(400).json({ error: 'text required' });
+        const buf = await voiceTts(text, voice || 'alloy');
+        res.json({ audio: buf.toString('base64'), mimeType: 'audio/ogg;codecs=opus' });
+    } catch (e) {
+        console.error('[openai/tts]', e.message);
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // ── Utility endpoints ─────────────────────────────────────────────────────────

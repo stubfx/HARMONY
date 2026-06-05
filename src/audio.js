@@ -155,6 +155,42 @@ export function stopAudio() {
 
 export function isActive() { return _active; }
 
+// ── Recording (MediaRecorder on the existing mic stream) ──────────────────────
+// Used by the OpenAI voice pipeline. The brightness analyser and MediaRecorder
+// can share the same MediaStream — no cloning needed. The returned promise
+// resolves with the recorded Blob when stopRecording() is called.
+
+let _recorder         = null;
+let _recordChunks     = [];
+let _recordPromise    = null;
+let _recordResolve    = null;
+
+export function startRecording(mimeType = 'audio/webm;codecs=opus') {
+    if (!_stream) throw new Error('mic not started');
+    if (_recorder) return _recordPromise;
+    _recordChunks = [];
+    _recorder = new MediaRecorder(_stream, { mimeType });
+    _recorder.ondataavailable = e => { if (e.data && e.data.size) _recordChunks.push(e.data); };
+    _recordPromise = new Promise(resolve => { _recordResolve = resolve; });
+    _recorder.onstop = () => {
+        const blob = new Blob(_recordChunks, { type: mimeType });
+        _recordChunks = [];
+        _recorder     = null;
+        const r = _recordResolve;
+        _recordResolve = null;
+        r?.(blob);
+    };
+    _recorder.start();
+    return _recordPromise;
+}
+
+export function stopRecording() {
+    if (_recorder?.state === 'recording') _recorder.stop();
+    return _recordPromise;
+}
+
+export function isRecording() { return _recorder?.state === 'recording'; }
+
 // Call on first user interaction to satisfy the browser autoplay policy.
 export async function unlockAudio() {
     _ensureAnalyser();

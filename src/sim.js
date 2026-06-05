@@ -129,6 +129,11 @@ const params = {
     useDeltaTime:  true,  // false = fixed 1/60 s timestep (no frame-spike compensation)
     // Audio reactivity
     audioFloor:    0.1,   // brightness multiplier when fully silent (0 = black, 1 = no effect)
+    // OpenAI voice (turn-based, proxied through Express → /openai/transcribe + /chat + /tts).
+    // Disabled by default; the talk button is a no-op until openaiVoiceEnabled is on.
+    openaiVoiceEnabled: false,
+    openaiVoice:        'alloy',
+    openaiSystemPrompt: 'Sei una presenza sintetica dentro un\'installazione visiva. Rispondi conciso, in italiano.',
     duckLevel:     0.15,  // bg gain while voiceover is active (0 = mute, 1 = no ducking)
 };
 
