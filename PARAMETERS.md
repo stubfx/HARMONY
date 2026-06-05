@@ -964,30 +964,6 @@ Same delivery mechanism as `audio`, but loops continuously until stopped. Sendin
 
 Enabled via `startMic()` (not controllable from the GUI or n8n). When active, the microphone signal drives the same brightness pipeline as the audio tracks. The mic source is connected only to the analyser (not to `destination`) — no feedback loop.
 
-### OpenAI voice (turn-based)
-
-A self-contained voice loop independent of the n8n audio flow. **Disabled by default.** The talk button stays greyed in the GUI until `openaiVoiceEnabled` is on. The OpenAI API key never reaches the browser — every call goes through three Express proxy endpoints (`/openai/transcribe`, `/openai/chat`, `/openai/tts`) backed by `server/openai-voice.js`.
-
-**Pipeline per turn:**
-
-1. First click of `🎤 talk` → `MediaRecorder` starts on the existing mic stream (no clone needed — the brightness analyser and the recorder share the same `MediaStream` simultaneously).
-2. Second click → the recorder stops, the blob is base64-encoded and POSTed to `/openai/transcribe` (Whisper-class model, default `gpt-4o-mini-transcribe`), the text is appended to the rolling history and POSTed to `/openai/chat` (default `gpt-4o-mini`), and the reply is POSTed to `/openai/tts` (default `gpt-4o-mini-tts`, opus output).
-3. The synthesised audio is base64-decoded and played through the existing voiceover channel (`playAudio` from `audio.js`), so the n8n background-audio ducking still works.
-
-**Params:**
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `openaiVoiceEnabled` | `false` | Gates the talk button. When off, `toggleVoiceTurn()` is a no-op and the button is disabled. |
-| `openaiVoice` | `'alloy'` | TTS voice. One of `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`, `sage`, `shimmer`. |
-| `openaiSystemPrompt` | `'Sei una presenza sintetica…'` | System prompt prepended to the conversation. Re-injected only when its value changes between turns. |
-
-**History:** kept in memory inside `src/openai-voice.js`. The `reset history` button clears it (the system prompt is re-injected on the next turn).
-
-**Talk button label** reflects pipeline state: `🎤 talk` → `⏸ stop` (recording) → `… processing` (transcription request in flight) → `… thinking` (chat request) → `… speaking` (TTS + playback) → back to `🎤 talk`. On error the label switches to `⚠ retry` and the same button re-arms.
-
-**Environment overrides:** the three model names in `server/openai-voice.js` accept overrides via `OPENAI_VOICE_TRANSCRIBE_MODEL`, `OPENAI_VOICE_CHAT_MODEL`, `OPENAI_VOICE_TTS_MODEL` — useful for swapping to `whisper-1`, `gpt-4o`, or `tts-1` without touching code.
-
 ---
 
 ## Monitor (top-left, when GUI is visible)

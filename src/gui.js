@@ -1,6 +1,5 @@
 import GUI from 'lil-gui';
 import { startMic, stopAudio, isActive, setDuckLevel } from './audio.js';
-import { toggleVoiceTurn, resetVoiceHistory, onVoiceState } from './openai-voice.js';
 
 // ── GUI initialisation ────────────────────────────────────────────────────────
 // Call once after all sim functions are defined.
@@ -191,36 +190,6 @@ export function initGUI({
     });
     fAudio.add(params, 'audioFloor', 0, 1, 0.01).name('silence floor');
     fAudio.add(params, 'duckLevel',  0, 1, 0.01).name('duck level').onChange(v => setDuckLevel(v));
-
-    // ── OpenAI voice (turn-based, server-proxied) ────────────────────────────
-    // Flag-gated: when disabled the talk button is greyed and toggleVoiceTurn
-    // refuses to start a turn. The key lives only on the server (OPENAI_API_KEY).
-    const VOICES = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer'];
-    fAudio.add(params, 'openaiVoiceEnabled').name('openai voice').onChange(v => {
-        if (v) { _voiceBtn.enable();  _voiceResetBtn.enable();  }
-        else   { _voiceBtn.disable(); _voiceResetBtn.disable(); }
-    });
-    fAudio.add(params, 'openaiVoice', VOICES).name('voice');
-    fAudio.add(params, 'openaiSystemPrompt').name('system prompt');
-    const _voiceCtl = { talk: () => toggleVoiceTurn({
-        enabled:      params.openaiVoiceEnabled,
-        voice:        params.openaiVoice,
-        systemPrompt: params.openaiSystemPrompt,
-    }) };
-    const _voiceBtn = fAudio.add(_voiceCtl, 'talk').name('🎤 talk');
-    const _voiceResetCtl = { reset: () => resetVoiceHistory() };
-    const _voiceResetBtn = fAudio.add(_voiceResetCtl, 'reset').name('reset history');
-    if (!params.openaiVoiceEnabled) { _voiceBtn.disable(); _voiceResetBtn.disable(); }
-    onVoiceState(s => {
-        const label = s.phase === 'recording'  ? '⏸ stop'
-                    : s.phase === 'processing' ? '… processing'
-                    : s.phase === 'thinking'   ? '… thinking'
-                    : s.phase === 'speaking'   ? '… speaking'
-                    : s.phase === 'error'      ? '⚠ retry'
-                    :                            '🎤 talk';
-        _voiceBtn.name(label);
-    });
-
     fAudio.close();
 
     // ── Debug ─────────────────────────────────────────────────────────────────
