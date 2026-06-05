@@ -25,7 +25,7 @@ const MAX_AGENTS = 5_000_000;
 // ── Tunable parameters (mutated by lil-gui) ───────────────────────────────────
 const params = {
     // Agents
-    agentCount:  2_000_000,
+    agentCount:  100_000,
     // Motion
     stepLen:     2.0,
     turnRate:    0.04,
@@ -44,12 +44,13 @@ const params = {
     color:       '#00ff00',
     speedColor:  '#0000ff',   // color approached at max speed
     brightness:  0.06,        // per-particle alpha; prevents additive saturation to white
-    additiveBlend: true,      // true = additive (glow, accumulates); false = max blend (no over-brightness)
+    additiveBlend: false,     // true = additive (glow, accumulates); false = max blend (no over-brightness)
+    blendAmount:   1.0,       // 0–1 multiplier on per-particle fragment output; lowers contribution in both blend modes
     toneBlack:   0.0,         // input level mapped to black (lifts lone-particle visibility)
     toneWhite:   1.0,         // input level mapped to white (HDR saturation point)
     toneGamma:   1.0,         // power curve: <1 boosts darks, >1 crushes darks
     shadowBoost: 0.0,         // inverse-brightness boost: peaks at ~12% luminance, negligible above 60%
-    pixelGrid:      true,     // chunky low-res grid (downsample → nearest-sample blit) — final stage before canvas
+    pixelGrid:      false,    // chunky low-res grid (downsample → nearest-sample blit) — final stage before canvas
     pixelGridCells: 400,      // cell count along the X axis; Y count is derived from canvas aspect ratio
     // Magnet
     magnetStr:      30.0, // homing speed: px/frame agents move toward their home position
@@ -86,6 +87,8 @@ const params = {
     avoidForceStr:   1.0, // multiplier on image-trace avoidance forces
     avoidMapScale:   1.0, // avoidance map coverage as fraction of canvas (1.0 = full)
     avoidMapInvert:  false, // true = read the map as 1 - r, so light areas become non-avoid and dark areas become the avoid signal
+    avoidMapSampleColor: false, // true = non-homing particles take their base color from the avoid map sample at their position
+    avoidMapFixedColor:  false, // true (paired with sampleColor) = use the sampled pixel exactly; false = use it as base color then mix with speed color
     qrOverlay:       false, // true = QR on a 2D overlay canvas; agents freed from QR area
     // Primed-spot probe (free agents only)
     probeLen:          15.0, // probe cast distance in canvas pixels
@@ -310,7 +313,7 @@ const soloUB = device.createBuffer({
     size: 192, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
-    size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const fadeUB = device.createBuffer({
     size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -685,15 +688,18 @@ let avoidGifDurations = null;
 let avoidGifFrameIdx  = 0;
 let avoidGifNextFrameAt = 0;
 
-// Rebuilds particle render bind group — called after pipeline creation and on image change
+// Rebuilds particle render bind group — called after pipeline creation, on image change,
+// and on avoid-map change (avoid map at binding 5 feeds the optional per-particle color sampling).
 function rebuildRenderBG() {
-    const texView = (hasImage && imageTexView) ? imageTexView : placeholderTexView;
+    const texView      = (hasImage && imageTexView) ? imageTexView : placeholderTexView;
+    const avoidView    = (hasAvoidMap && avoidMapTexView) ? avoidMapTexView : placeholderTexView;
     const entries = [
         { binding: 0, resource: { buffer: renderUB } },
         { binding: 1, resource: { buffer: agentBuf } },
         { binding: 2, resource: imageSampler },
         { binding: 3, resource: texView },
         { binding: 4, resource: { buffer: spectatorSlotsBuf } },
+        { binding: 5, resource: avoidView },
     ];
     renderBG       = device.createBindGroup({ layout: renderPipe.getBindGroupLayout(0),       entries });
     renderBGNormal = device.createBindGroup({ layout: renderPipeNormal.getBindGroupLayout(0), entries });
@@ -795,6 +801,7 @@ function updateQROverlay() {
     hasAvoidMap      = true;
     _qrOwnedAvoidMap = true;
     rebuildSimBG();
+    rebuildRenderBG();
 }
 
 // ── Trace canvas compositor ───────────────────────────────────────────────────
@@ -1845,6 +1852,7 @@ async function loadAvoidMap(source) {
     avoidMapTexView = avoidMapTex.createView();
     hasAvoidMap     = true;
     rebuildSimBG();
+    rebuildRenderBG();
     if (!_inQROverlayUpdate && params.qrOverlay && simState.qrStatus === 'SHOW' && qrBitmap) updateQROverlay();
 }
 
@@ -1854,6 +1862,7 @@ function clearAvoidMap() {
     avoidMapTexView = null;
     hasAvoidMap     = false;
     rebuildSimBG();
+    rebuildRenderBG();
     if (!_inQROverlayUpdate && params.qrOverlay && simState.qrStatus === 'SHOW' && qrBitmap) updateQROverlay();
 }
 
@@ -2078,6 +2087,15 @@ function writeRenderUB() {
         f[27] = 1;
         f[28] = 1;
     }
+    f[29] = params.blendAmount;
+    // Avoid map options for per-particle color sampling. hasAvoidMap mirrors the
+    // global flag so the shader can early-out when no map is loaded (the binding
+    // is still valid — it falls back to placeholderTexView).
+    u[30] = hasAvoidMap ? 1 : 0;
+    f[31] = params.avoidMapScale;
+    u[32] = params.avoidMapInvert ? 1 : 0;
+    u[33] = params.avoidMapSampleColor ? 1 : 0;
+    u[34] = params.avoidMapFixedColor  ? 1 : 0;
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 
@@ -2167,7 +2185,7 @@ function writeContamUB() {
 
 // ── Pre-allocated uniform buffers (reused every frame to avoid GC pressure) ──
 const _soloAB  = new ArrayBuffer(192); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
-const _renderAB= new ArrayBuffer(128); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
+const _renderAB= new ArrayBuffer(144); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
 const _fadeAB  = new ArrayBuffer(16);  const _fadeF  = new Float32Array(_fadeAB);
 const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB); const _blitU  = new Uint32Array(_blitAB);
 const _downsampleAB = new ArrayBuffer(16); const _downsampleF = new Float32Array(_downsampleAB);

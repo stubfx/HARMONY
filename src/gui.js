@@ -85,6 +85,7 @@ export function initGUI({
     fVis.addColor(params, 'speedColor').name('fast color');
     fVis.add(params, 'brightness', 0.01, 0.5, 0.005).name('brightness');
     fVis.add(params, 'additiveBlend').name('additive blend');
+    fVis.add(params, 'blendAmount', 0, 1, 0.01).name('blend amount');
     fVis.add(params, 'pixelGrid').name('pixel grid');
     fVis.add(params, 'pixelGridCells', 20, 400, 1).name('grid cells').onChange(() => rebuildGridTex());
 
@@ -143,6 +144,8 @@ export function initGUI({
     const fAvoid = gui.addFolder('Avoidance map');
     fAvoid.add(params, 'avoidMapScale', 0.05, 1.0, 0.01).name('scale');
     fAvoid.add(params, 'avoidMapInvert').name('invert colors');
+    fAvoid.add(params, 'avoidMapSampleColor').name('sample color');
+    fAvoid.add(params, 'avoidMapFixedColor').name('fixed color');
     fAvoid.add({ load: () => document.querySelector('#avoid-map-input').click() }, 'load').name('Load map…');
     fAvoid.add({ clear: clearAvoidMap }, 'clear').name('Clear map');
 

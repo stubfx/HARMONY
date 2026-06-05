@@ -168,12 +168,36 @@ The alpha of each rendered particle quad. Because particle blending is additive 
 > **Homing agents are unaffected by this slider.** Agents whose home pixel is primed always render at the full alpha of the image pixel they're assigned to (multiplied only by the edge vignette). This ensures the collective image they form reads at full intended intensity regardless of how dim free agents are set.
 
 ### additive blend (`additiveBlend`)
-**Default:** on
+**Default:** off
 
 Selects the particle blend equation:
 
 - **On (additive):** `dst + src` — particles accumulate, bright spots can blow out to white in dense areas. Creates a glowing, luminous look.
 - **Off (max blend):** `max(dst, src)` — each pixel takes the brighter of the incoming and existing value. Dense clusters never blow out; brightness saturates at the image's peak value. WebGPU max blend ignores alpha by specification; the shader pre-multiplies RGB × alpha before output to keep proximity fade working for homing agents.
+
+### blend amount (`blendAmount`)
+**Range:** 0 – 1 | **Default:** 1.0
+
+Multiplier applied inside the fragment shader to the per-particle output, working in both blend modes. At `1.0` every particle contributes at full strength (current behaviour); at `0.0` particles render as black and disappear into the canvas.
+
+- In **additive blend** the multiplier scales the alpha (and thus the additive contribution): lowering it reduces how strongly overlapping particles accumulate, so dense areas glow less and bright spots take more particles to reach saturation.
+- In **max blend** the multiplier scales RGB before the per-channel max comparison: lowering it dims the source so the max picks a fainter colour, useful for softening the otherwise hard cap of max blend without falling back to additive accumulation.
+
+This is the easiest single knob to dial in "how much overlapping particles blend with each other" once the blend mode is chosen.
+
+### pixel grid (`pixelGrid`)
+**Default:** off
+
+Renders particles directly into a low-resolution `gridTex` (sized `pixelGridCells × derived height`) instead of the full-resolution offscreen accumulator. The vertex shader snaps each agent's continuous position to the centre of the cell it falls in and draws a quad that covers exactly one cell, so each particle becomes a single hard pixel; the final blit uses a nearest sampler to upscale the small texture across the canvas.
+
+- Produces an 8-bit, chessboard-style look where motion appears as discrete cell-to-cell jumps.
+- The agent shadow pass is skipped while pixel grid is on (the soft splat is incoherent with hard cells).
+- Significantly cheaper than rendering full-res: the fragment shader runs on the cell grid (~90 K pixels at the default 400 cells, 16:9 aspect) instead of the full canvas, and the previous downsample pass is no longer needed.
+
+### grid cells (`pixelGridCells`)
+**Range:** 20 – 400 | **Default:** 400
+
+Number of cells along the X axis of `gridTex` when pixel grid is on. The Y-axis count is derived from the canvas aspect ratio. Higher counts give finer cells (more like a normal render), lower counts give chunkier ones. Changing this triggers a `gridTex` rebuild.
 
 ### tone black (`toneBlack`)
 **Range:** 0 – 0.5 | **Default:** 0.0
@@ -417,6 +441,27 @@ The force magnitude uses the same `avoid force` multiplier as image-trace avoida
 **Range:** 0.05 – 1.0 | **Default:** 1.0
 
 The map is always centered on the canvas. This value controls what fraction of the canvas it covers. At 1.0 the map spans the full canvas. At 0.5 it occupies the central half.
+
+### invert colors (`avoidMapInvert`)
+**Default:** off
+
+When on, the avoidance map is read inverted at the sample site — `1.0 − r` for the compute shader's avoidance signal, and `vec3(1 − r, 1 − g, 1 − b)` for the per-particle color sample (see below). This flips the meaning of the source image: areas that were white (strong avoid / bright color) become weak / dark, and vice versa.
+
+The flip is applied once, at each read site, so every downstream consumer (the gradient, the lookahead deflection, the force scaling, the per-particle color) sees the inverted signal without separate branches.
+
+### sample color (`avoidMapSampleColor`)
+**Default:** off
+
+When on, **non-homing** particles take their base color from the avoid-map pixel directly underneath them, using the same cover-fit + scale mapping as the avoidance force. The render shader samples `avoidMapTex` at the agent's canvas position (binding 5, mirrored from the compute shader's binding 4) and uses the RGB value as the base.
+
+- The sample is performed in the vertex shader (one read per particle) and respects `invert colors`.
+- Homing agents are skipped — they don't react to the avoid map at all, so colour-by-avoid-map wouldn't be coherent for them; the fragment shader also overrides with the trace image. Spectator-assigned particles whose slot is *active* keep their explicit per-spectator colour; the sample only replaces the default "speed-blended base" path.
+- If the agent's position falls outside the avoid map's visible area (or no map is loaded), the sample is ignored and the default base/speed mix is used.
+
+### fixed color (`avoidMapFixedColor`)
+**Default:** off
+
+Modifier on top of `sample color`. When off, the sampled RGB is used as the *base* and is then mixed with the speed colour (just like the global base colour normally would be), so faster particles still drift toward the speed colour. When on, the sampled pixel becomes the particle's final colour with no speed blend — the swarm reads as a direct, frozen copy of the avoid map's colours wherever it overlaps with the map.
 
 ### Delivering via n8n
 
@@ -774,6 +819,13 @@ Seconds of silence from all remote devices before the QR trace is automatically 
 **Range:** 1 – 50 | **Default:** 1
 
 The remote page's persistent QR code fades when the connected spectator count reaches this threshold. This value is baked into the QR URL at generation time — changing it mid-session requires the QR to be regenerated (restart the simulation).
+
+### n8n enabled (`n8nEnabled`)
+**Default:** on
+
+Runtime kill-switch for all n8n traffic — the periodic heartbeat, the per-event `sim-event` fetches, and the text-event fallback path that uses n8n presence to decide whether to show submitted text locally. Toggling it off stops sending without unsetting `VITE_N8N_BASE_URL` or reloading; toggling it back on restarts the heartbeat timer (the GUI handler calls `restartHeartbeat()`).
+
+The `?n8n=off` URL parameter (and its aliases `false`, `0`, `disabled`) flips this flag to `false` at boot. Setting it via URL is equivalent to toggling it off in the GUI immediately after load.
 
 ### n8n test mode (`n8nTestMode`)
 **Default:** off

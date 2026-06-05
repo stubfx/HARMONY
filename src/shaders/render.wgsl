@@ -29,6 +29,12 @@
 //   [104] pixelMode            u32   (1 = snap to cell-grid and draw 1-cell quads into gridTex)
 //   [108] cellsW               f32   (gridTex width in cells; only meaningful when pixelMode=1)
 //   [112] cellsH               f32   (gridTex height in cells; only meaningful when pixelMode=1)
+//   [116] blendAmount          f32   (0–1 multiplier on fragment output; lowers per-particle contribution)
+//   [120] hasAvoidMap          u32   (mirrors the global flag — short-circuits the avoid-map color sample)
+//   [124] avoidMapScale        f32   (cover-fit scale for avoidMapTex; matches the compute shader's sampling)
+//   [128] avoidMapInvert       u32   (1 = sample as vec3(1 - r, 1 - g, 1 - b))
+//   [132] avoidMapSampleColor  u32   (1 = non-homing particles take their base color from the avoid-map sample)
+//   [136] avoidMapFixedColor   u32   (paired with sampleColor: 1 = use the exact pixel, 0 = use it as base then mix with speed color)
 
 struct SoloRenderParams {
     agentCount:           u32,
@@ -60,6 +66,12 @@ struct SoloRenderParams {
     pixelMode:            u32,
     cellsW:               f32,
     cellsH:               f32,
+    blendAmount:          f32,
+    hasAvoidMap:          u32,
+    avoidMapScale:        f32,
+    avoidMapInvert:       u32,
+    avoidMapSampleColor:  u32,
+    avoidMapFixedColor:   u32,
 }
 
 struct Agent {
@@ -90,6 +102,7 @@ struct SpectatorSlot {
 @group(0) @binding(2) var                imgSmp:         sampler;
 @group(0) @binding(3) var                imgTex:         texture_2d<f32>;
 @group(0) @binding(4) var<storage, read> spectatorSlots: array<SpectatorSlot, 16>;
+@group(0) @binding(5) var                avoidMapTex:    texture_2d<f32>;
 
 struct VsOut {
     @builtin(position) pos:        vec4<f32>,
@@ -107,6 +120,26 @@ fn hash(n: u32) -> f32 {
     x = x * 0x45d9f3bu;
     x = x ^ (x >> 16u);
     return f32(x) * (1.0 / 4294967296.0);
+}
+
+// Sample RGB from the avoidance map at a canvas-pixel position, using the same
+// cover-fit + scale mapping as the compute shader's avoidMapStrAt so positions
+// stay aligned between the avoidance force and the color sample.
+// Returns vec4(rgb, validFlag); validFlag is 0 when the sample lands outside
+// the texture's visible area (caller falls back to the default base color).
+fn avoidMapColorAt(canvasPx: vec2<f32>) -> vec4<f32> {
+    let dims  = textureDimensions(avoidMapTex, 0u);
+    let texSz = vec2<f32>(f32(dims.x), f32(dims.y));
+    let coverScale = max(params.canvasW / texSz.x, params.canvasH / texSz.y)
+                   * params.avoidMapScale;
+    let center = vec2<f32>(params.canvasW, params.canvasH) * 0.5;
+    let uv     = (canvasPx - center) / (texSz * coverScale) + 0.5;
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { return vec4<f32>(0.0); }
+    let tx = u32(clamp(uv.x, 0.0, 1.0) * f32(dims.x - 1u));
+    let ty = u32(clamp(uv.y, 0.0, 1.0) * f32(dims.y - 1u));
+    let s  = textureLoad(avoidMapTex, vec2<u32>(tx, ty), 0u);
+    let rgb = select(s.rgb, vec3<f32>(1.0) - s.rgb, params.avoidMapInvert != 0u);
+    return vec4<f32>(rgb, 1.0);
 }
 
 @vertex fn vs(@builtin(vertex_index) vi: u32) -> VsOut {
@@ -141,9 +174,28 @@ fn hash(n: u32) -> f32 {
     }
     let finalNdc = ndc + corners[corner] * half * 2.0;
 
-    let speed = length(agent.vel);
-    let t     = clamp(speed / max(params.maxSpeed, 0.001), 0.0, 1.0);
+    let speed     = length(agent.vel);
+    let t         = clamp(speed / max(params.maxSpeed, 0.001), 0.0, 1.0);
     let baseColor = vec3f(params.colorR, params.colorG, params.colorB);
+    let spdColor  = vec3f(params.speedColorR, params.speedColorG, params.speedColorB);
+
+    // Default colour = speed-blended base. Optionally replaced by an avoid-map
+    // sample for non-homing agents (homing agents are skipped — the fragment
+    // shader overrides with the trace image, and they don't react to the avoid
+    // map either so the colour wouldn't be coherent).
+    let isHoming = params.hasImage != 0u && agent.primed > 0.5;
+    var defaultColor = mix(baseColor, spdColor, t);
+    if (params.avoidMapSampleColor != 0u && params.hasAvoidMap != 0u && !isHoming) {
+        let s = avoidMapColorAt(agent.pos);
+        if (s.a > 0.5) {
+            if (params.avoidMapFixedColor != 0u) {
+                defaultColor = s.rgb;
+            } else {
+                defaultColor = mix(s.rgb, spdColor, t);
+            }
+        }
+    }
+
     var color: vec3f;
     if (params.spectatorCount > 0u && agentId < u32(f32(params.agentCount) * params.spectatorAgentShare)) {
         let slot = spectatorSlots[agentId % params.spectatorCount];
@@ -153,10 +205,10 @@ fn hash(n: u32) -> f32 {
             let rnd = hash(agentId) * 0.6 + 0.7;
             color = clamp(vec3f(slot.colorR, slot.colorG, slot.colorB) * rnd, vec3f(0.0), vec3f(1.0));
         } else {
-            color = mix(baseColor, vec3f(params.speedColorR, params.speedColorG, params.speedColorB), t);
+            color = defaultColor;
         }
     } else {
-        color = mix(baseColor, vec3f(params.speedColorR, params.speedColorG, params.speedColorB), t);
+        color = defaultColor;
     }
     let homeUV = vec2<f32>(
         (agent.home.x - params.imgX0) / (params.imgX1 - params.imgX0),
@@ -198,8 +250,12 @@ fn hash(n: u32) -> f32 {
         let a        = imgSample.a * vig * in.proximityT;
         // Max blend (operation:'max', factors:'one') ignores alpha — pre-multiply so the
         // max comparison sees distance-scaled colours instead of raw image values.
-        if (params.additiveBlend == 0u) { return vec4<f32>(imgSample.rgb * a, a); }
-        return vec4<f32>(imgSample.rgb, a);
+        // blendAmount scales the contribution in both modes: alpha for additive
+        // (less accumulation), rgb for max (dimmer source in the per-channel max).
+        let b = params.blendAmount;
+        if (params.additiveBlend == 0u) { return vec4<f32>(imgSample.rgb * a * b, a * b); }
+        return vec4<f32>(imgSample.rgb * b, a * b);
     }
-    return vec4<f32>(in.color, params.brightness);
+    let b = params.blendAmount;
+    return vec4<f32>(in.color * b, params.brightness * b);
 }
