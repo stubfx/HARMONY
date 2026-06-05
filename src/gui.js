@@ -142,6 +142,7 @@ export function initGUI({
     // ── Avoidance map ─────────────────────────────────────────────────────────
     const fAvoid = gui.addFolder('Avoidance map');
     fAvoid.add(params, 'avoidMapScale', 0.05, 1.0, 0.01).name('scale');
+    fAvoid.add(params, 'avoidMapInvert').name('invert colors');
     fAvoid.add({ load: () => document.querySelector('#avoid-map-input').click() }, 'load').name('Load map…');
     fAvoid.add({ clear: clearAvoidMap }, 'clear').name('Clear map');
 
@@ -156,6 +157,7 @@ export function initGUI({
     fSession.add(params, 'spawnerInactiveTimeout',   1,  30,  1   ).name('spawner timeout (s)');
     fSession.add(params, 'remoteTimeout',            0, 180,  5   ).name('idle restore QR (s)');
     fSession.add(params, 'maxSpectators',            1,  50,  1   ).name('QR hides at N users');
+    fSession.add(params, 'n8nEnabled').name('n8n enabled').onChange(() => restartHeartbeat());
     fSession.add(params, 'n8nTestMode').name('n8n test mode').onChange(v => {
         socket.emit('set-n8n-test-mode', v);
         const url = new URL(location.href);

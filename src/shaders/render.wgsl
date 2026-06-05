@@ -1,31 +1,34 @@
 // ─── Solo Particle Render Shader ──────────────────────────────────────────────
-// SoloRenderParams layout (104 bytes):
-//   [0]  agentCount          u32
-//   [4]  canvasW             f32
-//   [8]  canvasH             f32
-//   [12] pointSize           f32
-//   [16] colorR              f32
-//   [20] colorG              f32
-//   [24] colorB              f32
-//   [28] maxSpeed            f32
-//   [32] hasImage            u32
-//   [36] imgX0               f32
-//   [40] imgY0               f32
-//   [44] imgX1               f32
-//   [48] imgY1               f32
-//   [52] speedColorR         f32
-//   [56] speedColorG         f32
-//   [60] speedColorB         f32
-//   [64] brightness          f32
-//   [68] alphaThreshold      f32
-//   [72] blackThreshold      f32
-//   [76] vignetteEdge        f32
-//   [80] qrMode              u32   (1 = QR active)
-//   [84] homingProximityRange f32  (canvas px over which homing agents fade in)
-//   [88] homingMinAlpha       f32  (minimum alpha for a homing agent at max distance)
-//   [92] spectatorCount       u32  (active spectators; 0 = use global params.color)
-//   [96] additiveBlend        u32  (1 = additive; 0 = max blend with pre-multiplied alpha)
-//   [100] spectatorAgentShare f32  (0–1 fraction of agents assigned to spectators; rest use global color)
+// SoloRenderParams layout (116 bytes, padded to 128 in uniform block):
+//   [0]   agentCount           u32
+//   [4]   canvasW              f32
+//   [8]   canvasH              f32
+//   [12]  pointSize            f32
+//   [16]  colorR               f32
+//   [20]  colorG               f32
+//   [24]  colorB               f32
+//   [28]  maxSpeed             f32
+//   [32]  hasImage             u32
+//   [36]  imgX0                f32
+//   [40]  imgY0                f32
+//   [44]  imgX1                f32
+//   [48]  imgY1                f32
+//   [52]  speedColorR          f32
+//   [56]  speedColorG          f32
+//   [60]  speedColorB          f32
+//   [64]  brightness           f32
+//   [68]  alphaThreshold       f32
+//   [72]  blackThreshold       f32
+//   [76]  vignetteEdge         f32
+//   [80]  qrMode               u32   (1 = QR active)
+//   [84]  homingProximityRange f32   (canvas px over which homing agents fade in)
+//   [88]  homingMinAlpha       f32   (minimum alpha for a homing agent at max distance)
+//   [92]  spectatorCount       u32   (active spectators; 0 = use global params.color)
+//   [96]  additiveBlend        u32   (1 = additive; 0 = max blend with pre-multiplied alpha)
+//   [100] spectatorAgentShare  f32   (0–1 fraction of agents assigned to spectators)
+//   [104] pixelMode            u32   (1 = snap to cell-grid and draw 1-cell quads into gridTex)
+//   [108] cellsW               f32   (gridTex width in cells; only meaningful when pixelMode=1)
+//   [112] cellsH               f32   (gridTex height in cells; only meaningful when pixelMode=1)
 
 struct SoloRenderParams {
     agentCount:           u32,
@@ -54,6 +57,9 @@ struct SoloRenderParams {
     spectatorCount:       u32,
     additiveBlend:        u32,
     spectatorAgentShare:  f32,
+    pixelMode:            u32,
+    cellsW:               f32,
+    cellsH:               f32,
 }
 
 struct Agent {
@@ -113,11 +119,26 @@ fn hash(n: u32) -> f32 {
     );
 
     let agent    = agents[agentId];
-    let ndc      = vec2<f32>(
-         agent.pos.x / params.canvasW * 2.0 - 1.0,
-        -(agent.pos.y / params.canvasH * 2.0 - 1.0),
-    );
-    let half     = vec2<f32>(params.pointSize / params.canvasW, params.pointSize / params.canvasH);
+    var ndc:  vec2<f32>;
+    var half: vec2<f32>;
+    if (params.pixelMode != 0u) {
+        // Snap the agent's continuous position to the centre of the grid cell it
+        // falls in, and size the quad to cover exactly one cell. The render target
+        // is the low-res gridTex (cellsW × cellsH), so each particle becomes one
+        // hard pixel — and movement appears as discrete cell-to-cell jumps.
+        let cellX = floor(clamp(agent.pos.x / params.canvasW, 0.0, 0.99999) * params.cellsW);
+        let cellY = floor(clamp(agent.pos.y / params.canvasH, 0.0, 0.99999) * params.cellsH);
+        let cu    = (cellX + 0.5) / params.cellsW;
+        let cv    = (cellY + 0.5) / params.cellsH;
+        ndc  = vec2<f32>(cu * 2.0 - 1.0, -(cv * 2.0 - 1.0));
+        half = vec2<f32>(1.0 / params.cellsW, 1.0 / params.cellsH);
+    } else {
+        ndc  = vec2<f32>(
+             agent.pos.x / params.canvasW * 2.0 - 1.0,
+            -(agent.pos.y / params.canvasH * 2.0 - 1.0),
+        );
+        half = vec2<f32>(params.pointSize / params.canvasW, params.pointSize / params.canvasH);
+    }
     let finalNdc = ndc + corners[corner] * half * 2.0;
 
     let speed = length(agent.vel);

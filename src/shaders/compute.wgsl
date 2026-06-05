@@ -49,6 +49,7 @@
 //   [168] qrY0                 f32   (QR rect top edge)
 //   [172] qrX1                 f32   (QR rect right edge)
 //   [176] qrY1                 f32   (QR rect bottom edge)
+//   [180] avoidMapInvert       u32   (1 = invert the avoidance map sample at read time: 1.0 - r)
 
 struct SoloParams {
     agentCount:     u32,
@@ -96,6 +97,7 @@ struct SoloParams {
     qrY0:                 f32,
     qrX1:                 f32,
     qrY1:                 f32,
+    avoidMapInvert:       u32,
 }
 
 // Per-spectator partition data — color, joystick spawner position, personal wind.
@@ -201,7 +203,10 @@ fn avoidMapStrAt(canvasPx: vec2<f32>) -> f32 {
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { return 0.0; }
     let tx = u32(clamp(uv.x, 0.0, 1.0) * f32(dims.x - 1u));
     let ty = u32(clamp(uv.y, 0.0, 1.0) * f32(dims.y - 1u));
-    return textureLoad(avoidMapTex, vec2<u32>(tx, ty), 0u).r;
+    let r = textureLoad(avoidMapTex, vec2<u32>(tx, ty), 0u).r;
+    // Invert before returning so every downstream caller (gradient, deflection,
+    // strength scaling) sees the flipped signal with no extra branches.
+    return select(r, 1.0 - r, params.avoidMapInvert != 0u);
 }
 
 // Sample shadow density at a canvas-pixel position.
