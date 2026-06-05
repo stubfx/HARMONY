@@ -18,7 +18,6 @@ import downsampleWGSL   from './shaders/downsample.wgsl?raw';
 import windVisWGSL      from './shaders/wind-vis.wgsl?raw';
 import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
 import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
-import agentDepositWGSL from './shaders/agentDeposit.wgsl?raw';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const MAX_AGENTS = 5_000_000;
@@ -91,7 +90,6 @@ const params = {
     avoidMapSampleColor: false, // true = non-homing particles take their base color from the avoid map sample at their position
     avoidMapFixedColor:  false, // true (paired with sampleColor) = use the sampled pixel exactly; false = use it as base color then mix with speed color
     avoidMapBlackCutoff: 0.05,  // luminance floor for the color sample: pixels below this are skipped (particle keeps base color) — mirrors trace blackThreshold
-    agentsMap:           false, // when true, every agent deposits an opaque-white quad of pointSize onto avoidMapTex each frame (feedback into avoidance + color sampling)
     qrOverlay:       false, // true = QR on a 2D overlay canvas; agents freed from QR area
     // Primed-spot probe (free agents only)
     probeLen:          15.0, // probe cast distance in canvas pixels
@@ -507,38 +505,6 @@ const downsamplePipe = device.createRenderPipeline({
         targets: [{ format: 'rgba16float' }],
     },
     primitive: { topology: 'triangle-list' },
-});
-
-// Agent deposit: one opaque-white quad per agent, drawn into avoidMapTex.
-// Closes the loop — agents paint the field they then react to. Gated by
-// params.agentsMap + hasAvoidMap so the pass is skipped when no map is loaded
-// or the toggle is off. Pass runs at the end of the frame so reads in the
-// same frame (compute, render binding 5) see the previous frame's deposits.
-const agentDepositMod  = device.createShaderModule({ code: agentDepositWGSL });
-const agentDepositPipe = device.createRenderPipeline({
-    layout: 'auto',
-    vertex:   { module: agentDepositMod, entryPoint: 'vs' },
-    fragment: {
-        module: agentDepositMod, entryPoint: 'fs',
-        targets: [{
-            format: 'rgba8unorm',
-            blend: {
-                color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-                alpha: { srcFactor: 'one',       dstFactor: 'one-minus-src-alpha', operation: 'add' },
-            },
-        }],
-    },
-    primitive: { topology: 'triangle-list' },
-});
-const agentDepositUB = device.createBuffer({
-    size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-});
-const agentDepositBG = device.createBindGroup({
-    layout: agentDepositPipe.getBindGroupLayout(0),
-    entries: [
-        { binding: 0, resource: { buffer: agentDepositUB } },
-        { binding: 1, resource: { buffer: agentBuf } },
-    ],
 });
 
 // Agent shadow: per-homing-agent soft dark splat blended onto offscreen texture
@@ -2181,17 +2147,6 @@ function writeAgentShadowUB() {
     device.queue.writeBuffer(agentShadowUB, 0, _shadowAB);
 }
 
-function writeAgentDepositUB() {
-    if (!avoidMapTex) return;
-    _agentDepositF[0] = canvas.width;
-    _agentDepositF[1] = canvas.height;
-    _agentDepositF[2] = avoidMapTex.width;
-    _agentDepositF[3] = avoidMapTex.height;
-    _agentDepositF[4] = params.avoidMapScale;
-    _agentDepositF[5] = params.pointSize;
-    device.queue.writeBuffer(agentDepositUB, 0, _agentDepositAB);
-}
-
 function writeImageDebugUB() {
     const { x0, y0, x1, y1 } = getImageRegion();
     _imgDbgF[0] = canvas.width;
@@ -2238,7 +2193,6 @@ const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB)
 const _downsampleAB = new ArrayBuffer(16); const _downsampleF = new Float32Array(_downsampleAB);
 const _contamAB= new ArrayBuffer(176); const _contamU= new Uint32Array(_contamAB); const _contamF= new Float32Array(_contamAB);
 const _shadowAB= new ArrayBuffer(32);  const _shadowF= new Float32Array(_shadowAB); const _shadowU= new Uint32Array(_shadowAB);
-const _agentDepositAB = new ArrayBuffer(32); const _agentDepositF = new Float32Array(_agentDepositAB);
 const _imgDbgAB= new ArrayBuffer(32);  const _imgDbgF= new Float32Array(_imgDbgAB);
 const _windVisAB=new ArrayBuffer(32);  const _windVisF=new Float32Array(_windVisAB); const _windVisU=new Uint32Array(_windVisAB);
 
@@ -2452,21 +2406,6 @@ function frame(ts) {
     const visGridW = Math.ceil(canvas.width  / visStep) + 1;
     const visGridH = Math.ceil(canvas.height / visStep) + 1;
     if (params.showWindVis && windVisPipe) writeWindVisUB(now, visGridW);
-
-    // Agent deposit: every agent paints an opaque-white quad of pointSize into
-    // avoidMapTex. Reads of avoidMapTex in the same frame (compute, render
-    // colour sample) already happened above, so writing here lands in the next
-    // frame's input. Gated on hasAvoidMap so we never target a missing texture.
-    if (params.agentsMap && hasAvoidMap && avoidMapTexView) {
-        writeAgentDepositUB();
-        const dp = enc.beginRenderPass({
-            colorAttachments: [{ view: avoidMapTexView, loadOp: 'load', storeOp: 'store' }],
-        });
-        dp.setPipeline(agentDepositPipe);
-        dp.setBindGroup(0, agentDepositBG);
-        dp.draw(params.agentCount * 6);
-        dp.end();
-    }
 
     // (Pixel-grid mode now renders particles directly into gridTex above, so no
     // downsample pass is needed — gridTex already holds the chunky cell-aligned
