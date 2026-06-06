@@ -25,7 +25,7 @@ const MAX_AGENTS = 5_000_000;
 // ── Tunable parameters (mutated by lil-gui) ───────────────────────────────────
 const params = {
     // Agents
-    agentCount:  2_000_000,
+    agentCount:  100_000,
     // Motion
     stepLen:     2.0,
     turnRate:    0.04,
@@ -44,12 +44,13 @@ const params = {
     color:       '#00ff00',
     speedColor:  '#0000ff',   // color approached at max speed
     brightness:  0.06,        // per-particle alpha; prevents additive saturation to white
-    additiveBlend: true,      // true = additive (glow, accumulates); false = max blend (no over-brightness)
+    additiveBlend: false,     // true = additive (glow, accumulates); false = max blend (no over-brightness)
+    blendAmount:   1.0,       // 0–1 multiplier on per-particle fragment output; lowers contribution in both blend modes
     toneBlack:   0.0,         // input level mapped to black (lifts lone-particle visibility)
     toneWhite:   1.0,         // input level mapped to white (HDR saturation point)
     toneGamma:   1.0,         // power curve: <1 boosts darks, >1 crushes darks
     shadowBoost: 0.0,         // inverse-brightness boost: peaks at ~12% luminance, negligible above 60%
-    pixelGrid:      true,     // chunky low-res grid (downsample → nearest-sample blit) — final stage before canvas
+    pixelGrid:      false,    // chunky low-res grid (downsample → nearest-sample blit) — final stage before canvas
     pixelGridCells: 400,      // cell count along the X axis; Y count is derived from canvas aspect ratio
     // Magnet
     magnetStr:      30.0, // homing speed: px/frame agents move toward their home position
@@ -85,6 +86,10 @@ const params = {
     // Avoidance
     avoidForceStr:   1.0, // multiplier on image-trace avoidance forces
     avoidMapScale:   1.0, // avoidance map coverage as fraction of canvas (1.0 = full)
+    avoidMapInvert:  false, // true = read the map as 1 - r, so light areas become non-avoid and dark areas become the avoid signal
+    avoidMapSampleColor: false, // true = non-homing particles take their base color from the avoid map sample at their position
+    avoidMapFixedColor:  false, // true (paired with sampleColor) = use the sampled pixel exactly; false = use it as base color then mix with speed color
+    avoidMapBlackCutoff: 0.05,  // luminance floor for the color sample: pixels below this are skipped (particle keeps base color) — mirrors trace blackThreshold
     qrOverlay:       false, // true = QR on a 2D overlay canvas; agents freed from QR area
     // Primed-spot probe (free agents only)
     probeLen:          15.0, // probe cast distance in canvas pixels
@@ -111,6 +116,7 @@ const params = {
     maxSpectators:  1,    // sim QR hides when connected count reaches this threshold
     respawnOnQR:      true,  // respawn free agents inside the QR rect to a random edge
     qrRespawnChance:  0.01,  // per-frame probability [0–1] for the respawn
+    n8nEnabled:        true,  // false = silence all n8n traffic (heartbeat + sim-event) without unsetting VITE_N8N_BASE_URL
     n8nTestMode:       false, // true = /webhook-test/sim-event, false = /webhook/sim-event
     heartbeatInterval: 10,   // seconds between periodic param snapshots sent to n8n (0 = off)
     heartbeatTimeout:  60,   // seconds before a heartbeat fetch is aborted
@@ -132,12 +138,14 @@ const params = {
 // ?amount=<n>    — override the starting agent count (still adjustable in the GUI)
 // ?test=1        — start with n8n test mode enabled (mirrors GUI toggle, survives reloads)
 // ?password=<x>  — forwarded as-is in every heartbeat payload; survives reloads via URL
-// ?n8n=off       — disable all n8n traffic (heartbeat + sim-event); takes precedence over VITE_N8N_BASE_URL
+// ?n8n=off       — start with n8n traffic disabled (heartbeat + sim-event); mirrors GUI toggle, survives reloads
 // ?pixelGrid=true — start with the chunky low-res pixel-grid mode enabled
 const _urlParams     = new URLSearchParams(location.search);
 const _forcedSession = _urlParams.get('s') || null;
 const _n8nPassword   = _urlParams.get('password') || null;
-const _n8nDisabled   = ['off', 'false', '0', 'disabled'].includes(_urlParams.get('n8n') ?? '');
+if (['off', 'false', '0', 'disabled'].includes(_urlParams.get('n8n') ?? '')) {
+    params.n8nEnabled = false;
+}
 {
     const v = _urlParams.get('pixelGrid');
     if (v === 'true' || v === '1') params.pixelGrid = true;
@@ -306,7 +314,7 @@ const soloUB = device.createBuffer({
     size: 192, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
-    size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const fadeUB = device.createBuffer({
     size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -681,15 +689,18 @@ let avoidGifDurations = null;
 let avoidGifFrameIdx  = 0;
 let avoidGifNextFrameAt = 0;
 
-// Rebuilds particle render bind group — called after pipeline creation and on image change
+// Rebuilds particle render bind group — called after pipeline creation, on image change,
+// and on avoid-map change (avoid map at binding 5 feeds the optional per-particle color sampling).
 function rebuildRenderBG() {
-    const texView = (hasImage && imageTexView) ? imageTexView : placeholderTexView;
+    const texView      = (hasImage && imageTexView) ? imageTexView : placeholderTexView;
+    const avoidView    = (hasAvoidMap && avoidMapTexView) ? avoidMapTexView : placeholderTexView;
     const entries = [
         { binding: 0, resource: { buffer: renderUB } },
         { binding: 1, resource: { buffer: agentBuf } },
         { binding: 2, resource: imageSampler },
         { binding: 3, resource: texView },
         { binding: 4, resource: { buffer: spectatorSlotsBuf } },
+        { binding: 5, resource: avoidView },
     ];
     renderBG       = device.createBindGroup({ layout: renderPipe.getBindGroupLayout(0),       entries });
     renderBGNormal = device.createBindGroup({ layout: renderPipeNormal.getBindGroupLayout(0), entries });
@@ -791,6 +802,7 @@ function updateQROverlay() {
     hasAvoidMap      = true;
     _qrOwnedAvoidMap = true;
     rebuildSimBG();
+    rebuildRenderBG();
 }
 
 // ── Trace canvas compositor ───────────────────────────────────────────────────
@@ -1235,15 +1247,16 @@ let lastRemoteActivity = Date.now(); // timestamp of last remote-event (touch or
 // whether the client is up to date or needs a re-push.
 let _serverEcho = {};
 
-// `?n8n=off` short-circuits to empty string so every existing `if (!N8N_BASE)` guard
-// already gates correctly — no call-site changes needed.
-const N8N_BASE            = _n8nDisabled ? '' : (import.meta.env.VITE_N8N_BASE_URL ?? '').replace(/\/$/, '');
+// Runtime toggle is `params.n8nEnabled`; URL `?n8n=off` flips that flag at boot.
+// Every fetch / scheduler / fallback path that referenced N8N_BASE also checks
+// the runtime flag, so disabling at runtime stops traffic without needing a reload.
+const N8N_BASE            = (import.meta.env.VITE_N8N_BASE_URL ?? '').replace(/\/$/, '');
 const N8N_USER_TIMEOUT_MS = 15_000;
 let   n8nInFlight          = false;
 let   n8nHeartbeatInFlight = false;
 
 async function callN8n(event) {
-    if (!N8N_BASE || n8nInFlight) return;
+    if (!N8N_BASE || !params.n8nEnabled || n8nInFlight) return;
     n8nInFlight = true;
     const path = params.n8nTestMode ? '/webhook-test/sim-event' : '/webhook/sim-event';
     const controller = new AbortController();
@@ -1273,7 +1286,7 @@ async function callN8n(event) {
 // params.heartbeatInterval seconds. Response is handled identically to sim-event.
 // In-flight guard: any heartbeat requested while one is running is dropped (no queue).
 async function callN8nHeartbeat() {
-    if (!N8N_BASE) return;
+    if (!N8N_BASE || !params.n8nEnabled) return;
     if (n8nHeartbeatInFlight) { console.log('[n8n heartbeat] skipped — previous call still in flight'); return; }
     n8nHeartbeatInFlight = true;
     const path = params.n8nTestMode ? '/webhook-test/heartbeat' : '/webhook/heartbeat';
@@ -1329,7 +1342,7 @@ let heartbeatTimer = null;
 function restartHeartbeat() {
     clearInterval(heartbeatTimer);
     heartbeatTimer = null;
-    if (N8N_BASE && params.heartbeatInterval > 0) {
+    if (N8N_BASE && params.n8nEnabled && params.heartbeatInterval > 0) {
         heartbeatTimer = setInterval(callN8nHeartbeat, params.heartbeatInterval * 1000);
     }
 }
@@ -1553,7 +1566,7 @@ let socket;
         if (event.type === 'raise' || event.type === 'wave') {
             burstBrightness = BURST_BRIGHTNESS;
         }
-        if (event.type === 'text' && event.data?.text && !N8N_BASE) {
+        if (event.type === 'text' && event.data?.text && (!N8N_BASE || !params.n8nEnabled)) {
             const input = document.querySelector('#trace-text-input');
             if (input) input.value = event.data.text;
             renderTraceCanvas();
@@ -1840,6 +1853,7 @@ async function loadAvoidMap(source) {
     avoidMapTexView = avoidMapTex.createView();
     hasAvoidMap     = true;
     rebuildSimBG();
+    rebuildRenderBG();
     if (!_inQROverlayUpdate && params.qrOverlay && simState.qrStatus === 'SHOW' && qrBitmap) updateQROverlay();
 }
 
@@ -1849,6 +1863,7 @@ function clearAvoidMap() {
     avoidMapTexView = null;
     hasAvoidMap     = false;
     rebuildSimBG();
+    rebuildRenderBG();
     if (!_inQROverlayUpdate && params.qrOverlay && simState.qrStatus === 'SHOW' && qrBitmap) updateQROverlay();
 }
 
@@ -2009,6 +2024,7 @@ function writeSoloUB(dt, time) {
     } else {
         f[41] = 0; f[42] = 0; f[43] = 0; f[44] = 0;
     }
+    u[45] = params.avoidMapInvert ? 1 : 0;
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
@@ -2058,6 +2074,30 @@ function writeRenderUB() {
     u[23] = activeSlots.length;
     u[24] = params.additiveBlend ? 1 : 0;
     f[25] = params.spectatorAgentShare / 100.0;
+    // Pixel-grid mode: when on, vertex shader snaps agents to gridTex cells and
+    // draws 1-cell quads. cellsW/cellsH must match the gridTex that the same
+    // frame's render pass will target — see frame loop where the attachment
+    // selection mirrors this condition.
+    const usingPixel = !!(params.pixelGrid && gridTex);
+    u[26] = usingPixel ? 1 : 0;
+    if (usingPixel) {
+        const [cellsW, cellsH] = gridCellDims();
+        f[27] = cellsW;
+        f[28] = cellsH;
+    } else {
+        f[27] = 1;
+        f[28] = 1;
+    }
+    f[29] = params.blendAmount;
+    // Avoid map options for per-particle color sampling. hasAvoidMap mirrors the
+    // global flag so the shader can early-out when no map is loaded (the binding
+    // is still valid — it falls back to placeholderTexView).
+    u[30] = hasAvoidMap ? 1 : 0;
+    f[31] = params.avoidMapScale;
+    u[32] = params.avoidMapInvert ? 1 : 0;
+    u[33] = params.avoidMapSampleColor ? 1 : 0;
+    u[34] = params.avoidMapFixedColor  ? 1 : 0;
+    f[35] = params.avoidMapBlackCutoff;
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 
@@ -2147,7 +2187,7 @@ function writeContamUB() {
 
 // ── Pre-allocated uniform buffers (reused every frame to avoid GC pressure) ──
 const _soloAB  = new ArrayBuffer(192); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
-const _renderAB= new ArrayBuffer(112); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
+const _renderAB= new ArrayBuffer(144); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
 const _fadeAB  = new ArrayBuffer(16);  const _fadeF  = new Float32Array(_fadeAB);
 const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB); const _blitU  = new Uint32Array(_blitAB);
 const _downsampleAB = new ArrayBuffer(16); const _downsampleF = new Float32Array(_downsampleAB);
@@ -2334,16 +2374,23 @@ function frame(ts) {
         dp.end();
     }
 
-    // Offscreen: fade old trail + draw new particles
+    // Pixel-grid mode renders particles snapped-to-cell directly into the small
+    // gridTex; non-pixel mode draws full-resolution particles into offscreenTex
+    // as before. Both targets are rgba16float so the pipelines work on either.
+    const usingPixel = !!(params.pixelGrid && gridTexView);
+    const renderTargetView = usingPixel ? gridTexView : offscreenView;
+
+    // Render: fade old trail + draw new particles
     const rp = enc.beginRenderPass({
         colorAttachments: [{
-            view: offscreenView, loadOp: 'load', storeOp: 'store',
+            view: renderTargetView, loadOp: 'load', storeOp: 'store',
         }],
     });
     rp.setPipeline(fadePipe);
     rp.setBindGroup(0, fadeBG);
     rp.draw(3);
-    if (hasImage && agentShadowBG) {
+    // Agent shadow is a soft splat — incoherent with chunky cells, skip in pixel mode.
+    if (hasImage && agentShadowBG && !usingPixel) {
         rp.setPipeline(agentShadowPipe);
         rp.setBindGroup(0, agentShadowBG);
         rp.draw(params.agentCount * 6);
@@ -2360,23 +2407,9 @@ function frame(ts) {
     const visGridH = Math.ceil(canvas.height / visStep) + 1;
     if (params.showWindVis && windVisPipe) writeWindVisUB(now, visGridW);
 
-    // Pixel-grid: downsample offscreen → gridTex (per-cell area average) before the blit.
-    // The blit then reads gridTex with a nearest sampler, producing the chunky look
-    // while still going through tone-map / shadow-boost / colour-mode in blit.wgsl.
-    if (params.pixelGrid && gridTexView && downsampleBG) {
-        const [cellsW, cellsH] = gridCellDims();
-        writeDownsampleUB(cellsW, cellsH);
-        const dp = enc.beginRenderPass({
-            colorAttachments: [{
-                view: gridTexView, loadOp: 'clear',
-                clearValue: { r: 0, g: 0, b: 0, a: 1 }, storeOp: 'store',
-            }],
-        });
-        dp.setPipeline(downsamplePipe);
-        dp.setBindGroup(0, downsampleBG);
-        dp.draw(3);
-        dp.end();
-    }
+    // (Pixel-grid mode now renders particles directly into gridTex above, so no
+    // downsample pass is needed — gridTex already holds the chunky cell-aligned
+    // image. The blit still reads it with a nearest sampler for the upscale.)
 
     // Blit offscreen (or gridTex when pixelGrid on) → canvas, then optional overlays
     const curTex = ctx.getCurrentTexture();

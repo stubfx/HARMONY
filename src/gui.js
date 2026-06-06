@@ -85,6 +85,7 @@ export function initGUI({
     fVis.addColor(params, 'speedColor').name('fast color');
     fVis.add(params, 'brightness', 0.01, 0.5, 0.005).name('brightness');
     fVis.add(params, 'additiveBlend').name('additive blend');
+    fVis.add(params, 'blendAmount', 0, 1, 0.01).name('blend amount');
     fVis.add(params, 'pixelGrid').name('pixel grid');
     fVis.add(params, 'pixelGridCells', 20, 400, 1).name('grid cells').onChange(() => rebuildGridTex());
 
@@ -142,6 +143,10 @@ export function initGUI({
     // ── Avoidance map ─────────────────────────────────────────────────────────
     const fAvoid = gui.addFolder('Avoidance map');
     fAvoid.add(params, 'avoidMapScale', 0.05, 1.0, 0.01).name('scale');
+    fAvoid.add(params, 'avoidMapInvert').name('invert colors');
+    fAvoid.add(params, 'avoidMapSampleColor').name('sample color');
+    fAvoid.add(params, 'avoidMapFixedColor').name('fixed color');
+    fAvoid.add(params, 'avoidMapBlackCutoff', 0, 0.5, 0.005).name('color black cutoff');
     fAvoid.add({ load: () => document.querySelector('#avoid-map-input').click() }, 'load').name('Load map…');
     fAvoid.add({ clear: clearAvoidMap }, 'clear').name('Clear map');
 
@@ -156,6 +161,7 @@ export function initGUI({
     fSession.add(params, 'spawnerInactiveTimeout',   1,  30,  1   ).name('spawner timeout (s)');
     fSession.add(params, 'remoteTimeout',            0, 180,  5   ).name('idle restore QR (s)');
     fSession.add(params, 'maxSpectators',            1,  50,  1   ).name('QR hides at N users');
+    fSession.add(params, 'n8nEnabled').name('n8n enabled').onChange(() => restartHeartbeat());
     fSession.add(params, 'n8nTestMode').name('n8n test mode').onChange(v => {
         socket.emit('set-n8n-test-mode', v);
         const url = new URL(location.href);
