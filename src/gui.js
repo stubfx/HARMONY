@@ -60,17 +60,6 @@ export function initGUI({
     fMotion.add(params, 'dotCenterRadius',  0, 500,  1    ).name('DOT center radius (px)');
     fMotion.add(params, 'dotRespawnChance', 0,   1,  0.005).name('DOT respawn chance');
 
-    // ── Flock (Boids) ───────────────────────────────────────────────────────────
-    // Field-based flocking: agents splat their velocity into a low-res field and
-    // steer by the local average (alignment) and density gradient (cohesion/separation).
-    const fFlock = gui.addFolder('Flock (Boids)');
-    fFlock.add(params, 'flockEnabled').name('enabled');
-    fFlock.add(params, 'flockAlign',      0, 0.3, 0.005).name('alignment');
-    fFlock.add(params, 'flockCohesion',   0, 2,   0.01 ).name('cohesion');
-    fFlock.add(params, 'flockSeparation', 0, 3,   0.01 ).name('separation');
-    fFlock.add(params, 'flockRadius',     2, 80,  1    ).name('neighbour radius (px)');
-    fFlock.close();
-
     // ── Game of Life ────────────────────────────────────────────────────────────
     // Conway automaton on a grid; particles are pulled toward the live cells.
     const fGol = gui.addFolder('Game of Life');

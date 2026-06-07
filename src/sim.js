@@ -18,14 +18,10 @@ import downsampleWGSL   from './shaders/downsample.wgsl?raw';
 import windVisWGSL      from './shaders/wind-vis.wgsl?raw';
 import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
 import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
-import flockWGSL        from './shaders/flock.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const MAX_AGENTS = 5_000_000;
-// Flock velocity/density field is rendered at this fraction of canvas resolution
-// (lower = cheaper + smoother neighbourhood averaging).
-const FLOCK_FIELD_SCALE = 0.25;
 // Game of Life grid width in cells (height derived from canvas aspect).
 const GOL_W = 192;
 
@@ -84,17 +80,11 @@ const params = {
     // Agent shadow
     agentShadowStr:    0.20, // peak opacity of each homing-agent shadow splat (0–1)
     agentShadowRadius: 10,   // splat half-radius in canvas pixels
-    // Flocking (field-based Boids) — experimental, toggle
-    flockEnabled:    false,
-    flockAlign:      0.06, // alignment: steer toward local average heading
-    flockCohesion:   0.4,  // cohesion: steer toward denser neighbourhood
-    flockSeparation: 0.8,  // separation: steer away from crowding
-    flockRadius:     24,   // neighbourhood / gradient sample radius in canvas pixels
-    // Game of Life mode — experimental, toggle
-    golEnabled:      false,
+    // Game of Life mode — toggle
+    golEnabled:      true,
     golStrength:     0.5,  // attraction of particles toward live cells
     golStepInterval: 4,    // frames between Game-of-Life generations (higher = slower)
-    golSpark:        0.008, // random life injection per generation (0 = pure Conway; prevents freezing)
+    golSpark:        0.001, // random life injection per generation (0 = pure Conway; prevents freezing)
     // Homing behaviour
     homingChance:    0.2, // per-frame probability [0–1] that a newly-eligible agent commits to homing
     homingInfluence: 1.0, // max homing blend weight at dist=0; falls to 0 at dist=canvasW
@@ -329,7 +319,7 @@ const agentBuf = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 const soloUB = device.createBuffer({
-    size: 224, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 192, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
     size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -348,10 +338,6 @@ const windVisUB = device.createBuffer({
 });
 const imageDebugUB = device.createBuffer({
     size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-});
-// Flock pass uniform: canvasW, canvasH, radius, pad (16 bytes)
-const flockUB = device.createBuffer({
-    size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 // Game of Life step uniform: seed, spark, pad, pad (16 bytes)
 const golUB = device.createBuffer({
@@ -571,25 +557,6 @@ const agentShadowDensityPipe = device.createRenderPipeline({
 let agentShadowBG        = null;
 let agentShadowDensityBG = null;
 
-// Flock field: per-agent velocity splat accumulated additively into a low-res field.
-const flockMod  = device.createShaderModule({ code: flockWGSL });
-const flockPipe = device.createRenderPipeline({
-    layout: 'auto',
-    vertex:   { module: flockMod, entryPoint: 'vs' },
-    fragment: {
-        module: flockMod, entryPoint: 'fs',
-        targets: [{
-            format: 'rgba16float',
-            blend: {
-                color: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
-                alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
-            },
-        }],
-    },
-    primitive: { topology: 'triangle-list' },
-});
-let flockBG = null;
-
 // Game of Life: a Conway automaton on a small grid; particles are attracted to live cells.
 const golStepMod  = device.createShaderModule({ code: golStepWGSL });
 const golStepPipe = device.createRenderPipeline({
@@ -625,8 +592,6 @@ let offscreenView      = null;
 let blitBG             = null;
 let shadowDensityTex   = null;
 let shadowDensityView  = null;
-let flockFieldTex      = null;
-let flockFieldView     = null;
 let golStateTex        = null;
 let golStateView       = null;
 let golScratchTex      = null;
@@ -693,15 +658,6 @@ function rebuildOffscreen() {
         usage:  GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     });
     shadowDensityView = shadowDensityTex.createView();
-
-    if (flockFieldTex) flockFieldTex.destroy();
-    flockFieldTex = device.createTexture({
-        size:   [Math.max(1, Math.round(canvas.width  * FLOCK_FIELD_SCALE)),
-                 Math.max(1, Math.round(canvas.height * FLOCK_FIELD_SCALE))],
-        format: 'rgba16float',
-        usage:  GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    });
-    flockFieldView = flockFieldTex.createView();
 
     golW = GOL_W;
     golH = Math.max(1, Math.round(GOL_W * canvas.height / canvas.width));
@@ -800,7 +756,6 @@ function rebuildRenderBG() {
 rebuildRenderBG();
 rebuildAgentShadowBG();
 rebuildAgentShadowDensityBG();
-rebuildFlockBG();
 
 function rebuildImageDebugBG() {
     if (!hasImage || !imageTexView) { imageDebugBG = null; return; }
@@ -832,16 +787,6 @@ function rebuildAgentShadowDensityBG() {
             { binding: 0, resource: { buffer: agentShadowUB } },
             { binding: 1, resource: { buffer: agentBuf } },
             { binding: 2, resource: { buffer: contamUB } },
-        ],
-    });
-}
-
-function rebuildFlockBG() {
-    flockBG = device.createBindGroup({
-        layout: flockPipe.getBindGroupLayout(0),
-        entries: [
-            { binding: 0, resource: { buffer: flockUB } },
-            { binding: 1, resource: { buffer: agentBuf } },
         ],
     });
 }
@@ -1260,8 +1205,7 @@ function rebuildSimBG() {
             { binding: 4, resource: avoidMapView },
             { binding: 5, resource: shadowDensityRes },
             { binding: 6, resource: { buffer: spectatorSlotsBuf } },
-            { binding: 7, resource: flockFieldView ?? placeholderTexView },
-            { binding: 8, resource: golStateView ?? placeholderTexView },
+            { binding: 7, resource: golStateView ?? placeholderTexView },
         ],
     });
 }
@@ -2161,13 +2105,8 @@ function writeSoloUB(dt, time) {
         f[41] = 0; f[42] = 0; f[43] = 0; f[44] = 0;
     }
     u[45] = params.avoidMapInvert ? 1 : 0;
-    u[46] = params.flockEnabled ? 1 : 0;
-    f[47] = params.flockAlign;
-    f[48] = params.flockCohesion;
-    f[49] = params.flockSeparation;
-    f[50] = params.flockRadius;
-    u[51] = params.golEnabled ? 1 : 0;
-    f[52] = params.golStrength;
+    u[46] = params.golEnabled ? 1 : 0;
+    f[47] = params.golStrength;
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
@@ -2281,13 +2220,6 @@ function writeAgentShadowUB() {
     device.queue.writeBuffer(agentShadowUB, 0, _shadowAB);
 }
 
-function writeFlockUB() {
-    _flockF[0] = canvas.width;
-    _flockF[1] = canvas.height;
-    _flockF[2] = params.flockRadius;
-    device.queue.writeBuffer(flockUB, 0, _flockAB);
-}
-
 function writeImageDebugUB() {
     const { x0, y0, x1, y1 } = getImageRegion();
     _imgDbgF[0] = canvas.width;
@@ -2327,14 +2259,13 @@ function writeContamUB() {
 }
 
 // ── Pre-allocated uniform buffers (reused every frame to avoid GC pressure) ──
-const _soloAB  = new ArrayBuffer(224); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
+const _soloAB  = new ArrayBuffer(192); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
 const _renderAB= new ArrayBuffer(144); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
 const _fadeAB  = new ArrayBuffer(16);  const _fadeF  = new Float32Array(_fadeAB);
 const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB); const _blitU  = new Uint32Array(_blitAB);
 const _downsampleAB = new ArrayBuffer(16); const _downsampleF = new Float32Array(_downsampleAB);
 const _contamAB= new ArrayBuffer(176); const _contamU= new Uint32Array(_contamAB); const _contamF= new Float32Array(_contamAB);
 const _shadowAB= new ArrayBuffer(32);  const _shadowF= new Float32Array(_shadowAB); const _shadowU= new Uint32Array(_shadowAB);
-const _flockAB = new ArrayBuffer(16);  const _flockF = new Float32Array(_flockAB);
 const _golAB   = new ArrayBuffer(16);  const _golU   = new Uint32Array(_golAB);   const _golF   = new Float32Array(_golAB);
 const _imgDbgAB= new ArrayBuffer(32);  const _imgDbgF= new Float32Array(_imgDbgAB);
 const _windVisAB=new ArrayBuffer(32);  const _windVisF=new Float32Array(_windVisAB); const _windVisU=new Uint32Array(_windVisAB);
@@ -2489,7 +2420,6 @@ function frame(ts) {
     writeBlitUB();
     writeContamUB();
     writeAgentShadowUB();
-    writeFlockUB();
 
     const enc = device.createCommandEncoder();
 
@@ -2518,21 +2448,6 @@ function frame(ts) {
                 [golW, golH, 1],
             );
         }
-    }
-
-    // Flock field pass: splat each agent's velocity into the low-res field that the
-    // compute shader reads next (alignment / cohesion / separation). Toggle-gated.
-    if (params.flockEnabled && flockBG && flockFieldView) {
-        const fp = enc.beginRenderPass({
-            colorAttachments: [{
-                view: flockFieldView,
-                loadOp: 'clear', clearValue: { r: 0, g: 0, b: 0, a: 0 }, storeOp: 'store',
-            }],
-        });
-        fp.setPipeline(flockPipe);
-        fp.setBindGroup(0, flockBG);
-        fp.draw(params.agentCount * 6);
-        fp.end();
     }
 
     // Compute: move all particles

@@ -160,6 +160,15 @@ The first palette colour. Each particle is assigned a colour by its index (`agen
 
 The second palette colour. Odd-index particles take this colour, even-index particles take `color1`.
 
+### Game of Life
+
+A Conway cellular automaton runs on a coarse grid. When `golEnabled` is on (default), free particles are pulled toward the live cells, so the swarm gathers on and follows the evolving patterns.
+
+- **`golEnabled`** — mode on/off.
+- **`golStrength`** (0–2) — attraction strength toward live cells.
+- **`golStepInterval`** (frames) — frames between generations; higher is slower.
+- **`golSpark`** (0–0.1) — random births injected each generation so the automaton never freezes into still lifes and oscillators. `0` is pure Conway.
+
 ### brightness
 **Range:** 0.01 – 0.5 | **Default:** 0.08
 

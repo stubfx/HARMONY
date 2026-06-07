@@ -139,6 +139,10 @@ Any key matching a property in the `params` object is written directly and takes
 | `brightness` | `0.06` | `0 – 1` | Per-particle alpha for free agents. Prevents additive over-saturation. |
 | `trailDecay` | `0.04` | `0 – 1` | Fade rate of the trail texture per frame. Higher = shorter trails. |
 | `bgBlackCutoff` | `0.05` | `0 – 1` | Luminance below which trail pixels are clamped to black at display time. |
+| `golEnabled` | `true` | bool | Game of Life mode on/off. When on, free particles are attracted toward the live cells of a Conway automaton running on a grid. |
+| `golStrength` | `0.5` | `0 – 2` | How strongly particles are pulled toward live cells. |
+| `golStepInterval` | `4` | frames | Frames between Game-of-Life generations. Higher = slower evolution. |
+| `golSpark` | `0.001` | `0 – 0.1` | Random births injected each generation so the automaton never freezes into still lifes (0 = pure Conway). |
 
 ### Magnet image
 
