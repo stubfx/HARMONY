@@ -34,10 +34,10 @@ fn aliveAt(c: vec2<i32>, dims: vec2<i32>) -> i32 {
     n += aliveAt(c + vec2<i32>( 0,  1), dims);
     n += aliveAt(c + vec2<i32>( 1,  1), dims);
 
-    let self = aliveAt(c, dims);
+    let cur = aliveAt(c, dims);
     // Survive with 2 or 3 live neighbours; a dead cell is born with exactly 3.
     var next = 0.0;
-    if (self == 1 && (n == 2 || n == 3)) { next = 1.0; }
-    if (self == 0 && n == 3)             { next = 1.0; }
+    if (cur == 1 && (n == 2 || n == 3)) { next = 1.0; }
+    if (cur == 0 && n == 3)             { next = 1.0; }
     return vec4<f32>(next, next, next, 1.0);
 }
