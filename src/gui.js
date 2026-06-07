@@ -10,6 +10,7 @@ export function initGUI({
     simState,
     MAX_AGENTS,
     seedAgents,
+    seedGoL,
     setSize,
     rebuildOffscreen,
     rebuildGridTex,
@@ -69,6 +70,15 @@ export function initGUI({
     fFlock.add(params, 'flockSeparation', 0, 3,   0.01 ).name('separation');
     fFlock.add(params, 'flockRadius',     2, 80,  1    ).name('neighbour radius (px)');
     fFlock.close();
+
+    // ── Game of Life ────────────────────────────────────────────────────────────
+    // Conway automaton on a grid; particles are pulled toward the live cells.
+    const fGol = gui.addFolder('Game of Life');
+    fGol.add(params, 'golEnabled').name('enabled').onChange(v => { if (v) seedGoL(); });
+    fGol.add(params, 'golStrength',     0, 2,  0.01).name('attraction');
+    fGol.add(params, 'golStepInterval', 1, 30, 1   ).name('frames / step');
+    fGol.add({ reseed: () => seedGoL() }, 'reseed').name('reseed');
+    fGol.close();
 
     // ── Wind ──────────────────────────────────────────────────────────────────
     const fWind = gui.addFolder('Wind');

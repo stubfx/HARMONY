@@ -103,6 +103,8 @@ struct SoloParams {
     flockCohesion:        f32,   // cohesion strength (steer toward denser neighbourhood)
     flockSeparation:      f32,   // separation strength (steer away from crowding)
     flockRadius:          f32,   // gradient sample offset in canvas pixels
+    golEnabled:           u32,   // 1 = particles are attracted to Game-of-Life live cells
+    golStrength:          f32,   // attraction strength toward live cells
 }
 
 // Per-spectator partition data — color, joystick spawner position, personal wind.
@@ -156,6 +158,7 @@ struct ContamParams {
 @group(0) @binding(5) var                      shadowDensityTex: texture_2d<f32>;
 @group(0) @binding(6) var<storage, read>       spectatorSlots:   array<SpectatorSlot, 16>;
 @group(0) @binding(7) var                      flockFieldTex:    texture_2d<f32>;
+@group(0) @binding(8) var                      golTex:           texture_2d<f32>;
 
 const PI:     f32 = 3.14159265358979;
 const TWO_PI: f32 = 6.28318530717959;
@@ -234,6 +237,14 @@ fn flockFieldAt(canvasPx: vec2<f32>) -> vec4<f32> {
     let tx   = u32(clamp(canvasPx.x / params.canvasW, 0.0, 1.0) * f32(dims.x - 1u));
     let ty   = u32(clamp(canvasPx.y / params.canvasH, 0.0, 1.0) * f32(dims.y - 1u));
     return textureLoad(flockFieldTex, vec2<u32>(tx, ty), 0u);
+}
+
+// Sample the Game-of-Life grid at a canvas-pixel position. Returns 1 = live, 0 = dead.
+fn golAliveAt(canvasPx: vec2<f32>) -> f32 {
+    let dims = textureDimensions(golTex, 0u);
+    let tx   = u32(clamp(canvasPx.x / params.canvasW, 0.0, 1.0) * f32(dims.x - 1u));
+    let ty   = u32(clamp(canvasPx.y / params.canvasH, 0.0, 1.0) * f32(dims.y - 1u));
+    return textureLoad(golTex, vec2<u32>(tx, ty), 0u).r;
 }
 
 // Returns true when pt falls inside any active contamination circle.
@@ -368,6 +379,22 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                 let coh   =  g * params.flockCohesion;
                 let sep   = -g * params.flockSeparation * crowd;
                 vel += (coh + sep) * params.maxSpeed * params.dt * 60.0;
+            }
+        }
+
+        // ── Game of Life attraction ────────────────────────────────────────────
+        // Steer up the gradient of the live-cell grid, so the swarm gathers on and
+        // follows the evolving Game-of-Life patterns.
+        if (params.golEnabled != 0u) {
+            let cellW = params.canvasW / f32(textureDimensions(golTex, 0u).x);
+            let e2    = max(cellW, 1.0);
+            let aR    = golAliveAt(pos + vec2<f32>( e2, 0.0));
+            let aL    = golAliveAt(pos + vec2<f32>(-e2, 0.0));
+            let aD    = golAliveAt(pos + vec2<f32>(0.0,  e2));
+            let aU    = golAliveAt(pos + vec2<f32>(0.0, -e2));
+            let gg    = vec2<f32>(aR - aL, aD - aU);
+            if (length(gg) > 0.0001) {
+                vel += normalize(gg) * params.golStrength * params.maxSpeed * params.dt * 60.0;
             }
         }
 

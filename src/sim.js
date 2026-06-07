@@ -19,12 +19,15 @@ import windVisWGSL      from './shaders/wind-vis.wgsl?raw';
 import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
 import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
 import flockWGSL        from './shaders/flock.wgsl?raw';
+import golStepWGSL      from './shaders/gol-step.wgsl?raw';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const MAX_AGENTS = 5_000_000;
 // Flock velocity/density field is rendered at this fraction of canvas resolution
 // (lower = cheaper + smoother neighbourhood averaging).
 const FLOCK_FIELD_SCALE = 0.25;
+// Game of Life grid width in cells (height derived from canvas aspect).
+const GOL_W = 192;
 
 // ── Tunable parameters (mutated by lil-gui) ───────────────────────────────────
 const params = {
@@ -87,6 +90,10 @@ const params = {
     flockCohesion:   0.4,  // cohesion: steer toward denser neighbourhood
     flockSeparation: 0.8,  // separation: steer away from crowding
     flockRadius:     24,   // neighbourhood / gradient sample radius in canvas pixels
+    // Game of Life mode — experimental, toggle
+    golEnabled:      false,
+    golStrength:     0.5,  // attraction of particles toward live cells
+    golStepInterval: 4,    // frames between Game-of-Life generations (higher = slower)
     // Homing behaviour
     homingChance:    0.2, // per-frame probability [0–1] that a newly-eligible agent commits to homing
     homingInfluence: 1.0, // max homing blend weight at dist=0; falls to 0 at dist=canvasW
@@ -321,7 +328,7 @@ const agentBuf = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 const soloUB = device.createBuffer({
-    size: 208, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 224, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
     size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -578,6 +585,16 @@ const flockPipe = device.createRenderPipeline({
 });
 let flockBG = null;
 
+// Game of Life: a Conway automaton on a small grid; particles are attracted to live cells.
+const golStepMod  = device.createShaderModule({ code: golStepWGSL });
+const golStepPipe = device.createRenderPipeline({
+    layout: 'auto',
+    vertex:   { module: golStepMod, entryPoint: 'vs' },
+    fragment: { module: golStepMod, entryPoint: 'fs', targets: [{ format: 'rgba8unorm' }] },
+    primitive: { topology: 'triangle-list' },
+});
+let golStepBG = null;
+
 // Image debug: centered 1/4-screen quad, 50% opacity grayscale
 const imageDebugMod = device.createShaderModule({ code: imageDebugWGSL });
 const imageDebugPipe = device.createRenderPipeline({
@@ -605,6 +622,13 @@ let shadowDensityTex   = null;
 let shadowDensityView  = null;
 let flockFieldTex      = null;
 let flockFieldView     = null;
+let golStateTex        = null;
+let golStateView       = null;
+let golScratchTex      = null;
+let golScratchView     = null;
+let golW               = 1;
+let golH               = 1;
+let golTick            = 0;
 
 // Pixel-grid mode resources — rebuilt on canvas resize or grid-cell-count change.
 let gridTex      = null;
@@ -673,6 +697,25 @@ function rebuildOffscreen() {
         usage:  GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     });
     flockFieldView = flockFieldTex.createView();
+
+    golW = GOL_W;
+    golH = Math.max(1, Math.round(GOL_W * canvas.height / canvas.width));
+    if (golStateTex)   golStateTex.destroy();
+    if (golScratchTex) golScratchTex.destroy();
+    golStateTex = device.createTexture({
+        size:   [golW, golH],
+        format: 'rgba8unorm',
+        usage:  GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    golScratchTex = device.createTexture({
+        size:   [golW, golH],
+        format: 'rgba8unorm',
+        usage:  GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+    });
+    golStateView   = golStateTex.createView();
+    golScratchView = golScratchTex.createView();
+    seedGoL();
+    rebuildGolBG();
 
     blitBG = device.createBindGroup({
         layout: blitPipe.getBindGroupLayout(0),
@@ -796,6 +839,36 @@ function rebuildFlockBG() {
             { binding: 1, resource: { buffer: agentBuf } },
         ],
     });
+}
+
+function rebuildGolBG() {
+    if (!golStateView) return;
+    golStepBG = device.createBindGroup({
+        layout: golStepPipe.getBindGroupLayout(0),
+        entries: [
+            { binding: 0, resource: golStateView },
+        ],
+    });
+}
+
+// Seed the Game-of-Life grid with a random live/dead pattern.
+function seedGoL() {
+    if (!golStateTex) return;
+    const cells = golW * golH;
+    const d = new Uint8Array(cells * 4);
+    for (let i = 0; i < cells; i++) {
+        const alive = Math.random() < 0.22 ? 255 : 0;
+        d[i * 4]     = alive;
+        d[i * 4 + 1] = alive;
+        d[i * 4 + 2] = alive;
+        d[i * 4 + 3] = 255;
+    }
+    device.queue.writeTexture(
+        { texture: golStateTex },
+        d,
+        { offset: 0, bytesPerRow: golW * 4, rowsPerImage: golH },
+        [golW, golH, 1],
+    );
 }
 
 // ── QR overlay + avoid map ────────────────────────────────────────────────────
@@ -1182,6 +1255,7 @@ function rebuildSimBG() {
             { binding: 5, resource: shadowDensityRes },
             { binding: 6, resource: { buffer: spectatorSlotsBuf } },
             { binding: 7, resource: flockFieldView ?? placeholderTexView },
+            { binding: 8, resource: golStateView ?? placeholderTexView },
         ],
     });
 }
@@ -1781,7 +1855,7 @@ function applySimParams(data) {
     applyGUIVisibility, toggleGUI, updateGizmo,
 } = initGUI({
     params, socket, simState, MAX_AGENTS,
-    seedAgents, setSize, rebuildOffscreen, rebuildGridTex,
+    seedAgents, seedGoL, setSize, rebuildOffscreen, rebuildGridTex,
     renderTraceCanvas, generateQR,
     clearMagnetImage, clearTraceText, clearAvoidMap,
     restartHeartbeat,
@@ -2086,6 +2160,8 @@ function writeSoloUB(dt, time) {
     f[48] = params.flockCohesion;
     f[49] = params.flockSeparation;
     f[50] = params.flockRadius;
+    u[51] = params.golEnabled ? 1 : 0;
+    f[52] = params.golStrength;
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
@@ -2254,7 +2330,7 @@ function writeContamUB() {
 }
 
 // ── Pre-allocated uniform buffers (reused every frame to avoid GC pressure) ──
-const _soloAB  = new ArrayBuffer(208); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
+const _soloAB  = new ArrayBuffer(224); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
 const _renderAB= new ArrayBuffer(144); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
 const _fadeAB  = new ArrayBuffer(16);  const _fadeF  = new Float32Array(_fadeAB);
 const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB); const _blitU  = new Uint32Array(_blitAB);
@@ -2418,6 +2494,30 @@ function frame(ts) {
     writeFlockUB();
 
     const enc = device.createCommandEncoder();
+
+    // Game of Life step: advance the automaton every golStepInterval frames, then copy
+    // the new generation back over the state texture that the compute pass reads.
+    if (params.golEnabled && golStepBG && golScratchView && golStateTex) {
+        golTick++;
+        const interval = Math.max(1, params.golStepInterval | 0);
+        if (golTick % interval === 0) {
+            const gp = enc.beginRenderPass({
+                colorAttachments: [{
+                    view: golScratchView,
+                    loadOp: 'clear', clearValue: { r: 0, g: 0, b: 0, a: 1 }, storeOp: 'store',
+                }],
+            });
+            gp.setPipeline(golStepPipe);
+            gp.setBindGroup(0, golStepBG);
+            gp.draw(3);
+            gp.end();
+            enc.copyTextureToTexture(
+                { texture: golScratchTex },
+                { texture: golStateTex },
+                [golW, golH, 1],
+            );
+        }
+    }
 
     // Flock field pass: splat each agent's velocity into the low-res field that the
     // compute shader reads next (alignment / cohesion / separation). Toggle-gated.
