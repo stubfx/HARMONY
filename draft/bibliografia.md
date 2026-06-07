@@ -62,6 +62,8 @@ Woolfson, Adrian. *Life Without Genes*. Flamingo, 2000.
 
 Adamatzky, Andrew. "Physarum Machines: Computers from Slime Mould." *World Scientific Series on Nonlinear Science*, vol. 74, 2010.
 
+Gardner, Martin. "Mathematical Games: The Fantastic Combinations of John Conway's New Solitaire Game 'Life'." *Scientific American*, vol. 223, n. 4, 1970, pp. 120–123. (L'articolo che introdusse il Game of Life di Conway.)
+
 Reynolds, Craig W. "Flocks, Herds and Schools: A Distributed Behavioral Model." *SIGGRAPH Computer Graphics*, vol. 21, n. 4, 1987, pp. 25–34.
 
 Tero, Atsushi, et al. "Rules for Biologically Inspired Adaptive Network Design." *Science*, vol. 327, n. 5964, 2010, pp. 439–442. (Lo studio sul Physarum polycephalum e le reti ferroviarie.)

@@ -173,6 +173,11 @@ Fonti: [Britannica, *4′33″ by Cage*](https://www.britannica.com/topic/433-by
 
 ---
 
+### Conway, John / Game of Life — VERIFICA MANUALE
+Aggiunto in cap2 sezione 2.3 come analogia dell'emergenza (automa cellulare di John Conway, 1970). Il riferimento standard è l'articolo divulgativo che lo introdusse: Gardner, Martin, "Mathematical Games: The Fantastic Combinations of John Conway's New Solitaire Game 'Life'", *Scientific American* 223:4, ottobre 1970, pp. 120–123. **Da verificare** i numeri di pagina esatti sulla copia o scansione dell'articolo. Nel testo della tesi è una parafrasi attribuita, senza citazione testuale tra virgolette. Voce aggiunta a `bibliografia.md` (sezione "Sciame, emergenza e intelligenza collettiva").
+
+---
+
 ### Eco, Umberto — *Opera aperta* — VERIFICATO
 Confermato: prima edizione **Bompiani, Milano, 1962**, collana "Portico — critica e saggi" n. 38. Seconda edizione (rivista e ampliata): Bompiani, 1967 (collana "Delfini cultura"). Terza edizione (ristampa): Bompiani, 1971 (collana "I satelliti"). Quarta edizione (riveduta, tascabile): Bompiani, 1976 (collana "Tascabili Bompiani"), che aggiunge in appendice il saggio *Generazione di messaggi estetici in una lingua edenica*. Traduzione inglese: *The Open Work*, Harvard University Press, 1989, introduzione di David Robey.
 
