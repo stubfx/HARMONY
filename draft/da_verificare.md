@@ -176,7 +176,7 @@ Fonti: [Britannica, *4′33″ by Cage*](https://www.britannica.com/topic/433-by
 ### Eco, Umberto — *Opera aperta* — VERIFICATO
 Confermato: prima edizione **Bompiani, Milano, 1962**, collana "Portico — critica e saggi" n. 38. Seconda edizione (rivista e ampliata): Bompiani, 1967 (collana "Delfini cultura"). Terza edizione (ristampa): Bompiani, 1971 (collana "I satelliti"). Quarta edizione (riveduta, tascabile): Bompiani, 1976 (collana "Tascabili Bompiani"), che aggiunge in appendice il saggio *Generazione di messaggi estetici in una lingua edenica*. Traduzione inglese: *The Open Work*, Harvard University Press, 1989, introduzione di David Robey.
 
-**Azione**: in cap4 il riferimento a "1962" è corretto. Aggiungere voce completa a `bibliografia.md` (al momento assente).
+**Azione**: COMPLETATA. Riferimento reintegrato in cap4 sezione 4.3 come parafrasi attribuita (Umberto Eco, *opera aperta*, 1962), senza citazione testuale tra virgolette, quindi nessun rischio di citazione inventata. Voce completa aggiunta a `bibliografia.md` (sezione "Arte interattiva e partecipativa").
 
 Fonti: [IRIS, Università di Bologna](https://cris.unibo.it/handle/11585/960730); [PhilPapers, Opera aperta](https://philpapers.org/rec/ECOOAG); [Harvard University Press, *The Open Work*](https://www.hup.harvard.edu/catalog.php?isbn=9780674639768); [Libreria Pontremoli, descrizione bibliografica 1ª ed.](https://www.libreriapontremoli.it/filemanager/libri/opera-aperta-forma-e-indeterminazione-nelle-poetiche-contemporanee.php).
 

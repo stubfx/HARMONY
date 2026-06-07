@@ -12,6 +12,8 @@ Bourriaud, Nicolas. *Estetica relazionale*. Postmedia Books, 2010. (ed. orig. *E
 
 Dixon, Steve. *Digital Performance: A History of New Media in Theater, Dance, Performance Art, and Installation*. MIT Press, 2007.
 
+Eco, Umberto. *Opera aperta. Forma e indeterminazione nelle poetiche contemporanee*. Bompiani, Milano, 1962.
+
 Grau, Oliver. *Virtual Art: From Illusion to Immersion*. MIT Press, 2003.
 
 Kwastek, Katja. *Aesthetics of Interaction in Digital Art*. MIT Press, 2013.
