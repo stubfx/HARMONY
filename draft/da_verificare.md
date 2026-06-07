@@ -12,6 +12,8 @@ Legenda stato:
 
 ## Citazioni dirette
 
+> **Aggiornamento (riscrittura dei capitoli).** Nella riscrittura tutte le citazioni dirette tra caporali non verificate sono state **rimosse o convertite in parafrasi attribuite senza virgolette**: la frase di Reynolds (cap2), quella di Tero sul Physarum (cap2), la frase attribuita ad Aristotele (cap2, ora resa come concetto di emergenza senza attribuzione), la frase di Rubin (cap8). I name-drop accademici non essenziali sono stati tolti dal cap2 (Cavagna, Tero, Steven Johnson), tenendo i fenomeni a parole proprie; come ispirazione restano nominati solo Reynolds/Boids e Conway/Game of Life. Le correzioni di contenuto sono state applicate (storni: in media sei-sette vicini; formiche: termoregolazione solo in alcune specie). Le voci qui sotto restano per memoria.
+
 ### Reynolds, Craig W. (1987) — VERIFICA MANUALE
 La frase «the lifelike quality of self-organization», attribuita a Reynolds nel testo di cap2 sezione 2.3, **non risulta presente nel paper originale** *Flocks, Herds and Schools: A Distributed Behavioral Model* (SIGGRAPH '87, Computer Graphics 21:4, pp. 25–34). La parola "self-organization" non compare in nessun estratto testuale del paper consultato. Tre formulazioni autentiche di Reynolds, attestate sul suo sito e nelle versioni archiviate del paper:
 

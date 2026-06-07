@@ -24,11 +24,11 @@
 - **1.1 — Dalla contemplazione alla partecipazione**
   Il momento storico in cui l'arte ha cominciato a chiedere qualcosa al pubblico. L'arte cinetica, gli ambienti partecipativi degli anni Sessanta e Settanta. Il visitatore che diventa parte dell'opera.
 
-- **1.2 — La macchina come interlocutore**
-  Quando il sistema tecnologico smette di essere sfondo e diventa presenza attiva. Riferimenti: David Rokeby e *Very Nervous System*, Rafael Lozano-Hemmer e le sue installazioni di presenza. La macchina che ascolta, che risponde, che ricorda.
+- **1.2 — La macchina come presenza**
+  La differenza tra una macchina che reagisce, e resta ferma finché non la si attiva, e una macchina che è già viva e in movimento prima che arrivi qualcuno. È in questa seconda famiglia che il progetto si riconosce.
 
 - **1.3 — Il collettivo come materiale**
-  Opere che esistono solo grazie alla partecipazione di molti. TeamLab, Random International, *Rain Room*. La differenza tra un'opera che tollera il pubblico e un'opera che ha bisogno di lui per esistere.
+  Opere che esistono solo grazie alla presenza di molti. La forma emergente che nessuno ha disegnato e che appare solo quando il gruppo è grande, dove le persone restano distinte invece di sciogliersi nell'ambiente.
 
 - **1.4 — Il mistero come scelta estetica**
   Opere in cui non capire subito è parte dell'esperienza. Il senso di scoperta, l'interfaccia che non si spiega. Perché la chiarezza non è sempre una virtù.
@@ -45,7 +45,7 @@
   Come dalla semplicità nasce la complessità. Il concetto di agente autonomo: nessuno vede il quadro intero, eppure il quadro intero esiste. Il paradosso dell'intelligenza distribuita.
 
 - **2.3 — Dallo sciame biologico a quello digitale**
-  Come questi principi sono stati tradotti in algoritmi. Craig Reynolds e i Boids. Il Physarum come modello computazionale. La simulazione come modo di studiare e replicare comportamenti emergenti.
+  Come questi principi diventano algoritmi. I Boids di Craig Reynolds e il Game of Life di Conway, i due sistemi autonomi da cui il progetto ha preso spunto. La simulazione come modo di studiare e replicare comportamenti emergenti.
 
 - **2.4 — Lo sciame come metafora**
   Cosa significa usare lo sciame per parlare di persone. Il corpo sociale, la folla, il pubblico. Il senso di appartenenza a un movimento che nessuno ha deciso ma tutti hanno contribuito a creare.
@@ -101,31 +101,19 @@
 - **5.3 — Il suono**
   Il microfono come senso aggiuntivo. Il volume della stanza che modifica la luminosità delle particelle. Un sistema che ascolta anche quando nessuno sta parlando direttamente con lui.
 
-- **5.4 — La narrativa automatica**
-  Come una storia può essere generata in tempo reale e consegnata al sistema pezzo per pezzo. Il testo come attrazione fisica: le parole che le particelle abitano. L'immagine come territorio.
-
 ---
 
 ### 6. Le modalità dell'esperienza
-*Il sistema non è sempre uguale a se stesso. Questo capitolo descrive i suoi stati, che sono anche stati emotivi dell'installazione.*
+*Il comportamento dello sciame è continuo, senza confini netti tra una fase e l'altra. Dentro questa continuità, il sistema apre ogni tanto al pubblico dei momenti di partecipazione esplicita.*
 
-- **6.1 — DOT: raccoglimento**
-  Le particelle convergono verso il centro. Il sistema si contrae, aspetta. Una pausa prima di qualcosa.
+- **6.1 — Una domanda al pubblico**
+  Il voto. Due opzioni, nessuna risposta giusta. Una decisione collettiva che orienta una variazione dentro una storia che procede comunque.
 
-- **6.2 — FREEROAM: deriva**
-  Nessuna direzione imposta. Le particelle seguono solo la fisica e il caso. Il sistema respira da solo.
+- **6.2 — Un gesto che diventa territorio**
+  Il disegno. Una forma tracciata da una persona diventa un campo di attrazione che le particelle di tutti abitano. Un segno individuale che orienta il collettivo.
 
-- **6.3 — NORMAL: dialogo**
-  Formule matematiche invisibili guidano il flusso. Il sistema è in relazione con qualcosa, anche se non si vede con cosa.
-
-- **6.4 — Il voto**
-  Il momento in cui il gruppo decide. Due opzioni, nessuna risposta giusta. Una variazione dentro una struttura narrativa che procede comunque. La democrazia come meccanismo estetico.
-
-- **6.5 — Il disegno**
-  Lasciare una traccia che gli altri seguono. Il gesto individuale che diventa orientamento collettivo. Cosa rimane dopo che la mano si è alzata.
-
-- **6.6 — La parola scritta**
-  Quando il pubblico può digitare. La parola individuale che lo sciame abita e che diventa luce condivisa. L'anonimato che, per un attimo, ha una crepa.
+- **6.3 — La parola che si fa luce**
+  Le parole proposte dal sistema e quelle digitate dal pubblico. Lo sciame le abita e le riempie di luce. L'anonimato che, per un attimo, ha una crepa.
 
 ---
 
@@ -198,6 +186,7 @@
 
 - L'opera come domanda rimasta aperta
 - La tecnologia che sparisce, l'esperienza che resta
+- *Anche questo è stato un dialogo*: l'intelligenza artificiale come materia dell'opera e come strumento di lavoro, e la direzione che resta umana
 - Una nota personale sul perché questo progetto
 
 ---
