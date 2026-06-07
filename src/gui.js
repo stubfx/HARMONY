@@ -59,6 +59,8 @@ export function initGUI({
     fMotion.add(params, 'useDeltaTime').name('delta time');
     fMotion.add(params, 'dotCenterRadius',  0, 500,  1    ).name('DOT center radius (px)');
     fMotion.add(params, 'dotRespawnChance', 0,   1,  0.005).name('DOT respawn chance');
+    fMotion.add(params, 'freeroamLock').name('freeroam lock');
+    fMotion.add(params, 'freeroamLockDelay', 1, 60, 1).name('freeroam lock (s)');
 
     // ── Game of Life ────────────────────────────────────────────────────────────
     // Conway automaton on a grid; particles are pulled toward the live cells.

@@ -67,7 +67,7 @@ const params = {
     // Trace canvas
     traceScale:   0.5,   // trace canvas resolution relative to main canvas (perf control)
     // QR placement on trace canvas
-    qrSize:       0.5,    // QR size as fraction of min(traceW, traceH)
+    qrSize:       0.25,   // QR size as fraction of min(traceW, traceH)
     qrMargin:     0.02,  // uniform margin from the aligned edge, as fraction of min(traceW, traceH)
     qrAlignX:     'center', // 'left' | 'center' | 'right'
     qrAlignY:     'center', // 'top'  | 'center' | 'bottom'
@@ -81,7 +81,7 @@ const params = {
     agentShadowStr:    0.20, // peak opacity of each homing-agent shadow splat (0–1)
     agentShadowRadius: 10,   // splat half-radius in canvas pixels
     // Game of Life mode — toggle
-    golEnabled:      true,
+    golEnabled:      false,
     golStrength:     0.5,  // attraction of particles toward live cells
     golStepInterval: 4,    // frames between Game-of-Life generations (higher = slower)
     golSpark:        0.001, // random life injection per generation (0 = pure Conway; prevents freezing)
@@ -111,6 +111,9 @@ const params = {
     // DOT mode
     dotCenterRadius:     50,   // px — agents within this radius of centre are candidates for respawn (0 = disabled)
     dotRespawnChance:    0.01, // per-frame probability that a centre-zone agent is respawned to an edge
+    // Freeroam lock — when on, FREEROAM auto-reverts to NORMAL after a delay
+    freeroamLock:        false,
+    freeroamLockDelay:   10,   // seconds in FREEROAM before reverting to NORMAL (timer resets each time FREEROAM is re-entered)
     // Spectator partitioning
     spectatorAgentShare:       35,   // % of agents assigned to spectators (0 = sim only, 100 = full user control)
     spectatorSpawnChance:      0.01, // base per-frame spawn probability (scaled by user count × multiplier)
@@ -1296,6 +1299,30 @@ function updateStateDisplay() {
     qrStateCtrl?.updateDisplay();
 }
 
+let freeroamTimer = null;
+
+// Freeroam lock: when enabled, entering FREEROAM starts a timer that reverts the
+// status to NORMAL after freeroamLockDelay seconds. Re-entering FREEROAM resets it.
+function armFreeroamLock() {
+    clearTimeout(freeroamTimer);
+    freeroamTimer = null;
+    if (simState.status === 'FREEROAM' && params.freeroamLock) {
+        freeroamTimer = setTimeout(() => {
+            freeroamTimer = null;
+            if (params.freeroamLock && simState.status === 'FREEROAM') setStatus('NORMAL');
+        }, Math.max(0, params.freeroamLockDelay) * 1000);
+    }
+}
+
+// Single entry point for status changes (GUI dropdown and n8n API both route here),
+// so the freeroam lock timer is armed/reset wherever FREEROAM is (re)entered.
+function setStatus(newStatus) {
+    simState.status = newStatus;
+    if (newStatus === 'DOT') applyFormulas(DOT_DIR, DOT_WIND);
+    armFreeroamLock();
+    updateStateDisplay();
+}
+
 let qrBitmap           = null;  // permanent reference to the session QR bitmap
 let sessionRoom        = null;  // UUID assigned by server — needed for n8n payload
 let sessionUrl         = null;  // full remote URL — kept so QR can be regenerated on param change
@@ -1730,9 +1757,7 @@ function applySimParams(data) {
         updateStateDisplay();
     }
     if (status === 'NORMAL' || status === 'FREEROAM' || status === 'DOT') {
-        simState.status = status;
-        if (status === 'DOT') applyFormulas(DOT_DIR, DOT_WIND);
-        updateStateDisplay();
+        setStatus(status);
     }
     if (restart)              seedAgents();
     if (avoidMap === null)    clearAvoidMap();
@@ -1811,7 +1836,7 @@ function applySimParams(data) {
     restartHeartbeat,
 }));
 
-stateCtrl.onChange(v => { if (v === 'DOT') applyFormulas(DOT_DIR, DOT_WIND); });
+stateCtrl.onChange(v => setStatus(v));
 qrStateCtrl.onChange(() => { updateStateDisplay(); renderTraceCanvas(); });
 
 window.addEventListener('keydown', e => {

@@ -162,12 +162,16 @@ The second palette colour. Odd-index particles take this colour, even-index part
 
 ### Game of Life
 
-A Conway cellular automaton runs on a coarse grid. When `golEnabled` is on (default), free particles are pulled toward the live cells, so the swarm gathers on and follows the evolving patterns.
+A Conway cellular automaton runs on a coarse grid. When `golEnabled` is on (it is off by default), free particles are pulled toward the live cells, so the swarm gathers on and follows the evolving patterns.
 
 - **`golEnabled`** — mode on/off.
 - **`golStrength`** (0–2) — attraction strength toward live cells.
 - **`golStepInterval`** (frames) — frames between generations; higher is slower.
 - **`golSpark`** (0–0.1) — random births injected each generation so the automaton never freezes into still lifes and oscillators. `0` is pure Conway.
+
+### Freeroam lock
+
+When `freeroamLock` is on, entering FREEROAM starts a timer, and after `freeroamLockDelay` seconds (default 10) the status reverts automatically to NORMAL. Re-entering FREEROAM, whether from the GUI or the n8n API, resets the timer. Off by default.
 
 ### brightness
 **Range:** 0.01 – 0.5 | **Default:** 0.08
