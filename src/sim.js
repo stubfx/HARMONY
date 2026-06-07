@@ -32,7 +32,7 @@ const GOL_W = 192;
 // ── Tunable parameters (mutated by lil-gui) ───────────────────────────────────
 const params = {
     // Agents
-    agentCount:  100_000,
+    agentCount:  2_000_000,
     // Motion
     stepLen:     2.0,
     turnRate:    0.04,
@@ -51,7 +51,7 @@ const params = {
     color1:      '#00ff00',   // first palette colour
     color2:      '#0000ff',   // second palette colour (assigned by agent index % 2)
     brightness:  0.06,        // per-particle alpha; prevents additive saturation to white
-    additiveBlend: false,     // true = additive (glow, accumulates); false = max blend (no over-brightness)
+    additiveBlend: true,      // true = additive (glow, accumulates); false = max blend (no over-brightness)
     blendAmount:   1.0,       // 0–1 multiplier on per-particle fragment output; lowers contribution in both blend modes
     toneBlack:   0.0,         // input level mapped to black (lifts lone-particle visibility)
     toneWhite:   1.0,         // input level mapped to white (HDR saturation point)
