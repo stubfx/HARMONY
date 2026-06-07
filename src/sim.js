@@ -183,9 +183,8 @@ const IDLE_WIND = 'atan2(y - cy, x - cx) + sin(length(vec2(x-cx,y-cy)) * 0.008) 
 const DOT_DIR  = 'atan2(cy - y, cx - x) + sin(t * 1.4 + length(vec2(x-cx,y-cy)) * 0.012) * PI * 0.38';
 const DOT_WIND = 'atan2(cy - y, cx - x) + PI * 0.46 + sin(t * 0.65 + length(vec2(x-cx,y-cy)) * 0.007) * 0.6';
 
-// 20 direction formulas cycled automatically when params.autoDir is true.
-// Variables: x, y, t, cx, cy, PI, TWO_PI
-const DIR_FORMULAS = [
+// Base direction formulas. Variables: x, y, t, cx, cy, PI, TWO_PI
+const BASE_DIR_FORMULAS = [
     'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI',
     'atan2(y - cy, x - cx) + t * 0.3',
     'atan2(y - cy, x - cx) - t * 0.4',
@@ -206,6 +205,38 @@ const DIR_FORMULAS = [
     'sin(length(vec2(x-cx,y-cy)) * 0.015 - t * 2.5) * TWO_PI',
     'atan2(y - cy, x - cx) * 2.0 + t * 0.2',
     'sin(x * 0.003 + y * 0.002 + t * 0.15) * TWO_PI',
+];
+
+// Line / cell / grid heading patterns — the family we want to favour (like 'cells').
+// Folded into the auto-cycle pool several times below so it lands on these far more often.
+const LINE_CELL_DIR = [
+    // cells / grids — product of the two axes
+    'sin(x * 0.006) * cos(y * 0.006) * TWO_PI',
+    'sin(x * 0.010) * cos(y * 0.010) * TWO_PI',
+    'sin(x * 0.004) * cos(y * 0.004) * TWO_PI',
+    'cos(x * 0.007) * sin(y * 0.007) * TWO_PI',
+    '(sin(x * 0.006) + cos(y * 0.006)) * PI',
+    'sin(x * 0.012) * cos(y * 0.012) * PI',
+    'sin(x * 0.008 + t * 0.2) * cos(y * 0.008 - t * 0.2) * TWO_PI',
+    // lines / bands — single axis
+    'sin(x * 0.006) * PI',
+    'sin(y * 0.006) * PI',
+    'cos(x * 0.008) * PI',
+    'sin(x * 0.010 + t * 0.3) * PI',
+    'sin(y * 0.008 - t * 0.2) * PI',
+    // diagonal lines
+    'sin((x + y) * 0.005) * TWO_PI',
+    'sin((x - y) * 0.005) * TWO_PI',
+    'sin((x + y) * 0.008 + t * 0.25) * TWO_PI',
+];
+
+// Auto-cycle pool: base set + the line/cell family repeated, so a line- or
+// cell-like pattern is much more likely to be picked.
+const DIR_FORMULAS = [
+    ...BASE_DIR_FORMULAS,
+    ...LINE_CELL_DIR,
+    ...LINE_CELL_DIR,
+    ...LINE_CELL_DIR,
 ];
 
 // 20 wind formulas cycled automatically when params.autoWind is true.
@@ -240,6 +271,11 @@ const PRESETS = [
     { label: 'vortex',          dir: 'atan2(y - cy, x - cx) + PI * 0.5',                                     wind: 'atan2(y - cy, x - cx) + t + sin(x * 0.003) * 0.8' },
     { label: 'turbulence',      dir: 'sin(x * 0.009 + sin(y * 0.006 + t)) * TWO_PI',                        wind: 'sin(x * 0.005 + cos(y * 0.006 + t * 0.3)) * TWO_PI' },
     { label: 'radial pulse',    dir: 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI',   wind: 'sin(x * 0.004 - y * 0.003 + t * 0.4) * TWO_PI' },
+    { label: 'grid',            dir: 'sin(x * 0.008) * cos(y * 0.008) * TWO_PI',                            wind: 'sin(x * 0.003 + t * 0.2) * PI' },
+    { label: 'fine grid',       dir: 'sin(x * 0.012) * cos(y * 0.012) * TWO_PI',                            wind: 'cos(y * 0.004 - t * 0.2) * PI' },
+    { label: 'lines',           dir: 'sin(x * 0.006) * PI',                                                 wind: 'cos(y * 0.004 + t * 0.2) * PI' },
+    { label: 'lines (horizontal)', dir: 'sin(y * 0.006) * PI',                                              wind: 'sin(x * 0.004 - t * 0.2) * PI' },
+    { label: 'diagonal',        dir: 'sin((x + y) * 0.006) * TWO_PI',                                       wind: 'sin((x - y) * 0.004 + t * 0.2) * PI' },
 ];
 
 // ── Canvas ────────────────────────────────────────────────────────────────────
