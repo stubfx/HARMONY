@@ -48,8 +48,8 @@ const params = {
     trailDecay:     0.04,
     bgBlackCutoff:  0.05, // luminance below which trail pixels are clamped to 0 at display time
     pointSize:      1.3,
-    color:       '#00ff00',
-    speedColor:  '#0000ff',   // color approached at max speed
+    color1:      '#00ff00',   // first palette colour
+    color2:      '#0000ff',   // second palette colour (assigned by agent index % 2)
     brightness:  0.06,        // per-particle alpha; prevents additive saturation to white
     additiveBlend: false,     // true = additive (glow, accumulates); false = max blend (no over-brightness)
     blendAmount:   1.0,       // 0–1 multiplier on per-particle fragment output; lowers contribution in both blend modes
@@ -1685,7 +1685,7 @@ let socket;
         if (event.type === 'shake') {
             const slot = activeSlots.find(s => s.spectatorId === event.spectatorId);
             if (slot) {
-                const [r, g, b] = hexToF(params.color);
+                const [r, g, b] = hexToF(params.color1);
                 slot.colorR = r; slot.colorG = g; slot.colorB = b;
                 uploadSpectatorSlots();
             }
@@ -2169,35 +2169,26 @@ function writeRenderUB() {
     const ab = _renderAB;
     const u  = _renderU;
     const f  = _renderF;
-    const rgb  = hexToF(params.color);
-    const srgb = hexToF(params.speedColor);
-
-    // Collective temperature tints the fast (speed) colour by up to 65%.
-    // Cold (0) → deep blue  ·  neutral (0.5) → user speedColor  ·  warm (1) → amber
-    const COLD  = [0.05, 0.15, 0.90];
-    const WARM  = [1.00, 0.40, 0.05];
-    const tintTarget = smoothTemp < 0.5
-        ? lerpColor(COLD, srgb, smoothTemp * 2)
-        : lerpColor(srgb, WARM, (smoothTemp - 0.5) * 2);
-    const tinted = lerpColor(srgb, tintTarget, 0.65);
+    const c1 = hexToF(params.color1);
+    const c2 = hexToF(params.color2);
 
     const { x0, y0, x1, y1 } = getImageRegion();
     u[0] = params.agentCount;
     f[1] = canvas.width;
     f[2] = canvas.height;
     f[3] = params.pointSize;
-    f[4] = rgb[0];
-    f[5] = rgb[1];
-    f[6] = rgb[2];
+    f[4] = c1[0];
+    f[5] = c1[1];
+    f[6] = c1[2];
     f[7] = params.maxSpeed;
     u[8]  = hasImage ? 1 : 0;
     f[9]  = x0;
     f[10] = y0;
     f[11] = x1;
     f[12] = y1;
-    f[13] = tinted[0];
-    f[14] = tinted[1];
-    f[15] = tinted[2];
+    f[13] = c2[0];
+    f[14] = c2[1];
+    f[15] = c2[2];
     // Treat "audio not yet unlocked" as full silence so the pre/post-unlock
     // brightness step disappears — audioFloor stays exactly as tuned.
     const audioMult = params.audioFloor + (1 - params.audioFloor) * (isActive() ? getVolume() : 0);

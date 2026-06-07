@@ -134,8 +134,8 @@ Any key matching a property in the `params` object is written directly and takes
 |-----|---------|-------|-------------|
 | `renderScale` | `1.0` | `0.1 – 1.0` | Multiplied with DPR; reduces canvas resolution for performance. |
 | `pointSize` | `2.0` | px | Side length of each agent quad in canvas pixels. |
-| `color` | `"#1a0099"` | hex | Base particle colour (applied when speed = 0). |
-| `speedColor` | `"#ff4400"` | hex | Colour blended in as speed approaches `maxSpeed`. |
+| `color1` | `"#1a0099"` | hex | First palette colour. Each particle is assigned a colour by its index (`agentId % N`). |
+| `color2` | `"#ff4400"` | hex | Second palette colour. No velocity interpolation — colours are flat per particle. |
 | `brightness` | `0.06` | `0 – 1` | Per-particle alpha for free agents. Prevents additive over-saturation. |
 | `trailDecay` | `0.04` | `0 – 1` | Fade rate of the trail texture per frame. Higher = shorter trails. |
 | `bgBlackCutoff` | `0.05` | `0 – 1` | Luminance below which trail pixels are clamped to black at display time. |
@@ -204,7 +204,7 @@ The trace canvas is always full-screen (scaled by `traceScale`). QR and user con
 | `avoidMapScale` | `1.0` | `0 – 1` | Coverage of the avoid map as a fraction of the canvas. |
 | `avoidMapInvert` | `false` | bool | When `true`, the avoid map is read as `1 − r` / `vec3(1 − rgb)` at every sample site (avoidance force *and* the per-particle colour sample), flipping which areas repel and which are transparent. |
 | `avoidMapSampleColor` | `false` | bool | When `true`, non-homing particles take their base colour from the avoid-map pixel directly under them. Homing agents and active-spectator particles are unaffected. |
-| `avoidMapFixedColor` | `false` | bool | Modifier on top of `sampleColor`: when `true` the sampled pixel becomes the particle's final colour (no speed blend); when `false` it's used as the base then mixed with `speedColor` by speed. |
+| `avoidMapFixedColor` | `false` | bool | Legacy modifier on `sampleColor`. With the flat two-colour palette the sampled pixel is used directly, so this flag no longer changes the result. |
 
 ### Session / QR
 

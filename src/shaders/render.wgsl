@@ -4,18 +4,18 @@
 //   [4]   canvasW              f32
 //   [8]   canvasH              f32
 //   [12]  pointSize            f32
-//   [16]  colorR               f32
-//   [20]  colorG               f32
-//   [24]  colorB               f32
+//   [16]  color1R              f32
+//   [20]  color1G              f32
+//   [24]  color1B              f32
 //   [28]  maxSpeed             f32
 //   [32]  hasImage             u32
 //   [36]  imgX0                f32
 //   [40]  imgY0                f32
 //   [44]  imgX1                f32
 //   [48]  imgY1                f32
-//   [52]  speedColorR          f32
-//   [56]  speedColorG          f32
-//   [60]  speedColorB          f32
+//   [52]  color2R              f32
+//   [56]  color2G              f32
+//   [60]  color2B              f32
 //   [64]  brightness           f32
 //   [68]  alphaThreshold       f32
 //   [72]  blackThreshold       f32
@@ -23,7 +23,7 @@
 //   [80]  qrMode               u32   (1 = QR active)
 //   [84]  homingProximityRange f32   (canvas px over which homing agents fade in)
 //   [88]  homingMinAlpha       f32   (minimum alpha for a homing agent at max distance)
-//   [92]  spectatorCount       u32   (active spectators; 0 = use global params.color)
+//   [92]  spectatorCount       u32   (active spectators; 0 = use the global palette)
 //   [96]  additiveBlend        u32   (1 = additive; 0 = max blend with pre-multiplied alpha)
 //   [100] spectatorAgentShare  f32   (0–1 fraction of agents assigned to spectators)
 //   [104] pixelMode            u32   (1 = snap to cell-grid and draw 1-cell quads into gridTex)
@@ -42,18 +42,18 @@ struct SoloRenderParams {
     canvasW:              f32,
     canvasH:              f32,
     pointSize:            f32,
-    colorR:               f32,
-    colorG:               f32,
-    colorB:               f32,
+    color1R:              f32,
+    color1G:              f32,
+    color1B:              f32,
     maxSpeed:             f32,
     hasImage:             u32,
     imgX0:                f32,
     imgY0:                f32,
     imgX1:                f32,
     imgY1:                f32,
-    speedColorR:          f32,
-    speedColorG:          f32,
-    speedColorB:          f32,
+    color2R:              f32,
+    color2G:              f32,
+    color2B:              f32,
     brightness:           f32,
     alphaThreshold:       f32,
     blackThreshold:       f32,
@@ -181,25 +181,19 @@ fn avoidMapColorAt(canvasPx: vec2<f32>) -> vec4<f32> {
     }
     let finalNdc = ndc + corners[corner] * half * 2.0;
 
-    let speed     = length(agent.vel);
-    let t         = clamp(speed / max(params.maxSpeed, 0.001), 0.0, 1.0);
-    let baseColor = vec3f(params.colorR, params.colorG, params.colorB);
-    let spdColor  = vec3f(params.speedColorR, params.speedColorG, params.speedColorB);
+    // Two-colour palette assigned by agent index, no velocity interpolation.
+    // Conceptually colors[agentId % N]; currently two colours.
+    let color1 = vec3f(params.color1R, params.color1G, params.color1B);
+    let color2 = vec3f(params.color2R, params.color2G, params.color2B);
 
-    // Default colour = speed-blended base. Optionally replaced by an avoid-map
-    // sample for non-homing agents (homing agents are skipped — the fragment
-    // shader overrides with the trace image, and they don't react to the avoid
-    // map either so the colour wouldn't be coherent).
+    // Optionally replaced by an avoid-map sample for non-homing agents (homing
+    // agents are skipped — the fragment shader overrides with the trace image).
     let isHoming = params.hasImage != 0u && agent.primed > 0.5;
-    var defaultColor = mix(baseColor, spdColor, t);
+    var defaultColor = select(color1, color2, (agentId % 2u) == 1u);
     if (params.avoidMapSampleColor != 0u && params.hasAvoidMap != 0u && !isHoming) {
         let s = avoidMapColorAt(agent.pos);
         if (s.a > 0.5) {
-            if (params.avoidMapFixedColor != 0u) {
-                defaultColor = s.rgb;
-            } else {
-                defaultColor = mix(s.rgb, spdColor, t);
-            }
+            defaultColor = s.rgb;
         }
     }
 
@@ -228,7 +222,7 @@ fn avoidMapColorAt(canvasPx: vec2<f32>) -> vec4<f32> {
     let rawT       = 1.0 - clamp(distToHome / max(params.homingProximityRange, 1.0), 0.0, 1.0);
     let proximityT = mix(params.homingMinAlpha, 1.0, rawT);
 
-    return VsOut(vec4<f32>(finalNdc, 0.0, 1.0), color, agent.pos, t, homeUV, agent.primed, proximityT);
+    return VsOut(vec4<f32>(finalNdc, 0.0, 1.0), color, agent.pos, 0.0, homeUV, agent.primed, proximityT);
 }
 
 @fragment fn fs(in: VsOut) -> @location(0) vec4<f32> {

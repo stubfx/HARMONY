@@ -61,7 +61,7 @@ How sharply each agent steers toward the direction formula each frame. This is a
 ### max speed
 **Range:** 1 – 15 | **Default:** 5.0
 
-Hard speed cap in canvas pixels per frame (before dt scaling). Velocity is clamped to this magnitude every frame. This is also the reference value for the slow/fast color blend: an agent at `maxSpeed` renders at full fast-color intensity.
+Hard speed cap in canvas pixels per frame (before dt scaling). Velocity is clamped to this magnitude every frame.
 
 ### min speed
 **Range:** 0 – 2 | **Default:** 0.2
@@ -150,15 +150,15 @@ At the default of 0.012 the residual is invisible in practice while the fix is i
 
 The side length of each agent's rendered quad, in canvas pixels. Larger agents overlap more, producing a denser, painterly look. Smaller agents are sharp and precise.
 
-### base color
+### color 1 (`color1`)
+**Default:** `#00ff00`
+
+The first palette colour. Each particle is assigned a colour by its index (`agentId % N`, currently two colours), with no velocity interpolation.
+
+### color 2 (`color2`)
 **Default:** `#0000ff`
 
-The color of slow or stationary agents. This is the low end of the speed-to-color gradient.
-
-### fast color (`speedColor`)
-**Default:** `#ff4400`
-
-The color agents approach as their speed reaches `max speed`. The two colors are blended linearly using `speed / maxSpeed` as the interpolation factor.
+The second palette colour. Odd-index particles take this colour, even-index particles take `color1`.
 
 ### brightness
 **Range:** 0.01 – 0.5 | **Default:** 0.08

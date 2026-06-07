@@ -102,8 +102,8 @@ export function initGUI({
     fVis.add(params, 'toneGamma',     0.2,   2.0,  0.05 ).name('tone gamma');
     fVis.add(params, 'shadowBoost',   0,     8.0,  0.1  ).name('shadow boost');
     fVis.add(params, 'pointSize',     1,     6,    0.1  ).name('agent size');
-    fVis.addColor(params, 'color').name('base color');
-    fVis.addColor(params, 'speedColor').name('fast color');
+    fVis.addColor(params, 'color1').name('color 1');
+    fVis.addColor(params, 'color2').name('color 2');
     fVis.add(params, 'brightness', 0.01, 0.5, 0.005).name('brightness');
     fVis.add(params, 'additiveBlend').name('additive blend');
     fVis.add(params, 'blendAmount', 0, 1, 0.01).name('blend amount');
