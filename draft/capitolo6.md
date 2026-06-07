@@ -1,4 +1,4 @@
-# 6. Le modalità dell'esperienza
+# 6. L'esperienza
 
 Lo sciame si muove in due modi, in ascolto e per conto proprio, e quasi sempre li tiene insieme. Quando ascolta reagisce a ciò che lo tocca, dagli input di chi è connesso ai suoni della stanza, e si lascia spostare di conseguenza. Quando va per conto suo segue correnti che nessuno gli ha imposto e insiste su una direzione finché qualcosa non la interrompe. Anche allora resta influenzato da chi lo abita, perché la presenza del gruppo è sempre nel campo, e una particella che agisce di propria iniziativa lo fa comunque in un ambiente già pieno di altre intenzioni.
 

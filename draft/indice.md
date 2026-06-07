@@ -103,7 +103,7 @@
 
 ---
 
-### 6. Le modalità dell'esperienza
+### 6. L'esperienza
 *Il comportamento dello sciame è continuo, senza confini netti tra una fase e l'altra. Dentro questa continuità, il sistema apre ogni tanto al pubblico dei momenti di partecipazione esplicita.*
 
 - **6.1 — Una domanda al pubblico**
