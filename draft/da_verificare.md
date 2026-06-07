@@ -167,7 +167,7 @@ Fonti: [davidrokeby.com, *Very Nervous System*](http://www.davidrokeby.com/vns.h
 ### Cage, John — *4'33"* — VERIFICATO
 Confermato: composizione 1952; prima esecuzione **29 agosto 1952, Maverick Concert Hall, area di Woodstock, NY** (la sala si trova a Hurley/West Hurley, ma viene convenzionalmente associata a Woodstock); esecutore: **David Tudor** (pianoforte); tre movimenti, totale 4 minuti e 33 secondi. La durata dei singoli movimenti varia per edizione (manoscritto Woodstock: 30" / 2'23" / 1'40"; First Tacet Edition indica 33" / 2'40" / 1'20"). Editore della partitura: Edition Peters / Henmar Press, EP 6777.
 
-**Azione**: nessuna correzione necessaria per il testo di cap5 sezione "Il suono". Aggiungere il riferimento bibliografico (al momento assente da `bibliografia.md`): partitura *4'33"*, Edition Peters / Henmar Press, EP 6777.
+**Azione**: COMPLETATA. Nessuna correzione necessaria per il testo di cap5 sezione 5.3, dove Cage è citato con il nome come parafrasi (nessuna citazione testuale a rischio). Voce aggiunta a `bibliografia.md`: partitura *4'33"*, Edition Peters / Henmar Press, EP 6777, 1952.
 
 Fonti: [Britannica, *4′33″ by Cage*](https://www.britannica.com/topic/433-by-Cage); [Edition Peters, partitura ufficiale](https://www.editionpeterspublications.us/products/cage-433-peters-1); [James Pritchett, *The origin of 4'33"*](https://rosewhitemusic.com/piano/2018/09/03/the-origin-of-4-33/); [Maverick Concerts (sede della prima)](https://maverickconcerts.org/event/nothing-john-cage-and-433/).
 

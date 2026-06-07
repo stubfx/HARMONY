@@ -10,6 +10,8 @@ Ascott, Roy. *Telematic Embrace: Visionary Theories of Art, Technology, and Cons
 
 Bourriaud, Nicolas. *Estetica relazionale*. Postmedia Books, 2010. (ed. orig. *Esthétique relationnelle*, Les Presses du réel, 1998.)
 
+Cage, John. *4'33"*. Partitura, Edition Peters / Henmar Press, EP 6777, 1952.
+
 Dixon, Steve. *Digital Performance: A History of New Media in Theater, Dance, Performance Art, and Installation*. MIT Press, 2007.
 
 Eco, Umberto. *Opera aperta. Forma e indeterminazione nelle poetiche contemporanee*. Bompiani, Milano, 1962.
