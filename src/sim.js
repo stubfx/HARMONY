@@ -1920,6 +1920,9 @@ function _syncAudioBanner() {
 
 document.addEventListener('pointerdown', async () => {
     await unlockAudio();
+    // Start the room microphone on the same gesture, so ambient volume drives
+    // particle brightness from the moment audio is enabled.
+    try { await startMic(); } catch (e) { console.warn('[audio] mic denied:', e); }
     if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
     _syncAudioBanner();
 }, { once: true });
