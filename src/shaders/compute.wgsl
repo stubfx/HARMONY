@@ -98,6 +98,11 @@ struct SoloParams {
     qrX1:                 f32,
     qrY1:                 f32,
     avoidMapInvert:       u32,
+    flockEnabled:         u32,   // 1 = field-based flocking active
+    flockAlign:           f32,   // alignment strength (steer toward local avg velocity)
+    flockCohesion:        f32,   // cohesion strength (steer toward denser neighbourhood)
+    flockSeparation:      f32,   // separation strength (steer away from crowding)
+    flockRadius:          f32,   // gradient sample offset in canvas pixels
 }
 
 // Per-spectator partition data — color, joystick spawner position, personal wind.
@@ -150,6 +155,7 @@ struct ContamParams {
 @group(0) @binding(4) var                      avoidMapTex:      texture_2d<f32>;
 @group(0) @binding(5) var                      shadowDensityTex: texture_2d<f32>;
 @group(0) @binding(6) var<storage, read>       spectatorSlots:   array<SpectatorSlot, 16>;
+@group(0) @binding(7) var                      flockFieldTex:    texture_2d<f32>;
 
 const PI:     f32 = 3.14159265358979;
 const TWO_PI: f32 = 6.28318530717959;
@@ -219,6 +225,15 @@ fn shadowDensityAt(canvasPx: vec2<f32>) -> f32 {
     let ty   = u32(clamp(canvasPx.y / params.canvasH, 0.0, 1.0) * f32(dims.y - 1u));
     let px   = textureLoad(shadowDensityTex, vec2<u32>(tx, ty), 0u);
     return dot(px.rgb, vec3<f32>(0.299, 0.587, 0.114));
+}
+
+// Sample the flock field at a canvas-pixel position.
+// Returns vec4: xy = Σ(weight·velocity), z = Σ(weight) = local density.
+fn flockFieldAt(canvasPx: vec2<f32>) -> vec4<f32> {
+    let dims = textureDimensions(flockFieldTex, 0u);
+    let tx   = u32(clamp(canvasPx.x / params.canvasW, 0.0, 1.0) * f32(dims.x - 1u));
+    let ty   = u32(clamp(canvasPx.y / params.canvasH, 0.0, 1.0) * f32(dims.y - 1u));
+    return textureLoad(flockFieldTex, vec2<u32>(tx, ty), 0u);
 }
 
 // Returns true when pt falls inside any active contamination circle.
@@ -325,6 +340,31 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             vel = mix(vel, desired * (params.stepLen * weight), params.turnRate);
         }
         vel += wind * params.dt * 60.0;
+
+        // ── Flocking (field-based Boids) ───────────────────────────────────────
+        // Reads the velocity+density field splatted by the flock pass. Alignment
+        // steers toward the local average heading; cohesion/separation follow the
+        // density gradient (toward denser, away from crowding). No neighbour search.
+        if (params.flockEnabled != 0u) {
+            let fld  = flockFieldAt(pos);
+            let dens = fld.z;
+            if (dens > 0.001) {
+                let avgVel = fld.xy / dens;
+                vel += (avgVel - vel) * params.flockAlign * params.dt * 60.0;
+            }
+            let e  = max(params.flockRadius, 1.0);
+            let dR = flockFieldAt(pos + vec2<f32>( e, 0.0)).z;
+            let dL = flockFieldAt(pos + vec2<f32>(-e, 0.0)).z;
+            let dD = flockFieldAt(pos + vec2<f32>(0.0,  e)).z;
+            let dU = flockFieldAt(pos + vec2<f32>(0.0, -e)).z;
+            let grad = vec2<f32>(dR - dL, dD - dU);
+            if (length(grad) > 0.0001) {
+                let g   = normalize(grad);
+                let coh =  g * params.flockCohesion;
+                let sep = -g * params.flockSeparation * dens;
+                vel += (coh + sep) * params.maxSpeed * params.dt * 60.0;
+            }
+        }
 
         // ── Image trace avoidance ──────────────────────────────────────────────
         // Replaces the old push-from-centre with content-aware deflection:
