@@ -168,7 +168,7 @@
 
 ---
 
-### 10. I limiti
+### 10. Il futuro
 
 - **10.1 — Cosa il sistema non riesce ancora a fare**
   Le limitazioni tecniche e concettuali attuali. Cosa si è scelto di non affrontare e perché.
