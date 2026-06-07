@@ -359,9 +359,14 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             let dU = flockFieldAt(pos + vec2<f32>(0.0, -e)).z;
             let grad = vec2<f32>(dR - dL, dD - dU);
             if (length(grad) > 0.0001) {
-                let g   = normalize(grad);
-                let coh =  g * params.flockCohesion;
-                let sep = -g * params.flockSeparation * dens;
+                let g     = normalize(grad);
+                // Saturate the crowding factor (0..1) so a dense clump can't produce
+                // an unbounded force that, after the speed clamp, drowns out avoidance,
+                // image-trace deflection and the formula. Keeps flocking comparable in
+                // magnitude to the other steering terms.
+                let crowd = dens / (dens + 4.0);
+                let coh   =  g * params.flockCohesion;
+                let sep   = -g * params.flockSeparation * crowd;
                 vel += (coh + sep) * params.maxSpeed * params.dt * 60.0;
             }
         }
