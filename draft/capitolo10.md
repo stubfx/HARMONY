@@ -1,4 +1,4 @@
-# 10. Limiti e direzioni future
+# 10. I limiti
 
 Costruire qualcosa insegna anche cosa non si riesce a fare, e non è un dato neutro, perché i limiti di un sistema ne rivelano la natura con la stessa precisione delle sue possibilità. Quello che un sistema non sa fare dice dove finisce la sua intelligenza e dove comincia la necessità di qualcosa di diverso.
 

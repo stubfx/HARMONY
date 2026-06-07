@@ -1,4 +1,4 @@
-# 9. Il dialogo tra umano e macchina
+# 9. Il dialogo
 
 Il rapporto tra una persona e un sistema interattivo non è mai semplice come sembra. Si entra in uno spazio con l'idea di controllare qualcosa e si scopre che qualcosa, intanto, sta controllando noi. Il ruolo di soggetto che ci si era assunti entrando si rivela parziale, perché di fronte a un sistema che risponde si è anche oggetto.
 

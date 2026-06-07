@@ -1,4 +1,4 @@
-# 3. Il corpo come interfaccia
+# 3. Il corpo
 
 La mano è stata la prima interfaccia. Molto prima delle parole e della scrittura, il corpo umano ha imparato a comunicare con il mondo attraverso il gesto, la postura, il contatto, e ogni tecnologia arrivata dopo non ha sostituito quella relazione ma l'ha soltanto spostata su nuovi oggetti.
 

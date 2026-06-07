@@ -1,4 +1,4 @@
-# 7. Il design dell'invisibilità
+# 7. L'invisibilità
 
 Ogni scelta visiva di questo progetto è una decisione concettuale, perché non esiste un elemento estetico neutro. Il colore dello sfondo, la dimensione delle particelle, la quantità di testo sull'interfaccia del telefono, tutto dice qualcosa su come si vuole che l'esperienza venga vissuta.
 

@@ -1,4 +1,4 @@
-# 8. Fare come forma di conoscenza
+# 8. Il fare
 
 Costruire questo progetto ha insegnato cose che non avrei potuto imparare in nessun altro modo, cose che vanno oltre la parte tecnica, oltre l'imparare un'API grafica o gestire connessioni in tempo reale. Si tratta di capire come si comporta un sistema complesso da dentro, mentre prende forma.
 

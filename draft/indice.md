@@ -18,7 +18,7 @@
 ## Parte I — Il contesto
 *Prima di descrivere il progetto, costruire gli strumenti per capirlo. Tre capitoli che si muovono dal generale al particolare: la storia dell'arte interattiva, la logica dello sciame, il corpo come interfaccia.*
 
-### 1. L'arte che risponde
+### 1. L'arte
 *Il progetto si inserisce in una tradizione. Questo capitolo la racconta senza fare un elenco, ma seguendo il filo di una domanda: quando ha smesso di bastare guardare?*
 
 - **1.1 — Dalla contemplazione alla partecipazione**
@@ -35,7 +35,7 @@
 
 ---
 
-### 2. La logica dello sciame
+### 2. Lo sciame
 *Il capitolo più vicino al cuore del progetto. Si stabilisce qui il concetto centrale: intelligenza che emerge senza nessuno che la coordina.*
 
 - **2.1 — In natura**
@@ -52,7 +52,7 @@
 
 ---
 
-### 3. Il corpo come interfaccia
+### 3. Il corpo
 *Il capitolo che avvicina la teoria alla pratica. Lo smartphone, il gesto, la voce: come il corpo diventa il punto di contatto tra la persona e il sistema.*
 
 - **3.1 — Il gesto prima delle parole**
@@ -72,7 +72,7 @@
 ## Parte II — Il progetto
 *La descrizione del progetto, dall'idea al dettaglio. Si parte dall'intenzione, si arriva al funzionamento, senza mai perdere di vista perché ogni scelta è stata fatta.*
 
-### 4. Concept e intenzione
+### 4. L'intenzione
 *Il capitolo che spiega l'idea prima di spiegare il sistema. Cosa si voleva ottenere, che tipo di esperienza si cercava.*
 
 - **4.1 — Un organismo, non uno schermo**
@@ -117,7 +117,7 @@
 
 ---
 
-### 7. Il design dell'invisibilità
+### 7. L'invisibilità
 *Le scelte estetiche del progetto, e perché ogni dettaglio visivo è una decisione concettuale.*
 
 - **7.1 — Il nero come spazio**
@@ -137,7 +137,7 @@
 ## Parte III — La riflessione
 *Un passo indietro. Cosa ha insegnato il processo, cosa rimane aperto, cosa il progetto dice di noi.*
 
-### 8. Fare come forma di conoscenza
+### 8. Il fare
 *Il processo di costruzione del progetto come ricerca in sé. Cosa si impara facendo qualcosa che non è mai esistito prima.*
 
 - **8.1 — L'errore come informazione**
@@ -151,7 +151,7 @@
 
 ---
 
-### 9. Il dialogo tra umano e macchina
+### 9. Il dialogo
 *Il capitolo più teorico della Parte III. La riflessione su cosa significa questa relazione, cosa rivela, dove porta.*
 
 - **9.1 — Chi guida chi**
@@ -168,7 +168,7 @@
 
 ---
 
-### 10. Limiti e direzioni future
+### 10. I limiti
 
 - **10.1 — Cosa il sistema non riesce ancora a fare**
   Le limitazioni tecniche e concettuali attuali. Cosa si è scelto di non affrontare e perché.

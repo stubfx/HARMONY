@@ -1,4 +1,4 @@
-# 2. La logica dello sciame
+# 2. Lo sciame
 
 C'è qualcosa di difficile da spiegare nella sensazione che si prova guardando uno stormo di storni muoversi nel cielo al tramonto. Non è soltanto bellezza visiva, è la percezione che quella forma stia pensando, che abbia intenzioni, che sappia dove vuole andare.
 

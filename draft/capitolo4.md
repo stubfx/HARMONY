@@ -1,4 +1,4 @@
-# 4. Concept e intenzione
+# 4. L'intenzione
 
 Ogni progetto nasce da una distinzione, e in questo caso la distinzione era semplice da dire e difficile da costruire. Uno schermo mostra qualcosa, un sistema è qualcosa. Sembra una sfumatura, ma in pratica cambia tutto.
 
