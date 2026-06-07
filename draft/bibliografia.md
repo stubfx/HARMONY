@@ -18,6 +18,10 @@ Eco, Umberto. *Opera aperta. Forma e indeterminazione nelle poetiche contemporan
 
 Grau, Oliver. *Virtual Art: From Illusion to Immersion*. MIT Press, 2003.
 
+Haacke, Hans. *MoMA Poll*. Installazione, in *Information*, a cura di Kynaston McShine, MoMA, New York, 1970.
+
+Holzer, Jenny. *Truisms*. 1977–1979; versione su insegna luminosa a Times Square (Public Art Fund, *Messages to the Public*), 1982.
+
 Kwastek, Katja. *Aesthetics of Interaction in Digital Art*. MIT Press, 2013.
 
 Manovich, Lev. *The Language of New Media*. MIT Press, 2001.
