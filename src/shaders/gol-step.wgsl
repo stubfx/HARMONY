@@ -6,6 +6,17 @@
 
 @group(0) @binding(0) var inTex: texture_2d<f32>;
 
+// seed changes every generation; spark = per-cell probability of a random birth.
+struct GolParams { seed: u32, spark: f32, _p0: u32, _p1: u32 }
+@group(0) @binding(1) var<uniform> gp: GolParams;
+
+fn rngCell(x: u32, y: u32, seed: u32) -> f32 {
+    var h = x * 374761393u + y * 668265263u + seed * 2246822519u;
+    h = (h ^ (h >> 13u)) * 1274126177u;
+    h = h ^ (h >> 16u);
+    return f32(h) * (1.0 / 4294967296.0);
+}
+
 struct V { @builtin(position) pos: vec4<f32> }
 
 @vertex fn vs(@builtin(vertex_index) i: u32) -> V {
@@ -39,5 +50,10 @@ fn aliveAt(c: vec2<i32>, dims: vec2<i32>) -> i32 {
     var next = 0.0;
     if (cur == 1 && (n == 2 || n == 3)) { next = 1.0; }
     if (cur == 0 && n == 3)             { next = 1.0; }
+    // Random "spark": inject a few births each generation so the automaton never
+    // freezes into still lifes and oscillators. spark = 0 → pure Conway.
+    if (gp.spark > 0.0 && rngCell(u32(c.x), u32(c.y), gp.seed) < gp.spark) {
+        next = 1.0;
+    }
     return vec4<f32>(next, next, next, 1.0);
 }

@@ -94,6 +94,7 @@ const params = {
     golEnabled:      false,
     golStrength:     0.5,  // attraction of particles toward live cells
     golStepInterval: 4,    // frames between Game-of-Life generations (higher = slower)
+    golSpark:        0.008, // random life injection per generation (0 = pure Conway; prevents freezing)
     // Homing behaviour
     homingChance:    0.2, // per-frame probability [0–1] that a newly-eligible agent commits to homing
     homingInfluence: 1.0, // max homing blend weight at dist=0; falls to 0 at dist=canvasW
@@ -104,8 +105,8 @@ const params = {
     avoidForceStr:   1.0, // multiplier on image-trace avoidance forces
     avoidMapScale:   1.0, // avoidance map coverage as fraction of canvas (1.0 = full)
     avoidMapInvert:  false, // true = read the map as 1 - r, so light areas become non-avoid and dark areas become the avoid signal
-    avoidMapSampleColor: false, // true = non-homing particles take their base color from the avoid map sample at their position
-    avoidMapFixedColor:  false, // true (paired with sampleColor) = use the sampled pixel exactly; false = use it as base color then mix with speed color
+    avoidMapSampleColor: true,  // true = non-homing particles take their base color from the avoid map sample at their position
+    avoidMapFixedColor:  true,  // true (paired with sampleColor) = use the sampled pixel exactly
     avoidMapBlackCutoff: 0.05,  // luminance floor for the color sample: pixels below this are skipped (particle keeps base color) — mirrors trace blackThreshold
     qrOverlay:       false, // true = QR on a 2D overlay canvas; agents freed from QR area
     // Primed-spot probe (free agents only)
@@ -350,6 +351,10 @@ const imageDebugUB = device.createBuffer({
 });
 // Flock pass uniform: canvasW, canvasH, radius, pad (16 bytes)
 const flockUB = device.createBuffer({
+    size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+});
+// Game of Life step uniform: seed, spark, pad, pad (16 bytes)
+const golUB = device.createBuffer({
     size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 // ContamParams: 16-byte header + 10 × vec4<f32> (16 bytes each) = 176 bytes
@@ -847,6 +852,7 @@ function rebuildGolBG() {
         layout: golStepPipe.getBindGroupLayout(0),
         entries: [
             { binding: 0, resource: golStateView },
+            { binding: 1, resource: { buffer: golUB } },
         ],
     });
 }
@@ -2329,6 +2335,7 @@ const _downsampleAB = new ArrayBuffer(16); const _downsampleF = new Float32Array
 const _contamAB= new ArrayBuffer(176); const _contamU= new Uint32Array(_contamAB); const _contamF= new Float32Array(_contamAB);
 const _shadowAB= new ArrayBuffer(32);  const _shadowF= new Float32Array(_shadowAB); const _shadowU= new Uint32Array(_shadowAB);
 const _flockAB = new ArrayBuffer(16);  const _flockF = new Float32Array(_flockAB);
+const _golAB   = new ArrayBuffer(16);  const _golU   = new Uint32Array(_golAB);   const _golF   = new Float32Array(_golAB);
 const _imgDbgAB= new ArrayBuffer(32);  const _imgDbgF= new Float32Array(_imgDbgAB);
 const _windVisAB=new ArrayBuffer(32);  const _windVisF=new Float32Array(_windVisAB); const _windVisU=new Uint32Array(_windVisAB);
 
@@ -2492,6 +2499,9 @@ function frame(ts) {
         golTick++;
         const interval = Math.max(1, params.golStepInterval | 0);
         if (golTick % interval === 0) {
+            _golU[0] = golTick >>> 0;
+            _golF[1] = params.golSpark;
+            device.queue.writeBuffer(golUB, 0, _golAB);
             const gp = enc.beginRenderPass({
                 colorAttachments: [{
                     view: golScratchView,
