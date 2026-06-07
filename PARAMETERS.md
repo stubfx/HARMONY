@@ -171,7 +171,7 @@ A Conway cellular automaton runs on a coarse grid. When `golEnabled` is on (it i
 
 ### Freeroam lock
 
-When `freeroamLock` is on, entering FREEROAM starts a timer, and after `freeroamLockDelay` seconds (default 10) the status reverts automatically to NORMAL. Re-entering FREEROAM, whether from the GUI or the n8n API, resets the timer. On by default.
+When `freeroamLock` is on, entering FREEROAM starts a timer, and after `freeroamLockDelay` seconds (default 30) the status reverts automatically to NORMAL. Re-entering FREEROAM, whether from the GUI or the n8n API, resets the timer. On by default.
 
 ### brightness
 **Range:** 0.01 – 0.5 | **Default:** 0.08

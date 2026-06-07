@@ -113,7 +113,7 @@ const params = {
     dotRespawnChance:    0.01, // per-frame probability that a centre-zone agent is respawned to an edge
     // Freeroam lock — when on, FREEROAM auto-reverts to NORMAL after a delay
     freeroamLock:        true,
-    freeroamLockDelay:   10,   // seconds in FREEROAM before reverting to NORMAL (timer resets each time FREEROAM is re-entered)
+    freeroamLockDelay:   30,   // seconds in FREEROAM before reverting to NORMAL (timer resets each time FREEROAM is re-entered)
     // Spectator partitioning
     spectatorAgentShare:       35,   // % of agents assigned to spectators (0 = sim only, 100 = full user control)
     spectatorSpawnChance:      0.01, // base per-frame spawn probability (scaled by user count × multiplier)
