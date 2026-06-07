@@ -143,7 +143,7 @@ Any key matching a property in the `params` object is written directly and takes
 | `golStrength` | `0.5` | `0 – 2` | How strongly particles are pulled toward live cells. |
 | `golStepInterval` | `4` | frames | Frames between Game-of-Life generations. Higher = slower evolution. |
 | `golSpark` | `0.001` | `0 – 0.1` | Random births injected each generation so the automaton never freezes into still lifes (0 = pure Conway). |
-| `freeroamLock` | `false` | bool | When on, the status auto-reverts from FREEROAM to NORMAL after `freeroamLockDelay` seconds. Sending `status: "FREEROAM"` again (from anywhere, including this API) resets the timer. |
+| `freeroamLock` | `true` | bool | When on, the status auto-reverts from FREEROAM to NORMAL after `freeroamLockDelay` seconds. Sending `status: "FREEROAM"` again (from anywhere, including this API) resets the timer. |
 | `freeroamLockDelay` | `10` | seconds | Delay in FREEROAM before the lock reverts to NORMAL. |
 
 ### Magnet image
