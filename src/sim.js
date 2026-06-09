@@ -80,6 +80,13 @@ const params = {
     // Agent shadow
     agentShadowStr:    0.20, // peak opacity of each homing-agent shadow splat (0–1)
     agentShadowRadius: 10,   // splat half-radius in canvas pixels
+    // Champions — every Nth agent (agentId % champions == 0) drops a constant shadow
+    // splat under itself even when free. 1 = every agent, 2 = one in two…
+    championsEnabled:  true, // master on/off for the whole champions feature
+    champions:         700,
+    // Champion point size — applied ONLY while a champion is free (not homing);
+    // homing champions render at the normal agent size like everyone else.
+    championSize:      15,
     // Game of Life mode — toggle
     golEnabled:      false,
     golStrength:     0.5,  // attraction of particles toward live cells
@@ -108,7 +115,10 @@ const params = {
     captionSize:   0.035, // font size as fraction of min(canvas width, canvas height)
     // Font — Google Fonts family used for trace/caption text, loaded at runtime
     // (nothing installed on the host machine). Empty string = system sans-serif.
-    fontFamily:    'Inter',
+    fontFamily:    'Bellefair',
+    // Export ('s' screenshot) — both off by default
+    exportTransparent: false, // make the black background transparent (alpha = brightness)
+    exportCMYK:        false, // convert to CMYK and save as TIFF instead of PNG
     // Auto-clear
     clearDelay:    0,     // seconds before auto-clearing user trace content (0 = disabled)
     // DOT mode
@@ -125,6 +135,7 @@ const params = {
     spawnerVelocityBoost:   2.0,  // multiplier applied to spawnerSpeed when joystick is moved quickly (0 = no boost)
     spawnerSteering:        6,    // direction-change rate (1/s); lower = wider curves, higher = tighter turns
     spawnerInactiveTimeout: 5,    // seconds of joystick silence before spawner goes inactive
+    releaseBurstSpeed:      30,   // fireworks: speed agents scatter at when a joystick is released (0 = disabled)
     // Session / QR restore
     remoteTimeout:  0,    // seconds of silence from all remotes before QR is restored (0 = disabled)
     maxSpectators:  1,    // sim QR hides when connected count reaches this threshold
@@ -143,7 +154,7 @@ const params = {
     bounceEdges:   false, // reflect agents at canvas edges instead of wrapping
     useDeltaTime:  true,  // false = fixed 1/60 s timestep (no frame-spike compensation)
     // Audio reactivity
-    audioFloor:    0.1,   // brightness multiplier when fully silent (0 = black, 1 = no effect)
+    color2AudioStr: 1.0,  // how strongly room audio leans the palette toward color2 (0 = off, 1 = full color2 at peak volume)
     duckLevel:     0.15,  // bg gain while voiceover is active (0 = mute, 1 = no ducking)
 };
 
@@ -361,10 +372,10 @@ const agentBuf = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 const soloUB = device.createBuffer({
-    size: 192, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 208, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
-    size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 160, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const fadeUB = device.createBuffer({
     size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -1594,10 +1605,17 @@ function uploadSpectatorSlots() {
         u[b + 7] = 0;
         f[b + 8] = s.windX;
         f[b + 9] = s.windY;
-        u[b + 10] = 0;
-        u[b + 11] = 0;
+        u[b + 10] = s.burst ? 1 : 0;
+        u[b + 11] = s.burstSeed >>> 0;
     }
     device.queue.writeBuffer(spectatorSlotsBuf, 0, ab);
+}
+
+// Fireworks: flag a slot's agents to scatter in random directions on the next
+// compute frame. One-shot — the flag is cleared right after the frame consumes it.
+function triggerReleaseBurst(slot) {
+    slot.burst     = 1;
+    slot.burstSeed = (Math.random() * 0x7fffffff) >>> 0;
 }
 
 // ── Session: Socket.IO connection + QR code ───────────────────────────────────
@@ -1694,7 +1712,7 @@ let socket;
         if (spectatorId && activeSlots.length < MAX_SPECTATOR_SLOTS) {
             // Start with a neutral white — the phone sends a 'color-pick' immediately
             // after joining with its locally generated palette color, which overwrites this.
-            activeSlots.push({ spectatorId, colorR: 1, colorG: 1, colorB: 1, spawnerX: 0.5, spawnerY: 0.5, spawnerLocationActive: 0, windX: 0, windY: 0, dx: 0, dy: 0, magnitude: 0, velocity: 0, _smoothDx: 0, _smoothDy: 0, lastInputTime: 0 });
+            activeSlots.push({ spectatorId, colorR: 1, colorG: 1, colorB: 1, spawnerX: 0.5, spawnerY: 0.5, spawnerLocationActive: 0, windX: 0, windY: 0, dx: 0, dy: 0, magnitude: 0, velocity: 0, _smoothDx: 0, _smoothDy: 0, lastInputTime: 0, burst: 0, burstSeed: 0 });
             uploadSpectatorSlots();
         }
     });
@@ -1728,6 +1746,7 @@ let socket;
             if (slot) {
                 const { dx = 0, dy = 0, magnitude = 0, velocity = 0, active = true } = event.data ?? {};
                 if (!active) {
+                    if (slot.spawnerLocationActive === 1) triggerReleaseBurst(slot); // fireworks on release
                     slot.spawnerLocationActive = 0;
                     slot.dx = 0; slot.dy = 0; slot.magnitude = 0; slot.velocity = 0;
                 } else {
@@ -2147,6 +2166,7 @@ let smoothCoherence   = 0.5;
 
 // ── Join burst state ──────────────────────────────────────────────────────────
 // When a spectator joins, a single brightness pulse fires across the field.
+const REST_BRIGHTNESS  = 0.1;   // fixed brightness scale — former audio "silence floor" (audio now drives color, not brightness)
 const BURST_BRIGHTNESS = 0.4;   // peak brightness boost added to params.brightness
 const BURST_DECAY      = 0.88;  // per frame — fully dissipated in ~0.5 s at 60 fps
 const BURST_THRESHOLD  = 0.001;
@@ -2252,6 +2272,7 @@ function writeSoloUB(dt, time) {
     u[45] = params.avoidMapInvert ? 1 : 0;
     u[46] = params.golEnabled ? 1 : 0;
     f[47] = params.golStrength;
+    f[48] = params.releaseBurstSpeed;
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
@@ -2279,10 +2300,11 @@ function writeRenderUB() {
     f[13] = c2[0];
     f[14] = c2[1];
     f[15] = c2[2];
-    // Treat "audio not yet unlocked" as full silence so the pre/post-unlock
-    // brightness step disappears — audioFloor stays exactly as tuned.
-    const audioMult = params.audioFloor + (1 - params.audioFloor) * (isActive() ? getVolume() : 0);
-    f[16] = (params.brightness + burstBrightness + pulseEnergy) * audioMult;
+    // Audio no longer affects brightness — it leans the palette toward color2 instead (f[38]).
+    // Audio used to multiply brightness by audioMult ∈ [0.1, 1.0] (0.1 at rest). Keep that
+    // former resting level as a fixed scale so the at-rest look is unchanged; brightness,
+    // burst and pulse stay in the same balance they had before.
+    f[16] = (params.brightness + burstBrightness + pulseEnergy) * REST_BRIGHTNESS;
     f[17] = params.alphaThreshold;
     f[18] = params.blackThreshold;
     f[19] = simState.qrStatus === 'SHOW' ? 0 : params.vignetteEdge;
@@ -2316,6 +2338,10 @@ function writeRenderUB() {
     u[33] = params.avoidMapSampleColor ? 1 : 0;
     u[34] = params.avoidMapFixedColor  ? 1 : 0;
     f[35] = params.avoidMapBlackCutoff;
+    u[36] = params.championsEnabled ? params.champions : 0;
+    f[37] = params.championSize;
+    // Room audio leans the base palette toward color2: 0 at silence, → color2AudioStr at peak.
+    f[38] = (isActive() ? getVolume() : 0) * params.color2AudioStr;
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 
@@ -2362,6 +2388,7 @@ function writeAgentShadowUB() {
     _shadowU[4] = hasImage ? 1 : 0;
     _shadowF[5] = params.homingProximityRange;
     _shadowF[6] = params.homingMinAlpha;
+    _shadowU[7] = params.championsEnabled ? params.champions : 0;
     device.queue.writeBuffer(agentShadowUB, 0, _shadowAB);
 }
 
@@ -2404,8 +2431,8 @@ function writeContamUB() {
 }
 
 // ── Pre-allocated uniform buffers (reused every frame to avoid GC pressure) ──
-const _soloAB  = new ArrayBuffer(192); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
-const _renderAB= new ArrayBuffer(144); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
+const _soloAB  = new ArrayBuffer(208); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
+const _renderAB= new ArrayBuffer(160); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
 const _fadeAB  = new ArrayBuffer(16);  const _fadeF  = new Float32Array(_fadeAB);
 const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB); const _blitU  = new Uint32Array(_blitAB);
 const _downsampleAB = new ArrayBuffer(16); const _downsampleF = new Float32Array(_downsampleAB);
@@ -2421,28 +2448,110 @@ const _windVisAB=new ArrayBuffer(32);  const _windVisF=new Float32Array(_windVis
 // as the frame, after the blit pass, so we always grab what was just on screen.
 let _captureRequested = false;
 
+// Trigger a browser download of a Blob under the given filename.
+function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}
+
+// Build an uncompressed baseline CMYK TIFF from straight-alpha RGBA pixels.
+// Naive, device-independent RGB→CMYK (no ICC profile, per project decision) —
+// final print conversion is expected to happen in pro software. When withAlpha
+// is true a 5th unassociated-alpha sample is written so transparency survives.
+function encodeCmykTiff(rgba, w, h, withAlpha) {
+    const spp    = withAlpha ? 5 : 4;        // samples per pixel
+    const px      = w * h * spp;              // pixel data byte count (8-bit samples)
+    const tags    = withAlpha ? 12 : 11;      // IFD entry count
+    const ifd     = 2 + 12 * tags + 4;        // count + entries + next-IFD offset
+    const bpsOff  = 8 + ifd;                  // BitsPerSample array sits after the IFD
+    const pixOff  = bpsOff + spp * 2;         // pixel data follows
+    const ab = new ArrayBuffer(pixOff + px);
+    const dv = new DataView(ab);
+    const u8 = new Uint8Array(ab);
+
+    // Header (little-endian)
+    dv.setUint16(0, 0x4949, true);  // 'II'
+    dv.setUint16(2, 42, true);
+    dv.setUint32(4, 8, true);       // first IFD offset
+
+    // IFD — entries must be in ascending tag order
+    dv.setUint16(8, tags, true);
+    let o = 10;
+    const SHORT = 3, LONG = 4;
+    const entry = (tag, type, count, value) => {
+        dv.setUint16(o, tag, true);
+        dv.setUint16(o + 2, type, true);
+        dv.setUint32(o + 4, count, true);
+        dv.setUint32(o + 8, value, true); // inline value (SHORT count-1 uses low 2 bytes) or offset
+        o += 12;
+    };
+    entry(256, LONG,  1, w);        // ImageWidth
+    entry(257, LONG,  1, h);        // ImageLength
+    entry(258, SHORT, spp, bpsOff); // BitsPerSample → out-of-line array (spp×8)
+    entry(259, SHORT, 1, 1);        // Compression = none
+    entry(262, SHORT, 1, 5);        // PhotometricInterpretation = Separated (CMYK)
+    entry(273, LONG,  1, pixOff);   // StripOffsets
+    entry(277, SHORT, 1, spp);      // SamplesPerPixel
+    entry(278, LONG,  1, h);        // RowsPerStrip (single strip)
+    entry(279, LONG,  1, px);       // StripByteCounts
+    entry(284, SHORT, 1, 1);        // PlanarConfiguration = chunky
+    entry(332, SHORT, 1, 1);        // InkSet = CMYK
+    if (withAlpha) entry(338, SHORT, 1, 2); // ExtraSamples = unassociated alpha
+    dv.setUint32(o, 0, true);       // no next IFD
+
+    for (let s = 0; s < spp; s++) dv.setUint16(bpsOff + s * 2, 8, true); // BitsPerSample = 8 each
+
+    // Pixel data — naive RGB→CMYK
+    let d = pixOff;
+    for (let i = 0; i < w * h; i++) {
+        const r = rgba[i * 4] / 255, g = rgba[i * 4 + 1] / 255, b = rgba[i * 4 + 2] / 255;
+        const k = 1 - Math.max(r, g, b);
+        let c = 0, m = 0, y = 0;
+        if (k < 1) { c = (1 - r - k) / (1 - k); m = (1 - g - k) / (1 - k); y = (1 - b - k) / (1 - k); }
+        u8[d++] = Math.round(c * 255);
+        u8[d++] = Math.round(m * 255);
+        u8[d++] = Math.round(y * 255);
+        u8[d++] = Math.round(k * 255);
+        if (withAlpha) u8[d++] = rgba[i * 4 + 3];
+    }
+    return new Blob([ab], { type: 'image/tiff' });
+}
+
 async function finalizeCapture(buf, w, h, padded) {
     try {
         await buf.mapAsync(GPUMapMode.READ);
         const src = new Uint8Array(buf.getMappedRange());
         const isBGRA = canvasFormat === 'bgra8unorm';
+        const transparent = params.exportTransparent;
         const out = new Uint8ClampedArray(w * h * 4);
         const stride = w * 4;
         for (let y = 0; y < h; y++) {
             const srcOff = y * padded;
             const dstOff = y * stride;
-            if (isBGRA) {
-                for (let x = 0; x < stride; x += 4) {
-                    out[dstOff + x]     = src[srcOff + x + 2];
-                    out[dstOff + x + 1] = src[srcOff + x + 1];
-                    out[dstOff + x + 2] = src[srcOff + x];
-                    out[dstOff + x + 3] = 255;
-                }
-            } else {
-                for (let x = 0; x < stride; x += 4) {
-                    out[dstOff + x]     = src[srcOff + x];
-                    out[dstOff + x + 1] = src[srcOff + x + 1];
-                    out[dstOff + x + 2] = src[srcOff + x + 2];
+            for (let x = 0; x < stride; x += 4) {
+                const r = isBGRA ? src[srcOff + x + 2] : src[srcOff + x];
+                const g = src[srcOff + x + 1];
+                const b = isBGRA ? src[srcOff + x]     : src[srcOff + x + 2];
+                if (transparent) {
+                    // Additive light on true black → brightness is a perfect alpha
+                    // mask. Un-premultiply so the glow keeps its full intensity.
+                    const a = Math.max(r, g, b);
+                    if (a > 0) {
+                        out[dstOff + x]     = Math.min(255, Math.round(r * 255 / a));
+                        out[dstOff + x + 1] = Math.min(255, Math.round(g * 255 / a));
+                        out[dstOff + x + 2] = Math.min(255, Math.round(b * 255 / a));
+                    }
+                    out[dstOff + x + 3] = a;
+                } else {
+                    out[dstOff + x]     = r;
+                    out[dstOff + x + 1] = g;
+                    out[dstOff + x + 2] = b;
                     out[dstOff + x + 3] = 255;
                 }
             }
@@ -2450,31 +2559,28 @@ async function finalizeCapture(buf, w, h, padded) {
         buf.unmap();
         buf.destroy();
 
+        // Composite the QR overlay (separate 2D canvas) — but not for a transparent
+        // export, where its black modules would punch holes in the alpha.
+        const qrOpacity   = parseFloat(qrOverlayEl.style.opacity) || 0;
+        const compositeQR = !transparent && qrOpacity > 0 && qrOverlayEl.width > 0 && qrOverlayEl.height > 0;
+
         const tmp = document.createElement('canvas');
         tmp.width = w; tmp.height = h;
         const c2d = tmp.getContext('2d');
         c2d.putImageData(new ImageData(out, w, h), 0, 0);
-
-        // Composite the QR overlay (separate 2D canvas) if it's currently visible.
-        const qrOpacity = parseFloat(qrOverlayEl.style.opacity) || 0;
-        if (qrOpacity > 0 && qrOverlayEl.width > 0 && qrOverlayEl.height > 0) {
+        if (compositeQR) {
             c2d.globalAlpha = qrOpacity;
             c2d.drawImage(qrOverlayEl, 0, 0, w, h);
             c2d.globalAlpha = 1;
         }
 
-        tmp.toBlob(blob => {
-            if (!blob) return;
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-            a.download = `thesis-sim-${ts}.png`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            URL.revokeObjectURL(url);
-        }, 'image/png');
+        const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        if (params.exportCMYK) {
+            const rgba = compositeQR ? c2d.getImageData(0, 0, w, h).data : out;
+            downloadBlob(encodeCmykTiff(rgba, w, h, transparent), `thesis-sim-${ts}.tif`);
+        } else {
+            tmp.toBlob(blob => { if (blob) downloadBlob(blob, `thesis-sim-${ts}.png`); }, 'image/png');
+        }
     } catch (e) {
         console.warn('[screenshot]', e);
     }
@@ -2520,6 +2626,7 @@ function frame(ts) {
         for (const slot of activeSlots) {
             if (slot.spawnerLocationActive === 1) {
                 if (wallNow - slot.lastInputTime > params.spawnerInactiveTimeout * 1000) {
+                    triggerReleaseBurst(slot); // fireworks when the joystick goes silent
                     slot.spawnerLocationActive = 0;
                     slot.dx = 0; slot.dy = 0; slot.magnitude = 0; slot.velocity = 0;
                     slot._smoothDx = 0; slot._smoothDy = 0;
@@ -2636,7 +2743,8 @@ function frame(ts) {
     rp.setBindGroup(0, fadeBG);
     rp.draw(3);
     // Agent shadow is a soft splat — incoherent with chunky cells, skip in pixel mode.
-    if (hasImage && agentShadowBG && !usingPixel) {
+    // Runs when an image is loaded (homing shadows) or champions are active (constant shadows).
+    if ((hasImage || (params.championsEnabled && params.champions > 0)) && agentShadowBG && !usingPixel) {
         rp.setPipeline(agentShadowPipe);
         rp.setBindGroup(0, agentShadowBG);
         rp.draw(params.agentCount * 6);
@@ -2703,6 +2811,14 @@ function frame(ts) {
     device.queue.submit([enc.finish()]);
 
     if (captureBuf) finalizeCapture(captureBuf, captureW, captureH, capturePadded);
+
+    // Fireworks burst is one-shot — this frame's compute consumed it, so clear the
+    // flags now and re-upload, leaving the scattered agents to fly out on their own.
+    if (activeSlots.length) {
+        let burstDirty = false;
+        for (const slot of activeSlots) { if (slot.burst) { slot.burst = 0; burstDirty = true; } }
+        if (burstDirty) uploadSpectatorSlots();
+    }
 
     fpsFrames++;
 }

@@ -111,6 +111,12 @@ export function initGUI({
     fVis.add(params, 'pixelGrid').name('pixel grid');
     fVis.add(params, 'pixelGridCells', 20, 400, 1).name('grid cells').onChange(() => rebuildGridTex());
 
+    // ── Export (screenshot, 's' key) ────────────────────────────────────────────
+    const fExport = gui.addFolder('Export');
+    fExport.add(params, 'exportTransparent').name('transparent bg');
+    fExport.add(params, 'exportCMYK').name('CMYK (TIFF)');
+    fExport.close();
+
     // ── Trace ─────────────────────────────────────────────────────────────────
     const fMagnet = gui.addFolder('Trace');
     fMagnet.add(params, 'magnetStr',      0, 50,   0.1  ).name('homing speed');
@@ -122,7 +128,7 @@ export function initGUI({
     fMagnet.add(params, 'captionSize', 0.02, 0.15, 0.005).name('caption size').onChange(renderTraceCanvas);
     // Font presets — selecting one fills the #font-input and loads it from Google Fonts.
     const FONT_PRESETS = [
-        'Inter', 'Roboto', 'Montserrat', 'Oswald', 'Bebas Neue', 'Anton',
+        'Bellefair', 'Inter', 'Roboto', 'Montserrat', 'Oswald', 'Bebas Neue', 'Anton',
         'Archivo Black', 'Playfair Display', 'Lora', 'Space Mono', 'Spline Sans Mono',
     ];
     fMagnet.add({ preset: params.fontFamily }, 'preset', FONT_PRESETS).name('font preset').onChange(v => {
@@ -143,6 +149,13 @@ export function initGUI({
     fHoming.add(params, 'agentShadowRadius',    0, 300,  0.5  ).name('shadow radius');
     fHoming.add(params, 'homingProximityRange', 0, 2000, 10   ).name('proximity range (px)');
     fHoming.add(params, 'homingMinAlpha',       0, 1,    0.01 ).name('proximity min alpha');
+
+    // ── Champions ───────────────────────────────────────────────────────────────
+    const fChampions = gui.addFolder('Champions');
+    fChampions.add(params, 'championsEnabled').name('enabled');
+    fChampions.add(params, 'champions',    1, 1500, 1  ).name('1 in N');
+    fChampions.add(params, 'championSize', 0.1, 40, 0.1).name('size (free)');
+    fChampions.close();
 
     // ── Probe ─────────────────────────────────────────────────────────────────
     const fProbe = gui.addFolder('Probe');
@@ -191,6 +204,7 @@ export function initGUI({
     fSession.add(params, 'spawnerVelocityBoost',     0,   5,  0.1 ).name('spawner velocity boost');
     fSession.add(params, 'spawnerSteering',          1,  20,  0.5 ).name('spawner steering');
     fSession.add(params, 'spawnerInactiveTimeout',   1,  30,  1   ).name('spawner timeout (s)');
+    fSession.add(params, 'releaseBurstSpeed',        0, 100,  1   ).name('release burst (fireworks)');
     fSession.add(params, 'remoteTimeout',            0, 180,  5   ).name('idle restore QR (s)');
     fSession.add(params, 'maxSpectators',            1,  50,  1   ).name('QR hides at N users');
     fSession.add(params, 'n8nEnabled').name('n8n enabled').onChange(() => restartHeartbeat());
@@ -221,7 +235,7 @@ export function initGUI({
             stopAudio();
         }
     });
-    fAudio.add(params, 'audioFloor', 0, 1, 0.01).name('silence floor');
+    fAudio.add(params, 'color2AudioStr', 0, 1, 0.01).name('audio → color2');
     fAudio.add(params, 'duckLevel',  0, 1, 0.01).name('duck level').onChange(v => setDuckLevel(v));
     fAudio.close();
 

@@ -23,7 +23,24 @@ The texture is rebuilt 300 ms after the last keystroke (debounced). There is no 
 - **Text only** (no image loaded): the canvas width is fixed to the screen width (capped at the GPU's `maxTextureDimension2D` limit). Text is word-wrapped across multiple lines; font size is approximately 6% of the canvas width. Canvas height grows with the number of lines. This prevents arbitrarily wide textures when long strings are received (e.g. from n8n).
 - **Text + image**: the canvas is the same pixel dimensions as the loaded image. The text is drawn on top at auto-fitted size (starting at 72% of the image height, scaled down if the text would overflow 92% of the image width).
 
-The font is always **bold sans-serif**. The fill is always **white** (RGB 1,1,1), so agents homing to text glyphs are rendered bright white — unless a loaded image provides color underneath, in which case the image RGB shows through.
+The glyphs are always drawn **bold**, in the active font (see **Font** below; default **Bellefair**, with a `sans-serif` fallback). The fill is always **white** (RGB 1,1,1), so agents homing to text glyphs are rendered bright white — unless a loaded image provides color underneath, in which case the image RGB shows through.
+
+### Font (`fontFamily`)
+
+The typeface for both the trace text and the story caption is loaded **from Google Fonts at runtime** — nothing is installed on the host machine. Default: **Bellefair**.
+
+A **font** input sits directly below the trace text field in the formula panel. Paste anything you can copy from [fonts.google.com](https://fonts.google.com) and press **Enter** (or blur the field):
+
+| Form | Example |
+|------|---------|
+| bare family name | `Playfair Display` |
+| css2 family spec | `Bebas+Neue:wght@700` |
+| `family=` query part | `family=Inter:wght@700` |
+| full embed URL | `https://fonts.googleapis.com/css2?family=Lora…` |
+
+`parseFontSpec()` extracts the family name (used for `ctx.font`) and builds the Google Fonts `<link>` href; if no weight axis is supplied, `wght@400;700` is added so bold renders. `loadFontSpec()` injects/updates the `<link>`, waits for the stylesheet to parse and for the glyphs to download (`document.fonts.load` — Canvas 2D will not paint with a webfont before it is ready), then re-renders the trace canvas. A bad name or network failure falls back to `sans-serif` silently.
+
+The GUI's **font preset** dropdown (Trace folder) lists a few common Google Fonts; picking one fills the input and applies it.
 
 ### Layering with a loaded image
 
@@ -251,6 +268,22 @@ The mode is carried over the existing `blitUB` (32-byte buffer was already only 
 
 ---
 
+## Export (screenshot)
+
+Two flags in the **Export** GUI folder, both **off by default**, that change what the `s` key writes. They are pure CPU post-processing in `finalizeCapture()` — the live render is untouched.
+
+### transparent bg (`exportTransparent`)
+
+Removes the black background from the saved image. The scene is additive light on true black (and `bgBlackCutoff` floors residual trail noise to zero), so the background is genuinely `(0,0,0)` and brightness is an exact alpha mask. Per pixel, `alpha = max(r,g,b)` and the RGB is **un-premultiplied** (`rgb / alpha`) so the glow keeps its full intensity over a transparent or dark background. The QR overlay is **not** composited when this is on, since its black modules would become holes in the alpha. Output is an RGBA PNG (or a CMYK TIFF with an alpha channel when CMYK is also on).
+
+### CMYK (TIFF) (`exportCMYK`)
+
+PNG cannot store CMYK, so this switches the export to an uncompressed baseline **TIFF** (`.tif`, PhotometricInterpretation = Separated, InkSet = CMYK), built by `encodeCmykTiff()`. The RGB→CMYK conversion is the naive device-independent formula (`k = 1 − max(r,g,b)`; `c,m,y = (1 − channel − k)/(1 − k)`) with **no ICC profile** — a deliberate choice; the file is meant to be refined in pro print software. When `exportTransparent` is also on, a 5th sample (unassociated alpha, `ExtraSamples = 2`, `SamplesPerPixel = 5`) carries the transparency.
+
+**Four combinations:** opaque PNG (default) · transparent RGBA PNG · opaque CMYK TIFF · CMYK TIFF + alpha.
+
+---
+
 ## Trace
 
 The trace layer loads a static image onto the GPU and uses it to redirect agents. The image is never rendered directly — it is only felt through collective agent density and color.
@@ -386,6 +419,25 @@ Shadow rendering is a dedicated render sub-pass inside the offscreen render pass
 3. **Blend mode** is standard alpha compositing (`src-alpha / one-minus-src-alpha`) so the shadow physically darkens the trail texture underneath, unlike the additive particle blend.
 
 Because homing agents are drawn on top of the trail (with additive blend) in the subsequent particle pass, their rendered quads always appear above the shadow, giving the trace a sense of depth: dark halo behind, bright particle on top.
+
+---
+
+### champions (`championsEnabled`, `champions`)
+**enabled:** on by default · **1 in N:** 1 – 1500, default 700, step 1
+
+The **Champions** GUI folder gathers the whole feature. `enabled` is the master on/off; while off, champions are fully inert (the UBs receive `champions = 0`). `1 in N` selects champion agents by modulo on the agent index: every agent where `agentId % N == 0` becomes a champion. So `2` makes one in every two a champion, `10` one in ten, `1` makes every agent a champion.
+
+A champion **moves exactly like any other agent** — there is no change to the compute/movement step. The only difference is in the agent-shadow pass: a champion casts the same dark splat described above **constantly, even while free**, at constant full strength (`proximityT = 1.0`), so it leaves a persistent shadow trail under itself regardless of homing. When a champion happens to be homing, it behaves like every other homing agent.
+
+Implementation notes:
+- Driven entirely from the shadow shader (`agentShadow.wgsl`) via the `champions` field in `AgentShadowParams` (the former `_p2` slot — no buffer resize). The `&&` short-circuit avoids a modulo-by-zero when disabled.
+- The **visual** shadow pass now runs when an image is loaded **or** champions are active, so champion trails appear even with no trace image.
+- Champions are **excluded from the deterrent density pass** (`densityEmit`), so they leave a visible trail but do not repel the rest of the swarm. They share the **shadow strength** and **shadow radius** controls with homing shadows.
+
+### champion size (`championSize`)
+**Range:** 0.1 – 40 | **Default:** 15 | **Step:** 0.1
+
+Point size for a champion **while it is free**, set in the render shader (`render.wgsl`) — much larger than the normal `agent size` (1.3) by default (15) so champions read as bold, distinct dots. It applies only when the champion is not homing: a homing champion renders at the normal `agent size` like every other homing agent, so the collective image it helps form stays clean. Carried in `SoloRenderParams` (`champions` u32 + `championSize` f32 appended at bytes 144/148; the render UB grew 144 → 160). Has no effect in pixel-grid mode, where every particle is one cell.
 
 ---
 
@@ -806,6 +858,13 @@ Direction lerp rate in 1/s. Lower values produce wide, sweeping arcs as the spaw
 
 Seconds of joystick silence before the spawner deactivates. On re-activation after a timeout, the spawner is assigned a new random canvas position.
 
+### release burst / fireworks (`releaseBurstSpeed`)
+**Range:** 0 – 100 | **Default:** 30 | **Step:** 1
+
+The moment a spectator **stops** controlling (joystick released, or gone silent past `spawner timeout`), all of that spectator's free agents are flung outward in random directions — a fireworks burst — then the normal max-speed clamp and steering rein them back into the flow over the next fraction of a second. This value is the initial scatter speed (canvas px/frame); `0` disables the effect.
+
+Implementation: the release transition (both the explicit "joystick up" event and the inactivity timeout) sets a one-shot `burst` flag + random seed on the spectator's slot (the slot's former `_p1`/`_p2` padding). The compute shader, for that slot's assigned free agents, overrides velocity with `randomDir × releaseBurstSpeed`. The flag is cleared the frame after the compute consumes it, so it fires exactly once per release. Homing agents (those forming a loaded image) are not affected.
+
 ---
 
 ### respawn on QR (`respawnOnQR`)
@@ -959,7 +1018,12 @@ The `caption` field draws text at the bottom of the simulation canvas using the 
 
 ## Audio
 
-The simulation uses the Web Audio API to route sound through an `AnalyserNode`. Every frame, `getVolume()` reads an RMS value from the analyser and the compute shader uses it as a brightness multiplier for free agents — louder audio = brighter particles. Three sources share the same analyser simultaneously: the microphone (when enabled), the voiceover track, and the background track.
+The simulation uses the Web Audio API to route sound through an `AnalyserNode`. Every frame, `getVolume()` reads a smoothed RMS value (0–1) from the analyser. This value **leans the base palette toward `color2`** in the render shader — louder audio = more color2-dominant swarm — scaled by `audio → color2` (`color2AudioStr`). Three sources share the same analyser simultaneously: the microphone (when enabled), the voiceover track, and the background track.
+
+### audio → color2 (`color2AudioStr`)
+**Range:** 0 – 1 | **Default:** 1.0 | **Step:** 0.01
+
+How strongly room audio pushes the palette toward `color2`. The render shader mixes each free agent's base color (`color1`/`color2` by index) toward `color2` by `getVolume() × color2AudioStr`: at silence nothing changes (the normal `color1`/`color2` split shows), at peak volume the whole palette reaches `color2` (at strength 1.0). Set to 0 to disable the audio→color reaction entirely. Spectator-assigned colors and avoid-map sampled colors are not affected. (Audio no longer modulates brightness.)
 
 ### Audio unlock button
 
@@ -975,7 +1039,7 @@ Same delivery mechanism as `audio`, but loops continuously until stopped. Sendin
 
 ### Microphone
 
-Enabled via `startMic()` (not controllable from the GUI or n8n). When active, the microphone signal drives the same brightness pipeline as the audio tracks. The mic source is connected only to the analyser (not to `destination`) — no feedback loop.
+Enabled via `startMic()` (not controllable from the GUI or n8n). When active, the microphone signal drives the same color2-lean pipeline as the audio tracks. The mic source is connected only to the analyser (not to `destination`) — no feedback loop.
 
 ---
 

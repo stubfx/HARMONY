@@ -50,6 +50,9 @@
 //   [172] qrX1                 f32   (QR rect right edge)
 //   [176] qrY1                 f32   (QR rect bottom edge)
 //   [180] avoidMapInvert       u32   (1 = invert the avoidance map sample at read time: 1.0 - r)
+//   [184] golEnabled           u32
+//   [188] golStrength          f32
+//   [192] releaseBurstSpeed    f32   (initial speed of the fireworks scatter when a joystick is released; 0 = off)
 
 struct SoloParams {
     agentCount:     u32,
@@ -100,6 +103,7 @@ struct SoloParams {
     avoidMapInvert:       u32,
     golEnabled:           u32,   // 1 = particles are attracted to Game-of-Life live cells
     golStrength:          f32,   // attraction strength toward live cells
+    releaseBurstSpeed:    f32,   // fireworks scatter speed on joystick release (0 = disabled)
 }
 
 // Per-spectator partition data — color, joystick spawner position, personal wind.
@@ -115,8 +119,8 @@ struct SpectatorSlot {
     _p0:                  u32,
     windX:                f32,   // tilt-derived wind X — portrait = 0, scaled to ±1 at ±90° roll
     windY:                f32,   // tilt-derived wind Y — portrait = 0, scaled to ±1 at ±90° pitch
-    _p1:                  u32,
-    _p2:                  u32,
+    burst:                u32,   // 1 for the single frame after the joystick is released — scatter this slot's agents
+    burstSeed:            u32,   // per-release random seed so each burst differs
 }
 
 struct Agent {
@@ -597,10 +601,18 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     // Primed (homing) agents are never interrupted — they must finish homing.
     if (!homeInImg && params.spectatorCount > 0u && i < u32(f32(params.agentCount) * params.spectatorAgentShare)) {
         let slot = spectatorSlots[i % params.spectatorCount];
-        if (slot.isActive != 0u && slot.spawnerLocationActive != 0u) {
-            let rng = hash(i ^ (u32(params.time * 137.0) + 17u));
-            if (rng < params.spectatorSpawnChance) {
-                np = vec2<f32>(slot.spawnerX * params.canvasW, slot.spawnerY * params.canvasH);
+        if (slot.isActive != 0u) {
+            if (slot.burst != 0u && params.releaseBurstSpeed > 0.0) {
+                // Fireworks: the joystick was just released — fling this slot's agents
+                // outward in random directions. The normal max-speed clamp reins them
+                // back in over the next frames, so they scatter then rejoin the flow.
+                let ang = hash(i ^ slot.burstSeed) * 6.28318530718;
+                vel = vec2<f32>(cos(ang), sin(ang)) * params.releaseBurstSpeed;
+            } else if (slot.spawnerLocationActive != 0u) {
+                let rng = hash(i ^ (u32(params.time * 137.0) + 17u));
+                if (rng < params.spectatorSpawnChance) {
+                    np = vec2<f32>(slot.spawnerX * params.canvasW, slot.spawnerY * params.canvasH);
+                }
             }
         }
     }

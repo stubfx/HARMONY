@@ -146,8 +146,8 @@ All computation runs on the GPU. No Three.js. No WebGL.
 | Pass | Shader | Type | Description |
 |------|--------|------|-------------|
 | **Compute** | `compute.wgsl` | Compute | Agent physics (soloUB 144 bytes): formula steering, wind force + collective tilt bias, image-trace avoidance (gradient + lookahead), contamination circle avoidance, avoidance map (binding 4), edge bounce/wrap |
-| **Agent shadow density** | `agentShadow.wgsl` | Render | Greyscale splat texture — one soft disk per homing agent; used as a density probe by the compute shader |
-| **Agent shadow visual** | `agentShadow.wgsl` | Render | Dark soft splats blended onto the offscreen accumulation texture to create depth under homing agents |
+| **Agent shadow density** | `agentShadow.wgsl` | Render | Greyscale splat texture — one soft disk per homing agent; used as a density probe by the compute shader. Champions are excluded so they don't repel the swarm |
+| **Agent shadow visual** | `agentShadow.wgsl` | Render | Dark soft splats blended onto the offscreen accumulation texture to create depth under homing agents. Also drives **champion** trails — every Nth agent (Champions folder: `enabled` toggle + `1 in N`) drops a constant shadow under itself even while free, with no change to its movement. Free champions also render slightly larger (`champion size`, applied in `render.wgsl` only while not homing) |
 | **Fade** | `fade.wgsl` | Render | Black fullscreen quad with alpha blend — exponential trail decay each frame |
 | **Particles** | `render.wgsl` | Render | Per-agent quads drawn into `rgba16float` offscreen texture; additive **or** max blend selectable; speed-color tinted by collective temperature |
 | **Blit** | `blit.wgsl` | Render | Tone-map offscreen → canvas swap-chain (blitUB 32 bytes): `bgBlackCutoff` clamp, tone-black/white/gamma curve, shadow boost, color mode (NORMAL / GRAYSCALE / GRAYSCALE_INVERTED) |
@@ -263,9 +263,30 @@ The text is rendered as **white glyphs on a transparent canvas** using the brows
 - Texture rebuilds 300 ms after the last keystroke — no Enter needed
 - When combined with a loaded image, text is drawn on top in white
 - Clearing the image leaves text active; clearing the text field leaves the image active
-- Font is bold sans-serif, auto-fitted to the canvas width
+- Glyphs are drawn bold and auto-fitted to the canvas width, in the active font (see **Font** below)
 
 See [PARAMETERS.md](PARAMETERS.md) for full details on how sizing and layering work.
+
+---
+
+## Font
+
+The typeface used for both the trace text and the story caption is loaded **straight from Google Fonts at runtime**, so the machine running the simulation needs nothing installed locally. The default is **Bellefair**.
+
+A **font** field sits in the bottom-left panel, directly under the trace text input. Paste anything you can grab from [fonts.google.com](https://fonts.google.com) and press **Enter** (or blur the field). The parser accepts several shapes:
+
+| You paste | Example |
+|-----------|---------|
+| a bare family name | `Playfair Display` |
+| a css2 family spec | `Bebas+Neue:wght@700` |
+| the `family=` query part | `family=Inter:wght@700` |
+| a full embed URL | `https://fonts.googleapis.com/css2?family=Lora…` |
+
+The family name is extracted for the Canvas 2D `ctx.font`; the rest builds the `<link>` injected into `<head>`. If no weight axis is given, `wght@400;700` is requested so bold renders correctly.
+
+**How it works:** `loadFontSpec()` (in `src/sim.js`) injects/updates a `<link rel="stylesheet">` to Google Fonts, waits for the stylesheet to parse **and** for the glyphs to download via the CSS Font Loading API (`document.fonts.load`) — Canvas 2D will not paint with a webfont until it is ready — then re-renders the trace canvas. The font string carries a `sans-serif` fallback, so a bad name or a network failure degrades gracefully instead of breaking.
+
+The GUI mirrors this with a **font preset** dropdown (Trace folder) listing a handful of common Google Fonts; choosing one fills the input and applies it.
 
 ---
 
@@ -337,11 +358,15 @@ The HUD is **hidden by default**. Toggle it with:
 | Key | Effect |
 |-----|--------|
 | `Ctrl` | Toggle the HUD on/off |
-| `s` | Capture the current frame and download it as a PNG at canvas backing-store resolution. Plain `s` only — `Ctrl+S` / `Cmd+S` still trigger the browser's "Save Page". Ignored while focus is on an input or contenteditable element. For maximum resolution, set `render scale` to `1.0` before pressing. |
+| `s` | Capture the current frame and download it at canvas backing-store resolution. Default is an opaque PNG; the **Export** folder flags switch this to a transparent PNG and/or a CMYK TIFF (see below). Plain `s` only — `Ctrl+S` / `Cmd+S` still trigger the browser's "Save Page". Ignored while focus is on an input or contenteditable element. For maximum resolution, set `render scale` to `1.0` before pressing. |
+
+### Fullscreen
+
+A **⛶ toggle fullscreen** button sits at the very top of the lil-gui panel, above the state dropdowns. It toggles the browser Fullscreen API on `document.documentElement` (enter on first click, exit on the next). `Esc` also exits. The click counts as the user gesture the API requires.
 
 ### Top-level state controls
 
-Four dropdowns sit at the top of the lil-gui panel, above all folders. They mirror the set the n8n heartbeat exchanges:
+Four dropdowns sit below the fullscreen button, above all folders. They mirror the set the n8n heartbeat exchanges:
 
 | Control | Values | Description |
 |---------|--------|-------------|
@@ -393,6 +418,17 @@ The GUI has five folders below these dropdowns. See [PARAMETERS.md](PARAMETERS.m
 | tone gamma | Power curve: < 1 boosts darks, > 1 crushes darks |
 | shadow boost | Inverse-brightness lift peaking at ~12% luminance; makes faint trails pop |
 
+### Export
+
+Options for the `s` screenshot. Both **off by default** (default capture = opaque PNG, black background included, QR composited if visible).
+
+| Control | Description |
+|---------|-------------|
+| transparent bg | Drop the black background to transparency. The scene is additive light on true black, so per-pixel brightness (`max(r,g,b)`) is used as alpha and the RGB is un-premultiplied to keep the glow at full intensity. The QR overlay is **not** composited in this mode (its black modules would punch holes). Saved as RGBA PNG, or as a CMYK TIFF with a 5th alpha channel if CMYK is also on. |
+| CMYK (TIFF) | Convert to CMYK and save an uncompressed baseline **TIFF** (`.tif`) instead of PNG — PNG cannot hold CMYK. Conversion is a naive, device-independent RGB→CMYK with **no ICC profile** (final print conversion is expected in pro software). |
+
+The four combinations: opaque PNG (default) · transparent RGBA PNG · opaque CMYK TIFF · CMYK TIFF + unassociated alpha.
+
 ### Trace
 
 The trace layer loads an image onto the GPU and uses it to redirect agents.
@@ -404,6 +440,8 @@ The image is never rendered directly — it is felt through collective agent den
 | alpha threshold | Min image alpha required at an agent's home to activate homing |
 | black cutoff | Luminance below which pixels are treated as fully transparent |
 | edge fade | Width of smooth rectangular fade applied to all four image edges |
+| caption size | Story caption font size, as a fraction of `min(canvasW, canvasH)` |
+| font preset | Quick-pick of common Google Fonts; fills the **font** input and loads it (see [Font](#font)) |
 | size | Controls trace text overlay positioning; the trace image is always drawn fullscreen cover-fit (centered, aspect-ratio-preserving crop) |
 | show image | Grayscale debug overlay of the loaded image |
 | mouse eraser | Treat the mouse cursor as a live contamination point (toggle, default on) |
@@ -442,6 +480,7 @@ An invisible grayscale mask that repels free agents. White areas push agents awa
 | spawner velocity boost | Extra speed when joystick is flicked fast |
 | spawner steering | Direction change rate (1/s); lower = wider curves |
 | spawner timeout (s) | Seconds of joystick silence before spawner deactivates |
+| release burst (fireworks) | Scatter speed for a spectator's agents the moment they stop controlling (joystick released or timed out); 0 = off |
 | idle restore QR (s) | Seconds of silence from all remotes before QR trace is restored; 0 = disabled |
 | QR hides at N users | Remote page QR fades when `userCount` reaches this threshold |
 | n8n test mode | When on, calls `/webhook-test/` paths instead of `/webhook/`; no rebuild needed |
