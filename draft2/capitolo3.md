@@ -12,13 +12,13 @@ Esiste una forma di conoscenza che nasce soltanto dal fare. È diversa da quella
 
 I sistemi di simulazione basati su agenti sono particolarmente instabili nelle fasi di sviluppo, perché le interazioni tra migliaia di entità producono comportamenti emergenti che non si possono prevedere leggendo il codice. Un errore in una formula di movimento raramente dà un risultato sbagliato in modo ovvio, ma produce un comportamento inaspettato, che a volte è un bug e a volte è qualcosa di interessante.
 
-Più volte, durante lo sviluppo, mi sono trovato davanti a comportamenti che non avevo scritto. Particelle che formavano strutture filiformi invece di cluster tondi, correnti che si organizzavano in pattern ripetuti invece di fluire libere, oscillazioni che sembravano un respiro. In alcuni casi erano errori da correggere, in altri erano proprietà emergenti del sistema che non sapevo di voler costruire, ma che una volta viste sembravano ovvie.
+Più volte, durante lo sviluppo, mi sono trovato davanti a comportamenti che non avevo scritto. Particelle che formavano strutture filiformi invece di ammassi tondi, correnti che si organizzavano in schemi ripetuti invece di fluire libere, oscillazioni che sembravano un respiro. In alcuni casi erano errori da correggere, in altri erano proprietà emergenti del sistema che non sapevo di voler costruire, ma che una volta viste sembravano ovvie.
 
 > **[IMG]** Screenshot di un comportamento emergente inaspettato della simulazione: un pattern o una struttura che non era stata progettata esplicitamente, visivamente interessante proprio per la sua natura non intenzionale.
 
 Questo ha cambiato il modo in cui pensavo alla simulazione. Ha smesso di essere un sistema che controllavo ed è diventato un sistema con cui negoziavo. Le mie decisioni tecniche producevano effetti che poi osservavo e valutavo, e che usavo per prendere la decisione successiva. Lo stesso processo di sviluppo era un'esperienza di sciame, con me come agente, il sistema come ambiente e la simulazione come risultato emergente di quella relazione.
 
-Da qui è emersa una distinzione che conta, quella tra simulare un sistema e capire come si comporta. Si può scrivere la formula giusta senza sapere cosa produrrà nel groviglio di migliaia di interazioni a ogni frame, perché la comprensione vera arriva solo dall'osservazione in esecuzione, da quello che succede quando il sistema gira davvero.
+Da qui è emersa una distinzione che conta, quella tra simulare un sistema e capire come si comporta. Si può scrivere la formula giusta senza sapere cosa produrrà nel groviglio di migliaia di interazioni a ogni fotogramma, perché la comprensione vera arriva solo dall'osservazione in esecuzione, da quello che succede quando il sistema gira davvero.
 
 ### 3.1.2 Quando qualcosa ha funzionato
 
@@ -28,7 +28,7 @@ C'è un momento difficile da descrivere ma facile da riconoscere, quello in cui 
 
 Per questo progetto è arrivato la prima volta che ho visto le particelle rispondere al suono della stanza. Il sistema già funzionava, le particelle si muovevano, i colori dei partecipanti erano visibili, il joystick rispondeva. Ma quando ho capito che la luminosità dello sciame cambiava ogni volta che alzavo la voce, qualcosa è cambiato di qualità. Non stavo più guardando un programma che funzionava, stavo guardando qualcosa che ascoltava.
 
-Questa differenza è difficile da ridurre a criteri oggettivi. Non si misura in frame rate o in numero di particelle, si percepisce, perché c'è un momento in cui il sistema comincia ad avere una presenza, un carattere, qualcosa che lo rende riconoscibile come sé stesso invece che come la variante di qualcosa che esiste già. Riconoscere quel momento, e poi lavorare per conservarlo nelle iterazioni successive, è uno degli obiettivi impliciti di qualsiasi processo creativo.
+Questa differenza è difficile da ridurre a criteri oggettivi. Non si misura in fotogrammi al secondo o in numero di particelle, si percepisce, perché c'è un momento in cui il sistema comincia ad avere una presenza, un carattere, qualcosa che lo rende riconoscibile come sé stesso invece che come la variante di qualcosa che esiste già. Riconoscere quel momento, e poi lavorare per conservarlo nelle iterazioni successive, è uno degli obiettivi impliciti di qualsiasi processo creativo.
 
 ### 3.1.3 La distanza tra l'intenzione e il risultato
 
@@ -40,7 +40,7 @@ Altre cose sono emerse durante il lavoro e si sono rivelate centrali. La reattiv
 
 > **[IMG]** Documentazione di una fase intermedia dello sviluppo: screenshot più grezzo o interfaccia meno rifinita, a confronto implicito con lo stato attuale.
 
-Questa distanza tra intenzione e risultato è una parte normale di ogni processo creativo serio. È il segno che il lavoro ha avuto una vita propria e ha cambiato forma mentre veniva costruito. Chi costruisce qualcosa di non banale lo sa, perché l'oggetto finito raramente coincide con quello immaginato all'inizio, e quando coincide spesso è perché si è progettato in difetto, evitando le occasioni che il processo apriva strada facendo. Rick Rubin, in *The Creative Act* (2023), descrive l'artista come il custode di un progetto più che come il suo proprietario, qualcosa che ha una direzione propria che si rivela solo attraverso il fare. In anticipo non si può sapere dove porta, si può solo stare attenti a riconoscerlo quando ci si arriva.
+Questa distanza tra intenzione e risultato è una parte normale di ogni processo creativo serio. È il segno che il lavoro ha avuto una vita propria e ha cambiato forma mentre veniva costruito. Chi costruisce qualcosa di non banale lo sa, perché l'oggetto finito raramente coincide con quello immaginato all'inizio, e quando coincide spesso è perché si è progettato in difetto, evitando le occasioni che il processo apriva strada facendo. Rick Rubin, in *The Creative Act* del 2023, descrive l'artista come il custode di un progetto più che come il suo proprietario, qualcosa che ha una direzione propria che si rivela solo attraverso il fare. In anticipo non si può sapere dove porta, si può solo stare attenti a riconoscerlo quando ci si arriva.
 
 Alla fine quello che rimane è quello che si è riusciti a fare, con i vincoli del tempo, delle competenze disponibili e di quello che il sistema stesso suggeriva di diventare. Non è esattamente quello che volevo fare. In molti casi, è meglio.
 
@@ -52,7 +52,7 @@ Questa circolarità è al centro di molte delle domande più interessanti aperte
 
 ### 3.2.1 Chi guida chi
 
-In un sistema di particelle orientate dai partecipanti, la risposta alla domanda «chi guida?» è sempre provvisoria. I partecipanti guidano le proprie particelle, e questo è ovvio, ma il comportamento delle particelle altrui influenza quello che si vede, e quello che si vede influenza i gesti successivi. Il sistema ha una logica propria che resiste alle direzioni individuali, e la narrazione che arriva dall'esterno orienta l'attenzione.
+In un sistema di particelle orientate dai partecipanti, la risposta alla domanda su chi guidi è sempre provvisoria. I partecipanti guidano le proprie particelle, e questo è ovvio, ma il comportamento delle particelle altrui influenza quello che si vede, e quello che si vede influenza i gesti successivi. Il sistema ha una logica propria che resiste alle direzioni individuali, e la narrazione che arriva dall'esterno orienta l'attenzione.
 
 Alla fine non è chiaro chi stia guidando, o meglio, guidano tutti e nessuno guida del tutto. Il controllo è distribuito come nello sciame, perché nessuno vede l'intero, ognuno influenza una porzione, e il risultato finale appartiene a tutti i partecipanti insieme senza appartenere a nessuno in particolare.
 
@@ -82,7 +82,7 @@ Tutti gli aspetti descritti fin qui, le particelle, i momenti di partecipazione,
 
 Quando le persone entrano nella stanza, il sistema ha già qualcosa in corso. Esiste prima che qualcuno arrivi e continuerà a esistere dopo che se ne sarà andato.
 
-Questo cambia tutto nel tipo di relazione che si stabilisce. Davanti a un ambiente già in movimento la prima domanda non è «come lo uso?», è «cosa sta facendo?». Si osserva prima di agire, si cerca di capire la logica prima di intervenire. È una postura molto diversa da quella di chi usa uno strumento, perché chi usa uno strumento si avvicina con uno scopo già pronto e cerca i tasti che servono a raggiungerlo, mentre chi entra in questo progetto, le prime volte, si trova senza scopo. E quel vuoto, lontano dall'essere un difetto dell'interfaccia, è esattamente ciò che il sistema cerca di produrre.
+Questo cambia tutto nel tipo di relazione che si stabilisce. Davanti a un ambiente già in movimento la prima domanda non è come usarlo, ma cosa stia facendo. Si osserva prima di agire, si cerca di capire la logica prima di intervenire. È una postura molto diversa da quella di chi usa uno strumento, perché chi usa uno strumento si avvicina con uno scopo già pronto e cerca i tasti che servono a raggiungerlo, mentre chi entra in questo progetto, le prime volte, si trova senza scopo. E quel vuoto, lontano dall'essere un difetto dell'interfaccia, è esattamente ciò che il sistema cerca di produrre.
 
 Il sistema propone. Propone un comportamento, un ritmo, una qualità dell'esperienza, e i partecipanti rispondono a quella proposta con la propria. Il dialogo è già iniziato quando si collega il telefono, perché si entra in una conversazione in corso, non se ne apre una nuova.
 
@@ -90,7 +90,7 @@ Il sistema propone. Propone un comportamento, un ritmo, una qualità dell'esperi
 
 ### 3.2.4 Un'estetica della relazione
 
-Nicolas Bourriaud, nel libro *Estetica relazionale* (1998), descrive una tendenza dell'arte degli anni Novanta verso opere che producono modi di stare insieme, forme di relazione, più che oggetti da contemplare. L'opera diventa un contesto, lo spazio in cui nascono incontri tra persone, tra persone e sistemi, tra idee e corpi, e smette di essere un messaggio trasmesso da un autore a un pubblico.
+Nicolas Bourriaud, nel libro *Estetica relazionale* del 1998, descrive una tendenza dell'arte degli anni Novanta verso opere che producono modi di stare insieme, forme di relazione, più che oggetti da contemplare. L'opera diventa un contesto, lo spazio in cui nascono incontri tra persone, tra persone e sistemi, tra idee e corpi, e smette di essere un messaggio trasmesso da un autore a un pubblico.
 
 Questo progetto appartiene a quella tradizione, ma la prolunga in una direzione che Bourriaud non poteva prevedere, perché il sistema stesso diventa un interlocutore attivo, una presenza che partecipa alla relazione invece di limitarsi a ospitarla.
 

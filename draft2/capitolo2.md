@@ -164,7 +164,7 @@ C'è anche una ragione che viene da una lunga tradizione. Gran parte dell'arte c
 
 Una singola particella, sullo schermo, è quasi niente, un punto bianco di pochi pixel, appena visibile. Ma quando migliaia di particelle si trovano nello stesso punto la loro luce si somma, perché il rendering usa una miscelazione additiva, e invece di coprirsi a vicenda come farebbe la pittura i valori si sommano come fa la luce reale. Due luci sovrapposte danno una luce più intensa, non una mescolanza opaca.
 
-Questo significa che la densità diventa luminosità. Un cluster fitto di particelle produce un bagliore che supera di molto la luminosità di ogni singola particella, e le forme che emergono dallo sciame non sono disegnate, ma sono effetti di luce prodotti dall'accumulo.
+Questo significa che la densità diventa luminosità. Un ammasso fitto di particelle produce un bagliore che supera di molto la luminosità di ogni singola particella, e le forme che emergono dallo sciame non sono disegnate, ma sono effetti di luce prodotti dall'accumulo.
 
 > **[IMG]** Due stati a confronto: sciame disperso (particelle dim, quasi invisibili individualmente) e sciame denso (bagliore intenso, luce accumulata che produce alone luminoso).
 

@@ -20,7 +20,7 @@ C'è poi un secondo aspetto, perché alcune di quelle opere non aspettavano il p
 
 ### 1.1.2 La macchina come presenza
 
-Con la tecnologia questa relazione cambia natura, perché la macchina smette di essere lo sfondo o lo strumento neutro e prova a diventare una presenza, qualcosa che ha una propria logica e un proprio comportamento. La parola «presenza», però, può voler dire due cose molto diverse, e la distanza tra le due è il punto di questa sezione.
+Con la tecnologia questa relazione cambia natura, perché la macchina smette di essere lo sfondo o lo strumento neutro e prova a diventare una presenza, qualcosa che ha una propria logica e un proprio comportamento. La parola presenza, però, può voler dire due cose molto diverse, e la distanza tra le due è il punto di questa sezione.
 
 Da una parte c'è la macchina che reagisce, quella che traduce in immagini o in suono quello che le persone fanno e che, senza un gesto da cui partire, resta ferma ad aspettare. È una presenza condizionata, una specie di specchio che rimanda quello che riceve ma che da solo non produce niente, e che si accende soltanto quando qualcuno arriva a metterla in moto.
 
@@ -34,7 +34,7 @@ C'è poi una famiglia di opere che spinge tutto questo ancora più in là, perch
 
 Basta immaginare uno spazio in cui ognuno, muovendosi per conto suo, lascia attorno a sé una piccola traccia, e pensare a cosa succede quando le persone diventano molte, perché quelle tracce si moltiplicano e si sovrappongono fino a formare una geometria che cambia di continuo e che nessuno dei presenti ha deciso. Da solo non la si potrebbe ottenere, perché serve la quantità, serve che tante volontà separate agiscano nello stesso momento senza mettersi d'accordo.
 
-È questo il senso di «collettivo» che interessa al progetto, e non l'immersione o il pubblico che si scioglie nell'ambiente, perché qui le persone restano distinte e proprio agendo ciascuna per sé fanno emergere una forma comune. Togli i corpi e la loro simultaneità e l'opera non si indebolisce, semplicemente non c'è più, e resta soltanto un sistema in attesa.
+È questo il senso del collettivo che interessa al progetto, e non l'immersione o il pubblico che si scioglie nell'ambiente, perché qui le persone restano distinte e proprio agendo ciascuna per sé fanno emergere una forma comune. Togli i corpi e la loro simultaneità e l'opera non si indebolisce, semplicemente non c'è più, e resta soltanto un sistema in attesa.
 
 ### 1.1.4 Il mistero come scelta estetica
 
@@ -82,7 +82,7 @@ Il paradosso dell'intelligenza distribuita sta proprio qui, il sistema si compor
 
 ### 1.2.3 Dallo sciame biologico a quello digitale
 
-Nel 1987 l'informatico Craig Reynolds presentò al SIGGRAPH, la principale conferenza di computer grafica, un sistema di simulazione che aveva chiamato Boids, con l'obiettivo di replicare il comportamento degli storni in un ambiente digitale. Aveva dato a ogni agente tre regole, separazione (mantieni una distanza minima dai vicini per non scontrarti), allineamento (vai nella direzione media dei vicini), coesione (tendi verso il centro del gruppo vicino). Nessuna regola globale, nessuna mappa dell'intero sistema.
+Nel 1987 l'informatico Craig Reynolds presentò al SIGGRAPH, la principale conferenza di grafica computazionale, un sistema di simulazione che aveva chiamato Boids, con l'obiettivo di replicare il comportamento degli storni in un ambiente digitale. Aveva dato a ogni agente tre regole. La separazione tiene una distanza minima dai vicini per non scontrarsi, l'allineamento orienta il movimento verso la direzione media dei vicini, la coesione spinge verso il centro del gruppo vicino. Nessuna regola globale, nessuna mappa dell'intero sistema.
 
 Il risultato sorprese anche chi l'aveva costruito. I Boids si dividevano attorno agli ostacoli e si riunivano dall'altra parte, oscillavano, formavano code, si separavano e si ricompattavano. Reynolds aveva scritto tre regole, e il sistema ne mostrava molte di più, tutte emergenti e nessuna programmata, con quella qualità viva e auto-organizzata che nasceva da meccanismi presi uno per uno quasi banali.
 
