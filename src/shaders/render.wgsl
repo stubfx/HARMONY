@@ -36,6 +36,8 @@
 //   [132] avoidMapSampleColor  u32   (1 = non-homing particles take their base color from the avoid-map sample)
 //   [136] avoidMapFixedColor   u32   (paired with sampleColor: 1 = use the exact pixel, 0 = use it as base then mix with speed color)
 //   [140] avoidMapBlackCutoff  f32   (luminance floor on the sample: below this the sample is skipped, particle keeps base color)
+//   [144] champions            u32   (every Nth agent is a champion; 0 = off — mirrors the shadow pass)
+//   [148] championSize         f32   (point size for a FREE champion; ignored while homing)
 
 struct SoloRenderParams {
     agentCount:           u32,
@@ -74,6 +76,8 @@ struct SoloRenderParams {
     avoidMapSampleColor:  u32,
     avoidMapFixedColor:   u32,
     avoidMapBlackCutoff:  f32,
+    champions:            u32,
+    championSize:         f32,
 }
 
 struct Agent {
@@ -177,7 +181,12 @@ fn avoidMapColorAt(canvasPx: vec2<f32>) -> vec4<f32> {
              agent.pos.x / params.canvasW * 2.0 - 1.0,
             -(agent.pos.y / params.canvasH * 2.0 - 1.0),
         );
-        half = vec2<f32>(params.pointSize / params.canvasW, params.pointSize / params.canvasH);
+        // Champions render larger, but ONLY while free — a homing champion falls
+        // back to the normal agent size like everyone else.
+        let isChampion = params.champions != 0u && (agentId % params.champions) == 0u;
+        let homingNow  = params.hasImage != 0u && agent.primed > 0.5;
+        let sz = select(params.pointSize, params.championSize, isChampion && !homingNow);
+        half = vec2<f32>(sz / params.canvasW, sz / params.canvasH);
     }
     let finalNdc = ndc + corners[corner] * half * 2.0;
 

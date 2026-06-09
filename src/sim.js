@@ -80,6 +80,13 @@ const params = {
     // Agent shadow
     agentShadowStr:    0.20, // peak opacity of each homing-agent shadow splat (0–1)
     agentShadowRadius: 10,   // splat half-radius in canvas pixels
+    // Champions — every Nth agent (agentId % champions == 0) drops a constant shadow
+    // splat under itself even when free. 1 = every agent, 2 = one in two…
+    championsEnabled:  false, // master on/off for the whole champions feature
+    champions:         2,
+    // Champion point size — applied ONLY while a champion is free (not homing);
+    // homing champions render at the normal agent size like everyone else.
+    championSize:      2.0,
     // Game of Life mode — toggle
     golEnabled:      false,
     golStrength:     0.5,  // attraction of particles toward live cells
@@ -367,7 +374,7 @@ const soloUB = device.createBuffer({
     size: 192, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
-    size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 160, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const fadeUB = device.createBuffer({
     size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -2319,6 +2326,8 @@ function writeRenderUB() {
     u[33] = params.avoidMapSampleColor ? 1 : 0;
     u[34] = params.avoidMapFixedColor  ? 1 : 0;
     f[35] = params.avoidMapBlackCutoff;
+    u[36] = params.championsEnabled ? params.champions : 0;
+    f[37] = params.championSize;
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 
@@ -2365,6 +2374,7 @@ function writeAgentShadowUB() {
     _shadowU[4] = hasImage ? 1 : 0;
     _shadowF[5] = params.homingProximityRange;
     _shadowF[6] = params.homingMinAlpha;
+    _shadowU[7] = params.championsEnabled ? params.champions : 0;
     device.queue.writeBuffer(agentShadowUB, 0, _shadowAB);
 }
 
@@ -2408,7 +2418,7 @@ function writeContamUB() {
 
 // ── Pre-allocated uniform buffers (reused every frame to avoid GC pressure) ──
 const _soloAB  = new ArrayBuffer(192); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
-const _renderAB= new ArrayBuffer(144); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
+const _renderAB= new ArrayBuffer(160); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
 const _fadeAB  = new ArrayBuffer(16);  const _fadeF  = new Float32Array(_fadeAB);
 const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB); const _blitU  = new Uint32Array(_blitAB);
 const _downsampleAB = new ArrayBuffer(16); const _downsampleF = new Float32Array(_downsampleAB);
@@ -2718,7 +2728,8 @@ function frame(ts) {
     rp.setBindGroup(0, fadeBG);
     rp.draw(3);
     // Agent shadow is a soft splat — incoherent with chunky cells, skip in pixel mode.
-    if (hasImage && agentShadowBG && !usingPixel) {
+    // Runs when an image is loaded (homing shadows) or champions are active (constant shadows).
+    if ((hasImage || (params.championsEnabled && params.champions > 0)) && agentShadowBG && !usingPixel) {
         rp.setPipeline(agentShadowPipe);
         rp.setBindGroup(0, agentShadowBG);
         rp.draw(params.agentCount * 6);

@@ -146,8 +146,8 @@ All computation runs on the GPU. No Three.js. No WebGL.
 | Pass | Shader | Type | Description |
 |------|--------|------|-------------|
 | **Compute** | `compute.wgsl` | Compute | Agent physics (soloUB 144 bytes): formula steering, wind force + collective tilt bias, image-trace avoidance (gradient + lookahead), contamination circle avoidance, avoidance map (binding 4), edge bounce/wrap |
-| **Agent shadow density** | `agentShadow.wgsl` | Render | Greyscale splat texture — one soft disk per homing agent; used as a density probe by the compute shader |
-| **Agent shadow visual** | `agentShadow.wgsl` | Render | Dark soft splats blended onto the offscreen accumulation texture to create depth under homing agents |
+| **Agent shadow density** | `agentShadow.wgsl` | Render | Greyscale splat texture — one soft disk per homing agent; used as a density probe by the compute shader. Champions are excluded so they don't repel the swarm |
+| **Agent shadow visual** | `agentShadow.wgsl` | Render | Dark soft splats blended onto the offscreen accumulation texture to create depth under homing agents. Also drives **champion** trails — every Nth agent (Champions folder: `enabled` toggle + `1 in N`) drops a constant shadow under itself even while free, with no change to its movement. Free champions also render slightly larger (`champion size`, applied in `render.wgsl` only while not homing) |
 | **Fade** | `fade.wgsl` | Render | Black fullscreen quad with alpha blend — exponential trail decay each frame |
 | **Particles** | `render.wgsl` | Render | Per-agent quads drawn into `rgba16float` offscreen texture; additive **or** max blend selectable; speed-color tinted by collective temperature |
 | **Blit** | `blit.wgsl` | Render | Tone-map offscreen → canvas swap-chain (blitUB 32 bytes): `bgBlackCutoff` clamp, tone-black/white/gamma curve, shadow boost, color mode (NORMAL / GRAYSCALE / GRAYSCALE_INVERTED) |

@@ -20,7 +20,7 @@
 //   [16] hasImage             u32
 //   [20] homingProximityRange f32   (canvas px over which shadow fades in)
 //   [24] homingMinAlpha       f32   (minimum shadow alpha at max distance)
-//   [28] _p2                  u32
+//   [28] champions            u32   (every Nth agent drops a constant shadow; 0 = off)
 
 struct AgentShadowParams {
     canvasW:              f32,
@@ -30,7 +30,7 @@ struct AgentShadowParams {
     hasImage:             u32,
     homingProximityRange: f32,
     homingMinAlpha:       f32,
-    _p2:                  u32,
+    champions:            u32,
 }
 
 struct Agent {
@@ -55,10 +55,11 @@ struct ContamParams {
 @group(0) @binding(2) var<uniform>       contam: ContamParams;
 
 struct VsOut {
-    @builtin(position) clipPos:    vec4<f32>,
-    @location(0)       agentPos:   vec2<f32>,  // agent centre in canvas pixels
-    @location(1)       isHoming:   f32,
-    @location(2)       proximityT: f32,         // 0 = far from home, 1 = at home
+    @builtin(position) clipPos:     vec4<f32>,
+    @location(0)       agentPos:    vec2<f32>,  // agent centre in canvas pixels
+    @location(1)       emit:        f32,         // 1 = draw a visual shadow splat this frame
+    @location(2)       proximityT:  f32,         // 0 = far from home, 1 = at home
+    @location(3)       densityEmit: f32,         // 1 = contribute to deterrent density (homing only)
 }
 
 @vertex fn vs(@builtin(vertex_index) vi: u32) -> VsOut {
@@ -85,10 +86,22 @@ struct VsOut {
         }
     }
 
-    // Proximity factor: shadow strengthens as the agent closes in on its home pixel.
+    // Champions: every Nth agent leaves a shadow constantly, even when free.
+    let isChampion = p.champions != 0u && (agentId % p.champions) == 0u;
+
+    // Homing-driven shadow needs a loaded image; champions don't.
+    let homingShadow = isHoming > 0.5 && p.hasImage != 0u;
+    let emit         = homingShadow || isChampion;
+    // Only true homing feeds the deterrent density — champions are purely visual,
+    // so they don't make other agents avoid them.
+    let densityEmit  = homingShadow;
+
+    // Proximity factor: homing shadow strengthens as the agent nears its home pixel.
+    // Champions emit at constant full strength.
     let distToHome = length(agent.pos - agent.home);
     let rawT       = 1.0 - clamp(distToHome / max(p.homingProximityRange, 1.0), 0.0, 1.0);
-    let proximityT = mix(p.homingMinAlpha, 1.0, rawT);
+    var proximityT = mix(p.homingMinAlpha, 1.0, rawT);
+    if (isChampion) { proximityT = 1.0; }
 
     let ndc = vec2<f32>(
          agent.pos.x / p.canvasW * 2.0 - 1.0,
@@ -96,7 +109,7 @@ struct VsOut {
     );
 
     var clipPos: vec4<f32>;
-    if (isHoming > 0.5 && p.hasImage != 0u) {
+    if (emit) {
         let halfW = p.shadowRadius / p.canvasW;
         let halfH = p.shadowRadius / p.canvasH;
         clipPos = vec4<f32>(ndc + corners[corner] * vec2<f32>(halfW, halfH) * 2.0, 0.0, 1.0);
@@ -105,11 +118,11 @@ struct VsOut {
         clipPos = vec4<f32>(10.0, 10.0, 0.0, 1.0);
     }
 
-    return VsOut(clipPos, agent.pos, isHoming, proximityT);
+    return VsOut(clipPos, agent.pos, select(0.0, 1.0, emit), proximityT, select(0.0, 1.0, densityEmit));
 }
 
 @fragment fn fs(in: VsOut) -> @location(0) vec4<f32> {
-    if (in.isHoming < 0.5) { return vec4<f32>(0.0); }
+    if (in.emit < 0.5) { return vec4<f32>(0.0); }
     // @builtin(position).xy gives the fragment centre in canvas (framebuffer) pixels,
     // matching the canvas-pixel space of agent.pos — distance is in canvas pixels.
     let dist    = length(in.clipPos.xy - in.agentPos);
@@ -121,8 +134,9 @@ struct VsOut {
 // Cleared to black each frame; additive blend makes overlapping agents accumulate.
 // Brightness = shadow strength at each fragment; compute probe reads this as a
 // continuous deterrent signal (brighter = denser swarm = stronger avoidance).
+// Champions are excluded here (densityEmit) so they don't repel the rest of the swarm.
 @fragment fn fs_density(in: VsOut) -> @location(0) vec4<f32> {
-    if (in.isHoming < 0.5) { return vec4<f32>(0.0); }
+    if (in.densityEmit < 0.5) { return vec4<f32>(0.0); }
     let dist    = length(in.clipPos.xy - in.agentPos);
     let falloff = 1.0 - smoothstep(0.0, p.shadowRadius, dist);
     let v       = falloff * p.shadowStr * in.proximityT;

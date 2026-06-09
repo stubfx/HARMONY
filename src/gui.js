@@ -150,6 +150,13 @@ export function initGUI({
     fHoming.add(params, 'homingProximityRange', 0, 2000, 10   ).name('proximity range (px)');
     fHoming.add(params, 'homingMinAlpha',       0, 1,    0.01 ).name('proximity min alpha');
 
+    // ── Champions ───────────────────────────────────────────────────────────────
+    const fChampions = gui.addFolder('Champions');
+    fChampions.add(params, 'championsEnabled').name('enabled');
+    fChampions.add(params, 'champions',    1, 500, 1   ).name('1 in N');
+    fChampions.add(params, 'championSize', 0.1, 12, 0.1).name('size (free)');
+    fChampions.close();
+
     // ── Probe ─────────────────────────────────────────────────────────────────
     const fProbe = gui.addFolder('Probe');
     fProbe.add(params, 'probeLen',         5, 300,               1   ).name('probe distance');
