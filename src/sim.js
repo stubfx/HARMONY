@@ -106,6 +106,9 @@ const params = {
     probeSensorAngle:  0.785, // half-angle between left/right Physarum sensors (radians; π/4 ≈ 45°)
     // Caption
     captionSize:   0.035, // font size as fraction of min(canvas width, canvas height)
+    // Font — Google Fonts family used for trace/caption text, loaded at runtime
+    // (nothing installed on the host machine). Empty string = system sans-serif.
+    fontFamily:    'Inter',
     // Auto-clear
     clearDelay:    0,     // seconds before auto-clearing user trace content (0 = disabled)
     // DOT mode
@@ -937,6 +940,70 @@ function updateQROverlay() {
 // full-screen rect and agents can home to any bright pixel on screen.
 let captionText = ''; // story caption — drawn at bottom of trace canvas like subtitle
 
+// ── Google Fonts loader ─────────────────────────────────────────────────────
+// Loads a typeface straight from Google Fonts at runtime (CSS link + the CSS
+// Font Loading API), so the machine running the simulation needs nothing
+// installed. Canvas 2D won't paint with a webfont until the glyphs are ready,
+// so we await loading and then re-render the trace canvas. Falls back to
+// sans-serif if the family can't be fetched.
+//
+// Accepts anything you can grab from fonts.google.com:
+//   • a bare family name              "Playfair Display"
+//   • a css2 family spec              "Bebas+Neue:wght@400;700"
+//   • the family= query part          "family=Inter:wght@700"
+//   • a full embed URL                "https://fonts.googleapis.com/css2?family=…"
+function parseFontSpec(raw) {
+    let spec = (raw || '').trim();
+    if (!spec) return null;
+    if (/fonts\.googleapis\.com/.test(spec)) {
+        const m = spec.match(/[?&]family=([^&]+)/);
+        spec = m ? m[1] : '';
+    } else if (/^family=/.test(spec)) {
+        spec = spec.replace(/^family=/, '');
+    }
+    if (!spec) return null;
+    // Family name (for canvas ctx.font) is the part before the ':' axis spec,
+    // with '+' turned back into spaces.
+    const family = spec.split(':')[0].replace(/\+/g, ' ').trim();
+    if (!family) return null;
+    // Build a css2 query: spaces → '+', keep ':' ';' '@' literal as Google wants.
+    let query = spec.replace(/\s+/g, '+');
+    if (!query.includes(':')) query += ':wght@400;700'; // ensure bold + regular
+    return { href: `https://fonts.googleapis.com/css2?family=${query}&display=swap`, family };
+}
+
+let _fontLinkEl = null;
+async function loadFontSpec(raw) {
+    const parsed = parseFontSpec(raw);
+    if (!parsed) { params.fontFamily = ''; renderTraceCanvas(); return; }
+    const { href, family } = parsed;
+    if (!_fontLinkEl) {
+        _fontLinkEl = document.createElement('link');
+        _fontLinkEl.rel = 'stylesheet';
+        _fontLinkEl.id  = 'google-font-link';
+        document.head.appendChild(_fontLinkEl);
+    }
+    try {
+        // Setting href fetches + parses the @font-face rules. Wait for that
+        // before asking the Font Loading API to download the actual glyphs.
+        if (_fontLinkEl.href !== href) {
+            await new Promise((resolve, reject) => {
+                _fontLinkEl.onload  = resolve;
+                _fontLinkEl.onerror = reject;
+                _fontLinkEl.href    = href;
+            });
+        }
+        await Promise.all([
+            document.fonts.load(`bold 100px "${family}"`),
+            document.fonts.load(`400 100px "${family}"`),
+        ]);
+    } catch (e) {
+        console.warn(`Could not load Google Font "${family}" — using sans-serif fallback.`, e);
+    }
+    params.fontFamily = family;
+    renderTraceCanvas();
+}
+
 function renderTraceCanvas() {
     if (!device) return;
 
@@ -969,6 +1036,8 @@ function renderTraceCanvas() {
     const tcW = Math.min(Math.max(1, Math.round(canvas.width  * params.traceScale)), MAX_DIM);
     const tcH = Math.min(Math.max(1, Math.round(canvas.height * params.traceScale)), MAX_DIM);
     const minDim = Math.min(tcW, tcH);
+    // Google-font family (loaded at runtime) with a system fallback baked in.
+    const fontStack = params.fontFamily ? `"${params.fontFamily}", sans-serif` : 'sans-serif';
 
     // ── 2. Paint layers ───────────────────────────────────────────────────────
     if (!traceCanvas) traceCanvas = document.createElement('canvas');
@@ -1007,7 +1076,7 @@ function renderTraceCanvas() {
         if (!imageBitmap) {
             // Multi-line word-wrap centered on (cx, cy)
             const fontSize = Math.round(minDim * 0.10);
-            ctx.font = `bold ${fontSize}px sans-serif`;
+            ctx.font = `bold ${fontSize}px ${fontStack}`;
             const maxW  = tcW * 0.88;
             const words = text.split(/\s+/);
             const lines = [];
@@ -1024,12 +1093,12 @@ function renderTraceCanvas() {
         } else {
             // Single line over an image — shrink font to fit width
             let fontSize = minDim * 0.72;
-            ctx.font = `bold ${Math.round(fontSize)}px sans-serif`;
+            ctx.font = `bold ${Math.round(fontSize)}px ${fontStack}`;
             const measured = ctx.measureText(text).width;
             const maxW     = tcW * 0.92;
             if (measured > maxW) {
                 fontSize *= maxW / measured;
-                ctx.font  = `bold ${Math.round(fontSize)}px sans-serif`;
+                ctx.font  = `bold ${Math.round(fontSize)}px ${fontStack}`;
             }
             ctx.fillText(text, cx, cy);
         }
@@ -1041,7 +1110,7 @@ function renderTraceCanvas() {
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'alphabetic';
         const fontSize = Math.round(minDim * params.captionSize);
-        ctx.font = `bold ${fontSize}px sans-serif`;
+        ctx.font = `bold ${fontSize}px ${fontStack}`;
         const maxW  = tcW * 0.80;
         const words = captionText.split(/\s+/);
         const lines = [];
@@ -1867,7 +1936,7 @@ function applySimParams(data) {
 } = initGUI({
     params, socket, simState, MAX_AGENTS,
     seedAgents, seedGoL, setSize, rebuildOffscreen, rebuildGridTex,
-    renderTraceCanvas, generateQR,
+    renderTraceCanvas, generateQR, loadFontSpec,
     clearMagnetImage, clearTraceText, clearAvoidMap,
     restartHeartbeat,
 }));
@@ -2028,6 +2097,18 @@ document.querySelector('#trace-text-input').addEventListener('input', () => {
         scheduleAutoClear();
     }, 300);
 });
+
+// ── Font UI wiring ────────────────────────────────────────────────────────────
+// Paste a Google Fonts family (or the relevant part of its URL) and apply on
+// Enter or blur. The default family is loaded once at startup.
+const fontInput = document.querySelector('#font-input');
+if (fontInput) {
+    fontInput.value = params.fontFamily;
+    const applyFontInput = () => loadFontSpec(fontInput.value);
+    fontInput.addEventListener('change', applyFontInput);
+    fontInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyFontInput(); });
+}
+loadFontSpec(params.fontFamily); // load the default Google Font on boot
 
 // ── Hex color → float RGB ─────────────────────────────────────────────────────
 function hexToF(hex) {
