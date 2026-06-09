@@ -108,7 +108,7 @@ const params = {
     captionSize:   0.035, // font size as fraction of min(canvas width, canvas height)
     // Font — Google Fonts family used for trace/caption text, loaded at runtime
     // (nothing installed on the host machine). Empty string = system sans-serif.
-    fontFamily:    'Inter',
+    fontFamily:    'Bellefair',
     // Auto-clear
     clearDelay:    0,     // seconds before auto-clearing user trace content (0 = disabled)
     // DOT mode

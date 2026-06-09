@@ -263,9 +263,30 @@ The text is rendered as **white glyphs on a transparent canvas** using the brows
 - Texture rebuilds 300 ms after the last keystroke — no Enter needed
 - When combined with a loaded image, text is drawn on top in white
 - Clearing the image leaves text active; clearing the text field leaves the image active
-- Font is bold sans-serif, auto-fitted to the canvas width
+- Glyphs are drawn bold and auto-fitted to the canvas width, in the active font (see **Font** below)
 
 See [PARAMETERS.md](PARAMETERS.md) for full details on how sizing and layering work.
+
+---
+
+## Font
+
+The typeface used for both the trace text and the story caption is loaded **straight from Google Fonts at runtime**, so the machine running the simulation needs nothing installed locally. The default is **Bellefair**.
+
+A **font** field sits in the bottom-left panel, directly under the trace text input. Paste anything you can grab from [fonts.google.com](https://fonts.google.com) and press **Enter** (or blur the field). The parser accepts several shapes:
+
+| You paste | Example |
+|-----------|---------|
+| a bare family name | `Playfair Display` |
+| a css2 family spec | `Bebas+Neue:wght@700` |
+| the `family=` query part | `family=Inter:wght@700` |
+| a full embed URL | `https://fonts.googleapis.com/css2?family=Lora…` |
+
+The family name is extracted for the Canvas 2D `ctx.font`; the rest builds the `<link>` injected into `<head>`. If no weight axis is given, `wght@400;700` is requested so bold renders correctly.
+
+**How it works:** `loadFontSpec()` (in `src/sim.js`) injects/updates a `<link rel="stylesheet">` to Google Fonts, waits for the stylesheet to parse **and** for the glyphs to download via the CSS Font Loading API (`document.fonts.load`) — Canvas 2D will not paint with a webfont until it is ready — then re-renders the trace canvas. The font string carries a `sans-serif` fallback, so a bad name or a network failure degrades gracefully instead of breaking.
+
+The GUI mirrors this with a **font preset** dropdown (Trace folder) listing a handful of common Google Fonts; choosing one fills the input and applies it.
 
 ---
 
@@ -339,9 +360,13 @@ The HUD is **hidden by default**. Toggle it with:
 | `Ctrl` | Toggle the HUD on/off |
 | `s` | Capture the current frame and download it as a PNG at canvas backing-store resolution. Plain `s` only — `Ctrl+S` / `Cmd+S` still trigger the browser's "Save Page". Ignored while focus is on an input or contenteditable element. For maximum resolution, set `render scale` to `1.0` before pressing. |
 
+### Fullscreen
+
+A **⛶ toggle fullscreen** button sits at the very top of the lil-gui panel, above the state dropdowns. It toggles the browser Fullscreen API on `document.documentElement` (enter on first click, exit on the next). `Esc` also exits. The click counts as the user gesture the API requires.
+
 ### Top-level state controls
 
-Four dropdowns sit at the top of the lil-gui panel, above all folders. They mirror the set the n8n heartbeat exchanges:
+Four dropdowns sit below the fullscreen button, above all folders. They mirror the set the n8n heartbeat exchanges:
 
 | Control | Values | Description |
 |---------|--------|-------------|
@@ -404,6 +429,8 @@ The image is never rendered directly — it is felt through collective agent den
 | alpha threshold | Min image alpha required at an agent's home to activate homing |
 | black cutoff | Luminance below which pixels are treated as fully transparent |
 | edge fade | Width of smooth rectangular fade applied to all four image edges |
+| caption size | Story caption font size, as a fraction of `min(canvasW, canvasH)` |
+| font preset | Quick-pick of common Google Fonts; fills the **font** input and loads it (see [Font](#font)) |
 | size | Controls trace text overlay positioning; the trace image is always drawn fullscreen cover-fit (centered, aspect-ratio-preserving crop) |
 | show image | Grayscale debug overlay of the loaded image |
 | mouse eraser | Treat the mouse cursor as a live contamination point (toggle, default on) |

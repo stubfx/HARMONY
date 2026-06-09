@@ -23,7 +23,24 @@ The texture is rebuilt 300 ms after the last keystroke (debounced). There is no 
 - **Text only** (no image loaded): the canvas width is fixed to the screen width (capped at the GPU's `maxTextureDimension2D` limit). Text is word-wrapped across multiple lines; font size is approximately 6% of the canvas width. Canvas height grows with the number of lines. This prevents arbitrarily wide textures when long strings are received (e.g. from n8n).
 - **Text + image**: the canvas is the same pixel dimensions as the loaded image. The text is drawn on top at auto-fitted size (starting at 72% of the image height, scaled down if the text would overflow 92% of the image width).
 
-The font is always **bold sans-serif**. The fill is always **white** (RGB 1,1,1), so agents homing to text glyphs are rendered bright white — unless a loaded image provides color underneath, in which case the image RGB shows through.
+The glyphs are always drawn **bold**, in the active font (see **Font** below; default **Bellefair**, with a `sans-serif` fallback). The fill is always **white** (RGB 1,1,1), so agents homing to text glyphs are rendered bright white — unless a loaded image provides color underneath, in which case the image RGB shows through.
+
+### Font (`fontFamily`)
+
+The typeface for both the trace text and the story caption is loaded **from Google Fonts at runtime** — nothing is installed on the host machine. Default: **Bellefair**.
+
+A **font** input sits directly below the trace text field in the formula panel. Paste anything you can copy from [fonts.google.com](https://fonts.google.com) and press **Enter** (or blur the field):
+
+| Form | Example |
+|------|---------|
+| bare family name | `Playfair Display` |
+| css2 family spec | `Bebas+Neue:wght@700` |
+| `family=` query part | `family=Inter:wght@700` |
+| full embed URL | `https://fonts.googleapis.com/css2?family=Lora…` |
+
+`parseFontSpec()` extracts the family name (used for `ctx.font`) and builds the Google Fonts `<link>` href; if no weight axis is supplied, `wght@400;700` is added so bold renders. `loadFontSpec()` injects/updates the `<link>`, waits for the stylesheet to parse and for the glyphs to download (`document.fonts.load` — Canvas 2D will not paint with a webfont before it is ready), then re-renders the trace canvas. A bad name or network failure falls back to `sans-serif` silently.
+
+The GUI's **font preset** dropdown (Trace folder) lists a few common Google Fonts; picking one fills the input and applies it.
 
 ### Layering with a loaded image
 

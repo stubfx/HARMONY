@@ -122,7 +122,7 @@ export function initGUI({
     fMagnet.add(params, 'captionSize', 0.02, 0.15, 0.005).name('caption size').onChange(renderTraceCanvas);
     // Font presets — selecting one fills the #font-input and loads it from Google Fonts.
     const FONT_PRESETS = [
-        'Inter', 'Roboto', 'Montserrat', 'Oswald', 'Bebas Neue', 'Anton',
+        'Bellefair', 'Inter', 'Roboto', 'Montserrat', 'Oswald', 'Bebas Neue', 'Anton',
         'Archivo Black', 'Playfair Display', 'Lora', 'Space Mono', 'Spline Sans Mono',
     ];
     fMagnet.add({ preset: params.fontFamily }, 'preset', FONT_PRESETS).name('font preset').onChange(v => {
