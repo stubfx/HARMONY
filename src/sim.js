@@ -2157,6 +2157,7 @@ let smoothCoherence   = 0.5;
 
 // ── Join burst state ──────────────────────────────────────────────────────────
 // When a spectator joins, a single brightness pulse fires across the field.
+const REST_BRIGHTNESS  = 0.1;   // fixed brightness scale — former audio "silence floor" (audio now drives color, not brightness)
 const BURST_BRIGHTNESS = 0.4;   // peak brightness boost added to params.brightness
 const BURST_DECAY      = 0.88;  // per frame — fully dissipated in ~0.5 s at 60 fps
 const BURST_THRESHOLD  = 0.001;
@@ -2290,7 +2291,10 @@ function writeRenderUB() {
     f[14] = c2[1];
     f[15] = c2[2];
     // Audio no longer affects brightness — it leans the palette toward color2 instead (f[38]).
-    f[16] = params.brightness + burstBrightness + pulseEnergy;
+    // Audio used to multiply brightness by audioMult ∈ [0.1, 1.0] (0.1 at rest). Keep that
+    // former resting level as a fixed scale so the at-rest look is unchanged; brightness,
+    // burst and pulse stay in the same balance they had before.
+    f[16] = (params.brightness + burstBrightness + pulseEnergy) * REST_BRIGHTNESS;
     f[17] = params.alphaThreshold;
     f[18] = params.blackThreshold;
     f[19] = simState.qrStatus === 'SHOW' ? 0 : params.vignetteEdge;
