@@ -423,7 +423,7 @@ Because homing agents are drawn on top of the trail (with additive blend) in the
 ---
 
 ### champions (`championsEnabled`, `champions`)
-**enabled:** off by default · **1 in N:** 1 – 1500, default 700, step 1
+**enabled:** on by default · **1 in N:** 1 – 1500, default 700, step 1
 
 The **Champions** GUI folder gathers the whole feature. `enabled` is the master on/off; while off, champions are fully inert (the UBs receive `champions = 0`). `1 in N` selects champion agents by modulo on the agent index: every agent where `agentId % N == 0` becomes a champion. So `2` makes one in every two a champion, `10` one in ten, `1` makes every agent a champion.
 
