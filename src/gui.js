@@ -204,6 +204,7 @@ export function initGUI({
     fSession.add(params, 'spawnerVelocityBoost',     0,   5,  0.1 ).name('spawner velocity boost');
     fSession.add(params, 'spawnerSteering',          1,  20,  0.5 ).name('spawner steering');
     fSession.add(params, 'spawnerInactiveTimeout',   1,  30,  1   ).name('spawner timeout (s)');
+    fSession.add(params, 'releaseBurstSpeed',        0, 100,  1   ).name('release burst (fireworks)');
     fSession.add(params, 'remoteTimeout',            0, 180,  5   ).name('idle restore QR (s)');
     fSession.add(params, 'maxSpectators',            1,  50,  1   ).name('QR hides at N users');
     fSession.add(params, 'n8nEnabled').name('n8n enabled').onChange(() => restartHeartbeat());

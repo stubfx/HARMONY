@@ -858,6 +858,13 @@ Direction lerp rate in 1/s. Lower values produce wide, sweeping arcs as the spaw
 
 Seconds of joystick silence before the spawner deactivates. On re-activation after a timeout, the spawner is assigned a new random canvas position.
 
+### release burst / fireworks (`releaseBurstSpeed`)
+**Range:** 0 – 100 | **Default:** 30 | **Step:** 1
+
+The moment a spectator **stops** controlling (joystick released, or gone silent past `spawner timeout`), all of that spectator's free agents are flung outward in random directions — a fireworks burst — then the normal max-speed clamp and steering rein them back into the flow over the next fraction of a second. This value is the initial scatter speed (canvas px/frame); `0` disables the effect.
+
+Implementation: the release transition (both the explicit "joystick up" event and the inactivity timeout) sets a one-shot `burst` flag + random seed on the spectator's slot (the slot's former `_p1`/`_p2` padding). The compute shader, for that slot's assigned free agents, overrides velocity with `randomDir × releaseBurstSpeed`. The flag is cleared the frame after the compute consumes it, so it fires exactly once per release. Homing agents (those forming a loaded image) are not affected.
+
 ---
 
 ### respawn on QR (`respawnOnQR`)

@@ -480,6 +480,7 @@ An invisible grayscale mask that repels free agents. White areas push agents awa
 | spawner velocity boost | Extra speed when joystick is flicked fast |
 | spawner steering | Direction change rate (1/s); lower = wider curves |
 | spawner timeout (s) | Seconds of joystick silence before spawner deactivates |
+| release burst (fireworks) | Scatter speed for a spectator's agents the moment they stop controlling (joystick released or timed out); 0 = off |
 | idle restore QR (s) | Seconds of silence from all remotes before QR trace is restored; 0 = disabled |
 | QR hides at N users | Remote page QR fades when `userCount` reaches this threshold |
 | n8n test mode | When on, calls `/webhook-test/` paths instead of `/webhook/`; no rebuild needed |

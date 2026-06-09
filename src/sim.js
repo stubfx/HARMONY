@@ -135,6 +135,7 @@ const params = {
     spawnerVelocityBoost:   2.0,  // multiplier applied to spawnerSpeed when joystick is moved quickly (0 = no boost)
     spawnerSteering:        6,    // direction-change rate (1/s); lower = wider curves, higher = tighter turns
     spawnerInactiveTimeout: 5,    // seconds of joystick silence before spawner goes inactive
+    releaseBurstSpeed:      30,   // fireworks: speed agents scatter at when a joystick is released (0 = disabled)
     // Session / QR restore
     remoteTimeout:  0,    // seconds of silence from all remotes before QR is restored (0 = disabled)
     maxSpectators:  1,    // sim QR hides when connected count reaches this threshold
@@ -371,7 +372,7 @@ const agentBuf = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 const soloUB = device.createBuffer({
-    size: 192, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 208, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
     size: 160, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -1604,10 +1605,17 @@ function uploadSpectatorSlots() {
         u[b + 7] = 0;
         f[b + 8] = s.windX;
         f[b + 9] = s.windY;
-        u[b + 10] = 0;
-        u[b + 11] = 0;
+        u[b + 10] = s.burst ? 1 : 0;
+        u[b + 11] = s.burstSeed >>> 0;
     }
     device.queue.writeBuffer(spectatorSlotsBuf, 0, ab);
+}
+
+// Fireworks: flag a slot's agents to scatter in random directions on the next
+// compute frame. One-shot — the flag is cleared right after the frame consumes it.
+function triggerReleaseBurst(slot) {
+    slot.burst     = 1;
+    slot.burstSeed = (Math.random() * 0x7fffffff) >>> 0;
 }
 
 // ── Session: Socket.IO connection + QR code ───────────────────────────────────
@@ -1704,7 +1712,7 @@ let socket;
         if (spectatorId && activeSlots.length < MAX_SPECTATOR_SLOTS) {
             // Start with a neutral white — the phone sends a 'color-pick' immediately
             // after joining with its locally generated palette color, which overwrites this.
-            activeSlots.push({ spectatorId, colorR: 1, colorG: 1, colorB: 1, spawnerX: 0.5, spawnerY: 0.5, spawnerLocationActive: 0, windX: 0, windY: 0, dx: 0, dy: 0, magnitude: 0, velocity: 0, _smoothDx: 0, _smoothDy: 0, lastInputTime: 0 });
+            activeSlots.push({ spectatorId, colorR: 1, colorG: 1, colorB: 1, spawnerX: 0.5, spawnerY: 0.5, spawnerLocationActive: 0, windX: 0, windY: 0, dx: 0, dy: 0, magnitude: 0, velocity: 0, _smoothDx: 0, _smoothDy: 0, lastInputTime: 0, burst: 0, burstSeed: 0 });
             uploadSpectatorSlots();
         }
     });
@@ -1738,6 +1746,7 @@ let socket;
             if (slot) {
                 const { dx = 0, dy = 0, magnitude = 0, velocity = 0, active = true } = event.data ?? {};
                 if (!active) {
+                    if (slot.spawnerLocationActive === 1) triggerReleaseBurst(slot); // fireworks on release
                     slot.spawnerLocationActive = 0;
                     slot.dx = 0; slot.dy = 0; slot.magnitude = 0; slot.velocity = 0;
                 } else {
@@ -2263,6 +2272,7 @@ function writeSoloUB(dt, time) {
     u[45] = params.avoidMapInvert ? 1 : 0;
     u[46] = params.golEnabled ? 1 : 0;
     f[47] = params.golStrength;
+    f[48] = params.releaseBurstSpeed;
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
@@ -2421,7 +2431,7 @@ function writeContamUB() {
 }
 
 // ── Pre-allocated uniform buffers (reused every frame to avoid GC pressure) ──
-const _soloAB  = new ArrayBuffer(192); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
+const _soloAB  = new ArrayBuffer(208); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
 const _renderAB= new ArrayBuffer(160); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
 const _fadeAB  = new ArrayBuffer(16);  const _fadeF  = new Float32Array(_fadeAB);
 const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB); const _blitU  = new Uint32Array(_blitAB);
@@ -2616,6 +2626,7 @@ function frame(ts) {
         for (const slot of activeSlots) {
             if (slot.spawnerLocationActive === 1) {
                 if (wallNow - slot.lastInputTime > params.spawnerInactiveTimeout * 1000) {
+                    triggerReleaseBurst(slot); // fireworks when the joystick goes silent
                     slot.spawnerLocationActive = 0;
                     slot.dx = 0; slot.dy = 0; slot.magnitude = 0; slot.velocity = 0;
                     slot._smoothDx = 0; slot._smoothDy = 0;
@@ -2800,6 +2811,14 @@ function frame(ts) {
     device.queue.submit([enc.finish()]);
 
     if (captureBuf) finalizeCapture(captureBuf, captureW, captureH, capturePadded);
+
+    // Fireworks burst is one-shot — this frame's compute consumed it, so clear the
+    // flags now and re-upload, leaving the scattered agents to fly out on their own.
+    if (activeSlots.length) {
+        let burstDirty = false;
+        for (const slot of activeSlots) { if (slot.burst) { slot.burst = 0; burstDirty = true; } }
+        if (burstDirty) uploadSpectatorSlots();
+    }
 
     fpsFrames++;
 }
