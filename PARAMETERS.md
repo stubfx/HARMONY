@@ -423,7 +423,7 @@ Because homing agents are drawn on top of the trail (with additive blend) in the
 ---
 
 ### champions (`championsEnabled`, `champions`)
-**enabled:** off by default · **1 in N:** 1 – 500, default 2, step 1
+**enabled:** off by default · **1 in N:** 1 – 1500, default 700, step 1
 
 The **Champions** GUI folder gathers the whole feature. `enabled` is the master on/off; while off, champions are fully inert (the UBs receive `champions = 0`). `1 in N` selects champion agents by modulo on the agent index: every agent where `agentId % N == 0` becomes a champion. So `2` makes one in every two a champion, `10` one in ten, `1` makes every agent a champion.
 
@@ -435,9 +435,9 @@ Implementation notes:
 - Champions are **excluded from the deterrent density pass** (`densityEmit`), so they leave a visible trail but do not repel the rest of the swarm. They share the **shadow strength** and **shadow radius** controls with homing shadows.
 
 ### champion size (`championSize`)
-**Range:** 0.1 – 12 | **Default:** 2.0 | **Step:** 0.1
+**Range:** 0.1 – 40 | **Default:** 15 | **Step:** 0.1
 
-Point size for a champion **while it is free**, set in the render shader (`render.wgsl`) — slightly larger than the normal `agent size` (1.3) by default so champions read as distinct dots. It applies only when the champion is not homing: a homing champion renders at the normal `agent size` like every other homing agent, so the collective image it helps form stays clean. Carried in `SoloRenderParams` (`champions` u32 + `championSize` f32 appended at bytes 144/148; the render UB grew 144 → 160). Has no effect in pixel-grid mode, where every particle is one cell.
+Point size for a champion **while it is free**, set in the render shader (`render.wgsl`) — much larger than the normal `agent size` (1.3) by default (15) so champions read as bold, distinct dots. It applies only when the champion is not homing: a homing champion renders at the normal `agent size` like every other homing agent, so the collective image it helps form stays clean. Carried in `SoloRenderParams` (`champions` u32 + `championSize` f32 appended at bytes 144/148; the render UB grew 144 → 160). Has no effect in pixel-grid mode, where every particle is one cell.
 
 ---
 
