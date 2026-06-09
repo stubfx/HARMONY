@@ -268,6 +268,22 @@ The mode is carried over the existing `blitUB` (32-byte buffer was already only 
 
 ---
 
+## Export (screenshot)
+
+Two flags in the **Export** GUI folder, both **off by default**, that change what the `s` key writes. They are pure CPU post-processing in `finalizeCapture()` — the live render is untouched.
+
+### transparent bg (`exportTransparent`)
+
+Removes the black background from the saved image. The scene is additive light on true black (and `bgBlackCutoff` floors residual trail noise to zero), so the background is genuinely `(0,0,0)` and brightness is an exact alpha mask. Per pixel, `alpha = max(r,g,b)` and the RGB is **un-premultiplied** (`rgb / alpha`) so the glow keeps its full intensity over a transparent or dark background. The QR overlay is **not** composited when this is on, since its black modules would become holes in the alpha. Output is an RGBA PNG (or a CMYK TIFF with an alpha channel when CMYK is also on).
+
+### CMYK (TIFF) (`exportCMYK`)
+
+PNG cannot store CMYK, so this switches the export to an uncompressed baseline **TIFF** (`.tif`, PhotometricInterpretation = Separated, InkSet = CMYK), built by `encodeCmykTiff()`. The RGB→CMYK conversion is the naive device-independent formula (`k = 1 − max(r,g,b)`; `c,m,y = (1 − channel − k)/(1 − k)`) with **no ICC profile** — a deliberate choice; the file is meant to be refined in pro print software. When `exportTransparent` is also on, a 5th sample (unassociated alpha, `ExtraSamples = 2`, `SamplesPerPixel = 5`) carries the transparency.
+
+**Four combinations:** opaque PNG (default) · transparent RGBA PNG · opaque CMYK TIFF · CMYK TIFF + alpha.
+
+---
+
 ## Trace
 
 The trace layer loads a static image onto the GPU and uses it to redirect agents. The image is never rendered directly — it is only felt through collective agent density and color.

@@ -111,6 +111,12 @@ export function initGUI({
     fVis.add(params, 'pixelGrid').name('pixel grid');
     fVis.add(params, 'pixelGridCells', 20, 400, 1).name('grid cells').onChange(() => rebuildGridTex());
 
+    // ── Export (screenshot, 's' key) ────────────────────────────────────────────
+    const fExport = gui.addFolder('Export');
+    fExport.add(params, 'exportTransparent').name('transparent bg');
+    fExport.add(params, 'exportCMYK').name('CMYK (TIFF)');
+    fExport.close();
+
     // ── Trace ─────────────────────────────────────────────────────────────────
     const fMagnet = gui.addFolder('Trace');
     fMagnet.add(params, 'magnetStr',      0, 50,   0.1  ).name('homing speed');

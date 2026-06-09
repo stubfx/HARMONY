@@ -109,6 +109,9 @@ const params = {
     // Font — Google Fonts family used for trace/caption text, loaded at runtime
     // (nothing installed on the host machine). Empty string = system sans-serif.
     fontFamily:    'Bellefair',
+    // Export ('s' screenshot) — both off by default
+    exportTransparent: false, // make the black background transparent (alpha = brightness)
+    exportCMYK:        false, // convert to CMYK and save as TIFF instead of PNG
     // Auto-clear
     clearDelay:    0,     // seconds before auto-clearing user trace content (0 = disabled)
     // DOT mode
@@ -2421,28 +2424,110 @@ const _windVisAB=new ArrayBuffer(32);  const _windVisF=new Float32Array(_windVis
 // as the frame, after the blit pass, so we always grab what was just on screen.
 let _captureRequested = false;
 
+// Trigger a browser download of a Blob under the given filename.
+function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}
+
+// Build an uncompressed baseline CMYK TIFF from straight-alpha RGBA pixels.
+// Naive, device-independent RGB→CMYK (no ICC profile, per project decision) —
+// final print conversion is expected to happen in pro software. When withAlpha
+// is true a 5th unassociated-alpha sample is written so transparency survives.
+function encodeCmykTiff(rgba, w, h, withAlpha) {
+    const spp    = withAlpha ? 5 : 4;        // samples per pixel
+    const px      = w * h * spp;              // pixel data byte count (8-bit samples)
+    const tags    = withAlpha ? 12 : 11;      // IFD entry count
+    const ifd     = 2 + 12 * tags + 4;        // count + entries + next-IFD offset
+    const bpsOff  = 8 + ifd;                  // BitsPerSample array sits after the IFD
+    const pixOff  = bpsOff + spp * 2;         // pixel data follows
+    const ab = new ArrayBuffer(pixOff + px);
+    const dv = new DataView(ab);
+    const u8 = new Uint8Array(ab);
+
+    // Header (little-endian)
+    dv.setUint16(0, 0x4949, true);  // 'II'
+    dv.setUint16(2, 42, true);
+    dv.setUint32(4, 8, true);       // first IFD offset
+
+    // IFD — entries must be in ascending tag order
+    dv.setUint16(8, tags, true);
+    let o = 10;
+    const SHORT = 3, LONG = 4;
+    const entry = (tag, type, count, value) => {
+        dv.setUint16(o, tag, true);
+        dv.setUint16(o + 2, type, true);
+        dv.setUint32(o + 4, count, true);
+        dv.setUint32(o + 8, value, true); // inline value (SHORT count-1 uses low 2 bytes) or offset
+        o += 12;
+    };
+    entry(256, LONG,  1, w);        // ImageWidth
+    entry(257, LONG,  1, h);        // ImageLength
+    entry(258, SHORT, spp, bpsOff); // BitsPerSample → out-of-line array (spp×8)
+    entry(259, SHORT, 1, 1);        // Compression = none
+    entry(262, SHORT, 1, 5);        // PhotometricInterpretation = Separated (CMYK)
+    entry(273, LONG,  1, pixOff);   // StripOffsets
+    entry(277, SHORT, 1, spp);      // SamplesPerPixel
+    entry(278, LONG,  1, h);        // RowsPerStrip (single strip)
+    entry(279, LONG,  1, px);       // StripByteCounts
+    entry(284, SHORT, 1, 1);        // PlanarConfiguration = chunky
+    entry(332, SHORT, 1, 1);        // InkSet = CMYK
+    if (withAlpha) entry(338, SHORT, 1, 2); // ExtraSamples = unassociated alpha
+    dv.setUint32(o, 0, true);       // no next IFD
+
+    for (let s = 0; s < spp; s++) dv.setUint16(bpsOff + s * 2, 8, true); // BitsPerSample = 8 each
+
+    // Pixel data — naive RGB→CMYK
+    let d = pixOff;
+    for (let i = 0; i < w * h; i++) {
+        const r = rgba[i * 4] / 255, g = rgba[i * 4 + 1] / 255, b = rgba[i * 4 + 2] / 255;
+        const k = 1 - Math.max(r, g, b);
+        let c = 0, m = 0, y = 0;
+        if (k < 1) { c = (1 - r - k) / (1 - k); m = (1 - g - k) / (1 - k); y = (1 - b - k) / (1 - k); }
+        u8[d++] = Math.round(c * 255);
+        u8[d++] = Math.round(m * 255);
+        u8[d++] = Math.round(y * 255);
+        u8[d++] = Math.round(k * 255);
+        if (withAlpha) u8[d++] = rgba[i * 4 + 3];
+    }
+    return new Blob([ab], { type: 'image/tiff' });
+}
+
 async function finalizeCapture(buf, w, h, padded) {
     try {
         await buf.mapAsync(GPUMapMode.READ);
         const src = new Uint8Array(buf.getMappedRange());
         const isBGRA = canvasFormat === 'bgra8unorm';
+        const transparent = params.exportTransparent;
         const out = new Uint8ClampedArray(w * h * 4);
         const stride = w * 4;
         for (let y = 0; y < h; y++) {
             const srcOff = y * padded;
             const dstOff = y * stride;
-            if (isBGRA) {
-                for (let x = 0; x < stride; x += 4) {
-                    out[dstOff + x]     = src[srcOff + x + 2];
-                    out[dstOff + x + 1] = src[srcOff + x + 1];
-                    out[dstOff + x + 2] = src[srcOff + x];
-                    out[dstOff + x + 3] = 255;
-                }
-            } else {
-                for (let x = 0; x < stride; x += 4) {
-                    out[dstOff + x]     = src[srcOff + x];
-                    out[dstOff + x + 1] = src[srcOff + x + 1];
-                    out[dstOff + x + 2] = src[srcOff + x + 2];
+            for (let x = 0; x < stride; x += 4) {
+                const r = isBGRA ? src[srcOff + x + 2] : src[srcOff + x];
+                const g = src[srcOff + x + 1];
+                const b = isBGRA ? src[srcOff + x]     : src[srcOff + x + 2];
+                if (transparent) {
+                    // Additive light on true black → brightness is a perfect alpha
+                    // mask. Un-premultiply so the glow keeps its full intensity.
+                    const a = Math.max(r, g, b);
+                    if (a > 0) {
+                        out[dstOff + x]     = Math.min(255, Math.round(r * 255 / a));
+                        out[dstOff + x + 1] = Math.min(255, Math.round(g * 255 / a));
+                        out[dstOff + x + 2] = Math.min(255, Math.round(b * 255 / a));
+                    }
+                    out[dstOff + x + 3] = a;
+                } else {
+                    out[dstOff + x]     = r;
+                    out[dstOff + x + 1] = g;
+                    out[dstOff + x + 2] = b;
                     out[dstOff + x + 3] = 255;
                 }
             }
@@ -2450,31 +2535,28 @@ async function finalizeCapture(buf, w, h, padded) {
         buf.unmap();
         buf.destroy();
 
+        // Composite the QR overlay (separate 2D canvas) — but not for a transparent
+        // export, where its black modules would punch holes in the alpha.
+        const qrOpacity   = parseFloat(qrOverlayEl.style.opacity) || 0;
+        const compositeQR = !transparent && qrOpacity > 0 && qrOverlayEl.width > 0 && qrOverlayEl.height > 0;
+
         const tmp = document.createElement('canvas');
         tmp.width = w; tmp.height = h;
         const c2d = tmp.getContext('2d');
         c2d.putImageData(new ImageData(out, w, h), 0, 0);
-
-        // Composite the QR overlay (separate 2D canvas) if it's currently visible.
-        const qrOpacity = parseFloat(qrOverlayEl.style.opacity) || 0;
-        if (qrOpacity > 0 && qrOverlayEl.width > 0 && qrOverlayEl.height > 0) {
+        if (compositeQR) {
             c2d.globalAlpha = qrOpacity;
             c2d.drawImage(qrOverlayEl, 0, 0, w, h);
             c2d.globalAlpha = 1;
         }
 
-        tmp.toBlob(blob => {
-            if (!blob) return;
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-            a.download = `thesis-sim-${ts}.png`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            URL.revokeObjectURL(url);
-        }, 'image/png');
+        const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        if (params.exportCMYK) {
+            const rgba = compositeQR ? c2d.getImageData(0, 0, w, h).data : out;
+            downloadBlob(encodeCmykTiff(rgba, w, h, transparent), `thesis-sim-${ts}.tif`);
+        } else {
+            tmp.toBlob(blob => { if (blob) downloadBlob(blob, `thesis-sim-${ts}.png`); }, 'image/png');
+        }
     } catch (e) {
         console.warn('[screenshot]', e);
     }

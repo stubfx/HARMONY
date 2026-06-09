@@ -358,7 +358,7 @@ The HUD is **hidden by default**. Toggle it with:
 | Key | Effect |
 |-----|--------|
 | `Ctrl` | Toggle the HUD on/off |
-| `s` | Capture the current frame and download it as a PNG at canvas backing-store resolution. Plain `s` only — `Ctrl+S` / `Cmd+S` still trigger the browser's "Save Page". Ignored while focus is on an input or contenteditable element. For maximum resolution, set `render scale` to `1.0` before pressing. |
+| `s` | Capture the current frame and download it at canvas backing-store resolution. Default is an opaque PNG; the **Export** folder flags switch this to a transparent PNG and/or a CMYK TIFF (see below). Plain `s` only — `Ctrl+S` / `Cmd+S` still trigger the browser's "Save Page". Ignored while focus is on an input or contenteditable element. For maximum resolution, set `render scale` to `1.0` before pressing. |
 
 ### Fullscreen
 
@@ -417,6 +417,17 @@ The GUI has five folders below these dropdowns. See [PARAMETERS.md](PARAMETERS.m
 | tone white | Input level mapped to white — compress HDR above 1.0 |
 | tone gamma | Power curve: < 1 boosts darks, > 1 crushes darks |
 | shadow boost | Inverse-brightness lift peaking at ~12% luminance; makes faint trails pop |
+
+### Export
+
+Options for the `s` screenshot. Both **off by default** (default capture = opaque PNG, black background included, QR composited if visible).
+
+| Control | Description |
+|---------|-------------|
+| transparent bg | Drop the black background to transparency. The scene is additive light on true black, so per-pixel brightness (`max(r,g,b)`) is used as alpha and the RGB is un-premultiplied to keep the glow at full intensity. The QR overlay is **not** composited in this mode (its black modules would punch holes). Saved as RGBA PNG, or as a CMYK TIFF with a 5th alpha channel if CMYK is also on. |
+| CMYK (TIFF) | Convert to CMYK and save an uncompressed baseline **TIFF** (`.tif`) instead of PNG — PNG cannot hold CMYK. Conversion is a naive, device-independent RGB→CMYK with **no ICC profile** (final print conversion is expected in pro software). |
+
+The four combinations: opaque PNG (default) · transparent RGBA PNG · opaque CMYK TIFF · CMYK TIFF + unassociated alpha.
 
 ### Trace
 
