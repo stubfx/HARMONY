@@ -1011,7 +1011,12 @@ The `caption` field draws text at the bottom of the simulation canvas using the 
 
 ## Audio
 
-The simulation uses the Web Audio API to route sound through an `AnalyserNode`. Every frame, `getVolume()` reads an RMS value from the analyser and the compute shader uses it as a brightness multiplier for free agents — louder audio = brighter particles. Three sources share the same analyser simultaneously: the microphone (when enabled), the voiceover track, and the background track.
+The simulation uses the Web Audio API to route sound through an `AnalyserNode`. Every frame, `getVolume()` reads a smoothed RMS value (0–1) from the analyser. This value **leans the base palette toward `color2`** in the render shader — louder audio = more color2-dominant swarm — scaled by `audio → color2` (`color2AudioStr`). Three sources share the same analyser simultaneously: the microphone (when enabled), the voiceover track, and the background track.
+
+### audio → color2 (`color2AudioStr`)
+**Range:** 0 – 1 | **Default:** 1.0 | **Step:** 0.01
+
+How strongly room audio pushes the palette toward `color2`. The render shader mixes each free agent's base color (`color1`/`color2` by index) toward `color2` by `getVolume() × color2AudioStr`: at silence nothing changes (the normal `color1`/`color2` split shows), at peak volume the whole palette reaches `color2` (at strength 1.0). Set to 0 to disable the audio→color reaction entirely. Spectator-assigned colors and avoid-map sampled colors are not affected. (Audio no longer modulates brightness.)
 
 ### Audio unlock button
 
@@ -1027,7 +1032,7 @@ Same delivery mechanism as `audio`, but loops continuously until stopped. Sendin
 
 ### Microphone
 
-Enabled via `startMic()` (not controllable from the GUI or n8n). When active, the microphone signal drives the same brightness pipeline as the audio tracks. The mic source is connected only to the analyser (not to `destination`) — no feedback loop.
+Enabled via `startMic()` (not controllable from the GUI or n8n). When active, the microphone signal drives the same color2-lean pipeline as the audio tracks. The mic source is connected only to the analyser (not to `destination`) — no feedback loop.
 
 ---
 

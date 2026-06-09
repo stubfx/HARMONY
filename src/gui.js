@@ -234,7 +234,7 @@ export function initGUI({
             stopAudio();
         }
     });
-    fAudio.add(params, 'audioFloor', 0, 1, 0.01).name('silence floor');
+    fAudio.add(params, 'color2AudioStr', 0, 1, 0.01).name('audio → color2');
     fAudio.add(params, 'duckLevel',  0, 1, 0.01).name('duck level').onChange(v => setDuckLevel(v));
     fAudio.close();
 

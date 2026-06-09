@@ -153,7 +153,7 @@ const params = {
     bounceEdges:   false, // reflect agents at canvas edges instead of wrapping
     useDeltaTime:  true,  // false = fixed 1/60 s timestep (no frame-spike compensation)
     // Audio reactivity
-    audioFloor:    0.1,   // brightness multiplier when fully silent (0 = black, 1 = no effect)
+    color2AudioStr: 1.0,  // how strongly room audio leans the palette toward color2 (0 = off, 1 = full color2 at peak volume)
     duckLevel:     0.15,  // bg gain while voiceover is active (0 = mute, 1 = no ducking)
 };
 
@@ -2289,10 +2289,8 @@ function writeRenderUB() {
     f[13] = c2[0];
     f[14] = c2[1];
     f[15] = c2[2];
-    // Treat "audio not yet unlocked" as full silence so the pre/post-unlock
-    // brightness step disappears — audioFloor stays exactly as tuned.
-    const audioMult = params.audioFloor + (1 - params.audioFloor) * (isActive() ? getVolume() : 0);
-    f[16] = (params.brightness + burstBrightness + pulseEnergy) * audioMult;
+    // Audio no longer affects brightness — it leans the palette toward color2 instead (f[38]).
+    f[16] = params.brightness + burstBrightness + pulseEnergy;
     f[17] = params.alphaThreshold;
     f[18] = params.blackThreshold;
     f[19] = simState.qrStatus === 'SHOW' ? 0 : params.vignetteEdge;
@@ -2328,6 +2326,8 @@ function writeRenderUB() {
     f[35] = params.avoidMapBlackCutoff;
     u[36] = params.championsEnabled ? params.champions : 0;
     f[37] = params.championSize;
+    // Room audio leans the base palette toward color2: 0 at silence, → color2AudioStr at peak.
+    f[38] = (isActive() ? getVolume() : 0) * params.color2AudioStr;
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 
