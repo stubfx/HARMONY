@@ -15,6 +15,7 @@ export function initGUI({
     rebuildOffscreen,
     rebuildGridTex,
     renderTraceCanvas,
+    loadFontSpec,
     generateQR,
     clearMagnetImage,
     clearTraceText,
@@ -41,6 +42,14 @@ export function initGUI({
     const swarmDebug = { users: 0, pitch: 0.5, roll: 0.5, temp: 0.5, coherence: 0.5 };
     const gui = new GUI({ title: 'Wind Particles', width: 260 });
     if (!guiVisible) gui.domElement.style.display = 'none';
+
+    // ── Fullscreen toggle ───────────────────────────────────────────────────────
+    gui.add({
+        fullscreen: () => {
+            if (document.fullscreenElement) document.exitFullscreen();
+            else document.documentElement.requestFullscreen().catch(() => {});
+        },
+    }, 'fullscreen').name('⛶ toggle fullscreen');
 
     // ── Motion ────────────────────────────────────────────────────────────────
     const fMotion = gui.addFolder('Motion');
@@ -111,6 +120,16 @@ export function initGUI({
     fMagnet.add(params, 'avoidForceStr',  0,  5,   0.05 ).name('avoid force');
     fMagnet.add(params, 'showImage').name('show image');
     fMagnet.add(params, 'captionSize', 0.02, 0.15, 0.005).name('caption size').onChange(renderTraceCanvas);
+    // Font presets — selecting one fills the #font-input and loads it from Google Fonts.
+    const FONT_PRESETS = [
+        'Inter', 'Roboto', 'Montserrat', 'Oswald', 'Bebas Neue', 'Anton',
+        'Archivo Black', 'Playfair Display', 'Lora', 'Space Mono', 'Spline Sans Mono',
+    ];
+    fMagnet.add({ preset: params.fontFamily }, 'preset', FONT_PRESETS).name('font preset').onChange(v => {
+        const fi = document.querySelector('#font-input');
+        if (fi) fi.value = v;
+        loadFontSpec(v);
+    });
     fMagnet.add(params, 'clearDelay', 0, 120, 5).name('auto clear (s)');
     fMagnet.add({ load: () => document.querySelector('#image-input').click() }, 'load').name('Load image…');
     fMagnet.add({ clear: clearMagnetImage }, 'clear').name('Clear image');
