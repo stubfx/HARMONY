@@ -210,7 +210,7 @@
         <PAGE PAGEXPOS="941.890393700788" PAGEYPOS="26701.5628346456" PAGEWIDTH="841.889763779528" PAGEHEIGHT="595.275590551181" BORDERLEFT="40" BORDERRIGHT="40" BORDERTOP="40" BORDERBOTTOM="40" NUM="84" NAM="" MNAM="Normal Right" Size="Custom" Orientation="1" LEFT="0" PRESET="0" VerticalGuides="" HorizontalGuides="" AGhorizontalAutoGap="28.3464566929134" AGverticalAutoGap="28.3464566929134" AGhorizontalAutoCount="5" AGverticalAutoCount="5" AGhorizontalAutoRefer="1" AGverticalAutoRefer="1" AGSelection="0 0 0 0" pageEffectDuration="1" pageViewDuration="1" effectType="0" Dm="0" M="0" Di="0"/>
         <PAGE PAGEXPOS="100.00062992126" PAGEYPOS="27336.8381102362" PAGEWIDTH="841.889763779528" PAGEHEIGHT="595.275590551181" BORDERLEFT="40" BORDERRIGHT="40" BORDERTOP="40" BORDERBOTTOM="40" NUM="85" NAM="" MNAM="Normal Left" Size="Custom" Orientation="1" LEFT="0" PRESET="0" VerticalGuides="" HorizontalGuides="" AGhorizontalAutoGap="28.3464566929134" AGverticalAutoGap="28.3464566929134" AGhorizontalAutoCount="5" AGverticalAutoCount="5" AGhorizontalAutoRefer="1" AGverticalAutoRefer="1" AGSelection="0 0 0 0" pageEffectDuration="1" pageViewDuration="1" effectType="0" Dm="0" M="0" Di="0"/>
         <PAGE PAGEXPOS="941.890393700788" PAGEYPOS="27336.8381102362" PAGEWIDTH="841.889763779528" PAGEHEIGHT="595.275590551181" BORDERLEFT="40" BORDERRIGHT="40" BORDERTOP="40" BORDERBOTTOM="40" NUM="86" NAM="" MNAM="Normal Right" Size="Custom" Orientation="1" LEFT="0" PRESET="0" VerticalGuides="" HorizontalGuides="" AGhorizontalAutoGap="28.3464566929134" AGverticalAutoGap="28.3464566929134" AGhorizontalAutoCount="5" AGverticalAutoCount="5" AGhorizontalAutoRefer="1" AGverticalAutoRefer="1" AGSelection="0 0 0 0" pageEffectDuration="1" pageViewDuration="1" effectType="0" Dm="0" M="0" Di="0"/>
-        <MASTEROBJECT XPOS="140.00062992126" YPOS="575.276850393701" OwnPage="2" ItemID="1723200431" PTYPE="4" WIDTH="63.5679440069996" HEIGHT="40" FRTYPE="0" CLIPEDIT="0" PWIDTH="1" PLINEART="1" LOCALSCX="1" LOCALSCY="1" LOCALX="0" LOCALY="0" LOCALROT="0" PICART="1" SCALETYPE="1" RATIO="1" COLUMNS="1" COLGAP="0" AUTOTEXT="0" EXTRA="0" TEXTRA="0" BEXTRA="0" REXTRA="0" VAlign="1" FLOP="1" PLTSHOW="0" BASEOF="0" textPathType="0" textPathFlipped="0" path="M0 0 L63.5679 0 L63.5679 40 L0 40 L0 0 Z" copath="M0 0 L63.5679 0 L63.5679 40 L0 40 L0 0 Z" OnMasterPage="tesi_L" gXpos="223748.189606302" gYpos="84163934065.4228" gWidth="0" gHeight="0" ALIGN="0" LAYER="0" NEXTITEM="-1" BACKITEM="-1">
+        <MASTEROBJECT XPOS="140.00062992126" YPOS="575.276850393701" OwnPage="2" ItemID="1723200431" PTYPE="4" WIDTH="63.5679440069996" HEIGHT="40" FRTYPE="0" CLIPEDIT="0" PWIDTH="1" PLINEART="1" LOCALSCX="1" LOCALSCY="1" LOCALX="0" LOCALY="0" LOCALROT="0" PICART="1" SCALETYPE="1" RATIO="1" COLUMNS="1" COLGAP="0" AUTOTEXT="0" EXTRA="0" TEXTRA="0" BEXTRA="0" REXTRA="0" VAlign="1" FLOP="1" PLTSHOW="0" BASEOF="0" textPathType="0" textPathFlipped="0" path="M0 0 L63.5679 0 L63.5679 40 L0 40 L0 0 Z" copath="M0 0 L63.5679 0 L63.5679 40 L0 40 L0 0 Z" OnMasterPage="tesi_L" gXpos="223748.189606302" gYpos="84997303418.5294" gWidth="0" gHeight="0" ALIGN="0" LAYER="0" NEXTITEM="-1" BACKITEM="-1">
             <StoryText>
                 <DefaultStyle ALIGN="0"/>
                 <var name="pgno"/>
@@ -220,7 +220,7 @@
                 <ItemAttribute Name="page number" Type="integer" Value="" Parameter="" Relationship="none" RelationshipTo="" AutoAddTo="none"/>
             </PageItemAttributes>
         </MASTEROBJECT>
-        <MASTEROBJECT XPOS="838.322449693788" YPOS="575.276850393701" OwnPage="3" ItemID="1722776367" PTYPE="4" WIDTH="63.5679440069996" HEIGHT="40" FRTYPE="0" CLIPEDIT="0" PWIDTH="1" PLINEART="1" LOCALSCX="1" LOCALSCY="1" LOCALX="0" LOCALY="0" LOCALROT="0" PICART="1" SCALETYPE="1" RATIO="1" COLUMNS="1" COLGAP="0" AUTOTEXT="0" EXTRA="0" TEXTRA="0" BEXTRA="0" REXTRA="0" VAlign="1" FLOP="1" PLTSHOW="0" BASEOF="0" textPathType="0" textPathFlipped="0" path="M0 0 L63.5679 0 L63.5679 40 L0 40 L0 0 Z" copath="M0 0 L63.5679 0 L63.5679 40 L0 40 L0 0 Z" OnMasterPage="tesi_R" gXpos="194232891.234803" gYpos="84507377220.201" gWidth="0" gHeight="0" ALIGN="2" LAYER="0" NEXTITEM="-1" BACKITEM="-1">
+        <MASTEROBJECT XPOS="838.322449693788" YPOS="575.276850393701" OwnPage="3" ItemID="1722776367" PTYPE="4" WIDTH="63.5679440069996" HEIGHT="40" FRTYPE="0" CLIPEDIT="0" PWIDTH="1" PLINEART="1" LOCALSCX="1" LOCALSCY="1" LOCALX="0" LOCALY="0" LOCALROT="0" PICART="1" SCALETYPE="1" RATIO="1" COLUMNS="1" COLGAP="0" AUTOTEXT="0" EXTRA="0" TEXTRA="0" BEXTRA="0" REXTRA="0" VAlign="1" FLOP="1" PLTSHOW="0" BASEOF="0" textPathType="0" textPathFlipped="0" path="M0 0 L63.5679 0 L63.5679 40 L0 40 L0 0 Z" copath="M0 0 L63.5679 0 L63.5679 40 L0 40 L0 0 Z" OnMasterPage="tesi_R" gXpos="245049357.37611" gYpos="85317739443.9361" gWidth="0" gHeight="0" ALIGN="2" LAYER="0" NEXTITEM="-1" BACKITEM="-1">
             <StoryText>
                 <DefaultStyle ALIGN="2"/>
                 <var name="pgno"/>
@@ -230,8 +230,8 @@
                 <ItemAttribute Name="page number" Type="integer" Value="" Parameter="" Relationship="none" RelationshipTo="" AutoAddTo="none"/>
             </PageItemAttributes>
         </MASTEROBJECT>
-        <MASTEROBJECT XPOS="86.3274015748032" YPOS="6.32803149606298" OwnPage="4" ItemID="1724434415" PTYPE="6" WIDTH="869.236220472441" HEIGHT="625.456692913386" FRTYPE="0" CLIPEDIT="1" PWIDTH="1" PCOLOR="Black" PCOLOR2="Black" PLINEART="1" path="M0 0 L869.236 0 L869.236 625.457 L0 625.457 L0 0 Z" copath="M0 0 L869.237 0 L869.237 625.457 L0 625.457 L0 0 Z" OnMasterPage="dark_L" gXpos="48996300.6715001" gYpos="1726490159.85535" gWidth="866.799650043745" gHeight="627.180787401575" LAYER="2"/>
-        <MASTEROBJECT XPOS="86.3274015748032" YPOS="6.328031496063" OwnPage="5" ItemID="1724437343" PTYPE="6" WIDTH="869.236220472441" HEIGHT="625.456692913386" FRTYPE="0" CLIPEDIT="1" PWIDTH="1" PCOLOR="Black" PCOLOR2="Black" PLINEART="1" path="M0 0 L869.236 0 L869.236 625.457 L0 625.457 L0 0 Z" copath="M0 0 L869.237 0 L869.237 625.457 L0 625.457 L0 0 Z" OnMasterPage="dark_R" gXpos="35734011.2226749" gYpos="740835794.038732" gWidth="866.799650043745" gHeight="627.180787401575" LAYER="2"/>
+        <MASTEROBJECT XPOS="86.3274015748032" YPOS="6.32803149606298" OwnPage="4" ItemID="1724434415" PTYPE="6" WIDTH="869.236220472441" HEIGHT="625.456692913386" FRTYPE="0" CLIPEDIT="1" PWIDTH="1" PCOLOR="Black" PCOLOR2="Black" PLINEART="1" path="M0 0 L869.236 0 L869.236 625.457 L0 625.457 L0 0 Z" copath="M0 0 L869.237 0 L869.237 625.457 L0 625.457 L0 0 Z" OnMasterPage="dark_L" gXpos="59159593.8998515" gYpos="2232647006.23514" gWidth="866.799650043745" gHeight="627.180787401575" LAYER="2"/>
+        <MASTEROBJECT XPOS="86.3274015748032" YPOS="6.328031496063" OwnPage="5" ItemID="1724437343" PTYPE="6" WIDTH="869.236220472441" HEIGHT="625.456692913386" FRTYPE="0" CLIPEDIT="1" PWIDTH="1" PCOLOR="Black" PCOLOR2="Black" PLINEART="1" path="M0 0 L869.236 0 L869.236 625.457 L0 625.457 L0 0 Z" copath="M0 0 L869.237 0 L869.237 625.457 L0 625.457 L0 0 Z" OnMasterPage="dark_R" gXpos="42509540.0415758" gYpos="919780133.667329" gWidth="866.799650043745" gHeight="627.180787401575" LAYER="2"/>
         <PAGEOBJECT XPOS="1245.3024671916" YPOS="1330.55181102362" OwnPage="4" ItemID="1723008111" PTYPE="4" WIDTH="235.0656167979" HEIGHT="515.275590551182" FRTYPE="0" CLIPEDIT="0" PWIDTH="1" PLINEART="1" LOCALSCX="1" LOCALSCY="1" LOCALX="0" LOCALY="0" LOCALROT="0" PICART="1" SCALETYPE="1" RATIO="1" COLUMNS="1" COLGAP="28.3464566929134" AUTOTEXT="0" EXTRA="0" TEXTRA="0" BEXTRA="0" REXTRA="0" VAlign="0" FLOP="1" PLTSHOW="0" BASEOF="0" textPathType="0" textPathFlipped="0" path="M0 0 L235.066 0 L235.066 515.276 L0 515.276 L0 0 Z" copath="M0 0 L235.066 0 L235.066 515.276 L0 515.276 L0 0 Z" gXpos="1245.3024671916" gYpos="1330.55181102362" gWidth="0" gHeight="0" PSTYLE="Default Paragraph Style" LAYER="0" NEXTITEM="1728560847" BACKITEM="-1">
             <StoryText>
                 <DefaultStyle PARENT="Default Paragraph Style" LINESPMode="1" CPARENT="Default Character Style"/>
@@ -250,7 +250,7 @@
                 <ITEXT CH="Mi sono chiesto come sarebbe interagire con un sistema vivo, che segue un suo ritmo, che risponde al gruppo invece che al singolo, e che cambia forma in base a come quel gruppo si organizza."/>
                 <para/>
                 <ITEXT CH="Questo progetto nasce da quella domanda."/>
-                <para/>
+                <para PARENT="T_Heading 2"/>
             </StoryText>
         </PAGEOBJECT>
         <PAGEOBJECT XPOS="1508.71454068241" YPOS="1330.55181102362" OwnPage="4" ItemID="1728560847" PTYPE="4" WIDTH="235.0656167979" HEIGHT="515.275590551181" FRTYPE="0" CLIPEDIT="0" PWIDTH="1" PLINEART="1" LOCALSCX="1" LOCALSCY="1" LOCALX="0" LOCALY="0" LOCALROT="0" PICART="1" SCALETYPE="1" RATIO="1" COLUMNS="1" COLGAP="0" AUTOTEXT="0" EXTRA="0" TEXTRA="0" BEXTRA="0" REXTRA="0" VAlign="0" FLOP="1" PLTSHOW="0" BASEOF="0" textPathType="0" textPathFlipped="0" path="M0 0 L235.066 0 L235.066 515.276 L0 515.276 L0 0 Z" copath="M0 0 L235.066 0 L235.066 515.276 L0 515.276 L0 0 Z" gXpos="1508.71454068241" gYpos="1330.55181102362" gWidth="0" gHeight="0" PSTYLE="Default Paragraph Style" LAYER="0" NEXTITEM="-1" BACKITEM="1723008111"/>
@@ -351,7 +351,9 @@
                 <para PARENT="T_Heading 3"/>
                 <ITEXT CH="C'è poi una famiglia di opere che spinge tutto questo ancora più in là. Esistono solo grazie alla presenza di molte persone insieme, e quello che mostrano nasce proprio dal fatto che le persone sono tante. Non è la somma dei singoli gesti. È una forma che nessuno ha disegnato, e che compare soltanto quando il gruppo diventa abbastanza grande."/>
                 <para/>
-                <ITEXT CH="Basta immaginare uno spazio in cui ognuno, muovendosi per conto suo, lascia attorno a sé una piccola traccia. Quando le persone diventano molte, quelle tracce si moltiplicano, si sovrappongono, e formano una geometria che cambia di continuo e che nessuno dei presenti ha deciso. Da soli non la si otterrebbe. Serve la quantità, serve che tante volontà separate agiscano nello stesso momento senza mettersi d'accordo."/>
+                <ITEXT CH="Basta immaginare uno spazio in cui ognuno, muovendosi per conto suo, lascia attorno a sé una piccola traccia. Quando le persone diventano molte, quelle tracce si moltiplicano, si sovrappongono, e formano una geometria che cambia di continuo e che nessuno dei presenti ha deciso. Da soli non la si otterrebbe. "/>
+                <para/>
+                <ITEXT FCOLOR="Red" FSHADE="100" CH="Serve la quantità, serve che tante volontà separate agiscano nello stesso momento senza mettersi d'accordo."/>
                 <para/>
                 <ITEXT CH="È questo il senso del collettivo che interessa al progetto. Non l'immersione, non il pubblico che si scioglie nell'ambiente, ma persone che restano distinte e che, agendo ciascuna per sé, fanno emergere una forma comune. Togli i corpi e la loro simultaneità, e l'opera non si indebolisce. Semplicemente non c'è più. Resta soltanto un sistema in attesa."/>
                 <para/>
@@ -369,7 +371,7 @@
                 <para PARENT="T_Heading 2"/>
                 <ITEXT CH="C'è qualcosa di difficile da spiegare nella sensazione che si prova guardando uno stormo di storni muoversi nel cielo al tramonto. Non è soltanto bellezza visiva, è la percezione che quella forma stia pensando, che abbia intenzioni, che sappia dove vuole andare."/>
                 <para/>
-                <ITEXT CH="Non lo sa. O almeno, non nel senso in cui lo sappiamo noi."/>
+                <ITEXT FCOLOR="Red" FSHADE="100" CH="Non lo sa. O almeno, non nel senso in cui lo sappiamo noi."/>
                 <para/>
                 <ITEXT CH="1.2.1 In natura"/>
                 <para PARENT="T_Heading 3"/>
@@ -383,7 +385,7 @@
                 <ITEXT CPARENT="Bold" CH="[IMG]"/>
                 <ITEXT CH=" Colonia di formiche fotografata dall'alto: percorsi convergenti verso una fonte di cibo, organizzazione senza centro visibile."/>
                 <para/>
-                <ITEXT CH="Il Physarum polycephalum porta questo principio al suo estremo più sorprendente. È un organismo che vive in una zona grigia della biologia, a metà tra un animale e una pianta e in realtà né l'uno né l'altra, una massa unicellulare di colore giallo brillante che si espande lentamente su superfici umide in cerca di nutrimento. Non possiede neuroni. Eppure, messo davanti a fonti di cibo distribuite nello spazio, trova quasi sempre il percorso più efficiente per collegarle. In un esperimento diventato celebre alcuni ricercatori hanno disposto frammenti di nutrimento come le città dell'area di Tokyo e hanno lasciato che il micelio crescesse tra loro. In poche ore aveva formato una rete di connessioni quasi identica a quella ferroviaria reale, costruita da ingegneri in decenni di pianificazione."/>
+                <ITEXT CH="Il &quot;Physarum polycephalum&quot; porta questo principio al suo estremo più sorprendente. È un organismo che vive in una zona grigia della biologia, a metà tra un animale e una pianta e in realtà né l'uno né l'altra, una massa unicellulare di colore giallo brillante che si espande lentamente su superfici umide in cerca di nutrimento. Non possiede neuroni. Eppure, messo davanti a fonti di cibo distribuite nello spazio, trova quasi sempre il percorso più efficiente per collegarle. In un esperimento diventato celebre alcuni ricercatori hanno disposto frammenti di nutrimento come le città dell'area di Tokyo e hanno lasciato che il micelio crescesse tra loro. In poche ore aveva formato una rete di connessioni quasi identica a quella ferroviaria reale, costruita da ingegneri in decenni di pianificazione."/>
                 <para/>
                 <ITEXT CPARENT="Bold" CH="[IMG]"/>
                 <ITEXT CH=" Il Physarum polycephalum che cresce su un piano con fonti di cibo posizionate come le città dell'area di Tokyo: la rete del micelio a confronto con la mappa ferroviaria reale."/>
@@ -562,7 +564,7 @@
                 <para/>
                 <ITEXT CH="2.1.4 La soglia"/>
                 <para/>
-                <ITEXT FCOLOR="Black" CH="L'esperienza comincia con un gesto deliberato, inquadrare un codice QR con il proprio telefono. Nella vita di tutti i giorni è un gesto piccolo, quasi banale, ma qui ha un peso diverso."/>
+                <ITEXT FCOLOR="Red" FSHADE="100" CH="L'esperienza comincia con un gesto deliberato, inquadrare un codice QR con il proprio telefono. Nella vita di tutti i giorni è un gesto piccolo, quasi banale, ma qui ha un peso diverso."/>
                 <para/>
                 <ITEXT FCOLOR="Black" CH="Inquadrare il codice significa scegliere di partecipare. Si decide di entrare nel sistema, e questo è diverso dalla curiosità di chi passa davanti a una vetrina e si ferma a guardare. È una scelta attiva, e porta con sé una responsabilità leggera ma reale, perché da quel momento il proprio gesto ha conseguenze visibili, il proprio colore è sullo schermo, si fa parte dello sciame."/>
                 <para/>
@@ -601,7 +603,7 @@
                 <para/>
                 <ITEXT FCOLOR="Black" CH="2.2.3 Il suono"/>
                 <para/>
-                <ITEXT FCOLOR="Black" CH="Il microfono del dispositivo che gestisce la simulazione ascolta la stanza di continuo. Misura il volume ambientale, il livello sonoro complessivo, senza registrare nulla e senza analizzare cosa viene detto. Questo valore, elaborato in tempo reale, cambia la luminosità delle particelle. Più la stanza è rumorosa, più le particelle si fanno brillanti."/>
+                <ITEXT FCOLOR="Black" CH="Il microfono del dispositivo che gestisce la simulazione ascolta la stanza di continuo. Misura il volume ambientale, il livello sonoro complessivo, senza registrare nulla e senza analizzare cosa viene detto. Questo valore, elaborato in tempo reale, cambia il colore delle particelle."/>
                 <para/>
                 <ITEXT FCOLOR="Black" CH="C'è qualcosa di John Cage in questa scelta. Nel 1952, con "/>
                 <ITEXT CPARENT="Italic" FCOLOR="Black" CH="4'33&quot;"/>
@@ -641,8 +643,8 @@
                 <para/>
                 <ITEXT FCOLOR="Black" CH="Il voto porta dentro l'esperienza anche il tempo. C'è un conto alla rovescia, e un risultato che arriva. Questo ritmo scandisce l'esperienza e crea un senso di evento condiviso, qualcosa che accade insieme e ha una durata precisa."/>
                 <para/>
-                <ITEXT FCOLOR="Black" CH="2.3.2 Un gesto che diventa territorio"/>
-                <para/>
+                <ITEXT CH="2.3.2 Un gesto che diventa territorio"/>
+                <para PARENT="T_Heading 2"/>
                 <ITEXT FCOLOR="Black" CH="Quando un partecipante traccia un gesto sullo schermo, il sistema lo accoglie come territorio, una forma visibile sullo sfondo verso cui le particelle vengono attratte. Le particelle abitano il disegno e lo riempiono di luce, e il gesto individuale resta visibile come la struttura attorno a cui il collettivo si organizza."/>
                 <para/>
                 <ITEXT CPARENT="Bold" FCOLOR="Black" CH="[IMG]"/>
@@ -665,7 +667,7 @@
                 <para/>
                 <ITEXT FCOLOR="Black" CH="Il flusso dei frammenti proposti dal sistema è automatizzato. Un'orchestrazione esterna decide cosa mostrare e quando, secondo un piano preparato in anticipo. Resta possibile, se serve, intervenire durante una sessione per spingere la narrazione verso qualcosa di più aderente al pubblico in sala quella sera. È una scelta che protegge il progetto da uno dei rischi più comuni delle installazioni interattive, dover stare davanti a un computer durante la mostra invece di stare in mezzo alle persone che la vivono."/>
                 <para/>
-                <ITEXT FCOLOR="Black" CH="La parola digitata dal partecipante fa qualcosa di diverso. Per qualche secondo una sola persona scrive dentro il sistema, e quello che scrive si trasforma in territorio per le particelle di tutti. Una parola privata diventa visibile a tutti, e l'anonimato del partecipante, per il tempo in cui la parola resta sullo schermo, ha una crepa."/>
+                <ITEXT FCOLOR="Red" FSHADE="100" CH="La parola digitata dal partecipante fa qualcosa di diverso. Per qualche secondo una sola persona scrive dentro il sistema, e quello che scrive si trasforma in territorio per le particelle di tutti. Una parola privata diventa visibile a tutti, e l'anonimato del partecipante, per il tempo in cui la parola resta sullo schermo, ha una crepa."/>
                 <para/>
                 <ITEXT FCOLOR="Black" CH="Jenny Holzer fa qualcosa di simile da decenni con le sue "/>
                 <ITEXT CPARENT="Italic" FCOLOR="Black" CH="Truisms"/>
@@ -673,10 +675,10 @@
                 <para/>
                 <ITEXT FCOLOR="Black" CH="Cosa significhi, per uno sciame, scrivere una parola digitata da qualcuno è una domanda che il progetto lascia aperta. Forse è il momento in cui la distanza tra l'individuo che digita e il collettivo che lo riceve si riduce al minimo. Quello che rimane, dopo che la parola si dissolve, è una configurazione del flusso che nessuno aveva pianificato, la traccia di una parola che è passata."/>
                 <para/>
-                <ITEXT FCOLOR="Black" CH="Niente di quello che ho descritto fin qui viene annunciato. Non c'è un'etichetta sullo schermo, non c'è una voce che dichiari cosa sta accadendo. Il pubblico se ne accorge da quello che cambia sotto i suoi occhi. È una scelta di art direction, e ha conseguenze sull'estetica complessiva dell'opera. È il tema del paragrafo che segue."/>
+                <ITEXT FCOLOR="Black" CH="Niente di quello che ho descritto fin qui viene annunciato. Non c'è un'etichetta sullo schermo, non c'è una voce che dichiari cosa sta accadendo. Il pubblico se ne accorge da quello che cambia sotto i suoi occhi. È una scelta che ha conseguenze sull'estetica complessiva dell'opera."/>
                 <para/>
-                <ITEXT FCOLOR="Black" CH="2.4 L'invisibilità"/>
-                <para/>
+                <ITEXT CH="2.4 L'invisibilità"/>
+                <para PARENT="T_Heading 2"/>
                 <ITEXT FCOLOR="Black" CH="Ogni scelta visiva di questo progetto è una decisione concettuale, perché non esiste un elemento estetico neutro. Il colore dello sfondo, la dimensione delle particelle, la quantità di testo sull'interfaccia del telefono, tutto dice qualcosa su come si vuole che l'esperienza venga vissuta."/>
                 <para/>
                 <ITEXT FCOLOR="Black" CH="Il principio che guida queste scelte ha un nome quasi paradossale, il design dell'invisibilità. L'obiettivo è che l'interfaccia sparisca, e che resti solo l'esperienza."/>
@@ -994,7 +996,7 @@
                 <DefaultStyle FCOLOR="White"/>
                 <ITEXT FCOLOR="White" CH="# 2. Il PROGETTO"/>
                 <para PARENT="section_megatitle_onblack"/>
-                <ITEXT FCOLOR="White" CH="Questa parte descrive il progetto, dall'idea al dettaglio, partendo dall'intenzione per arrivare al funzionamento, senza mai perdere di vista perché ogni scelta è stata fatta."/>
+                <ITEXT FCOLOR="White" SCALEH="92" CH="Dall'idea al dettaglio, partendo dall'intenzione per arrivare al funzionamento, senza mai perdere di vista perché ogni scelta è stata fatta."/>
                 <trail PARENT="section_body_onblack"/>
             </StoryText>
         </PAGEOBJECT>
