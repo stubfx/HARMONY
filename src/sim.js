@@ -65,7 +65,7 @@ const params = {
     imageY:         0.5,  // user content center Y in screen-space 0–1
     showImage:    false,
     // Trace canvas
-    traceScale:   0.5,   // trace canvas resolution relative to main canvas (perf control)
+    traceScale:   1.0,   // trace canvas resolution relative to main canvas (perf control)
     // QR placement on trace canvas
     qrSize:       0.25,   // QR size as fraction of min(traceW, traceH)
     qrMargin:     0.02,  // uniform margin from the aligned edge, as fraction of min(traceW, traceH)
@@ -754,7 +754,12 @@ function rebuildOffscreen() {
 }
 rebuildOffscreen();
 
-window.addEventListener('resize', () => {
+// Full resolution-change rebuild: recreate every canvas-sized resource AND every
+// bind group that samples those textures. rebuildOffscreen alone rebuilds only a
+// subset (blit/grid/gol step) — simBG still references the recreated shadow-density
+// and GoL textures (bindings 5 and 7), so it must be rebuilt too or the next submit
+// uses a destroyed texture. Used on resize and on every renderScale change.
+function applyResize() {
     setSize();
     rebuildOffscreen();
     rebuildSimBG();
@@ -762,7 +767,8 @@ window.addEventListener('resize', () => {
     rebuildAgentShadowBG();
     rebuildAgentShadowDensityBG();
     seedAgents();
-});
+}
+window.addEventListener('resize', applyResize);
 
 // ── Trace layer state ─────────────────────────────────────────────────────────
 // The trace layer is a single GPU texture that is the composite of:
@@ -1932,7 +1938,7 @@ function applySimParams(data) {
     if ('duckLevel'  in rest) setDuckLevel(params.duckLevel);
     if ('n8nTestMode' in rest) socket.emit('set-n8n-test-mode', params.n8nTestMode);
     if (needsReseed)  seedAgents();
-    if (needsRebuild) { setSize(); rebuildOffscreen(); seedAgents(); }
+    if (needsRebuild) applyResize();
     if (needsRetrace) renderTraceCanvas();
     if (needsQRReseed) seedAgents();
     if (needsQRRegen)  generateQR().then(renderTraceCanvas);
@@ -1954,7 +1960,7 @@ function applySimParams(data) {
     applyGUIVisibility, toggleGUI, updateGizmo,
 } = initGUI({
     params, socket, simState, MAX_AGENTS,
-    seedAgents, seedGoL, setSize, rebuildOffscreen, rebuildGridTex,
+    seedAgents, seedGoL, setSize, rebuildOffscreen, rebuildGridTex, applyResize,
     renderTraceCanvas, generateQR, loadFontSpec,
     clearMagnetImage, clearTraceText, clearAvoidMap,
     restartHeartbeat,
