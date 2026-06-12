@@ -716,6 +716,7 @@ Caddy handles TLS automatically via Let's Encrypt and proxies WebSocket upgrade 
 | Parameter | Effect |
 |-----------|--------|
 | `?gui=true` | Start with GUI, monitor, and formula panel visible |
+| `?resolution=<0-1>` | Initial render scale (clamped to 0.1–1.0). Sets the `render scale` GUI slider at boot; lower = fewer pixels, higher frame rate |
 
 **Remote page (`/remote/`)**
 

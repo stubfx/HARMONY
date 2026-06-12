@@ -148,6 +148,8 @@ When on (and wind is enabled), a scheduler randomly picks a new formula from the
 
 Canvas resolution multiplier applied on top of the device pixel ratio (DPR). At 1.0 on a 2x HiDPI screen the offscreen texture is rendered at 2× native — sharp but expensive. Reducing this to 0.5 halves the texture in each dimension (¼ the pixels), significantly improving frame rate on high-resolution displays. Changing this re-seeds agents.
 
+Can be set at boot via the `?resolution=<0-1>` URL parameter (clamped to the 0.1–1.0 range), which initialises this slider before the first frame.
+
 ### trail decay
 **Range:** 0.005 – 0.4 | **Default:** 0.055
 
