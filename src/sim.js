@@ -184,6 +184,11 @@ if (['off', 'false', '0', 'disabled'].includes(_urlParams.get('n8n') ?? '')) {
     const t = _urlParams.get('test');
     if (t === '1' || t === 'true') params.n8nTestMode = true;
 }
+{
+    // resolution: initial render scale, 0–1 (clamped to the slider's 0.1–1.0 range).
+    const r = parseFloat(_urlParams.get('resolution') ?? '');
+    if (Number.isFinite(r)) params.renderScale = Math.max(0.1, Math.min(1.0, r));
+}
 
 const DEFAULT_DIR  = 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI';
 const DEFAULT_WIND = 'sin(x * 0.004 - y * 0.003 + t * 0.4) * TWO_PI';
