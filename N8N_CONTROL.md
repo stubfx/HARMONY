@@ -164,7 +164,7 @@ The trace canvas is always full-screen (scaled by `traceScale`). QR and user con
 
 | Key | Default | Range | Description |
 |-----|---------|-------|-------------|
-| `traceScale` | `0.5` | `0.1 – 1.0` | Trace canvas resolution relative to the main canvas. Lower = cheaper upload, less detail. |
+| `traceScale` | `1.0` | `0.1 – 1.0` | Trace canvas resolution relative to the main canvas. Lower = cheaper upload, less detail. |
 | `imageSize` | `0.316` | `0 – 1` | User content size as a fraction of `min(traceW, traceH)`. |
 | `imageX` | `0.5` | `0 – 1` | User content center X in screen-space (0 = left, 1 = right). |
 | `imageY` | `0.5` | `0 – 1` | User content center Y in screen-space (0 = top, 1 = bottom). |
