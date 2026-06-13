@@ -110,8 +110,8 @@ export function setSynthChaos(chaos) {
     // Drone — always audible, slightly quieter at peak chaos
     _droneVol.volume.rampTo(-18 - c * 6, RAMP, t);
 
-    // Noise — fades out as harmony approaches
-    _noiseGain.gain.rampTo(c * 0.25, RAMP, t);
+    // Noise — fades out as harmony approaches (floor at 1e-4: exponentialRamp can't reach 0)
+    _noiseGain.gain.rampTo(Math.max(1e-4, c * 0.25), RAMP, t);
 
     // Pad — emerges below chaos 0.6, filter opens further at harmony
     const padGain = c < 0.6 ? Math.pow(1 - c / 0.6, 1.5) * 0.55 : 0;
