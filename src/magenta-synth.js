@@ -83,7 +83,9 @@ function _schedulePart(seq) {
         vel:  (n.velocity ?? 80) / 127,
     }));
 
+    let _dbg = 0;
     _part = new Tone.Part((t, ev) => {
+        if (_dbg++ < 4) console.log('[magenta] NOTE', ev.note, 'vel', ev.vel?.toFixed(2), 'vol', _vol?.volume.value.toFixed(1) + 'dB');
         _synth.triggerAttackRelease(ev.note, '16n', t, ev.vel);
     }, events);
 
