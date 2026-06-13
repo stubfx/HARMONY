@@ -133,7 +133,7 @@ async function callN8nSpectator(roomId, type, spectatorId, userCount, testMode) 
         const res = await fetch(N8N_BASE + endpoint, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ type, room: roomId, spectatorId, userCount }),
+            body:    JSON.stringify({ type, room: roomId, spectatorId, userCount, avgChaos: rooms.get(roomId)?.lastAvgChaos ?? 1 }),
             signal:  controller.signal,
         });
         clearTimeout(timer);
@@ -174,12 +174,15 @@ setInterval(() => {
             }
         }
 
+        const avgChaos = n > 0 ? sChaos / n : 1;
+        room.lastAvgChaos = avgChaos;
+
         io.to(`${roomId}:hosts`).emit('collective-state', {
             avgPitch:     n > 0 ? sp / n : 0.5,
             avgRoll:      n > 0 ? sr / n : 0.5,
             avgTemp:      n > 0 ? st / n : 0.5,
             avgCoherence: n > 0 ? sc / n : 0.5,
-            avgChaos:     n > 0 ? sChaos / n : 1,
+            avgChaos,
             userCount:    room.connections.size,
         });
     }

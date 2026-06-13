@@ -141,7 +141,7 @@ const params = {
     maxSpectators:  1,    // sim QR hides when connected count reaches this threshold
     respawnOnQR:      true,  // respawn free agents inside the QR rect to a random edge
     qrRespawnChance:  0.01,  // per-frame probability [0–1] for the respawn
-    n8nEnabled:        false, // false = silence all n8n traffic (heartbeat + sim-event) without unsetting VITE_N8N_BASE_URL
+    n8nEnabled:        true,  // false = silence all n8n traffic (heartbeat + sim-event) without unsetting VITE_N8N_BASE_URL
     n8nTestMode:       false, // true = /webhook-test/sim-event, false = /webhook/sim-event
     heartbeatInterval: 10,   // seconds between periodic param snapshots sent to n8n (0 = off)
     heartbeatTimeout:  60,   // seconds before a heartbeat fetch is aborted
@@ -1545,6 +1545,7 @@ async function callN8nHeartbeat() {
                 votesB:            simState.votesB,
                 storyVoteResult:   simState.storyVoteResult,
                 userCount:         simState.userCount,
+                avgChaos:          smoothChaos,
                 ...(_n8nPassword !== null && { password: _n8nPassword }),
                 ..._serverEcho,
                 params:            { ...params },
