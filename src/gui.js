@@ -331,8 +331,8 @@ export function initGUI({
     const colorModeCtrl = gui.add(simState, 'colorMode', ['NORMAL', 'GRAYSCALE', 'GRAYSCALE_INVERTED']).name('color mode');
     const stateCtrl     = gui.add(simState, 'status',    ['NORMAL', 'FREEROAM', 'DOT']).name('status');
     const qrStateCtrl = gui.add(simState, 'qrStatus', ['SHOW', 'HIDE']).name('qr');
-    gui.add(simState, 'stepStatus', ['IDLE', 'DRAW', 'VOTE', 'PULSE', 'TEXT', 'RAISE', 'WAVE']).name('step status (test)')
-        .onChange(v => socket.emit('remote-ui', { stepStatus: v }));
+    gui.add(simState, 'stepStatus', ['HARMONY', 'IDLE', 'DRAW', 'VOTE', 'PULSE', 'TEXT', 'RAISE', 'WAVE']).name('step status (test)')
+        .onChange(v => socket.emit('remote-ui', { stepStatus: v === 'HARMONY' ? null : v }));
 
     fMotion.open();
     fWind.open();

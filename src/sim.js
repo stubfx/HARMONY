@@ -1403,7 +1403,7 @@ const simState = {
     storyVoteResult:   null,
     votesA:            0,      // raw vote count for optionA — dirty, never auto-reset
     votesB:            0,      // raw vote count for optionB — dirty, never auto-reset
-    stepStatus:        'IDLE', // 'IDLE' | 'DRAW' | 'VOTE' — spectator interaction mode
+    stepStatus:        'HARMONY', // 'HARMONY' | 'IDLE' | 'DRAW' | 'VOTE' — spectator interaction mode
     optionA:           null,
     optionB:           null,
     userCount:         0,      // live spectator count — updated via spectator-joined/-left
