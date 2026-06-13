@@ -209,11 +209,30 @@ fn avoidMapStrAt(canvasPx: vec2<f32>) -> f32 {
     let uv     = (canvasPx - center) / (texSz * coverScale) + 0.5;
 
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { return 0.0; }
-    let tx = u32(clamp(uv.x, 0.0, 1.0) * f32(dims.x - 1u));
-    let ty = u32(clamp(uv.y, 0.0, 1.0) * f32(dims.y - 1u));
-    let r = textureLoad(avoidMapTex, vec2<u32>(tx, ty), 0u).r;
-    // Invert before returning so every downstream caller (gradient, deflection,
-    // strength scaling) sees the flipped signal with no extra branches.
+
+    let mx = i32(dims.x) - 1;
+    let my = i32(dims.y) - 1;
+    let cx = i32(clamp(uv.x, 0.0, 1.0) * f32(dims.x - 1u));
+    let cy = i32(clamp(uv.y, 0.0, 1.0) * f32(dims.y - 1u));
+
+    // Chaos-driven blur: 9-tap sparse Gaussian kernel, radius = chaos × 8 texels.
+    // At chaos=0 all offsets are 0 → all taps hit the same texel, no blur.
+    // At chaos=1 samples spread ±8 texels on axes, ±6 on diagonals.
+    let br = params.chaos * 8.0;
+    let ra = i32(round(br));          // axis offset
+    let rd = i32(round(br * 0.707));  // diagonal offset ≈ br / √2
+
+    let r = (textureLoad(avoidMapTex, vec2<u32>(u32(clamp(cx,      0, mx)), u32(clamp(cy,      0, my))), 0u).r * 4.0
+           + textureLoad(avoidMapTex, vec2<u32>(u32(clamp(cx + ra, 0, mx)), u32(clamp(cy,      0, my))), 0u).r * 2.0
+           + textureLoad(avoidMapTex, vec2<u32>(u32(clamp(cx - ra, 0, mx)), u32(clamp(cy,      0, my))), 0u).r * 2.0
+           + textureLoad(avoidMapTex, vec2<u32>(u32(clamp(cx,      0, mx)), u32(clamp(cy + ra, 0, my))), 0u).r * 2.0
+           + textureLoad(avoidMapTex, vec2<u32>(u32(clamp(cx,      0, mx)), u32(clamp(cy - ra, 0, my))), 0u).r * 2.0
+           + textureLoad(avoidMapTex, vec2<u32>(u32(clamp(cx + rd, 0, mx)), u32(clamp(cy + rd, 0, my))), 0u).r * 1.0
+           + textureLoad(avoidMapTex, vec2<u32>(u32(clamp(cx - rd, 0, mx)), u32(clamp(cy + rd, 0, my))), 0u).r * 1.0
+           + textureLoad(avoidMapTex, vec2<u32>(u32(clamp(cx + rd, 0, mx)), u32(clamp(cy - rd, 0, my))), 0u).r * 1.0
+           + textureLoad(avoidMapTex, vec2<u32>(u32(clamp(cx - rd, 0, mx)), u32(clamp(cy - rd, 0, my))), 0u).r * 1.0
+           ) / 16.0;
+
     return select(r, 1.0 - r, params.avoidMapInvert != 0u);
 }
 
