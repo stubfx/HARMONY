@@ -102,9 +102,8 @@ export function setSynthState(chaos, coherence = 0.5, biasX = 0, biasY = 0, temp
     // Noise — fades out as harmony approaches
     smoothTo(_noiseGain.gain, Math.max(1e-4, c * 0.25));
 
-    // Pad — emerges below chaos 0.6, filter opens further at harmony
-    const padGain = c < 0.6 ? Math.pow(1 - c / 0.6, 1.5) * 0.55 : 0;
-    smoothTo(_padVol.volume, padGain > 0 ? Math.max(SILENT, Tone.gainToDb(padGain)) : SILENT);
+    // Pad — temporarily muted to isolate Magenta melody layer
+    smoothTo(_padVol.volume, SILENT);
     smoothTo(_padFilter.frequency, 300 + (1 - c) * 5500);
 
     // LFO frequency ← coherence: converged room = faster oscillation (0.05–0.8 Hz)
