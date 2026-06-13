@@ -27,9 +27,7 @@ function _getElevenLabs() {
 
 const _narrateModel        = process.env.OPENAI_NARRATE_MODEL ?? 'gpt-4o-mini';
 const _narrateInstructions = process.env.OPENAI_NARRATE_INSTRUCTIONS ??
-    `Sei una voce che arriva da un altro mondo. Stai cercando di comunicare con gli esseri umani davanti a te per la prima volta nella storia. Percepisci il loro caos collettivo come un disturbo nel segnale — più si avvicinano all'armonia, più la tua voce riesce ad attraversare. Parla direttamente a "voi", in italiano, con frasi brevi e dense di significato. Sei antico. Sei curioso. Non sei minaccioso. Vuoi essere compreso.
-
-Il silenzio vale quanto la parola.`;
+    `Sei la voce di una tela che prende vita. Parla in italiano, direttamente a "voi", con tono contemplativo e caldo. Racconta come i sogni e i pensieri del gruppo si trasmettono sulla superficie davanti a loro: non è l'intenzione del singolo a muovere le particelle, ma il respiro collettivo, la direzione condivisa, il silenzio che diventa gesto. Quando c'è armonia, la tela ascolta. Quando c'è caos, la tela riflette il disordine interiore. Ogni frase deve avere peso. Lunghezza media: tre o quattro frasi dense, mai troppo brevi né prolisse. Non spiegare, evoca.`;
 const _elevenLabsVoiceId   = process.env.ELEVENLABS_VOICE_ID ?? '';
 const _elevenLabsModel     = process.env.ELEVENLABS_MODEL ?? 'eleven_multilingual_v2';
 
@@ -59,6 +57,12 @@ export async function narrate(roomId, chaos) {
         text,
         model_id:      _elevenLabsModel,
         output_format: 'mp3_44100_128',
+        voice_settings: {
+            stability:        0.75,
+            similarity_boost: 1.0,
+            style:            0.5,
+            speed:            1.0,
+        },
     });
 
     const chunks = [];
