@@ -19,7 +19,7 @@ import windVisWGSL      from './shaders/wind-vis.wgsl?raw';
 import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
 import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
-import { startSynth, setSynthState } from './synth.js';
+import { startSynth, setSynthState, playIdleTrack, stopIdleTrack, setIdleChaos } from './synth.js';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const MAX_AGENTS = 5_000_000;
@@ -1727,7 +1727,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
     // A spectator joined — assign a slot, send them their color, brightness burst.
     socket.on('spectator-joined', ({ spectatorId, userCount } = {}) => {
         if (userCount !== undefined) simState.userCount = userCount;
-        if (userCount === 1) { clearAvoidMap(); _idleAudioGen++; playAudioBg(null); } // remove idle attractor + audio
+        if (userCount === 1) { clearAvoidMap(); _idleAudioGen++; stopIdleTrack(); } // remove idle attractor + audio
         if (simState.status === 'DOT' && userCount >= 1) setStatus('NORMAL');
         lastRemoteActivity = Date.now();
         burstBrightness    = BURST_BRIGHTNESS;
@@ -2333,6 +2333,7 @@ function writeSoloUB(dt, time) {
     if (_synthNow - _lastSynthTick >= 200) {
         _lastSynthTick = _synthNow;
         setSynthState(smoothChaos, smoothCoherence, smoothBiasX, smoothBiasY, smoothTemp);
+        setIdleChaos(smoothChaos);
     }
     if (Math.random() < 0.01) console.log('[chaos] smoothChaos→GPU:', smoothChaos.toFixed(4));
     device.queue.writeBuffer(soloUB, 0, ab);
@@ -2900,7 +2901,7 @@ _fetchIdleImageBytes().then(bytes => {
 }).catch(e => console.warn('[idle-image]', e));
 
 async function _fetchIdleImageBytes() {
-    const res = await fetch(`${_apiBase}/idle-image`, { cache: 'no-store' });
+    const res = await fetch(`${_apiBase}/simAss-image`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return new Uint8Array(await res.arrayBuffer());
 }
@@ -2930,23 +2931,18 @@ setInterval(async () => {
     }
 }, 30000);
 
-// ── Idle audio loader — chains tracks: fetches next as soon as current ends ──
+// ── Idle audio loader — chains tracks via Tone.js radio chain ────────────────
 let _idleAudioGen = 0;
 
 async function loadIdleAudio() {
     const gen = ++_idleAudioGen;
     try {
-        const res = await fetch(`${_apiBase}/idle-audio`);
+        const res = await fetch(`${_apiBase}/simAss-audio`);
         if (!res.ok) { console.warn('[idle-audio] HTTP', res.status); return; }
-        if (gen !== _idleAudioGen) return; // superseded
-        const buf   = await res.arrayBuffer();
-        const bytes = new Uint8Array(buf);
-        let binary  = '';
-        const CHUNK = 8192;
-        for (let i = 0; i < bytes.length; i += CHUNK)
-            binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-        console.log(`[idle-audio] loaded ${buf.byteLength}B — playing`);
-        playAudioBg(btoa(binary), 'audio/mpeg', false, () => {
+        if (gen !== _idleAudioGen) return;
+        const buf = await res.arrayBuffer();
+        console.log(`[idle-audio] loaded ${buf.byteLength}B — playing via Tone.js radio chain`);
+        await playIdleTrack(buf, () => {
             if (gen === _idleAudioGen) loadIdleAudio();
         });
     } catch (e) {

@@ -457,76 +457,90 @@ app.post('/rndImage', async (_req, res) => {
 });
 
 // ── Idle assets — ./idle/{images,music}/, max 3, auto-generate if missing ──────
-const _IDLE_DIR   = path.join(__dirname, '..', 'idle');
-const _IMAGE_MIME = { '.webp': 'image/webp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png' };
-const IDLE_MAX    = 3;
+const _SIM_ASS_DIR = path.join(__dirname, '..', 'simAss');
+const _IMAGE_MIME  = { '.webp': 'image/webp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png' };
+const SIM_ASS_MAX  = 3;
 
 const _generating = { image: false, audio: false };
 
-function _idleFiles(dir) {
+function _simAssFiles(dir) {
     return readdir(dir).catch(() => []).then(fs => fs.filter(f => !f.startsWith('.')));
 }
 
 async function _genAndSaveImage(dir) {
-    if (_generating.image) return;
+    if (_generating.image) { console.log('[simAss-image] generation already in progress — skipping'); return; }
     _generating.image = true;
+    console.log('[simAss-image] starting generation…');
     try {
         const base64   = await generateIdleImage();
         const buf      = Buffer.from(base64, 'base64');
-        const filename = `idle_${Date.now()}.webp`;
+        const filename = `simAss_${Date.now()}.webp`;
         await writeFile(path.join(dir, filename), buf);
-        console.log(`[idle-image] saved ${filename}  size=${buf.length}B`);
+        console.log(`[simAss-image] saved ${filename}  size=${buf.length}B`);
         return { buf, mime: 'image/webp' };
     } finally { _generating.image = false; }
 }
 
 async function _genAndSaveAudio(dir) {
-    if (_generating.audio) return;
+    if (_generating.audio) { console.log('[simAss-audio] generation already in progress — skipping'); return; }
     _generating.audio = true;
+    console.log('[simAss-audio] starting generation…');
     try {
         const buf      = await generateIdleAudio();
-        const filename = `idle_${Date.now()}.mp3`;
+        const filename = `simAss_${Date.now()}.mp3`;
         await writeFile(path.join(dir, filename), buf);
-        console.log(`[idle-audio] saved ${filename}  size=${buf.length}B`);
+        console.log(`[simAss-audio] saved ${filename}  size=${buf.length}B`);
         return { buf, mime: 'audio/mpeg' };
     } finally { _generating.audio = false; }
 }
 
-app.get('/idle-image', async (_req, res) => {
-    const dir   = path.join(_IDLE_DIR, 'images');
-    const files = await _idleFiles(dir);
+app.get('/simAss-image', async (_req, res) => {
+    const dir   = path.join(_SIM_ASS_DIR, 'images');
+    const files = await _simAssFiles(dir);
+    console.log(`[simAss-image] request — ${files.length} file(s) available: [${files.join(', ')}]`);
     if (files.length === 0) {
-        console.log('[idle-image] no files — generating…');
+        console.log('[simAss-image] no files — generating synchronously…');
         try {
             const { buf, mime } = await _genAndSaveImage(dir);
             return res.type(mime).send(buf);
         } catch (err) {
+            console.error('[simAss-image] generation failed:', err.message);
             return res.status(500).json({ error: err.message });
         }
     }
-    const file = path.join(dir, files[Math.floor(Math.random() * files.length)]);
-    const mime = _IMAGE_MIME[path.extname(file).toLowerCase()] ?? 'image/webp';
-    console.log(`[idle-image] serving ${path.basename(file)}  (${files.length}/${IDLE_MAX})`);
+    const chosen = files[Math.floor(Math.random() * files.length)];
+    const file   = path.join(dir, chosen);
+    const mime   = _IMAGE_MIME[path.extname(file).toLowerCase()] ?? 'image/webp';
+    console.log(`[simAss-image] serving ${chosen}  (${files.length}/${SIM_ASS_MAX})`);
     res.type(mime).send(await readFile(file));
-    if (files.length < IDLE_MAX) _genAndSaveImage(dir).catch(e => console.error('[idle-image] bg gen:', e.message));
+    if (files.length < SIM_ASS_MAX) {
+        console.log(`[simAss-image] below cap (${files.length}/${SIM_ASS_MAX}) — triggering background generation`);
+        _genAndSaveImage(dir).catch(e => console.error('[simAss-image] bg gen failed:', e.message));
+    }
 });
 
-app.get('/idle-audio', async (_req, res) => {
-    const dir   = path.join(_IDLE_DIR, 'music');
-    const files = await _idleFiles(dir);
+app.get('/simAss-audio', async (_req, res) => {
+    const dir   = path.join(_SIM_ASS_DIR, 'music');
+    const files = await _simAssFiles(dir);
+    console.log(`[simAss-audio] request — ${files.length} file(s) available: [${files.join(', ')}]`);
     if (files.length === 0) {
-        console.log('[idle-audio] no files — generating…');
+        console.log('[simAss-audio] no files — generating synchronously…');
         try {
             const { buf, mime } = await _genAndSaveAudio(dir);
             return res.type(mime).send(buf);
         } catch (err) {
+            console.error('[simAss-audio] generation failed:', err.message);
             return res.status(500).json({ error: err.message });
         }
     }
-    const file = path.join(dir, files[Math.floor(Math.random() * files.length)]);
-    console.log(`[idle-audio] serving ${path.basename(file)}  (${files.length}/${IDLE_MAX})`);
+    const chosen = files[Math.floor(Math.random() * files.length)];
+    const file   = path.join(dir, chosen);
+    console.log(`[simAss-audio] serving ${chosen}  (${files.length}/${SIM_ASS_MAX})`);
     res.type('audio/mpeg').send(await readFile(file));
-    if (files.length < IDLE_MAX) _genAndSaveAudio(dir).catch(e => console.error('[idle-audio] bg gen:', e.message));
+    if (files.length < SIM_ASS_MAX) {
+        console.log(`[simAss-audio] below cap (${files.length}/${SIM_ASS_MAX}) — triggering background generation`);
+        _genAndSaveAudio(dir).catch(e => console.error('[simAss-audio] bg gen failed:', e.message));
+    }
 });
 
 // ── Page fallbacks ────────────────────────────────────────────────────────────

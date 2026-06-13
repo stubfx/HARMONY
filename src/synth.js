@@ -159,3 +159,76 @@ export function stopSynth() {
         _ready = false;
     }, 1600);
 }
+
+// ── Idle radio chain — fetched music routed through chaos-driven degradation ──
+// At low chaos: clean-ish signal. At high chaos: heavy lowpass + static noise +
+// reverb wash + dropout tremolo = sounds like a radio with no reception.
+
+let _idleChainReady = false;
+let _idlePlayer     = null;
+let _idleFilter     = null;   // lowpass — chaos drives cutoff down
+let _idleDist       = null;   // waveshaper distortion — chaos drives up
+let _idleTremolo    = null;   // gain tremolo — chaos deepens dropout
+let _idleReverb     = null;   // reverb — chaos adds wash
+let _idleVol        = null;
+let _idleNoiseGain  = null;   // white noise static — chaos drives up
+
+async function _buildIdleChain() {
+    if (_idleChainReady) return;
+    _idleFilter  = new Tone.Filter({ frequency: 4000, type: 'lowpass', rolloff: -24 });
+    _idleDist    = new Tone.Distortion(0);
+    _idleTremolo = new Tone.Tremolo({ frequency: 3, depth: 0 }).start();
+    _idleReverb  = new Tone.Reverb({ decay: 4, wet: 0.15 });
+    _idleVol     = new Tone.Volume(-3);
+    _idlePlayer  = new Tone.Player({ loop: false, fadeOut: 0.3 });
+    _idlePlayer.chain(_idleFilter, _idleDist, _idleTremolo, _idleReverb, _idleVol);
+    _idleVol.toDestination();
+
+    const noiseBP   = new Tone.Filter({ frequency: 2000, type: 'bandpass', Q: 1.0 });
+    _idleNoiseGain  = new Tone.Gain(0);
+    const noise     = new Tone.Noise('white');
+    noise.connect(noiseBP);
+    noiseBP.connect(_idleNoiseGain);
+    _idleNoiseGain.toDestination();
+    noise.start();
+
+    await _idleReverb.ready;
+    _idleChainReady = true;
+}
+
+export async function playIdleTrack(arrayBuffer, onEnded) {
+    await Tone.start();
+    await _buildIdleChain();
+    if (_idlePlayer.state === 'started') _idlePlayer.stop();
+    const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+    const url  = URL.createObjectURL(blob);
+    await _idlePlayer.load(url);
+    URL.revokeObjectURL(url);
+    _idlePlayer.onstop = onEnded ?? null;
+    _idlePlayer.start();
+}
+
+export function stopIdleTrack() {
+    if (_idlePlayer?.state === 'started') _idlePlayer.stop();
+}
+
+export function setIdleChaos(chaos) {
+    if (!_idleChainReady) return;
+    const c  = Math.max(0, Math.min(1, chaos));
+    const t  = Tone.now();
+    const TC = RAMP / 3;
+
+    function smooth(signal, value) {
+        signal.cancelScheduledValues(t);
+        signal.setTargetAtTime(value, t, TC);
+    }
+
+    smooth(_idleFilter.frequency, 4000 - c * 3600);        // 4000 Hz → 400 Hz
+    smooth(_idleReverb.wet,       0.15 + c * 0.70);        // 0.15 → 0.85
+    smooth(_idleNoiseGain.gain,   c * 0.18);                // static noise
+    smooth(_idleVol.volume,       -3 - c * 12);             // -3 dB → -15 dB
+
+    _idleDist.distortion          = c * 0.65;
+    _idleTremolo.depth.value      = c * 0.85;
+    _idleTremolo.frequency.value  = 2 + c * 6;             // 2 Hz → 8 Hz dropout
+}
