@@ -1854,6 +1854,8 @@ function _remoteUiPayload() {
         stepStatus,
         optionA:       simState.optionA,
         optionB:       simState.optionB,
+        color1:        params.color1,
+        color2:        params.color2,
         ...(isVote && { voteDuration: params.voteDuration }),
     };
 }

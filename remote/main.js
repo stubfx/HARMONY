@@ -184,8 +184,10 @@ function _clearVoteCountdown() {
     if (voteTimerEl) voteTimerEl.textContent = '';
 }
 
-function setRemoteUI({ stepStatus, optionA, optionB, voteDuration } = {}) {
+function setRemoteUI({ stepStatus, optionA, optionB, voteDuration, color1, color2 } = {}) {
     _currentStepStatus = stepStatus ?? null;
+    if (color1) _simColor1 = color1;
+    if (color2) _simColor2 = color2;
     _storyOptionA = optionA ?? null;
     _storyOptionB = optionB ?? null;
     const isVote    = stepStatus === 'VOTE';
@@ -241,12 +243,14 @@ function setRemoteUI({ stepStatus, optionA, optionB, voteDuration } = {}) {
         topBarEl.style.opacity       = showColors ? '1' : '0';
         topBarEl.style.pointerEvents = showColors ? 'auto' : 'none';
     }
+    // In HARMONY the joystick is invisible but still accepts touch (discovered by chance)
+    const joystickTouchable = showJoystick || isHarmony;
     if (joystickBaseEl) {
         joystickBaseEl.style.opacity       = showJoystick ? '1' : '0';
-        joystickBaseEl.style.pointerEvents = showJoystick ? 'auto' : 'none';
+        joystickBaseEl.style.pointerEvents = joystickTouchable ? 'auto' : 'none';
     }
     setStarMode(showJoystick);
-    if (!showJoystick && joystickIsActive) releaseJoystick();
+    if (!joystickTouchable && joystickIsActive) releaseJoystick();
 }
 
 voteBtnA?.addEventListener('touchstart', (e) => {
@@ -549,6 +553,20 @@ function releaseJoystick() {
     sendEvent('spawner', { dx: 0, dy: 0, magnitude: 0, velocity: 0, active: false });
 }
 
+// ── Sim palette mirror (received via remote-ui) ───────────────────────────────
+let _simColor1 = null; // [r,g,b] 0-1, sim's current color1
+let _simColor2 = null; // [r,g,b] 0-1, sim's current color2
+
+function _randomSimColor() {
+    const c1 = _simColor1 ?? [1, 1, 1];
+    const c2 = _simColor2 ?? [0.5, 0.5, 1];
+    const t = Math.random();
+    const r = Math.max(0, Math.min(255, Math.round((c1[0] + (c2[0] - c1[0]) * t) * 255)));
+    const g = Math.max(0, Math.min(255, Math.round((c1[1] + (c2[1] - c1[1]) * t) * 255)));
+    const b = Math.max(0, Math.min(255, Math.round((c1[2] + (c2[2] - c1[2]) * t) * 255)));
+    return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
 // ── Shake detection ───────────────────────────────────────────────────────────
 let _shaken        = false;
 let _shakeLastTime = 0;
@@ -563,13 +581,17 @@ window.addEventListener('devicemotion', (e) => {
     const now = Date.now();
     const mag = Math.sqrt((a.x ?? 0) ** 2 + (a.y ?? 0) ** 2 + (a.z ?? 0) ** 2);
 
-    // Shake — DRAW mode only
-    const showJoystick = !_currentStepStatus || _currentStepStatus === 'DRAW';
-    if (showJoystick && mag > SHAKE_THRESHOLD && now - _shakeLastTime > SHAKE_COOLDOWN) {
+    const _isDraw    = !_currentStepStatus || _currentStepStatus === 'DRAW';
+    const _isHarmony = _currentStepStatus === 'HARMONY';
+    if ((_isDraw || _isHarmony) && mag > SHAKE_THRESHOLD && now - _shakeLastTime > SHAKE_COOLDOWN) {
         _shakeLastTime = now;
-        _shaken = true;
         navigator.vibrate?.(60);
-        sendEvent('shake', {});
+        if (_isHarmony) {
+            sendEvent('color-pick', { color: _randomSimColor() });
+        } else {
+            _shaken = true;
+            sendEvent('shake', {});
+        }
     }
 
     // WAVE — same shake magnitude, different step context
