@@ -2197,6 +2197,7 @@ let smoothBiasY       = 0;
 let smoothTemp        = 0.5;
 let smoothCoherence   = 0.5;
 let smoothChaos       = 1;
+let _lastSynthChaos   = -1;   // throttle: only call setSynthChaos when value changes
 
 // ── Join burst state ──────────────────────────────────────────────────────────
 // When a spectator joins, a single brightness pulse fires across the field.
@@ -2313,7 +2314,10 @@ function writeSoloUB(dt, time) {
     const chaosGPU = activeSlots.length > 0 ? Math.min(smoothChaos / 0.3, 1.0) : 0;
     f[49] = chaosGPU;
     setChaos(chaosGPU);
-    setSynthChaos(smoothChaos);
+    if (Math.abs(smoothChaos - _lastSynthChaos) >= 0.005) {
+        _lastSynthChaos = smoothChaos;
+        setSynthChaos(smoothChaos);
+    }
     if (Math.random() < 0.01) console.log('[chaos] smoothChaos→GPU:', smoothChaos.toFixed(4));
     device.queue.writeBuffer(soloUB, 0, ab);
 }
