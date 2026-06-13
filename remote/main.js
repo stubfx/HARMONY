@@ -585,9 +585,8 @@ window.addEventListener('devicemotion', (e) => {
     if ((_isDraw || _isHarmony) && mag > SHAKE_THRESHOLD && now - _shakeLastTime > SHAKE_COOLDOWN) {
         _shakeLastTime = now;
         navigator.vibrate?.(60);
-        // Pick a new random palette color (different from current) — updates swatch UI on phone and sends color-pick to sim
-        let newIdx = Math.random() * PALETTE_SIZE | 0;
-        if (PALETTE_SIZE > 1 && newIdx === selectedSwatchIdx) newIdx = (newIdx + 1) % PALETTE_SIZE;
+        // Pick a new random palette color — updates swatch UI on phone and sends color-pick to sim
+        const newIdx = Math.random() * PALETTE_SIZE | 0;
         pickColor(newIdx);
         if (!_isHarmony) sendEvent('shake', {}); // burst on sim
     }
