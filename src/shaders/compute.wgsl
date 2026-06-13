@@ -337,10 +337,13 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         vel = mix(freeVel, homingVel, blendT);
     } else {
         // ── Free agent: formula steering + wind ───────────────────────────────
+        // chaos=1 → freeFactor=0 → agents ignore formula/wind and go straight.
+        // chaos=0 → freeFactor=1 → normal steering.
+        let freeFactor = 1.0 - params.chaos;
         if (params.followFormula != 0u) {
-            vel = mix(vel, desired * (params.stepLen * weight), params.turnRate);
+            vel = mix(vel, desired * (params.stepLen * weight), params.turnRate * freeFactor);
         }
-        vel += wind * params.dt * 60.0;
+        vel += wind * params.dt * 60.0 * freeFactor;
 
         // ── Game of Life attraction ────────────────────────────────────────────
         // Steer up the gradient of the live-cell grid, so the swarm gathers on and
@@ -523,12 +526,6 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                 }
             }
         }
-    }
-
-    // Chaos noise — random impulse scaled by collective device rotation chaos (0=calm, 1=max).
-    if (params.chaos > 0.001) {
-        let noiseAngle = hash(i ^ u32(params.time * 17.0)) * TWO_PI;
-        vel += vec2f(cos(noiseAngle), sin(noiseAngle)) * params.chaos * params.maxSpeed * 2.0;
     }
 
     let spd = length(vel);
