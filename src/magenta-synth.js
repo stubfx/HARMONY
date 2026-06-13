@@ -35,19 +35,14 @@ export async function initMagentaSynth() {
         _vae = new mm.MusicVAE(CHECKPOINT);
         await _vae.initialize();
 
-        const delay  = new Tone.FeedbackDelay({ delayTime: '8n', feedback: 0.3, wet: 0.4 });
-        const reverb = new Tone.Reverb({ decay: 4, wet: 0.5 });
         _vol = new Tone.Volume(-60);
 
         _synth = new Tone.Synth({
             oscillator: { type: 'triangle8' },
             envelope:   { attack: 0.03, decay: 0.15, sustain: 0.35, release: 1.2 },
-            volume:     -14,
+            volume:     -4,
         });
-        _synth.connect(delay);
-        delay.connect(reverb);
-        await reverb.ready;
-        reverb.connect(_vol);
+        _synth.connect(_vol);
         _vol.toDestination();
 
         _ready = true;
