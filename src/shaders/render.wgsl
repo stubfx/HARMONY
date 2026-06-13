@@ -40,6 +40,10 @@
 //   [148] championSize         f32   (point size for a FREE champion; ignored while homing)
 //   [152] color2Mix            f32   (0–1 audio-driven lean of the base palette toward color2)
 //   [156] avoidMapSampleChaos f32   (chaos 0–1 drives avoidmap sample probability: 0.30 + (1-chaos)*0.70)
+//   [160] chaosColorR          f32   (chaos override color R)
+//   [164] chaosColorG          f32   (chaos override color G)
+//   [168] chaosColorB          f32   (chaos override color B)
+//   [172] chaosColorFraction   f32   (max fraction of all agents that use chaosColor at chaos=1)
 
 struct SoloRenderParams {
     agentCount:           u32,
@@ -82,6 +86,10 @@ struct SoloRenderParams {
     championSize:         f32,
     color2Mix:            f32,
     avoidMapSampleChaos:  f32,
+    chaosColorR:          f32,
+    chaosColorG:          f32,
+    chaosColorB:          f32,
+    chaosColorFraction:   f32,
 }
 
 struct Agent {
@@ -230,6 +238,14 @@ fn avoidMapColorAt(canvasPx: vec2<f32>) -> vec4<f32> {
     }
 
     var color = select(defaultColor, slotColor, slotIsActive);
+
+    // Chaos override — a chaos-driven fraction of ALL agents (spectator or free) ignores
+    // everything above and takes the raw chaosColor. Probability = chaosColorFraction * chaos.
+    let chaosThreshold = params.chaosColorFraction * params.avoidMapSampleChaos;
+    if (hash(agentId ^ 0xbad1deau) < chaosThreshold) {
+        color = vec3f(params.chaosColorR, params.chaosColorG, params.chaosColorB);
+    }
+
     let homeUV = vec2<f32>(
         (agent.home.x - params.imgX0) / (params.imgX1 - params.imgX0),
         (agent.home.y - params.imgY0) / (params.imgY1 - params.imgY0),

@@ -103,6 +103,8 @@ export function initGUI({
     fVis.add(params, 'pointSize',     1,     6,    0.1  ).name('agent size');
     fVis.addColor(params, 'color1').name('color 1');
     fVis.addColor(params, 'color2').name('color 2');
+    fVis.addColor(params, 'chaosColor').name('chaos color');
+    fVis.add(params, 'chaosColorFraction', 0, 1, 0.01).name('chaos color %');
     fVis.add(params, 'brightness', 0.01, 0.5, 0.005).name('brightness');
     fVis.add(params, 'additiveBlend').name('additive blend');
     fVis.add(params, 'blendAmount', 0, 1, 0.01).name('blend amount');

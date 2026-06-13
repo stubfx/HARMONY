@@ -47,6 +47,8 @@ const params = {
     pointSize:      1.3,
     color1:      '#00ff00',   // first palette colour
     color2:      '#0000ff',   // second palette colour (assigned by agent index % 2)
+    chaosColor:  '#ff2244',   // colour taken by chaosColorFraction of all agents at full chaos
+    chaosColorFraction: 0.5, // max fraction of agents that use chaosColor (at chaos=1)
     brightness:  0.06,        // per-particle alpha; prevents additive saturation to white
     additiveBlend: true,      // true = additive (glow, accumulates); false = max blend (no over-brightness)
     blendAmount:   1.0,       // 0–1 multiplier on per-particle fragment output; lowers contribution in both blend modes
@@ -381,7 +383,7 @@ const soloUB = device.createBuffer({
     size: 208, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
-    size: 160, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 176, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const fadeUB = device.createBuffer({
     size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -2416,6 +2418,12 @@ function writeRenderUB() {
     f[38] = (isActive() ? getVolume() : 0) * params.color2AudioStr;
     // AvoidMap color sampling probability: 0.30 + chaos*0.70 (30% at harmony, 100% at full chaos)
     f[39] = smoothChaos;
+    // Chaos color override — fraction of all agents forced to chaosColor, scales with chaos
+    const cc = hexToF(params.chaosColor);
+    f[40] = cc[0];
+    f[41] = cc[1];
+    f[42] = cc[2];
+    f[43] = params.chaosColorFraction;
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 
@@ -2506,7 +2514,7 @@ function writeContamUB() {
 
 // ── Pre-allocated uniform buffers (reused every frame to avoid GC pressure) ──
 const _soloAB  = new ArrayBuffer(208); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
-const _renderAB= new ArrayBuffer(160); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
+const _renderAB= new ArrayBuffer(176); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
 const _fadeAB  = new ArrayBuffer(16);  const _fadeF  = new Float32Array(_fadeAB);
 const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB); const _blitU  = new Uint32Array(_blitAB);
 const _downsampleAB = new ArrayBuffer(16); const _downsampleF = new Float32Array(_downsampleAB);
