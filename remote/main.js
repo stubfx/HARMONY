@@ -652,9 +652,14 @@ let tiltThrottle  = null;
 
 // Peace target = phone lying flat, screen facing up (face-up on a table).
 // beta=0°, gamma=0° → both normalize to 0.5 in gyro.js.
-const _peacePitch = 0.5;
-const _peaceRoll  = 0.5;
+let _peacePitch = 0.5;
+let _peaceRoll  = 0.5;
 function _circDist(a, b) { const d = Math.abs(a - b); return Math.min(d, 1 - d) * 2; }
+
+socket.on('peace-point', ({ pitch, roll } = {}) => {
+    _peacePitch = pitch ?? 0.5;
+    _peaceRoll  = roll  ?? 0.5;
+});
 
 // ── Harmony canvas draw loop ──────────────────────────────────────────────────
 let _harmonyRAF = null;

@@ -2935,6 +2935,7 @@ setInterval(async () => {
         const lastHash = _lastIdleImageBytes ? _simpleHash(_lastIdleImageBytes) : null;
         if (hash === lastHash) return;
         _lastIdleImageBytes = bytes;
+        socket.emit('reset-chaos-target');
         clearAvoidMap();
         await new Promise(r => setTimeout(r, 5000 + Math.random() * 5000));
         const blob = new Blob([bytes], { type: 'image/webp' });

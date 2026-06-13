@@ -95,6 +95,8 @@ function getOrCreateRoom(roomId) {
             votes:        new Map(), // socketId  → choice string (one vote per spectator)
             storyOptions: { a: null, b: null }, // current VOTE step options
             audioLocked:  null,      // null = unknown; true/false reported by sim
+            peacePitch:   0.5,       // target pitch for chaos=0; broadcast to spectators on change
+            peaceRoll:    0.5,       // target roll  for chaos=0; broadcast to spectators on change
         });
     }
     return rooms.get(roomId);
@@ -238,6 +240,17 @@ io.on('connection', (socket) => {
         io.to(`${assignedRoom}:admin`).emit('audio-state', { locked: room.audioLocked });
     });
 
+    // Sim requests a new random peace point (called on image rotation every ~30s).
+    // All spectators receive the new target and recalculate their chaos accordingly.
+    socket.on('reset-chaos-target', () => {
+        const room = assignedRoom ? rooms.get(assignedRoom) : null;
+        if (!room?.hostSockets.has(socket.id)) return;
+        room.peacePitch = Math.random();
+        room.peaceRoll  = Math.random();
+        console.log(`[chaos] new peace point — pitch:${room.peacePitch.toFixed(3)} roll:${room.peaceRoll.toFixed(3)}  room:${assignedRoom}`);
+        io.to(`${assignedRoom}:spectators`).emit('peace-point', { pitch: room.peacePitch, roll: room.peaceRoll });
+    });
+
     // ── Admin controller ──────────────────────────────────────────────────────
     let adminAuthorized = false;
     let adminToken      = null;
@@ -289,6 +302,7 @@ io.on('connection', (socket) => {
         console.log('[socket] remote joined     room:', room, '| spectator:', sid, '| total:', userCount);
 
         socket.emit('joined', { room, userCount });
+        socket.emit('peace-point', { pitch: roomData.peacePitch, roll: roomData.peaceRoll });
         if (roomData.hostSockets.size) {
             io.to(`${room}:hosts`).emit('spectator-joined', { userCount, spectatorId: sid });
         }
