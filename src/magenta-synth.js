@@ -99,8 +99,8 @@ export function setMagentaState(chaos, _coherence = 0.5, _temp = 0.5) {
     if (!_ready) return;
     const c = Math.max(0, Math.min(1, chaos));
 
-    // Melody audible below chaos 0.35, matching the arp threshold it replaces
-    const gain = c < 0.35 ? Math.pow(1 - c / 0.35, 2) * 0.45 : 0;
+    // Melody audible below chaos 0.6, same threshold as the pad layer
+    const gain = c < 0.6 ? Math.pow(1 - c / 0.6, 1.5) * 0.45 : 0;
     const db   = gain > 0 ? Math.max(-60, Tone.gainToDb(gain)) : -60;
     _vol.volume.cancelScheduledValues(Tone.now());
     _vol.volume.setTargetAtTime(db, Tone.now(), 0.67);
