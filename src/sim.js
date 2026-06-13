@@ -1639,6 +1639,8 @@ function triggerReleaseBurst(slot) {
 // If VITE_N8N_BASE_URL is set, the sim calls n8n directly on each remote-event.
 // socket is declared here so the GUI's n8nTestMode onChange can reach it.
 let socket;
+// Base URL for server API calls — VITE_USER_URL in production, own origin as fallback.
+const _apiBase = ((import.meta.env.VITE_USER_URL ?? '').replace(/\/$/, '')) || window.location.origin;
 {
     // In dev, Vite runs on a different port from Express, so connect directly to Express.
     // In production, use VITE_SOCKET_URL (the Caddy-fronted public origin) so Socket.IO
@@ -1745,7 +1747,7 @@ let socket;
             collectiveCoherence = 0.5;
             collectiveTemp      = 0.5;
             setSynthState(1.0, 0.5, 0, 0, 0.5);
-            loadTraceImageFromUrl('/idle-image', { method: 'POST' });
+            loadTraceImageFromUrl(`${_apiBase}/idle-image`, { method: 'POST' });
         }
         if (spectatorId) {
             const idx = activeSlots.findIndex(s => s.spectatorId === spectatorId);
@@ -2883,5 +2885,5 @@ function frame(ts) {
     fpsFrames++;
 }
 
-loadTraceImageFromUrl('/idle-image', { method: 'POST' });
+loadTraceImageFromUrl(`${_apiBase}/idle-image`, { method: 'POST' });
 requestAnimationFrame(frame);
