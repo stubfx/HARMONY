@@ -45,7 +45,8 @@ export async function initMagentaSynth() {
         _synth.toDestination();
 
         _ready = true;
-        console.log('[magenta] initialized');
+        console.log('[magenta] initialized — testing synth directly');
+        _synth.triggerAttackRelease('C4', '1n'); // immediate, no Transport
         _resample(1.0);
     } catch (e) {
         console.warn('[magenta] init failed — melody layer disabled:', e);
