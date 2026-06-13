@@ -1727,6 +1727,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
     // A spectator joined — assign a slot, send them their color, brightness burst.
     socket.on('spectator-joined', ({ spectatorId, userCount } = {}) => {
         if (userCount !== undefined) simState.userCount = userCount;
+        if (userCount === 1) clearAvoidMap();   // remove idle attractor when first spectator arrives
         if (simState.status === 'DOT' && userCount >= 1) setStatus('NORMAL');
         lastRemoteActivity = Date.now();
         burstBrightness    = BURST_BRIGHTNESS;
@@ -1747,7 +1748,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
             collectiveCoherence = 0.5;
             collectiveTemp      = 0.5;
             setSynthState(1.0, 0.5, 0, 0, 0.5);
-            loadTraceImageFromUrl(`${_apiBase}/idle-image`);
+            loadAvoidMap(`${_apiBase}/idle-image`);
         }
         if (spectatorId) {
             const idx = activeSlots.findIndex(s => s.spectatorId === spectatorId);
@@ -2885,5 +2886,5 @@ function frame(ts) {
     fpsFrames++;
 }
 
-loadTraceImageFromUrl(`${_apiBase}/idle-image`);
+loadAvoidMap(`${_apiBase}/idle-image`);
 requestAnimationFrame(frame);
