@@ -1727,7 +1727,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
     // A spectator joined — assign a slot, send them their color, brightness burst.
     socket.on('spectator-joined', ({ spectatorId, userCount } = {}) => {
         if (userCount !== undefined) simState.userCount = userCount;
-        if (userCount === 1) clearAvoidMap();   // remove idle attractor when first spectator arrives
+        if (userCount === 1) { clearAvoidMap(); playAudioBg(null); } // remove idle attractor + audio
         if (simState.status === 'DOT' && userCount >= 1) setStatus('NORMAL');
         lastRemoteActivity = Date.now();
         burstBrightness    = BURST_BRIGHTNESS;
@@ -1749,6 +1749,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
             collectiveTemp      = 0.5;
             setSynthState(1.0, 0.5, 0, 0, 0.5);
             loadAvoidMap(`${_apiBase}/idle-image`);
+            loadIdleAudio();
         }
         if (spectatorId) {
             const idx = activeSlots.findIndex(s => s.spectatorId === spectatorId);
@@ -2091,6 +2092,7 @@ document.addEventListener('pointerdown', async () => {
     if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
     _syncAudioBanner();
     startSynth().then(() => setSynthState(1.0, smoothCoherence, smoothBiasX, smoothBiasY, smoothTemp));
+    if (simState.userCount === 0) loadIdleAudio();
 }, { once: true });
 
 // ── File input for trace image ────────────────────────────────────────────────
@@ -2887,4 +2889,23 @@ function frame(ts) {
 }
 
 loadAvoidMap(`${_apiBase}/idle-image`);
+
+// ── Idle audio loader ─────────────────────────────────────────────────────────
+async function loadIdleAudio() {
+    try {
+        const res = await fetch(`${_apiBase}/idle-audio`);
+        if (!res.ok) { console.warn('[idle-audio] HTTP', res.status); return; }
+        const buf   = await res.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        let binary  = '';
+        const CHUNK = 8192;
+        for (let i = 0; i < bytes.length; i += CHUNK)
+            binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+        console.log(`[idle-audio] loaded ${buf.byteLength}B — playing`);
+        playAudioBg(btoa(binary), 'audio/mpeg', true);
+    } catch (e) {
+        console.warn('[idle-audio]', e);
+    }
+}
+
 requestAnimationFrame(frame);

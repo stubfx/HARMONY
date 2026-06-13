@@ -146,6 +146,25 @@ export async function imagine(prompt) {
     return resp;
 }
 
+// ── Idle audio — space synthwave, served when 0 spectators ───────────────────
+const _IDLE_MUSIC_PROMPT =
+    'Slow atmospheric synthwave instrumental. Deep space ambient: vast reverb pads drift like ' +
+    'nebulae, warm sub-bass drone anchors the void. Crystalline arpeggios glisten like distant ' +
+    'starlight. Occasional soaring synth leads pierce through like solar flares — luminous, brief, ' +
+    'then fading back into darkness. Melancholic wonder, 70 BPM, no drums, no vocals.';
+
+export async function generateIdleAudio() {
+    console.log('[idle-audio] generating space synthwave…');
+    const _t0 = Date.now();
+    const result = await _getElevenLabs().music.composeDetailed({
+        prompt:        _IDLE_MUSIC_PROMPT,
+        musicLengthMs: 120000,
+    });
+    const size = result.audio.length;
+    console.log(`[idle-audio] audio ready ${Date.now() - _t0}ms  size=${size}B  title="${result.json?.songMetadata?.title ?? '?'}"`);
+    return result.audio; // Buffer (mp3)
+}
+
 // ── Idle image — Van Gogh space scene, served when 0 spectators ──────────────
 const _IDLE_PROMPT =
     'Van Gogh post-impressionist oil painting. Deep space scene: swirling nebula in cobalt ' +

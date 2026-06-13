@@ -31,7 +31,7 @@ import path              from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID }    from 'node:crypto';
 import * as Utils        from './server-utils.js';
-import { narrate, generateIdleImage } from './openai-api.js';
+import { narrate, generateIdleImage, generateIdleAudio } from './openai-api.js';
 
 dotenv.config();
 
@@ -452,6 +452,28 @@ app.post('/rndImage', async (_req, res) => {
         res.json({ name: fileName, data: 'data:image/png;base64,' + data.toString('base64') });
     } catch {
         res.status(404).json(null);
+    }
+});
+
+// ── Idle audio — space synthwave, 30-min server cache ────────────────────────
+let _idleAudio = null;  // { buf: Buffer, at: number }
+const IDLE_AUDIO_TTL = 30 * 60 * 1000;
+
+app.get('/idle-audio', async (_req, res) => {
+    const now = Date.now();
+    if (_idleAudio && now - _idleAudio.at < IDLE_AUDIO_TTL) {
+        const age = Math.round((now - _idleAudio.at) / 1000);
+        console.log(`[idle-audio] serving cached  age=${age}s  size=${_idleAudio.buf.length}B`);
+        return res.type('audio/mpeg').send(_idleAudio.buf);
+    }
+    console.log('[idle-audio] cache miss — generating…');
+    try {
+        const buf = await generateIdleAudio();
+        _idleAudio = { buf, at: Date.now() };
+        res.type('audio/mpeg').send(buf);
+    } catch (err) {
+        console.error('[idle-audio] error:', err.message);
+        res.status(500).json({ error: err.message });
     }
 });
 

@@ -29,6 +29,7 @@ export default defineConfig({
             '/rndImage':   'http://localhost:3000',
             '/admin-auth': 'http://localhost:3000',
             '/idle-image': 'http://localhost:3000',
+            '/idle-audio': 'http://localhost:3000',
         },
     },
 });
