@@ -104,8 +104,7 @@ export function setMagentaState(chaos, _coherence = 0.5, _temp = 0.5) {
     // Melody audible below chaos 0.6, same threshold as the pad layer
     const gain = c < 0.6 ? Math.pow(1 - c / 0.6, 1.5) * 0.45 : 0;
     const db   = gain > 0 ? Math.max(-60, Tone.gainToDb(gain)) : -60;
-    _vol.volume.cancelScheduledValues(Tone.now());
-    _vol.volume.setTargetAtTime(db, Tone.now(), 0.67);
+    _vol.volume.value = db;
 
     // Re-sample when chaos crosses a significant threshold
     if (!_resampling && Math.abs(c - _lastChaos) > 0.15) {
