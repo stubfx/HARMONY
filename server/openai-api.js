@@ -167,10 +167,12 @@ export async function generateIdleAudio() {
 
 // ── Idle image — Van Gogh space scene, served when 0 spectators ──────────────
 const _IDLE_PROMPT =
-    'Van Gogh post-impressionist oil painting. Deep space scene: swirling nebula in cobalt ' +
-    'blue, burnt gold and vivid violet with thick impasto brushstrokes exactly like Starry Night. ' +
-    'Spiral galaxies dissolving into painterly strokes, stars scattered like fireflies against ' +
-    'a dark sky. No text, no frames, no watermarks. Wide panoramic composition.';
+    'Post-impressionist oil painting in the style of Van Gogh — thick impasto brushstrokes, ' +
+    'swirling textures exactly like Starry Night — but with the color palette of Wes Anderson films: ' +
+    'dusty pastel pinks, muted sage greens, warm ochres, faded teals and soft yellows. ' +
+    'Deep space scene: swirling nebula, spiral galaxies dissolving into painterly strokes, ' +
+    'stars scattered like fireflies against a deep muted sky. ' +
+    'No text, no frames, no watermarks. Wide panoramic composition.';
 
 export async function generateIdleImage() {
     console.log('[idle-image] generating Van Gogh space image…');
