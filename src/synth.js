@@ -114,20 +114,27 @@ export function setSynthState(chaos, coherence = 0.5, biasX = 0, biasY = 0, temp
     const coh = Math.max(0, Math.min(1, coherence));
     const tmp = Math.max(0, Math.min(1, temp));
     const t   = Tone.now();
+    const TC  = RAMP / 3;  // exponential time constant (~95% after RAMP seconds)
+
+    // setTargetAtTime avoids setRampPoint (which injects EPS=1e-7 into setValueAtTime,
+    // crashing when the AudioParam's range check sees [0,0] as bounds).
+    function smoothTo(param, value) {
+        param.cancelScheduledValues(t);
+        param.setTargetAtTime(value, t, TC);
+    }
 
     // Drone — always audible, slightly quieter at peak chaos
-    _droneVol.volume.rampTo(-18 - c * 6, RAMP, t);
+    smoothTo(_droneVol.volume, -18 - c * 6);
 
-    // Noise — fades out as harmony approaches (floor at 1e-4: exponentialRamp can't reach 0)
-    _noiseGain.gain.rampTo(Math.max(1e-4, c * 0.25), RAMP, t);
+    // Noise — fades out as harmony approaches
+    smoothTo(_noiseGain.gain, Math.max(1e-4, c * 0.25));
 
     // Pad — emerges below chaos 0.6, filter opens further at harmony
     const padGain = c < 0.6 ? Math.pow(1 - c / 0.6, 1.5) * 0.55 : 0;
-    _padVol.volume.rampTo(padGain > 0 ? Math.max(SILENT, Tone.gainToDb(padGain)) : SILENT, RAMP, t);
-    _padFilter.frequency.rampTo(300 + (1 - c) * 5500, RAMP, t);
+    smoothTo(_padVol.volume, padGain > 0 ? Math.max(SILENT, Tone.gainToDb(padGain)) : SILENT);
+    smoothTo(_padFilter.frequency, 300 + (1 - c) * 5500);
 
     // LFO frequency ← coherence: converged room = faster oscillation (0.05–0.8 Hz)
-    // Direct assignment avoids exponential ramp issues at sub-Hz values
     _padLFO.frequency.value = 0.05 + coh * 0.75;
 
     // LFO amplitude ← wind magnitude: physical tilt deepens the filter sweep (0.3–1.0)
@@ -136,7 +143,7 @@ export function setSynthState(chaos, coherence = 0.5, biasX = 0, biasY = 0, temp
 
     // Arp — only below chaos 0.35
     const arpGain = c < 0.35 ? Math.pow(1 - c / 0.35, 2) * 0.4 : 0;
-    _arpVol.volume.rampTo(arpGain > 0 ? Math.max(SILENT, Tone.gainToDb(arpGain)) : SILENT, RAMP, t);
+    smoothTo(_arpVol.volume, arpGain > 0 ? Math.max(SILENT, Tone.gainToDb(arpGain)) : SILENT);
 
     // Arp tempo ← temperature: higher temp = faster arpeggiation (80–140 BPM)
     Tone.getTransport().bpm.value = 80 + tmp * 60;
@@ -146,7 +153,7 @@ export function stopSynth() {
     if (!_ready) return;
     _arpSeq?.stop();
     Tone.getTransport().stop();
-    Tone.getDestination().volume.rampTo(SILENT, 1.5);
+    Tone.getDestination().volume.setTargetAtTime(SILENT, Tone.now(), 0.5);
     setTimeout(() => {
         Tone.getDestination().volume.value = 0;
         _ready = false;
