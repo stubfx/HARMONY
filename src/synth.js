@@ -5,19 +5,17 @@
 //   pad    : PolySynth sawtooth chord + LFO filter sweep — emerges below chaos 0.6
 //              LFO frequency ← coherence (0.05–0.8 Hz)
 //              LFO amplitude ← wind magnitude (deeper with physical movement)
-//   arp    : random minor-scale melody + delay — revealed below chaos 0.35
-//              BPM ← temperature (80–140)
+//   melody : MusicVAE-generated 4-bar loops — see magenta-synth.js
+//              BPM ← temperature (80–140), shared Transport
 
 import * as Tone from 'tone';
 
 const RAMP   = 2.0;  // seconds for smooth parameter transitions
 const SILENT = -60;  // dB floor (avoids -Infinity in ramps)
 
-// A natural minor scale across 2 octaves for arp randomisation
-const ARP_POOL = ['A3','B3','C4','D4','E4','F4','G4','A4','B4','C5','E5','G5'];
 
 let _ready = false;
-let _noiseGain, _padVol, _padFilter, _padLFO, _droneVol, _arpVol, _arpSeq;
+let _noiseGain, _padVol, _padFilter, _padLFO, _droneVol;
 
 export async function startSynth() {
     if (_ready) return;
@@ -72,33 +70,8 @@ export async function startSynth() {
     await reverb.ready;
     pad.triggerAttack(['A2', 'E3', 'A3', 'C4', 'E4', 'G4']);
 
-    // ── Arp — random notes from A minor scale ─────────────────────────────────
-    const arpDelay  = new Tone.FeedbackDelay({ delayTime: '8n', feedback: 0.35, wet: 0.5 });
-    const arpReverb = new Tone.Reverb({ decay: 3, wet: 0.35 });
-    _arpVol         = new Tone.Volume(SILENT);
-
-    const arpSynth = new Tone.Synth({
-        oscillator: { type: 'square4' },
-        envelope:   { attack: 0.01, decay: 0.12, sustain: 0.25, release: 0.6 },
-        volume:     -18,
-    });
-    arpSynth.connect(arpDelay);
-    arpDelay.connect(arpReverb);
-    arpReverb.connect(_arpVol);
-    _arpVol.connect(master);
-    await arpReverb.ready;
-
-    _arpSeq = new Tone.Sequence(
-        (time) => {
-            const note = ARP_POOL[Math.floor(Math.random() * ARP_POOL.length)];
-            arpSynth.triggerAttackRelease(note, '16n', time);
-        },
-        new Array(8).fill(null),
-        '8n',
-    );
-
+    // Melody layer handled by magenta-synth.js (MusicVAE replaces arp)
     Tone.getTransport().bpm.value = 110;
-    _arpSeq.start(0);
     Tone.getTransport().start();
 
     _ready = true;
@@ -141,17 +114,13 @@ export function setSynthState(chaos, coherence = 0.5, biasX = 0, biasY = 0, temp
     const windMag = Math.min(1, Math.sqrt(biasX * biasX + biasY * biasY) / Math.SQRT2);
     _padLFO.amplitude.value = 0.3 + windMag * 0.7;
 
-    // Arp — only below chaos 0.35
-    const arpGain = c < 0.35 ? Math.pow(1 - c / 0.35, 2) * 0.4 : 0;
-    smoothTo(_arpVol.volume, arpGain > 0 ? Math.max(SILENT, Tone.gainToDb(arpGain)) : SILENT);
-
     // Arp tempo ← temperature: higher temp = faster arpeggiation (80–140 BPM)
+    // Also drives Magenta's Tone.Part (both share the same Transport)
     Tone.getTransport().bpm.value = 80 + tmp * 60;
 }
 
 export function stopSynth() {
     if (!_ready) return;
-    _arpSeq?.stop();
     Tone.getTransport().stop();
     Tone.getDestination().volume.setTargetAtTime(SILENT, Tone.now(), 0.5);
     setTimeout(() => {

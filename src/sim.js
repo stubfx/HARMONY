@@ -20,6 +20,7 @@ import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
 import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
 import { startSynth, setSynthState } from './synth.js';
+import { initMagentaSynth, setMagentaState } from './magenta-synth.js';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const MAX_AGENTS = 5_000_000;
@@ -1748,6 +1749,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
             collectiveCoherence = 0.5;
             collectiveTemp      = 0.5;
             setSynthState(1.0, 0.5, 0, 0, 0.5);
+            setMagentaState(1.0);
             loadAvoidMap(`${_apiBase}/idle-image`);
         }
         if (spectatorId) {
@@ -2090,7 +2092,10 @@ document.addEventListener('pointerdown', async () => {
     try { await startMic(); } catch (e) { console.warn('[audio] mic denied:', e); }
     if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
     _syncAudioBanner();
-    startSynth().then(() => setSynthState(1.0, smoothCoherence, smoothBiasX, smoothBiasY, smoothTemp));
+    startSynth().then(() => {
+        setSynthState(1.0, smoothCoherence, smoothBiasX, smoothBiasY, smoothTemp);
+        initMagentaSynth().catch(e => console.warn('[magenta] startup error:', e));
+    });
 }, { once: true });
 
 // ── File input for trace image ────────────────────────────────────────────────
@@ -2328,6 +2333,7 @@ function writeSoloUB(dt, time) {
     if (_synthNow - _lastSynthTick >= 200) {
         _lastSynthTick = _synthNow;
         setSynthState(smoothChaos, smoothCoherence, smoothBiasX, smoothBiasY, smoothTemp);
+        setMagentaState(smoothChaos, smoothCoherence, smoothTemp);
     }
     if (Math.random() < 0.01) console.log('[chaos] smoothChaos→GPU:', smoothChaos.toFixed(4));
     device.queue.writeBuffer(soloUB, 0, ab);
