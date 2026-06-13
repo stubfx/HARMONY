@@ -39,6 +39,7 @@
 //   [144] champions            u32   (every Nth agent is a champion; 0 = off — mirrors the shadow pass)
 //   [148] championSize         f32   (point size for a FREE champion; ignored while homing)
 //   [152] color2Mix            f32   (0–1 audio-driven lean of the base palette toward color2)
+//   [156] avoidMapSampleChaos f32   (chaos 0–1 drives avoidmap sample probability: 0.30 + (1-chaos)*0.70)
 
 struct SoloRenderParams {
     agentCount:           u32,
@@ -80,6 +81,7 @@ struct SoloRenderParams {
     champions:            u32,
     championSize:         f32,
     color2Mix:            f32,
+    avoidMapSampleChaos:  f32,
 }
 
 struct Agent {
@@ -197,33 +199,37 @@ fn avoidMapColorAt(canvasPx: vec2<f32>) -> vec4<f32> {
     let color1 = vec3f(params.color1R, params.color1G, params.color1B);
     let color2 = vec3f(params.color2R, params.color2G, params.color2B);
 
-    // Optionally replaced by an avoid-map sample for non-homing agents (homing
-    // agents are skipped — the fragment shader overrides with the trace image).
     let isHoming = params.hasImage != 0u && agent.primed > 0.5;
     var defaultColor = select(color1, color2, (agentId % 2u) == 1u);
     // Room audio leans the whole palette toward color2 (color1 agents shift; color2 agents stay).
     defaultColor = mix(defaultColor, color2, clamp(params.color2Mix, 0.0, 1.0));
-    if (params.avoidMapSampleColor != 0u && params.hasAvoidMap != 0u && !isHoming) {
-        let s = avoidMapColorAt(agent.pos);
-        if (s.a > 0.5) {
-            defaultColor = s.rgb;
+
+    // Resolve spectator slot assignment first — spectator particles NEVER sample avoidmap color.
+    let inSpectatorRange = params.spectatorCount > 0u && agentId < u32(f32(params.agentCount) * params.spectatorAgentShare);
+    var slotIsActive = false;
+    var slotColor    = defaultColor;
+    if (inSpectatorRange) {
+        let slot = spectatorSlots[agentId % params.spectatorCount];
+        if (slot.isActive != 0u) {
+            slotIsActive = true;
+            let rnd = hash(agentId) * 0.6 + 0.7;
+            slotColor = clamp(vec3f(slot.colorR, slot.colorG, slot.colorB) * rnd, vec3f(0.0), vec3f(1.0));
         }
     }
 
-    var color: vec3f;
-    if (params.spectatorCount > 0u && agentId < u32(f32(params.agentCount) * params.spectatorAgentShare)) {
-        let slot = spectatorSlots[agentId % params.spectatorCount];
-        if (slot.isActive != 0u) {
-            // Assigned agents: fixed hue from the user's chosen color, no speed blend.
-            // Each agent gets a random brightness multiplier in [0.7, 1.3].
-            let rnd = hash(agentId) * 0.6 + 0.7;
-            color = clamp(vec3f(slot.colorR, slot.colorG, slot.colorB) * rnd, vec3f(0.0), vec3f(1.0));
-        } else {
-            color = defaultColor;
+    // AvoidMap color sampling — free particles only (not in spectator range, not homing).
+    // Probability is chaos-driven: 30% at harmony (chaos=0), 100% at full chaos (chaos=1).
+    if (!inSpectatorRange && params.avoidMapSampleColor != 0u && params.hasAvoidMap != 0u && !isHoming) {
+        let sampleProb = 0.30 + params.avoidMapSampleChaos * 0.70;
+        if (hash(agentId ^ 0xdeadbeefu) < sampleProb) {
+            let s = avoidMapColorAt(agent.pos);
+            if (s.a > 0.5) {
+                defaultColor = s.rgb;
+            }
         }
-    } else {
-        color = defaultColor;
     }
+
+    var color = select(defaultColor, slotColor, slotIsActive);
     let homeUV = vec2<f32>(
         (agent.home.x - params.imgX0) / (params.imgX1 - params.imgX0),
         (agent.home.y - params.imgY0) / (params.imgY1 - params.imgY0),

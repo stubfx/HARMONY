@@ -568,7 +568,6 @@ function _randomSimColor() {
 }
 
 // ── Shake detection ───────────────────────────────────────────────────────────
-let _shaken        = false;
 let _shakeLastTime = 0;
 const SHAKE_THRESHOLD = 22; // m/s²
 const SHAKE_COOLDOWN  = 1200; // ms between shakes
@@ -586,12 +585,10 @@ window.addEventListener('devicemotion', (e) => {
     if ((_isDraw || _isHarmony) && mag > SHAKE_THRESHOLD && now - _shakeLastTime > SHAKE_COOLDOWN) {
         _shakeLastTime = now;
         navigator.vibrate?.(60);
-        if (_isHarmony) {
-            sendEvent('color-pick', { color: _randomSimColor() });
-        } else {
-            _shaken = true;
-            sendEvent('shake', {});
-        }
+        // Pick a new random palette color — updates swatch UI on phone and sends color-pick to sim
+        const newIdx = Math.random() * PALETTE_SIZE | 0;
+        pickColor(newIdx);
+        if (!_isHarmony) sendEvent('shake', {}); // burst on sim
     }
 
     // WAVE — same shake magnitude, different step context
@@ -606,10 +603,6 @@ window.addEventListener('devicemotion', (e) => {
 joystickBaseEl?.addEventListener('touchstart', (e) => {
     e.preventDefault();
     if (joystickIsActive) return;
-    if (_shaken) {
-        _shaken = false;
-        sendEvent('color-pick', { color: palette[selectedSwatchIdx].hex });
-    }
     const touch = e.changedTouches[0];
     joystickTouchId  = touch.identifier;
     joystickIsActive = true;

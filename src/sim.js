@@ -1825,8 +1825,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
         if (event.type === 'shake') {
             const slot = activeSlots.find(s => s.spectatorId === event.spectatorId);
             if (slot) {
-                const [r, g, b] = hexToF(params.color1);
-                slot.colorR = r; slot.colorG = g; slot.colorB = b;
+                triggerReleaseBurst(slot);
                 uploadSpectatorSlots();
             }
         }
@@ -2415,6 +2414,8 @@ function writeRenderUB() {
     f[37] = params.championSize;
     // Room audio leans the base palette toward color2: 0 at silence, → color2AudioStr at peak.
     f[38] = (isActive() ? getVolume() : 0) * params.color2AudioStr;
+    // AvoidMap color sampling probability: 0.30 + chaos*0.70 (30% at harmony, 100% at full chaos)
+    f[39] = smoothChaos;
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 
