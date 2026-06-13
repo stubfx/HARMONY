@@ -462,15 +462,19 @@ const IDLE_TTL = 5 * 60 * 1000;
 app.get('/idle-image', async (_req, res) => {
     const now = Date.now();
     if (_idleImage && now - _idleImage.at < IDLE_TTL) {
+        const age = Math.round((now - _idleImage.at) / 1000);
+        console.log(`[idle-image] serving cached image  age=${age}s  size=${_idleImage.buf.length}B`);
         return res.type('image/webp').send(_idleImage.buf);
     }
+    console.log('[idle-image] cache miss — requesting new image from OpenAI');
     try {
         const base64 = await generateIdleImage();
         const buf = Buffer.from(base64, 'base64');
         _idleImage = { buf, at: Date.now() };
+        console.log(`[idle-image] cached new image  size=${buf.length}B`);
         res.type('image/webp').send(buf);
     } catch (err) {
-        console.error('[idle-image]', err.message);
+        console.error('[idle-image] error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });

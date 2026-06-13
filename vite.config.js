@@ -28,6 +28,7 @@ export default defineConfig({
             // Socket.IO connects directly to Express (no proxy) — see sim.js / remote/main.js.
             '/rndImage':   'http://localhost:3000',
             '/admin-auth': 'http://localhost:3000',
+            '/idle-image': 'http://localhost:3000',
         },
     },
 });

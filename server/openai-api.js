@@ -45,6 +45,8 @@ export async function narrate(roomId, chaos) {
     const chaosVal           = typeof chaos === 'number' ? Math.max(0, Math.min(1, chaos)) : 1;
     const previousResponseId = _roomLastResponseId.get(roomId) ?? null;
 
+    console.log(`[narrate] room=${roomId} chaos=${chaosVal.toFixed(3)} prev=${previousResponseId ?? 'none'}`);
+    const _t0 = Date.now();
     const response = await openai.responses.create({
         model:    _narrateModel,
         input:    `Valore chaos collettivo: ${chaosVal.toFixed(3)} (0 = armonia totale, 1 = caos massimo).`,
@@ -54,6 +56,7 @@ export async function narrate(roomId, chaos) {
     });
 
     _roomLastResponseId.set(roomId, response.id);
+    console.log(`[narrate] text ready  ${Date.now() - _t0}ms  id=${response.id}`);
 
     const text = response.output_text;
     if (!text) throw new Error('no text output from narrate response');
@@ -65,8 +68,10 @@ export async function narrate(roomId, chaos) {
     });
 
     const chunks = [];
-    for await (const chunk of audioStream) chunks.push(chunk);
+    let audioBytes = 0;
+    for await (const chunk of audioStream) { chunks.push(chunk); audioBytes += chunk.length; }
     const base64 = Buffer.concat(chunks).toString('base64');
+    console.log(`[narrate] audio ready ${Date.now() - _t0}ms  bytes=${audioBytes}`);
 
     return { base64, text };
 }
@@ -97,7 +102,9 @@ export async function chat(text) {
 }
 
 export async function imagine(prompt) {
-    return await openai.responses.create({
+    console.log(`[imagine] prompt="${prompt.slice(0, 80)}…"`);
+    const _t0 = Date.now();
+    const resp = await openai.responses.create({
         prompt: {
             "id": "pmpt_6901d8c6a23881979af6e5434008301408ca3d4bfa2b5c0d",
             "version": "4"
@@ -134,6 +141,9 @@ export async function imagine(prompt) {
         store: true,
         include: ["web_search_call.action.sources"]
     });
+    const imgCall = resp.output?.find(o => o.type === 'image_generation_call');
+    console.log(`[imagine] done ${Date.now() - _t0}ms  imgCall=${!!imgCall}  outputTypes=${resp.output?.map(o => o.type).join(',') ?? 'none'}`);
+    return resp;
 }
 
 // ── Idle image — Van Gogh space scene, served when 0 spectators ──────────────
@@ -144,9 +154,15 @@ const _IDLE_PROMPT =
     'a dark sky. No text, no frames, no watermarks. Square composition.';
 
 export async function generateIdleImage() {
+    console.log('[idle-image] generating Van Gogh space image…');
+    const _t0 = Date.now();
     const response = await imagine(_IDLE_PROMPT);
     const hit = response.output?.find(o => o.type === 'image_generation_call');
-    if (!hit?.result) throw new Error('no image_generation_call in response output');
+    if (!hit?.result) {
+        console.error('[idle-image] no image_generation_call in response. output types:', response.output?.map(o => o.type));
+        throw new Error('no image_generation_call in response output');
+    }
+    console.log(`[idle-image] image ready ${Date.now() - _t0}ms  base64len=${hit.result.length}`);
     return hit.result;  // raw base64 webp string
 }
 
