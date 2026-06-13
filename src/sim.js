@@ -19,6 +19,7 @@ import windVisWGSL      from './shaders/wind-vis.wgsl?raw';
 import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
 import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
+import { startSynth, setSynthChaos, stopSynth } from './synth.js';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const MAX_AGENTS = 5_000_000;
@@ -1724,6 +1725,7 @@ let socket;
     socket.on('spectator-joined', ({ spectatorId, userCount } = {}) => {
         if (userCount !== undefined) simState.userCount = userCount;
         if (simState.status === 'DOT' && userCount >= 1) setStatus('NORMAL');
+        if (userCount === 1) startSynth();
         lastRemoteActivity = Date.now();
         burstBrightness    = BURST_BRIGHTNESS;
         if (spectatorId && activeSlots.length < MAX_SPECTATOR_SLOTS) {
@@ -1738,6 +1740,7 @@ let socket;
 
     socket.on('spectator-left', ({ spectatorId, userCount } = {}) => {
         if (userCount !== undefined) simState.userCount = userCount;
+        if (userCount === 0) stopSynth();
         if (spectatorId) {
             const idx = activeSlots.findIndex(s => s.spectatorId === spectatorId);
             if (idx !== -1) {
@@ -2310,6 +2313,7 @@ function writeSoloUB(dt, time) {
     const chaosGPU = activeSlots.length > 0 ? Math.min(smoothChaos / 0.3, 1.0) : 0;
     f[49] = chaosGPU;
     setChaos(chaosGPU);
+    setSynthChaos(smoothChaos);
     if (Math.random() < 0.01) console.log('[chaos] smoothChaos→GPU:', smoothChaos.toFixed(4));
     device.queue.writeBuffer(soloUB, 0, ab);
 }
