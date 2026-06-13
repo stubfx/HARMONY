@@ -604,12 +604,15 @@ The server maintains a per-room state table (one entry per connected spectator, 
 
 ---
 
-### Tilt — aura feedback only
+### Tilt
 
 **Phone gesture:** hold the phone upright in portrait orientation (neutral) and tilt in any direction.
 **Data sent:** `pitch` and `roll` (0–1 each). Portrait upright = `pitch ≈ 0.75`, `roll ≈ 0.5`.
-**Routing:** forwarded directly to the sim as `remote-event`.
-**Effect:** tilt shifts the anchor point of the atmospheric gradient on the spectator's own phone screen — the radial glow follows the physical lean of the device, giving tactile visual feedback. Tilt does **not** affect the particle simulation — no wind or directional force is applied to any agent.
+**Routing:** forwarded to the sim as `remote-event`; the server also aggregates all spectators' pitch/roll into `avgPitch`/`avgRoll` in the `collective-state` broadcast.
+**Effect:** three simultaneous effects.
+1. **Aura feedback** — tilt shifts the anchor point of the atmospheric gradient on the spectator's own phone screen, giving tactile visual feedback of the physical lean.
+2. **Collective wind bias** — the server averages all active spectators' tilt vectors and emits them as `avgPitch`/`avgRoll`. The simulation writes this as a wind bias (`windBiasX`/`windBiasY`) directly into the compute uniform buffer, so the whole particle field leans in the direction the crowd tilts.
+3. **Synth LFO depth** — the magnitude of the collective tilt vector drives the amplitude of the pad filter LFO in the Tone.js synth: a crowd tilted strongly to one side deepens the filter sweep; a neutral, upright crowd minimises it.
 
 ---
 
@@ -1019,6 +1022,25 @@ The `caption` field draws text at the bottom of the simulation canvas using the 
 ---
 
 ## Audio
+
+### Generative synth (Tone.js)
+
+A procedural audio engine (`src/synth.js`) activates when the user first interacts with the page (same gesture that unlocks the Web Audio API). It runs four layered voices driven entirely by the collective state of connected spectators — updated every 200 ms from EMA-smoothed versions of the server's `collective-state` broadcast.
+
+| Layer | Sound | Collective parameter | Range |
+|-------|-------|---------------------|-------|
+| Drone | Sine sub-bass A1, always on | chaos → volume | -18 to -24 dB |
+| Noise | Pink noise bandpass | chaos → gain | silent at harmony, loud at chaos |
+| Pad | Sawtooth chord [A2 E3 A3 C4 E4 G4] + reverb | chaos → filter cutoff; coherence → LFO freq; tilt → LFO amplitude | emerges below chaos 0.6 |
+| Arp | Random A minor scale, Tone.Sequence | chaos → volume; temperature → BPM | emerges below chaos 0.35; 80–140 BPM |
+
+At full chaos (no spectators) the noise layer dominates. As the room converges (low chaos, high coherence) the pad and arp emerge and the noise recedes. When all spectators disconnect the synth resets to idle state.
+
+The engine uses `setTargetAtTime` rather than `rampTo` for all parameter transitions — `rampTo` triggers a Tone.js internal `setRampPoint` call that injects `EPS = 1e-7` into the AudioParam timeline, crashing on certain AudioParam configurations. `setTargetAtTime` avoids this entirely.
+
+---
+
+### Web Audio analyser
 
 The simulation uses the Web Audio API to route sound through an `AnalyserNode`. Every frame, `getVolume()` reads a smoothed RMS value (0–1) from the analyser. This value **leans the base palette toward `color2`** in the render shader — louder audio = more color2-dominant swarm — scaled by `audio → color2` (`color2AudioStr`). Three sources share the same analyser simultaneously: the microphone (when enabled), the voiceover track, and the background track.
 

@@ -127,13 +127,14 @@ If two browser windows open with the **same session UUID** (set manually in the 
 
 The server maintains a per-room user table. Every 300 ms it averages all active spectators' values and emits `collective-state` to the host simulation:
 
-| Field | Source | Effect in simulation |
-|-------|--------|----------------------|
-| `avgPitch` | phone tilt (Y axis) | wind bias Y — field tilts forward/back |
-| `avgRoll` | phone tilt (X axis) | wind bias X — field tilts left/right |
-| `avgTemp` | touch Y position | speed-color hue: blue (top/cold) → amber (bottom/warm), 65% blend |
-| `avgCoherence` | touch X position | turnRate multiplier: 0.08× (left/chaos) → 3.0× (right/order) |
-| `userCount` | active connections | logged; future use for presence-driven parameter scaling |
+| Field | Source | Effect in simulation | Effect in synth |
+|-------|--------|----------------------|-----------------|
+| `avgPitch` | phone tilt (Y axis) | wind bias Y — field tilts forward/back | LFO amplitude (via wind magnitude) |
+| `avgRoll` | phone tilt (X axis) | wind bias X — field tilts left/right | LFO amplitude (via wind magnitude) |
+| `avgTemp` | touch Y position | speed-color hue: blue (top/cold) → amber (bottom/warm), 65% blend | arp BPM (80–140) |
+| `avgCoherence` | touch X position | turnRate multiplier: 0.08× (left/chaos) → 3.0× (right/order) | pad LFO frequency (0.05–0.8 Hz) |
+| `avgChaos` | distance from target rotation | noise magnitude in agent compute | synth layer balance: noise↑ / pad+arp↓ |
+| `userCount` | active connections | DOT→NORMAL at first join; chaos reset when all leave | synth resets to idle state (chaos=1) |
 
 All collective values are smoothed with an exponential moving average (~0.8 s time constant) in the simulation before being written to the GPU, preventing jarring jumps when spectators join or leave.
 
@@ -508,13 +509,7 @@ When the GUI is visible, a compact overlay shows:
 npm install
 ```
 
-### 2. Install n8n globally
-
-```bash
-npm install -g n8n
-```
-
-### 3. Configure environment
+### 2. Configure environment
 
 ```bash
 cp .env.example .env
@@ -527,13 +522,12 @@ cp .env.example .env
 npm run dev
 ```
 
-Starts three processes concurrently:
+Starts two processes concurrently:
 
 | Process | Port | Description |
 |---------|------|-------------|
 | Vite | 5173 | Dev server with HMR; proxies `/rndImage` and `/admin-auth` to Express |
-| Express | 3000 | Socket.IO session assignment, n8n relay, static assets; HTML page requests redirect to Vite |
-| n8n | 5678 | Workflow automation |
+| Express | 3000 | Socket.IO session assignment, static assets; HTML page requests redirect to Vite |
 
 Socket.IO clients connect **directly** to Express in dev (bypassing Vite) because Vite's HTTP proxy can't reliably handle Socket.IO's polling handshake. The socket URL is controlled by `VITE_SERVER_PORT`.
 
@@ -573,12 +567,6 @@ for `stubfx.io` and `api.stubfx.io` point to the server. Just run:
 ```bash
 caddy run
 ```
-
-### 7. Import the n8n workflow
-
-1. Open `http://localhost:5678`
-2. New workflow → Import from file → `n8n-workflow.json`
-3. Activate the workflow
 
 ---
 
