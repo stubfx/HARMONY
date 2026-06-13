@@ -19,7 +19,7 @@ import windVisWGSL      from './shaders/wind-vis.wgsl?raw';
 import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
 import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
-import { startSynth, setSynthChaos, stopSynth } from './synth.js';
+import { startSynth, setSynthChaos } from './synth.js';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const MAX_AGENTS = 5_000_000;
@@ -1725,7 +1725,6 @@ let socket;
     socket.on('spectator-joined', ({ spectatorId, userCount } = {}) => {
         if (userCount !== undefined) simState.userCount = userCount;
         if (simState.status === 'DOT' && userCount >= 1) setStatus('NORMAL');
-        if (userCount === 1) startSynth();
         lastRemoteActivity = Date.now();
         burstBrightness    = BURST_BRIGHTNESS;
         if (spectatorId && activeSlots.length < MAX_SPECTATOR_SLOTS) {
@@ -1740,7 +1739,7 @@ let socket;
 
     socket.on('spectator-left', ({ spectatorId, userCount } = {}) => {
         if (userCount !== undefined) simState.userCount = userCount;
-        if (userCount === 0) stopSynth();
+        if (userCount === 0) setSynthChaos(1.0);
         if (spectatorId) {
             const idx = activeSlots.findIndex(s => s.spectatorId === spectatorId);
             if (idx !== -1) {
@@ -2078,11 +2077,10 @@ function _syncAudioBanner() {
 
 document.addEventListener('pointerdown', async () => {
     await unlockAudio();
-    // Start the room microphone on the same gesture, so ambient volume drives
-    // particle brightness from the moment audio is enabled.
     try { await startMic(); } catch (e) { console.warn('[audio] mic denied:', e); }
     if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
     _syncAudioBanner();
+    startSynth().then(() => setSynthChaos(1.0));
 }, { once: true });
 
 // ── File input for trace image ────────────────────────────────────────────────
