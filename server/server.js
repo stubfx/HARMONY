@@ -31,8 +31,8 @@ import path              from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID }    from 'node:crypto';
 import * as Utils        from './server-utils.js';
-import { narrate } from './openai-api.js';
-import { readdir, readFile } from 'node:fs/promises';
+import { narrate, generateIdleImage, generateIdleAudio } from './openai-api.js';
+import { readdir, readFile, writeFile } from 'node:fs/promises';
 
 dotenv.config();
 
@@ -456,30 +456,77 @@ app.post('/rndImage', async (_req, res) => {
     }
 });
 
-// ── Idle assets — served from ./idle/{images,music}/, random pick each request ─
+// ── Idle assets — ./idle/{images,music}/, max 3, auto-generate if missing ──────
 const _IDLE_DIR   = path.join(__dirname, '..', 'idle');
 const _IMAGE_MIME = { '.webp': 'image/webp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png' };
+const IDLE_MAX    = 3;
 
-async function _randomFile(dir) {
-    const files = (await readdir(dir).catch(() => [])).filter(f => !f.startsWith('.'));
-    if (!files.length) return null;
-    return path.join(dir, files[Math.floor(Math.random() * files.length)]);
+const _generating = { image: false, audio: false };
+
+function _idleFiles(dir) {
+    return readdir(dir).catch(() => []).then(fs => fs.filter(f => !f.startsWith('.')));
+}
+
+async function _genAndSaveImage(dir) {
+    if (_generating.image) return;
+    _generating.image = true;
+    try {
+        const base64   = await generateIdleImage();
+        const buf      = Buffer.from(base64, 'base64');
+        const filename = `idle_${Date.now()}.webp`;
+        await writeFile(path.join(dir, filename), buf);
+        console.log(`[idle-image] saved ${filename}  size=${buf.length}B`);
+        return { buf, mime: 'image/webp' };
+    } finally { _generating.image = false; }
+}
+
+async function _genAndSaveAudio(dir) {
+    if (_generating.audio) return;
+    _generating.audio = true;
+    try {
+        const buf      = await generateIdleAudio();
+        const filename = `idle_${Date.now()}.mp3`;
+        await writeFile(path.join(dir, filename), buf);
+        console.log(`[idle-audio] saved ${filename}  size=${buf.length}B`);
+        return { buf, mime: 'audio/mpeg' };
+    } finally { _generating.audio = false; }
 }
 
 app.get('/idle-image', async (_req, res) => {
-    const file = await _randomFile(path.join(_IDLE_DIR, 'images'));
-    if (!file) return res.status(404).json({ error: 'no idle images in idle/images/' });
-    const ext  = path.extname(file).toLowerCase();
-    const mime = _IMAGE_MIME[ext] ?? 'image/webp';
-    console.log(`[idle-image] serving ${path.basename(file)}`);
+    const dir   = path.join(_IDLE_DIR, 'images');
+    const files = await _idleFiles(dir);
+    if (files.length === 0) {
+        console.log('[idle-image] no files — generating…');
+        try {
+            const { buf, mime } = await _genAndSaveImage(dir);
+            return res.type(mime).send(buf);
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
+    }
+    const file = path.join(dir, files[Math.floor(Math.random() * files.length)]);
+    const mime = _IMAGE_MIME[path.extname(file).toLowerCase()] ?? 'image/webp';
+    console.log(`[idle-image] serving ${path.basename(file)}  (${files.length}/${IDLE_MAX})`);
     res.type(mime).send(await readFile(file));
+    if (files.length < IDLE_MAX) _genAndSaveImage(dir).catch(e => console.error('[idle-image] bg gen:', e.message));
 });
 
 app.get('/idle-audio', async (_req, res) => {
-    const file = await _randomFile(path.join(_IDLE_DIR, 'music'));
-    if (!file) return res.status(404).json({ error: 'no idle audio in idle/music/' });
-    console.log(`[idle-audio] serving ${path.basename(file)}`);
+    const dir   = path.join(_IDLE_DIR, 'music');
+    const files = await _idleFiles(dir);
+    if (files.length === 0) {
+        console.log('[idle-audio] no files — generating…');
+        try {
+            const { buf, mime } = await _genAndSaveAudio(dir);
+            return res.type(mime).send(buf);
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
+    }
+    const file = path.join(dir, files[Math.floor(Math.random() * files.length)]);
+    console.log(`[idle-audio] serving ${path.basename(file)}  (${files.length}/${IDLE_MAX})`);
     res.type('audio/mpeg').send(await readFile(file));
+    if (files.length < IDLE_MAX) _genAndSaveAudio(dir).catch(e => console.error('[idle-audio] bg gen:', e.message));
 });
 
 // ── Page fallbacks ────────────────────────────────────────────────────────────
