@@ -7,7 +7,6 @@
     },
     "dependencies": {
         "@elevenlabs/elevenlabs-js": "^2.52.0",
-        "@magenta/music": "^1.23.1",
         "concurrently": "^9.1.2",
         "cors": "^2.8.5",
         "dotenv": "^17.2.3",

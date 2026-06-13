@@ -3,9 +3,6 @@ import tailwindcss      from '@tailwindcss/vite';
 import path             from 'path';
 
 export default defineConfig({
-    optimizeDeps: {
-        include: ['@magenta/music'],
-    },
     // MPA mode: disables Vite's SPA catch-all so each HTML file is served at
     // its own path (/remote/ → remote/index.html, / → index.html).
     appType: 'mpa',
