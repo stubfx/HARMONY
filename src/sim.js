@@ -1702,6 +1702,7 @@ let socket;
         collectiveTemp      = avgTemp      ?? 0.5;
         collectiveCoherence = avgCoherence ?? 0.5;
         collectiveChaos     = avgChaos     ?? 1;
+        console.log('[chaos] raw avgChaos:', avgChaos?.toFixed(4), '| users:', userCount);
         // Mirror to GUI debug panel (manual refresh — no .listen() RAF loop)
         swarmDebug.users     = userCount ?? 0;
         swarmDebug.pitch     = +(avgPitch     ?? 0.5).toFixed(3);
@@ -2291,6 +2292,7 @@ function writeSoloUB(dt, time) {
     f[47] = params.golStrength;
     f[48] = params.releaseBurstSpeed;
     f[49] = smoothChaos;
+    if (Math.random() < 0.01) console.log('[chaos] smoothChaos→GPU:', smoothChaos.toFixed(4));
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
