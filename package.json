@@ -6,6 +6,7 @@
         "start": "concurrently -n server,n8n -c cyan,yellow \"node ./server/server.js\" \"n8n start\""
     },
     "dependencies": {
+        "@elevenlabs/elevenlabs-js": "^2.52.0",
         "concurrently": "^9.1.2",
         "cors": "^2.8.5",
         "dotenv": "^17.2.3",

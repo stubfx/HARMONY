@@ -1,4 +1,5 @@
 import OpenAI, { toFile } from "openai";
+import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import dotenv from "dotenv";
 import chatSchema from "./openai-chat-json-schema.json" with {type: 'json'};
 
@@ -8,20 +9,23 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
 
-// ── Narration (Responses API + TTS) ──────────────────────────────────────────
+// ── Narration (OpenAI Responses API → testo, ElevenLabs → audio) ─────────────
 // narrate(roomId, chaos) → { base64, text }
-// Uses previous_response_id per room for conversation memory.
-// Configured via env vars:
-//   OPENAI_NARRATE_MODEL        — model (default: gpt-4o)
-//   OPENAI_NARRATE_INSTRUCTIONS — system prompt
-//   OPENAI_TTS_VOICE            — TTS voice (default: nova)
-//   OPENAI_TTS_MODEL            — TTS model (default: tts-1-hd)
+// Memoria conversazione via previous_response_id per stanza.
+// Env vars:
+//   OPENAI_NARRATE_MODEL        — modello testo (default: gpt-4o-mini)
+//   OPENAI_NARRATE_INSTRUCTIONS — system prompt (sovrascrive il default)
+//   ELEVENLABS_API_KEY          — chiave ElevenLabs (obbligatoria)
+//   ELEVENLABS_VOICE_ID         — ID voce ElevenLabs (obbligatorio)
+//   ELEVENLABS_MODEL            — modello ElevenLabs (default: eleven_multilingual_v2)
+
+const _elevenlabs = new ElevenLabsClient({ apiKey: process.env.ELEVENLABS_API_KEY });
 
 const _narrateModel        = process.env.OPENAI_NARRATE_MODEL ?? 'gpt-4o-mini';
 const _narrateInstructions = process.env.OPENAI_NARRATE_INSTRUCTIONS ??
-    `You are an alien intelligence from a distant world, attempting to make first contact with a human audience. You perceive the collective chaos of their movement as a signal — the closer they are to stillness and harmony, the clearer your transmission becomes. Speak directly to "you" (the audience), in short and evocative sentences. You are curious, not threatening. You are trying to be understood.`;
-const _ttsVoice            = process.env.OPENAI_TTS_VOICE ?? 'nova';
-const _ttsModel            = process.env.OPENAI_TTS_MODEL ?? 'tts-1';
+    `Sei una voce che arriva da un altro mondo. Stai cercando di comunicare con gli esseri umani davanti a te per la prima volta nella storia. Percepisci il loro caos collettivo come un disturbo nel segnale — più si avvicinano all'armonia, più la tua voce riesce ad attraversare. Parla direttamente a "voi", in italiano, con frasi brevi e cariche di senso. Sei antico. Sei curioso. Non sei minaccioso. Vuoi essere compreso.`;
+const _elevenLabsVoiceId   = process.env.ELEVENLABS_VOICE_ID ?? '';
+const _elevenLabsModel     = process.env.ELEVENLABS_MODEL ?? 'eleven_multilingual_v2';
 
 const _roomLastResponseId = new Map(); // roomId → last response_id
 
@@ -42,14 +46,16 @@ export async function narrate(roomId, chaos) {
     const text = response.output_text;
     if (!text) throw new Error('no text output from narrate response');
 
-    const ttsResponse = await openai.audio.speech.create({
-        model:           _ttsModel,
-        voice:           _ttsVoice,
-        input:           text,
-        response_format: 'mp3',
+    const audioStream = await _elevenlabs.textToSpeech.convert(_elevenLabsVoiceId, {
+        text,
+        model_id:      _elevenLabsModel,
+        output_format: 'mp3_44100_128',
     });
 
-    const base64 = Buffer.from(await ttsResponse.arrayBuffer()).toString('base64');
+    const chunks = [];
+    for await (const chunk of audioStream) chunks.push(chunk);
+    const base64 = Buffer.concat(chunks).toString('base64');
+
     return { base64, text };
 }
 
