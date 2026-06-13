@@ -459,7 +459,7 @@ app.post('/rndImage', async (_req, res) => {
 let _idleImage = null;  // { buf: Buffer, at: number }
 const IDLE_TTL = 5 * 60 * 1000;
 
-app.get('/idle-image', async (_req, res) => {
+app.post('/idle-image', async (_req, res) => {
     const now = Date.now();
     if (_idleImage && now - _idleImage.at < IDLE_TTL) {
         const age = Math.round((now - _idleImage.at) / 1000);

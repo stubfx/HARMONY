@@ -1250,9 +1250,10 @@ async function loadMagnetImage(file) {
     scheduleAutoClear();
 }
 
-async function loadTraceImageFromUrl(url) {
+async function loadTraceImageFromUrl(url, fetchOptions = {}) {
     try {
-        const res  = await fetch(url);
+        const res = await fetch(url, fetchOptions);
+        if (!res.ok) { console.warn('[traceImage] HTTP', res.status, url); return; }
         const blob = await res.blob();
         clearGif();
         const anim = await decodeAnimatedImage(blob);
@@ -1744,7 +1745,7 @@ let socket;
             collectiveCoherence = 0.5;
             collectiveTemp      = 0.5;
             setSynthState(1.0, 0.5, 0, 0, 0.5);
-            loadTraceImageFromUrl('/idle-image');
+            loadTraceImageFromUrl('/idle-image', { method: 'POST' });
         }
         if (spectatorId) {
             const idx = activeSlots.findIndex(s => s.spectatorId === spectatorId);
@@ -2882,4 +2883,5 @@ function frame(ts) {
     fpsFrames++;
 }
 
+loadTraceImageFromUrl('/idle-image', { method: 'POST' });
 requestAnimationFrame(frame);
