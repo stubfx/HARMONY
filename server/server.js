@@ -31,7 +31,8 @@ import path              from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID }    from 'node:crypto';
 import * as Utils        from './server-utils.js';
-import { narrate, generateIdleImage, generateIdleAudio } from './openai-api.js';
+import { narrate } from './openai-api.js';
+import { readdir, readFile } from 'node:fs/promises';
 
 dotenv.config();
 
@@ -455,50 +456,30 @@ app.post('/rndImage', async (_req, res) => {
     }
 });
 
-// ── Idle audio — space synthwave, 30-min server cache ────────────────────────
-let _idleAudio = null;  // { buf: Buffer, at: number }
-const IDLE_AUDIO_TTL = 30 * 60 * 1000;
+// ── Idle assets — served from ./idle/{images,music}/, random pick each request ─
+const _IDLE_DIR   = path.join(__dirname, '..', 'idle');
+const _IMAGE_MIME = { '.webp': 'image/webp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png' };
 
-app.get('/idle-audio', async (_req, res) => {
-    const now = Date.now();
-    if (_idleAudio && now - _idleAudio.at < IDLE_AUDIO_TTL) {
-        const age = Math.round((now - _idleAudio.at) / 1000);
-        console.log(`[idle-audio] serving cached  age=${age}s  size=${_idleAudio.buf.length}B`);
-        return res.type('audio/mpeg').send(_idleAudio.buf);
-    }
-    console.log('[idle-audio] cache miss — generating…');
-    try {
-        const buf = await generateIdleAudio();
-        _idleAudio = { buf, at: Date.now() };
-        res.type('audio/mpeg').send(buf);
-    } catch (err) {
-        console.error('[idle-audio] error:', err.message);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// ── Idle image — Van Gogh space, 5-min server cache ──────────────────────────
-let _idleImage = null;  // { buf: Buffer, at: number }
-const IDLE_TTL = 5 * 60 * 1000;
+async function _randomFile(dir) {
+    const files = (await readdir(dir).catch(() => [])).filter(f => !f.startsWith('.'));
+    if (!files.length) return null;
+    return path.join(dir, files[Math.floor(Math.random() * files.length)]);
+}
 
 app.get('/idle-image', async (_req, res) => {
-    const now = Date.now();
-    if (_idleImage && now - _idleImage.at < IDLE_TTL) {
-        const age = Math.round((now - _idleImage.at) / 1000);
-        console.log(`[idle-image] serving cached image  age=${age}s  size=${_idleImage.buf.length}B`);
-        return res.type('image/webp').send(_idleImage.buf);
-    }
-    console.log('[idle-image] cache miss — requesting new image from OpenAI');
-    try {
-        const base64 = await generateIdleImage();
-        const buf = Buffer.from(base64, 'base64');
-        _idleImage = { buf, at: Date.now() };
-        console.log(`[idle-image] cached new image  size=${buf.length}B`);
-        res.type('image/webp').send(buf);
-    } catch (err) {
-        console.error('[idle-image] error:', err.message);
-        res.status(500).json({ error: err.message });
-    }
+    const file = await _randomFile(path.join(_IDLE_DIR, 'images'));
+    if (!file) return res.status(404).json({ error: 'no idle images in idle/images/' });
+    const ext  = path.extname(file).toLowerCase();
+    const mime = _IMAGE_MIME[ext] ?? 'image/webp';
+    console.log(`[idle-image] serving ${path.basename(file)}`);
+    res.type(mime).send(await readFile(file));
+});
+
+app.get('/idle-audio', async (_req, res) => {
+    const file = await _randomFile(path.join(_IDLE_DIR, 'music'));
+    if (!file) return res.status(404).json({ error: 'no idle audio in idle/music/' });
+    console.log(`[idle-audio] serving ${path.basename(file)}`);
+    res.type('audio/mpeg').send(await readFile(file));
 });
 
 // ── Page fallbacks ────────────────────────────────────────────────────────────
