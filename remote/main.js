@@ -144,6 +144,8 @@ socket.on('device-message', (data) => {
 // IDLE — joystick disabled
 // DRAW — joystick active (default when no story step is running)
 // VOTE — vote panel shown; joystick hidden
+const harmonyPanelEl  = document.querySelector('#harmony-panel');
+const harmonyCanvasEl = document.querySelector('#harmony-canvas');
 const votePanelEl    = document.querySelector('#vote-panel');
 const voteBtnA       = document.querySelector('#vote-btn-a');
 const voteBtnB       = document.querySelector('#vote-btn-b');
@@ -186,13 +188,14 @@ function setRemoteUI({ stepStatus, optionA, optionB, voteDuration } = {}) {
     _currentStepStatus = stepStatus ?? null;
     _storyOptionA = optionA ?? null;
     _storyOptionB = optionB ?? null;
-    const isVote  = stepStatus === 'VOTE';
-    const isText  = stepStatus === 'TEXT';
-    const isPulse = stepStatus === 'PULSE';
-    const isRaise = stepStatus === 'RAISE';
-    const isWave  = stepStatus === 'WAVE';
-    const showJoystick = !stepStatus || stepStatus === 'DRAW';
-    const showColors   = !stepStatus || stepStatus === 'IDLE' || stepStatus === 'DRAW';
+    const isVote    = stepStatus === 'VOTE';
+    const isText    = stepStatus === 'TEXT';
+    const isPulse   = stepStatus === 'PULSE';
+    const isRaise   = stepStatus === 'RAISE';
+    const isWave    = stepStatus === 'WAVE';
+    const isHarmony = !stepStatus || stepStatus === 'HARMONY';
+    const showJoystick = stepStatus === 'DRAW';
+    const showColors   = stepStatus === 'IDLE' || stepStatus === 'DRAW';
 
     // Reset one-shot state on mode enter
     if (isRaise) { _raiseDone = false; _raiseSwipeStartY = null; raisePanelEl?.classList.remove('completed'); }
@@ -226,6 +229,11 @@ function setRemoteUI({ stepStatus, optionA, optionB, voteDuration } = {}) {
     pulsePanelEl?.classList.toggle('visible', isPulse);
     raisePanelEl?.classList.toggle('visible', isRaise);
     wavePanelEl?.classList.toggle('visible', isWave);
+
+    if (harmonyPanelEl) {
+        harmonyPanelEl.classList.toggle('visible', isHarmony);
+        if (isHarmony) _startHarmonyLoop(); else _stopHarmonyLoop();
+    }
 
     if (isWave) checkSensorSupport(waveNoteEl);
 
@@ -632,6 +640,74 @@ let tiltThrottle  = null;
 const _peacePitch = Math.random();
 const _peaceRoll  = Math.random();
 function _circDist(a, b) { const d = Math.abs(a - b); return Math.min(d, 1 - d) * 2; }
+
+// ── Harmony canvas draw loop ──────────────────────────────────────────────────
+let _harmonyRAF = null;
+
+function _drawHarmony() {
+    const canvas = harmonyCanvasEl;
+    if (!canvas) return;
+    const W   = canvas.width;
+    const H   = canvas.height;
+    const ctx = canvas.getContext('2d');
+    const min = Math.min(W, H);
+    ctx.clearRect(0, 0, W, H);
+
+    const targetR = min * 0.14;
+    const dotR    = min * 0.035;
+    const tx = _peaceRoll  * W;
+    const ty = _peacePitch * H;
+    const dx = currentRoll  * W;
+    const dy = currentPitch * H;
+    const inside = Math.hypot(dx - tx, dy - ty) < targetR;
+    const pulse  = 0.5 + 0.5 * Math.sin(performance.now() / 500);
+
+    // Target ring
+    ctx.beginPath();
+    ctx.arc(tx, ty, targetR, 0, Math.PI * 2);
+    ctx.strokeStyle = inside
+        ? `rgba(255,255,255,${0.6 + 0.4 * pulse})`
+        : `rgba(255,255,255,${0.2 + 0.1 * pulse})`;
+    ctx.lineWidth = inside ? 2 : 1;
+    ctx.stroke();
+
+    // Dot
+    ctx.beginPath();
+    ctx.arc(dx, dy, dotR, 0, Math.PI * 2);
+    ctx.fillStyle = inside ? 'rgba(255,255,255,1)' : 'rgba(255,255,255,0.8)';
+    ctx.fill();
+
+    // Glow when inside
+    if (inside) {
+        const g = ctx.createRadialGradient(dx, dy, dotR, dx, dy, dotR * 4);
+        g.addColorStop(0, 'rgba(255,255,255,0.25)');
+        g.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.beginPath();
+        ctx.arc(dx, dy, dotR * 4, 0, Math.PI * 2);
+        ctx.fillStyle = g;
+        ctx.fill();
+    }
+
+    _harmonyRAF = requestAnimationFrame(_drawHarmony);
+}
+
+function _startHarmonyLoop() {
+    if (_harmonyRAF) cancelAnimationFrame(_harmonyRAF);
+    if (!harmonyCanvasEl) return;
+    harmonyCanvasEl.width  = harmonyCanvasEl.offsetWidth  || window.innerWidth;
+    harmonyCanvasEl.height = harmonyCanvasEl.offsetHeight || window.innerHeight;
+    _harmonyRAF = requestAnimationFrame(_drawHarmony);
+}
+
+function _stopHarmonyLoop() {
+    if (_harmonyRAF) { cancelAnimationFrame(_harmonyRAF); _harmonyRAF = null; }
+}
+
+window.addEventListener('resize', () => {
+    if (!harmonyCanvasEl || !harmonyPanelEl?.classList.contains('visible')) return;
+    harmonyCanvasEl.width  = harmonyCanvasEl.offsetWidth;
+    harmonyCanvasEl.height = harmonyCanvasEl.offsetHeight;
+});
 
 function startTilt() {
     motionEnabled = true;

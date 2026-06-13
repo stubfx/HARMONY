@@ -574,3 +574,23 @@ html, body {
     0%   { opacity: 1; }
     100% { opacity: 0; }
 }
+
+/* ── Harmony panel — tilt-to-target default screen ──────────────────────────── */
+#harmony-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    display: none;
+    pointer-events: none;
+}
+
+#harmony-panel.visible {
+    display: block;
+    animation: vote-panel-in 0.5s ease both;
+}
+
+#harmony-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
