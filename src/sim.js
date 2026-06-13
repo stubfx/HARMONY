@@ -1816,6 +1816,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
         }
         if (event.type === 'color-pick') {
             const slot = activeSlots.find(s => s.spectatorId === event.spectatorId);
+            console.log('[color-pick] sid:', event.spectatorId?.slice(0,8), '| slot:', !!slot, '| color:', event.data?.color);
             if (slot && typeof event.data?.color === 'string') {
                 const [r, g, b] = hexToF(event.data.color);
                 slot.colorR = r; slot.colorG = g; slot.colorB = b;
