@@ -133,7 +133,7 @@ The server maintains a per-room user table. Every 300 ms it averages all active 
 | `avgRoll` | phone tilt (X axis) | wind bias X — field tilts left/right | pad LFO amplitude (via wind magnitude) |
 | `avgTemp` | touch Y position | speed-color hue: blue (top/cold) → amber (bottom/warm), 65% blend | arp BPM (80–140) |
 | `avgCoherence` | touch X position | turnRate multiplier: 0.08× (left/chaos) → 3.0× (right/order) | — |
-| `avgChaos` | distance from target rotation | noise magnitude in agent compute | all synth layers + radio chain; pad LFO frequency (0.05→2 Hz as chaos→0) |
+| `avgChaos` | distance from peace point rotation | noise magnitude in agent compute; chaos color fraction on all agents | all synth layers + radio chain; pad LFO frequency (0.05→2 Hz as chaos→0) |
 | `userCount` | active connections | DOT→NORMAL at first join; chaos reset when all leave | synth at chaos=1 when empty; simAss music fades in on first join, out on last leave |
 
 All collective values are smoothed with an exponential moving average (~0.8 s time constant) in the simulation before being written to the GPU, preventing jarring jumps when spectators join or leave.
@@ -150,7 +150,7 @@ All computation runs on the GPU. No Three.js. No WebGL.
 | **Agent shadow density** | `agentShadow.wgsl` | Render | Greyscale splat texture — one soft disk per homing agent; used as a density probe by the compute shader. Champions are excluded so they don't repel the swarm |
 | **Agent shadow visual** | `agentShadow.wgsl` | Render | Dark soft splats blended onto the offscreen accumulation texture to create depth under homing agents. Also drives **champion** trails — every Nth agent (Champions folder: `enabled` toggle + `1 in N`) drops a constant shadow under itself even while free, with no change to its movement. Free champions also render slightly larger (`champion size`, applied in `render.wgsl` only while not homing) |
 | **Fade** | `fade.wgsl` | Render | Black fullscreen quad with alpha blend — exponential trail decay each frame |
-| **Particles** | `render.wgsl` | Render | Per-agent quads drawn into `rgba16float` offscreen texture; additive **or** max blend selectable; speed-color tinted by collective temperature |
+| **Particles** | `render.wgsl` | Render | Per-agent quads drawn into `rgba16float` offscreen texture; additive **or** max blend selectable; spectator slot colors; chaos color override; avoidmap color sampling |
 | **Blit** | `blit.wgsl` | Render | Tone-map offscreen → canvas swap-chain (blitUB 32 bytes): `bgBlackCutoff` clamp, tone-black/white/gamma curve, shadow boost, color mode (NORMAL / GRAYSCALE / GRAYSCALE_INVERTED) |
 | **Wind vis** *(debug)* | `wind-vis.wgsl` | Render | Arrow grid overlay — `evalWindFormula` prepended at pipeline build time, same pattern as `compute.wgsl` |
 | **Image debug** *(debug)* | `image-debug.wgsl` | Render | Grayscale overlay of the loaded image at its current size and position |
@@ -166,7 +166,7 @@ The compute uniform buffer (`soloUB`, 144 bytes) carries physics params plus:
 - `windBiasX` / `windBiasY` — smoothed collective tilt vector, added directly to formula wind
 - `avoidForceStr` — multiplier applied to all image-trace avoidance force vectors
 
-The render uniform buffer (`renderUB`, 144 bytes allocated, 140 bytes used — 35 fields) carries visual params, including `additiveBlend` (field 25) which selects between additive and max-blend render pipelines, `pixelMode` / `cellsW` / `cellsH` (fields 26–28) which when set make the vertex shader snap each agent to the centre of its cell and draw a 1-cell quad (rendering directly into the small `gridTex` instead of going through the full-res offscreen + downsample path), `blendAmount` (field 29) which scales the fragment output so per-particle contribution can be attenuated in both blend modes, and `hasAvoidMap` / `avoidMapScale` / `avoidMapInvert` / `avoidMapSampleColor` / `avoidMapFixedColor` (fields 30–34) which let non-homing particles take their base colour directly from the avoid-map pixel at their position (binding 5 in the render bind group, rebuilt whenever the map changes).
+The render uniform buffer (`renderUB`, 176 bytes — 44 fields) carries visual params, including `additiveBlend` (field 24) which selects between additive and max-blend render pipelines; `spectatorCount` / `spectatorAgentShare` (fields 23/25) which assign the first N% of agents to spectator slots with per-slot colors; `avoidMapSampleChaos` (field 39) which drives the avoidmap color sampling probability (30%→100% as chaos→1); and `chaosColorR/G/B` / `chaosColorFraction` (fields 40–43) which force a configurable fraction of all agents — spectator-controlled or free — to a single "chaos color", scaling linearly with chaos so at harmony=0 no agents are affected.
 
 The blit uniform buffer (`blitUB`, 32 bytes) carries 5 × f32 + 1 × u32: `cutoff`, `toneBlack`, `toneWhite`, `toneGamma`, `shadowBoost`, `colorMode` (0 = NORMAL, 1 = GRAYSCALE, 2 = GRAYSCALE_INVERTED). Grayscale and inversion both run post-tone-map so the additive HDR accumulation in the offscreen target isn't affected — applying inversion per particle would map bright particles to ~zero and additive blending of zeros would collapse the image.
 
@@ -240,7 +240,8 @@ Spectators open the `/remote/` page on their phones. The page has a virtual joys
 |---------|--------------|-------------|-------------------|
 | **Joystick** | Use the virtual joystick | Forwarded directly as `remote-event` | Moves the spectator's spawner across the canvas; agents teleport to spawner at scaled spawn chance |
 | **Color** | Color picker at top of page | Forwarded directly to simulation | Assigned color for that spectator's agents |
-| **Tilt** | Hold and tilt phone in any direction | Server averages all pitch/roll vectors | Collective wind bias — the whole field leans with the crowd |
+| **Shake** | Shake the phone | Forwarded as `color-pick` + `shake` | Bursts the spectator's agents outward AND picks a new random color from the local palette |
+| **Tilt** | Hold and tilt phone in any direction | Server averages pitch/roll; computes chaos as distance from peace point | Collective wind bias; chaos level — the whole field responds to how close the group is to the shared target orientation |
 | **Text** | Type in the text input at top | Forwarded directly to simulation | Trace attractor — particle field writes the word |
 
 ### Feedback loops
@@ -410,8 +411,10 @@ The GUI has five folders below these dropdowns. See [PARAMETERS.md](PARAMETERS.m
 | render scale | Canvas resolution multiplier (reduce on HiDPI screens for performance) |
 | trail decay | How fast trails fade (higher = shorter trails) |
 | agent size | Quad size in canvas pixels |
-| base color | Colour of slow/stationary agents |
-| fast color | Colour approached at max speed |
+| color 1 | Colour assigned to even-indexed agents |
+| color 2 | Colour assigned to odd-indexed agents |
+| chaos color | Colour forced onto `chaos color %` of all agents at full chaos; scales linearly with chaos so at harmony nothing changes |
+| chaos color % | Fraction (0–1) of all agents that switch to the chaos color at chaos=1 (default 0.5) |
 | brightness | Per-particle alpha; controls additive accumulation — prevents saturation to white |
 | additive blend | On = additive glow (can blow out); Off = max blend (no over-brightness) |
 | tone black | Input level mapped to black in the blit tone curve |
@@ -457,7 +460,11 @@ The image is never rendered directly — it is felt through collective agent den
 
 An invisible grayscale mask that repels free agents. White areas push agents away; black areas are transparent to them. The mask has its own scale independent of the trace image.
 
-At startup, and whenever the room is empty, the simulation fetches `/simAss-image` as the avoidance map. This endpoint serves a pre-generated widescreen (`1536×1024`) Van Gogh–style space image from `simAss/images/` (up to 3 files cached on disk; auto-generated by the server via OpenAI if the folder is empty). The map is refreshed every 30 seconds with a random pick from the same pool — if the image changes, the old map is cleared immediately and the new one loads after a 5–10 s random delay. Files are uploaded to `simAss/images/` manually or generated on demand.
+At startup, and whenever the room is empty, the simulation fetches `/simAss-image` as the avoidance map. This endpoint serves a pre-generated widescreen (`1536×1024`) image from `simAss/images/` (up to 10 files cached on disk, 1-day lifespan — expired files are deleted automatically on each request; auto-generated by the server via OpenAI if the folder is empty or all files have expired).
+
+Each generated image is an **antique star atlas illustration** in XVIII-century engraving style: bright star dots connected by fine lines forming a constellation in the shape of a randomly chosen epic/mythic object (submarine, grandfather clock, zeppelin, lighthouse, gothic cathedral, etc. — 26 subjects in the pool). Style reference: Bode's Uranographia / Flamsteed's Atlas Coelestis.
+
+The map is refreshed every 30 seconds — if the hash changes, the old map is cleared and the new one loads after a 5–10 s random delay. On each image change the sim also emits `reset-chaos-target` to the server, which generates a new random peace point (`pitch`/`roll`) and broadcasts it to all connected spectators, encouraging collective movement to find the new harmony orientation.
 
 | Control | Description |
 |---------|-------------|
@@ -520,11 +527,11 @@ cp .env.example .env
 
 ### 3. Pre-populate simAss assets (optional)
 
-The `simAss/images/` and `simAss/music/` directories hold up to 3 pre-generated files each. Drop files in manually, or leave them empty — the server auto-generates them on first request (requires `OPENAI_API_KEY` for images and `ELEVENLABS_API_KEY` for music). Generated files are named `simAss_<timestamp>.webp/.mp3`.
+The `simAss/images/` and `simAss/music/` directories hold up to 10 pre-generated files each (1-day lifespan). Drop files in manually, or leave them empty — the server auto-generates them on first request (requires `OPENAI_API_KEY` for images and `ELEVENLABS_API_KEY` for music). Generated files are named `simAss_<timestamp>.webp/.mp3`.
 
 ```
 simAss/
-  images/   ← 1536×1024 WebP — used as avoidance map (Van Gogh space style)
+  images/   ← 1536×1024 WebP — antique constellation chart, random epic subject
   music/    ← MP3 ~2 min — played through Tone.js radio chain when users connected
 ```
 
@@ -623,7 +630,7 @@ All parameters are driven by `chaos` in real time via `setIdleChaos()`, called e
 
 **Track chaining:** each audio file plays once (no loop). `onstop` immediately fetches and starts the next track from `/simAss-audio`. Generation counter `_idleAudioGen` prevents stale callbacks after a spectator leaves mid-fade.
 
-**Asset source:** `simAss/music/` — up to 3 MP3 files. The server picks at random and auto-generates new ones in the background when below the cap.
+**Asset source:** `simAss/music/` — up to 10 MP3 files (1-day lifespan). The server picks at random and auto-generates new ones in the background when below the cap.
 
 Independent volume control: **ch2: music vol** slider in the GUI Audio folder (−30 to +6 dB).
 
@@ -738,7 +745,10 @@ Example story step response:
 | `VITE_N8N_BASE_URL` | — | Base URL of your n8n instance (no trailing slash). The sim appends `/webhook/sim-event` or `/webhook/heartbeat`. Leave blank to disable n8n. Baked at build time — requires rebuild to change. |
 | `VITE_USER_URL` | `http://localhost:3000` | Origin used to build the QR code URL (`$VITE_USER_URL/remote/?s=<uuid>`) |
 | `VITE_SOCKET_URL` | — | Socket.IO server origin used by browser clients **in production**. Set to your public API domain (e.g. `https://api.stubfx.io`). In dev this is ignored — clients always connect directly to Express. Falls back to `'/'` (page origin) if unset. |
-| `SERVER_ASSETS_DIR` | `prev-images` | Directory for cached random images |
+| `OPENAI_API_KEY` | — | OpenAI key — used for image generation (`gpt-image-1-mini`) and narration (`gpt-4o-mini`) |
+| `ELEVENLABS_API_KEY` | — | ElevenLabs key — used for audio generation and narration TTS |
+| `ELEVENLABS_VOICE_ID` | — | ElevenLabs voice ID |
+| `ELEVENLABS_MODEL` | `eleven_multilingual_v2` | ElevenLabs TTS model. Voice settings: stability 0.75, similarity 1.0, style 0.5, speed 1.0 |
 | `EXTRA_ORIGINS` | — | Comma-separated extra CORS origins |
 
 ### Split-domain production setup
