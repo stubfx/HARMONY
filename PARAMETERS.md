@@ -224,10 +224,10 @@ Renders particles directly into a low-resolution `gridTex` (sized `pixelGridCell
 
 - Produces an 8-bit, chessboard-style look where motion appears as discrete cell-to-cell jumps.
 - The agent shadow pass is skipped while pixel grid is on (the soft splat is incoherent with hard cells).
-- Significantly cheaper than rendering full-res: the fragment shader runs on the cell grid (~90 K pixels at the default 400 cells, 16:9 aspect) instead of the full canvas, and the previous downsample pass is no longer needed.
+- Significantly cheaper than rendering full-res: the fragment shader runs on the cell grid (~90 K pixels at 700 cells, 16:9 aspect) instead of the full canvas, and the previous downsample pass is no longer needed.
 
 ### grid cells (`pixelGridCells`)
-**Range:** 20 – 400 | **Default:** 400
+**Range:** 20 – 1000 | **Default:** 700
 
 Number of cells along the X axis of `gridTex` when pixel grid is on. The Y-axis count is derived from the canvas aspect ratio. Higher counts give finer cells (more like a normal render), lower counts give chunkier ones. Changing this triggers a `gridTex` rebuild.
 
@@ -1030,11 +1030,13 @@ A procedural audio engine (`src/synth.js`) activates when the user first interac
 | Layer | Sound | Collective parameter | Range |
 |-------|-------|---------------------|-------|
 | Drone | Sine sub-bass A1, always on | chaos → volume | -18 to -24 dB |
-| Noise | Pink noise bandpass | chaos → gain | silent at harmony, loud at chaos |
-| Pad | Sawtooth chord [A2 E3 A3 C4 E4 G4] + reverb | chaos → filter cutoff; coherence → LFO freq; tilt → LFO amplitude | emerges below chaos 0.6 |
-| Arp | Random A minor scale, Tone.Sequence | chaos → volume; temperature → BPM | emerges below chaos 0.35; 80–140 BPM |
+| Noise | Pink noise bandpass 900 Hz | chaos → gain | silent at harmony, loud at chaos |
+| Pad | Sawtooth chord [A2 E3 A3 C4 E4 G4] + reverb/chorus | chaos → filter cutoff + volume; tilt → LFO amplitude | emerges below chaos 0.6 |
+| Arp | Random A minor scale, Tone.Sequence + delay | chaos → volume; temperature → BPM | emerges below chaos 0.35; 80–140 BPM |
 
-At full chaos (no spectators) the noise layer dominates. As the room converges (low chaos, high coherence) the pad and arp emerge and the noise recedes. When all spectators disconnect the synth resets to idle state.
+The **pad LFO** (filter cutoff sweep) frequency is driven by `(1 − chaos)`: nearly motionless at full chaos, oscillating at ~2 Hz at harmony. LFO amplitude is also suppressed at high chaos and deepens with physical phone tilt.
+
+At full chaos (no spectators) the noise layer dominates. As the room converges (low chaos) the pad and arp emerge and the noise recedes. When all spectators disconnect the synth resets to chaos=1.
 
 The engine uses `setTargetAtTime` rather than `rampTo` for all parameter transitions — `rampTo` triggers a Tone.js internal `setRampPoint` call that injects `EPS = 1e-7` into the AudioParam timeline, crashing on certain AudioParam configurations. `setTargetAtTime` avoids this entirely.
 
@@ -1048,6 +1050,47 @@ The simulation uses the Web Audio API to route sound through an `AnalyserNode`. 
 **Range:** 0 – 1 | **Default:** 1.0 | **Step:** 0.01
 
 How strongly room audio pushes the palette toward `color2`. The render shader mixes each free agent's base color (`color1`/`color2` by index) toward `color2` by `getVolume() × color2AudioStr`: at silence nothing changes (the normal `color1`/`color2` split shows), at peak volume the whole palette reaches `color2` (at strength 1.0). Set to 0 to disable the audio→color reaction entirely. Spectator-assigned colors and avoid-map sampled colors are not affected. (Audio no longer modulates brightness.)
+
+### ch1: synth vol (`synthBusVol`)
+**Range:** −30 – +6 dB | **Default:** 0 dB
+
+Master volume for the Tone.js generative synth channel (drone + noise + pad + arp). Adjusting this does not affect the simAss radio chain. Change takes effect immediately without interrupting the synthesis.
+
+### ch2: music vol (`musicBusVol`)
+**Range:** −30 – +6 dB | **Default:** 0 dB
+
+Master volume for the simAss radio chain (fetched ambient music + static noise). Independent of ch1. Useful for balancing the two channels in the room. Change takes effect immediately even during fade transitions.
+
+---
+
+### simAss radio chain
+
+A second audio stream that plays only while spectators are connected. Fetches MP3 tracks from `/simAss-audio` (served from `simAss/music/`) and routes them through a chaos-driven degradation chain before reaching the speaker, creating a "radio with no reception" effect at high chaos.
+
+**Signal path:**
+```
+Tone.Player
+  → lowpass filter     (4000 Hz → 400 Hz as chaos rises)
+  → Tone.Distortion    (0 → 0.65)
+  → Tone.Tremolo       (depth 0 → 0.85; rate 2 → 8 Hz)
+  → Tone.Reverb        (wet 0.15 → 0.85)
+  → chaos volume       (−3 dB → −15 dB)
+  → fade gain          (0 = off, 1 = present — used for in/out transitions)
+  → music bus (ch2)
+  → destination
+
+white noise → bandpass 2 kHz → static gain (0 → 0.04) → fade gain
+```
+
+**Fade behaviour on user join/leave:**
+- First spectator joins: music starts with a fade-in (exponential, `setTargetAtTime`).
+- Last spectator leaves: music fades out then stops — only the Tone.js synth remains.
+- Fade time constant: 0.7 s at chaos=1, 2.5 s at chaos=0 (total audible fade ≈ TC × 3.5 s).
+- Both music and static noise route through the same `_idleFadeGain`, so they fade together.
+
+**Track chaining:** each track plays once. When it ends, the next track is fetched immediately from `/simAss-audio`. A generation counter (`_idleAudioGen`) prevents stale chains after a spectator leaves mid-fade.
+
+---
 
 ### Audio unlock button
 
