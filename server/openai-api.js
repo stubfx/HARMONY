@@ -19,7 +19,11 @@ const openai = new OpenAI({
 //   ELEVENLABS_VOICE_ID         — ID voce ElevenLabs (obbligatorio)
 //   ELEVENLABS_MODEL            — modello ElevenLabs (default: eleven_multilingual_v2)
 
-const _elevenlabs = new ElevenLabsClient({ apiKey: process.env.ELEVENLABS_API_KEY });
+let _elevenlabs = null;
+function _getElevenLabs() {
+    if (!_elevenlabs) _elevenlabs = new ElevenLabsClient({ apiKey: process.env.ELEVENLABS_API_KEY });
+    return _elevenlabs;
+}
 
 const _narrateModel        = process.env.OPENAI_NARRATE_MODEL ?? 'gpt-4o-mini';
 const _narrateInstructions = process.env.OPENAI_NARRATE_INSTRUCTIONS ??
@@ -54,7 +58,7 @@ export async function narrate(roomId, chaos) {
     const text = response.output_text;
     if (!text) throw new Error('no text output from narrate response');
 
-    const audioStream = await _elevenlabs.textToSpeech.convert(_elevenLabsVoiceId, {
+    const audioStream = await _getElevenLabs().textToSpeech.convert(_elevenLabsVoiceId, {
         text,
         model_id:      _elevenLabsModel,
         output_format: 'mp3_44100_128',
