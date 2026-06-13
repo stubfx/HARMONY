@@ -1723,6 +1723,7 @@ let socket;
     // A spectator joined — assign a slot, send them their color, brightness burst.
     socket.on('spectator-joined', ({ spectatorId, userCount } = {}) => {
         if (userCount !== undefined) simState.userCount = userCount;
+        if (simState.status === 'DOT' && userCount >= 1) setStatus('NORMAL');
         lastRemoteActivity = Date.now();
         burstBrightness    = BURST_BRIGHTNESS;
         if (spectatorId && activeSlots.length < MAX_SPECTATOR_SLOTS) {
@@ -2301,6 +2302,8 @@ function writeSoloUB(dt, time) {
         f[41] = 0; f[42] = 0; f[43] = 0; f[44] = 0;
     }
     u[45] = params.avoidMapInvert ? 1 : 0;
+    // GoL activated automatically when collective chaos exceeds the freeroam threshold
+    params.golEnabled = smoothChaos > 0.3;
     u[46] = params.golEnabled ? 1 : 0;
     f[47] = params.golStrength;
     f[48] = params.releaseBurstSpeed;
@@ -2318,14 +2321,20 @@ function writeRenderUB() {
     const c1 = hexToF(params.color1);
     const c2 = hexToF(params.color2);
 
+    // Blend c1 toward warm orange as collective chaos rises (no param change — GPU only)
+    const _cw = smoothChaos;
+    const _c1r = c1[0] + (1.0 - c1[0]) * _cw;
+    const _c1g = c1[1] + (0.25 - c1[1]) * _cw;
+    const _c1b = c1[2] + (0.0  - c1[2]) * _cw;
+
     const { x0, y0, x1, y1 } = getImageRegion();
     u[0] = params.agentCount;
     f[1] = canvas.width;
     f[2] = canvas.height;
     f[3] = params.pointSize;
-    f[4] = c1[0];
-    f[5] = c1[1];
-    f[6] = c1[2];
+    f[4] = _c1r;
+    f[5] = _c1g;
+    f[6] = _c1b;
     f[7] = params.maxSpeed;
     u[8]  = hasImage ? 1 : 0;
     f[9]  = x0;
