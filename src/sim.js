@@ -1739,7 +1739,12 @@ let socket;
 
     socket.on('spectator-left', ({ spectatorId, userCount } = {}) => {
         if (userCount !== undefined) simState.userCount = userCount;
-        if (userCount === 0) setSynthState(1.0, smoothCoherence, smoothBiasX, smoothBiasY, smoothTemp);
+        if (userCount === 0) {
+            collectiveChaos     = 1;
+            collectiveCoherence = 0.5;
+            collectiveTemp      = 0.5;
+            setSynthState(1.0, 0.5, 0, 0, 0.5);
+        }
         if (spectatorId) {
             const idx = activeSlots.findIndex(s => s.spectatorId === spectatorId);
             if (idx !== -1) {
