@@ -1748,7 +1748,10 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
             collectiveCoherence = 0.5;
             collectiveTemp      = 0.5;
             setSynthState(1.0, 0.5, 0, 0, 0.5);
-            loadAvoidMap(`${_apiBase}/idle-image`);
+            _fetchIdleImageBytes().then(bytes => {
+                _lastIdleImageBytes = bytes;
+                return loadAvoidMap(new Blob([bytes], { type: 'image/webp' }));
+            }).catch(e => console.warn('[idle-image]', e));
             loadIdleAudio();
         }
         if (spectatorId) {
@@ -2888,7 +2891,46 @@ function frame(ts) {
     fpsFrames++;
 }
 
-loadAvoidMap(`${_apiBase}/idle-image`);
+// ── Idle image rotation — refresh every 30s when no spectators ───────────────
+let _lastIdleImageBytes = null;
+
+_fetchIdleImageBytes().then(bytes => {
+    _lastIdleImageBytes = bytes;
+    return loadAvoidMap(new Blob([bytes], { type: 'image/webp' }));
+}).catch(e => console.warn('[idle-image]', e));
+
+async function _fetchIdleImageBytes() {
+    const res = await fetch(`${_apiBase}/idle-image`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return new Uint8Array(await res.arrayBuffer());
+}
+
+function _simpleHash(bytes) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < Math.min(bytes.length, 4096); i++) {
+        h ^= bytes[i];
+        h = (h * 0x01000193) >>> 0;
+    }
+    return h;
+}
+
+setInterval(async () => {
+    if (simState.userCount > 0) return;
+    try {
+        const bytes = await _fetchIdleImageBytes();
+        const hash  = _simpleHash(bytes);
+        const lastHash = _lastIdleImageBytes ? _simpleHash(_lastIdleImageBytes) : null;
+        if (hash === lastHash) return;
+        _lastIdleImageBytes = bytes;
+        clearAvoidMap();
+        await new Promise(r => setTimeout(r, 5000 + Math.random() * 5000));
+        if (simState.userCount > 0) return; // spectator joined during sleep
+        const blob = new Blob([bytes], { type: 'image/webp' });
+        await loadAvoidMap(blob);
+    } catch (e) {
+        console.warn('[idle-image-rotation]', e);
+    }
+}, 30000);
 
 // ── Idle audio loader ─────────────────────────────────────────────────────────
 async function loadIdleAudio() {
