@@ -106,5 +106,5 @@ export function setMagentaState(chaos, _coherence = 0.5, _temp = 0.5) {
 export function stopMagentaSynth() {
     if (!_ready) return;
     _seq?.stop();
-    _vol?.volume.value = -60;
+    if (_vol) _vol.volume.value = -60;
 }
