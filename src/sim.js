@@ -2293,7 +2293,7 @@ function writeSoloUB(dt, time) {
     u[46] = params.golEnabled ? 1 : 0;
     f[47] = params.golStrength;
     f[48] = params.releaseBurstSpeed;
-    f[49] = activeSlots.length > 0 ? smoothChaos : 0;
+    f[49] = activeSlots.length > 0 ? Math.min(smoothChaos / 0.3, 1.0) : 0;
     if (Math.random() < 0.01) console.log('[chaos] smoothChaos→GPU:', smoothChaos.toFixed(4));
     device.queue.writeBuffer(soloUB, 0, ab);
 }
