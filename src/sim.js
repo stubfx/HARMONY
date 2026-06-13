@@ -1727,7 +1727,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
     // A spectator joined — assign a slot, send them their color, brightness burst.
     socket.on('spectator-joined', ({ spectatorId, userCount } = {}) => {
         if (userCount !== undefined) simState.userCount = userCount;
-        if (userCount === 1) { clearAvoidMap(); playAudioBg(null); } // remove idle attractor + audio
+        if (userCount === 1) { clearAvoidMap(); _idleAudioGen++; playAudioBg(null); } // remove idle attractor + audio
         if (simState.status === 'DOT' && userCount >= 1) setStatus('NORMAL');
         lastRemoteActivity = Date.now();
         burstBrightness    = BURST_BRIGHTNESS;
@@ -2915,7 +2915,6 @@ function _simpleHash(bytes) {
 }
 
 setInterval(async () => {
-    if (simState.userCount > 0) return;
     try {
         const bytes = await _fetchIdleImageBytes();
         const hash  = _simpleHash(bytes);
@@ -2924,7 +2923,6 @@ setInterval(async () => {
         _lastIdleImageBytes = bytes;
         clearAvoidMap();
         await new Promise(r => setTimeout(r, 5000 + Math.random() * 5000));
-        if (simState.userCount > 0) return; // spectator joined during sleep
         const blob = new Blob([bytes], { type: 'image/webp' });
         await loadAvoidMap(blob);
     } catch (e) {
@@ -2932,11 +2930,15 @@ setInterval(async () => {
     }
 }, 30000);
 
-// ── Idle audio loader ─────────────────────────────────────────────────────────
+// ── Idle audio loader — chains tracks: fetches next as soon as current ends ──
+let _idleAudioGen = 0;
+
 async function loadIdleAudio() {
+    const gen = ++_idleAudioGen;
     try {
         const res = await fetch(`${_apiBase}/idle-audio`);
         if (!res.ok) { console.warn('[idle-audio] HTTP', res.status); return; }
+        if (gen !== _idleAudioGen) return; // superseded
         const buf   = await res.arrayBuffer();
         const bytes = new Uint8Array(buf);
         let binary  = '';
@@ -2944,7 +2946,9 @@ async function loadIdleAudio() {
         for (let i = 0; i < bytes.length; i += CHUNK)
             binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
         console.log(`[idle-audio] loaded ${buf.byteLength}B — playing`);
-        playAudioBg(btoa(binary), 'audio/mpeg', true);
+        playAudioBg(btoa(binary), 'audio/mpeg', false, () => {
+            if (gen === _idleAudioGen) loadIdleAudio();
+        });
     } catch (e) {
         console.warn('[idle-audio]', e);
     }

@@ -169,7 +169,7 @@ export async function playAudio(base64, mimeType = 'audio/webm;codecs=opus') {
 
 // Background track. loop=true (default) loops forever; loop=false plays once then stops.
 // Null/empty stops and clears the track immediately.
-export async function playAudioBg(base64, mimeType = 'audio/webm;codecs=opus', loop = true) {
+export async function playAudioBg(base64, mimeType = 'audio/webm;codecs=opus', loop = true, onEnded = null) {
     _stopSrc(_bgSrc);
     _bgSrc = null;
     if (!base64) {
@@ -185,7 +185,7 @@ export async function playAudioBg(base64, mimeType = 'audio/webm;codecs=opus', l
     _bgSrc.buffer     = audioBuffer;
     _bgSrc.loop       = loop;
     _bgSrc.connect(_bgChaosFilter);
-    if (!loop) _bgSrc.onended = () => { _bgSrc = null; };
+    if (!loop) _bgSrc.onended = () => { _bgSrc = null; onEnded?.(); };
     _bgSrc.start();
 }
 
