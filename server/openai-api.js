@@ -38,18 +38,26 @@ export async function narrate(roomId, snapshot = {}) {
     const users       = typeof snapshot.users       === 'number' ? snapshot.users       : 0;
     const temperature = typeof snapshot.temperature === 'number' ? snapshot.temperature : 0.5;
     const coherence   = typeof snapshot.coherence   === 'number' ? snapshot.coherence   : 0.5;
+    const imageBase64 = snapshot.imageBase64 ?? null;
 
     const previousResponseId = _roomLastResponseId.get(roomId) ?? null;
 
     const chaosDesc   = chaosVal < 0.3 ? 'quasi perfetta armonia' : chaosVal < 0.6 ? 'disordine moderato' : 'caos intenso';
     const tempDesc    = temperature < 0.4 ? 'freddo e immobile' : temperature > 0.65 ? 'caldo e agitato' : 'tiepido';
     const cohDesc     = coherence < 0.4 ? 'poco coordinati tra loro' : coherence > 0.65 ? 'molto coordinati' : 'parzialmente sincronizzati';
-    const input = `Quello che vedo ora: ${users} ${users === 1 ? 'essere umano' : 'esseri umani'} presenti. ` +
-                  `Stato collettivo: ${chaosDesc} (chaos ${chaosVal.toFixed(2)}). ` +
-                  `Temperatura percepita: ${tempDesc}. ` +
-                  `Coordinazione del gruppo: ${cohDesc}.`;
+    const textInput = `Quello che vedo ora: ${users} ${users === 1 ? 'essere umano' : 'esseri umani'} presenti. ` +
+                      `Stato collettivo: ${chaosDesc} (chaos ${chaosVal.toFixed(2)}). ` +
+                      `Temperatura percepita: ${tempDesc}. ` +
+                      `Coordinazione del gruppo: ${cohDesc}.`;
 
-    console.log(`[narrate] room=${roomId} | ${input}`);
+    const input = imageBase64
+        ? [{ role: 'user', content: [
+            { type: 'input_image', image_url: `data:image/jpeg;base64,${imageBase64}` },
+            { type: 'input_text',  text: textInput },
+          ]}]
+        : textInput;
+
+    console.log(`[narrate] room=${roomId} image=${!!imageBase64} | ${textInput}`);
     const _t0 = Date.now();
     const response = await openai.responses.create({
         model:    _narrateModel,

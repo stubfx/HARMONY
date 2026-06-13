@@ -352,7 +352,7 @@ io.on('connection', (socket) => {
     });
 
     // ── OpenAI narration (keypress 'f' on host) ───────────────────────────────
-    socket.on('openai-narrate', async ({ chaos } = {}) => {
+    socket.on('openai-narrate', async ({ chaos, image } = {}) => {
         if (!assignedRoom) return;
         try {
             const room  = rooms.get(assignedRoom);
@@ -367,6 +367,7 @@ io.on('connection', (socket) => {
                 users:       room?.connections.size ?? 0,
                 temperature: n > 0 ? st / n : 0.5,
                 coherence:   n > 0 ? sc / n : 0.5,
+                imageBase64: typeof image === 'string' && image.length > 0 ? image : null,
             };
             const { base64, text } = await narrate(assignedRoom, snapshot);
             socket.emit('openai-audio', { base64, mimeType: 'audio/mpeg', text });

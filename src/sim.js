@@ -2020,7 +2020,8 @@ window.addEventListener('keydown', e => {
     if (e.key === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const t = e.target;
         if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-        socket.emit('openai-narrate', { chaos: smoothChaos });
+        _narrateChaosVal         = smoothChaos;
+        _narrateCaptureRequested = true;
     }
 });
 
@@ -2530,6 +2531,10 @@ const _windVisAB=new ArrayBuffer(32);  const _windVisF=new Float32Array(_windVis
 // as the frame, after the blit pass, so we always grab what was just on screen.
 let _captureRequested = false;
 
+// Press 'f' to narrate — captures frame first, then emits with base64 image.
+let _narrateCaptureRequested = false;
+let _narrateChaosVal         = 0;
+
 // Trigger a browser download of a Blob under the given filename.
 function downloadBlob(blob, filename) {
     const url = URL.createObjectURL(blob);
@@ -2665,6 +2670,41 @@ async function finalizeCapture(buf, w, h, padded) {
         }
     } catch (e) {
         console.warn('[screenshot]', e);
+    }
+}
+
+async function finalizeNarrateCapture(buf, w, h, padded, chaosVal) {
+    try {
+        await buf.mapAsync(GPUMapMode.READ);
+        const src    = new Uint8Array(buf.getMappedRange());
+        const isBGRA = canvasFormat === 'bgra8unorm';
+        const out    = new Uint8ClampedArray(w * h * 4);
+        const stride = w * 4;
+        for (let y = 0; y < h; y++) {
+            const srcOff = y * padded;
+            const dstOff = y * stride;
+            for (let x = 0; x < stride; x += 4) {
+                out[dstOff + x]     = isBGRA ? src[srcOff + x + 2] : src[srcOff + x];
+                out[dstOff + x + 1] = src[srcOff + x + 1];
+                out[dstOff + x + 2] = isBGRA ? src[srcOff + x]     : src[srcOff + x + 2];
+                out[dstOff + x + 3] = 255;
+            }
+        }
+        buf.unmap();
+        buf.destroy();
+
+        const tmp = document.createElement('canvas');
+        tmp.width = w; tmp.height = h;
+        const c2d = tmp.getContext('2d');
+        c2d.putImageData(new ImageData(out, w, h), 0, 0);
+
+        const dataUrl = tmp.toDataURL('image/jpeg', 0.7);
+        const base64  = dataUrl.slice(dataUrl.indexOf(',') + 1);
+
+        socket.emit('openai-narrate', { chaos: chaosVal, image: base64 });
+    } catch (e) {
+        console.warn('[narrate-capture]', e);
+        socket.emit('openai-narrate', { chaos: chaosVal });
     }
 }
 
@@ -2890,9 +2930,28 @@ function frame(ts) {
         );
     }
 
+    // Narrator capture: same GPU readback but returns base64 JPEG without download.
+    let narrateBuf = null, narrateW = 0, narrateH = 0, narratePadded = 0;
+    if (_narrateCaptureRequested) {
+        _narrateCaptureRequested = false;
+        narrateW      = curTex.width;
+        narrateH      = curTex.height;
+        narratePadded = Math.ceil(narrateW * 4 / 256) * 256;
+        narrateBuf    = device.createBuffer({
+            size:  narratePadded * narrateH,
+            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+        });
+        enc.copyTextureToBuffer(
+            { texture: curTex },
+            { buffer: narrateBuf, bytesPerRow: narratePadded, rowsPerImage: narrateH },
+            [narrateW, narrateH, 1],
+        );
+    }
+
     device.queue.submit([enc.finish()]);
 
     if (captureBuf) finalizeCapture(captureBuf, captureW, captureH, capturePadded);
+    if (narrateBuf) finalizeNarrateCapture(narrateBuf, narrateW, narrateH, narratePadded, _narrateChaosVal);
 
     // Fireworks burst is one-shot — this frame's compute consumed it, so clear the
     // flags now and re-upload, leaving the scattered agents to fly out on their own.
