@@ -27,28 +27,40 @@ function _getElevenLabs() {
 
 const _narrateModel        = process.env.OPENAI_NARRATE_MODEL ?? 'gpt-4o-mini';
 const _narrateInstructions = process.env.OPENAI_NARRATE_INSTRUCTIONS ??
-    `Sei la voce di una tela che prende vita. Parla in italiano, direttamente a "voi", con tono contemplativo e caldo. Racconta come i sogni e i pensieri del gruppo si trasmettono sulla superficie davanti a loro: non è l'intenzione del singolo a muovere le particelle, ma il respiro collettivo, la direzione condivisa, il silenzio che diventa gesto. Quando c'è armonia, la tela ascolta. Quando c'è caos, la tela riflette il disordine interiore. Ogni frase deve avere peso. Lunghezza media: tre o quattro frasi dense, mai troppo brevi né prolisse. Non spiegare, evoca.`;
+    `Sei un visitatore da un altro pianeta. Ti sei perso e hai trovato la Terra per caso. Quello che vedi davanti a te — questa superficie luminosa, questi esseri che si muovono e si agitano — ti affascina e ti sconcerta al tempo stesso. Parli in italiano, direttamente a "voi", con tono distaccato ma curioso, come chi osserva qualcosa di mai visto prima. Non capisci tutto. Fai considerazioni su ciò che percepisci: il movimento, il calore, il disordine o l'armonia collettiva, il numero di presenze. Sei antico. Hai visto altri mondi. Questo ti sembra peculiare. Tre o quattro frasi dense, mai descrittive in senso letterale — evoca, giudica, meravigliati. Non spiegare.`;
 const _elevenLabsVoiceId   = process.env.ELEVENLABS_VOICE_ID ?? '';
 const _elevenLabsModel     = process.env.ELEVENLABS_MODEL ?? 'eleven_multilingual_v2';
 
 const _roomLastResponseId = new Map(); // roomId → last response_id
 
-export async function narrate(roomId, chaos) {
-    const chaosVal           = typeof chaos === 'number' ? Math.max(0, Math.min(1, chaos)) : 1;
+export async function narrate(roomId, snapshot = {}) {
+    const chaosVal    = typeof snapshot.chaos       === 'number' ? Math.max(0, Math.min(1, snapshot.chaos))       : 1;
+    const users       = typeof snapshot.users       === 'number' ? snapshot.users       : 0;
+    const temperature = typeof snapshot.temperature === 'number' ? snapshot.temperature : 0.5;
+    const coherence   = typeof snapshot.coherence   === 'number' ? snapshot.coherence   : 0.5;
+
     const previousResponseId = _roomLastResponseId.get(roomId) ?? null;
 
-    console.log(`[narrate] room=${roomId} chaos=${chaosVal.toFixed(3)} prev=${previousResponseId ?? 'none'}`);
+    const chaosDesc   = chaosVal < 0.3 ? 'quasi perfetta armonia' : chaosVal < 0.6 ? 'disordine moderato' : 'caos intenso';
+    const tempDesc    = temperature < 0.4 ? 'freddo e immobile' : temperature > 0.65 ? 'caldo e agitato' : 'tiepido';
+    const cohDesc     = coherence < 0.4 ? 'poco coordinati tra loro' : coherence > 0.65 ? 'molto coordinati' : 'parzialmente sincronizzati';
+    const input = `Quello che vedo ora: ${users} ${users === 1 ? 'essere umano' : 'esseri umani'} presenti. ` +
+                  `Stato collettivo: ${chaosDesc} (chaos ${chaosVal.toFixed(2)}). ` +
+                  `Temperatura percepita: ${tempDesc}. ` +
+                  `Coordinazione del gruppo: ${cohDesc}.`;
+
+    console.log(`[narrate] room=${roomId} | ${input}`);
     const _t0 = Date.now();
     const response = await openai.responses.create({
         model:    _narrateModel,
-        input:    `Valore chaos collettivo: ${chaosVal.toFixed(3)} (0 = armonia totale, 1 = caos massimo).`,
+        input,
         ...(_narrateInstructions && { instructions: _narrateInstructions }),
         ...(previousResponseId   && { previous_response_id: previousResponseId }),
         store: true,
     });
 
     _roomLastResponseId.set(roomId, response.id);
-    console.log(`[narrate] text ready  ${Date.now() - _t0}ms  id=${response.id}`);
+    console.log(`[narrate] text ready ${Date.now() - _t0}ms  id=${response.id}`);
 
     const text = response.output_text;
     if (!text) throw new Error('no text output from narrate response');

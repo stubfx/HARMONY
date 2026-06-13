@@ -355,9 +355,22 @@ io.on('connection', (socket) => {
     socket.on('openai-narrate', async ({ chaos } = {}) => {
         if (!assignedRoom) return;
         try {
-            const { base64, text } = await narrate(assignedRoom, chaos);
+            const room  = rooms.get(assignedRoom);
+            let sp = 0, sr = 0, st = 0, sc = 0, n = 0;
+            for (const u of (room?.users?.values() ?? [])) {
+                sp += u.pitch ?? 0.5; sr += u.roll ?? 0.5;
+                st += u.temperature ?? 0.5; sc += u.coherence ?? 0.5;
+                n++;
+            }
+            const snapshot = {
+                chaos:       typeof chaos === 'number' ? chaos : (room?.lastAvgChaos ?? 1),
+                users:       room?.connections.size ?? 0,
+                temperature: n > 0 ? st / n : 0.5,
+                coherence:   n > 0 ? sc / n : 0.5,
+            };
+            const { base64, text } = await narrate(assignedRoom, snapshot);
             socket.emit('openai-audio', { base64, mimeType: 'audio/mpeg', text });
-            console.log('[openai] narrated — chaos:', (chaos ?? 1).toFixed(3), '| chars:', text.length);
+            console.log('[openai] narrated — chaos:', snapshot.chaos.toFixed(3), '| users:', snapshot.users, '| chars:', text.length);
         } catch (err) {
             console.error('[openai] narrate error:', err.message);
         }
