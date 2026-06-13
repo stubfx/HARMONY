@@ -19,7 +19,7 @@ import windVisWGSL      from './shaders/wind-vis.wgsl?raw';
 import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
 import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
-import { startSynth, setSynthChaos } from './synth.js';
+import { startSynth, setSynthState } from './synth.js';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const MAX_AGENTS = 5_000_000;
@@ -1739,7 +1739,7 @@ let socket;
 
     socket.on('spectator-left', ({ spectatorId, userCount } = {}) => {
         if (userCount !== undefined) simState.userCount = userCount;
-        if (userCount === 0) setSynthChaos(1.0);
+        if (userCount === 0) setSynthState(1.0, smoothCoherence, smoothBiasX, smoothBiasY, smoothTemp);
         if (spectatorId) {
             const idx = activeSlots.findIndex(s => s.spectatorId === spectatorId);
             if (idx !== -1) {
@@ -2080,7 +2080,7 @@ document.addEventListener('pointerdown', async () => {
     try { await startMic(); } catch (e) { console.warn('[audio] mic denied:', e); }
     if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
     _syncAudioBanner();
-    startSynth().then(() => setSynthChaos(1.0));
+    startSynth().then(() => setSynthState(1.0, smoothCoherence, smoothBiasX, smoothBiasY, smoothTemp));
 }, { once: true });
 
 // ── File input for trace image ────────────────────────────────────────────────
@@ -2197,7 +2197,7 @@ let smoothBiasY       = 0;
 let smoothTemp        = 0.5;
 let smoothCoherence   = 0.5;
 let smoothChaos       = 1;
-let _lastSynthChaos   = -1;   // throttle: only call setSynthChaos when value changes
+let _lastSynthTick    = 0;    // throttle: call setSynthState at most every 200ms
 
 // ── Join burst state ──────────────────────────────────────────────────────────
 // When a spectator joins, a single brightness pulse fires across the field.
@@ -2314,9 +2314,10 @@ function writeSoloUB(dt, time) {
     const chaosGPU = activeSlots.length > 0 ? Math.min(smoothChaos / 0.3, 1.0) : 0;
     f[49] = chaosGPU;
     setChaos(chaosGPU);
-    if (Math.abs(smoothChaos - _lastSynthChaos) >= 0.005) {
-        _lastSynthChaos = smoothChaos;
-        setSynthChaos(smoothChaos);
+    const _synthNow = performance.now();
+    if (_synthNow - _lastSynthTick >= 200) {
+        _lastSynthTick = _synthNow;
+        setSynthState(smoothChaos, smoothCoherence, smoothBiasX, smoothBiasY, smoothTemp);
     }
     if (Math.random() < 0.01) console.log('[chaos] smoothChaos→GPU:', smoothChaos.toFixed(4));
     device.queue.writeBuffer(soloUB, 0, ab);
