@@ -55,7 +55,7 @@ const params = {
     toneGamma:   1.0,         // power curve: <1 boosts darks, >1 crushes darks
     shadowBoost: 0.0,         // inverse-brightness boost: peaks at ~12% luminance, negligible above 60%
     pixelGrid:      false,    // chunky low-res grid (downsample → nearest-sample blit) — final stage before canvas
-    pixelGridCells: 400,      // cell count along the X axis; Y count is derived from canvas aspect ratio
+    pixelGridCells: 700,      // cell count along the X axis; Y count is derived from canvas aspect ratio
     // Magnet
     magnetStr:      30.0, // homing speed: px/frame agents move toward their home position
     alphaThreshold: 0.1,  // min image alpha to trigger homing (0–1)

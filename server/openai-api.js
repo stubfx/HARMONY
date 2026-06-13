@@ -130,7 +130,7 @@ export async function imagine(prompt) {
             {
                 "type": "image_generation",
                 "model": "gpt-image-1-mini",
-                "size": "1024x1024",
+                "size": "1536x1024",
                 "quality": "low",
                 "output_format": "webp",
                 "background": "opaque",
@@ -170,7 +170,7 @@ const _IDLE_PROMPT =
     'Van Gogh post-impressionist oil painting. Deep space scene: swirling nebula in cobalt ' +
     'blue, burnt gold and vivid violet with thick impasto brushstrokes exactly like Starry Night. ' +
     'Spiral galaxies dissolving into painterly strokes, stars scattered like fireflies against ' +
-    'a dark sky. No text, no frames, no watermarks. Square composition.';
+    'a dark sky. No text, no frames, no watermarks. Wide panoramic composition.';
 
 export async function generateIdleImage() {
     console.log('[idle-image] generating Van Gogh space image…');

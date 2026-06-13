@@ -106,7 +106,7 @@ export function initGUI({
     fVis.add(params, 'additiveBlend').name('additive blend');
     fVis.add(params, 'blendAmount', 0, 1, 0.01).name('blend amount');
     fVis.add(params, 'pixelGrid').name('pixel grid');
-    fVis.add(params, 'pixelGridCells', 20, 400, 1).name('grid cells').onChange(() => rebuildGridTex());
+    fVis.add(params, 'pixelGridCells', 20, 1000, 1).name('grid cells').onChange(() => rebuildGridTex());
 
     // ── Export (screenshot, 's' key) ────────────────────────────────────────────
     const fExport = gui.addFolder('Export');
