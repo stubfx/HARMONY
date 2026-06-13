@@ -32,7 +32,7 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID }    from 'node:crypto';
 import * as Utils        from './server-utils.js';
 import { narrate, generateIdleImage, generateIdleAudio } from './openai-api.js';
-import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { readdir, readFile, writeFile, stat, unlink } from 'node:fs/promises';
 
 dotenv.config();
 
@@ -456,15 +456,32 @@ app.post('/rndImage', async (_req, res) => {
     }
 });
 
-// ── Idle assets — ./idle/{images,music}/, max 3, auto-generate if missing ──────
-const _SIM_ASS_DIR = path.join(__dirname, '..', 'simAss');
-const _IMAGE_MIME  = { '.webp': 'image/webp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png' };
-const SIM_ASS_MAX  = 3;
+// ── simAss assets — ./simAss/{images,music}/, max 10, 1-day lifespan ─────────
+const _SIM_ASS_DIR   = path.join(__dirname, '..', 'simAss');
+const _IMAGE_MIME    = { '.webp': 'image/webp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png' };
+const SIM_ASS_MAX    = 10;
+const _FILE_LIFESPAN = 24 * 60 * 60 * 1000; // 1 day in ms
 
 const _generating = { image: false, audio: false };
 
-function _simAssFiles(dir) {
-    return readdir(dir).catch(() => []).then(fs => fs.filter(f => !f.startsWith('.')));
+async function _simAssFiles(dir) {
+    const now   = Date.now();
+    const names = await readdir(dir).catch(() => []);
+    const valid = [];
+    for (const name of names) {
+        if (name.startsWith('.')) continue;
+        const full = path.join(dir, name);
+        try {
+            const s = await stat(full);
+            if (now - s.mtimeMs > _FILE_LIFESPAN) {
+                await unlink(full);
+                console.log(`[simAss] expired and deleted: ${name}`);
+            } else {
+                valid.push(name);
+            }
+        } catch { /* file disappeared between readdir and stat — ignore */ }
+    }
+    return valid;
 }
 
 async function _genAndSaveImage(dir) {

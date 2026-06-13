@@ -165,25 +165,61 @@ export async function generateIdleAudio() {
     return result.audio; // Buffer (mp3)
 }
 
-// ── Idle image — Van Gogh space scene, served when 0 spectators ──────────────
-const _IDLE_PROMPT =
-    'Post-impressionist oil painting in the style of Van Gogh — thick impasto brushstrokes, ' +
-    'swirling textures exactly like Starry Night — but with the color palette of Wes Anderson films: ' +
-    'dusty pastel pinks, muted sage greens, warm ochres, faded teals and soft yellows. ' +
-    'Deep space scene: swirling nebula, spiral galaxies dissolving into painterly strokes, ' +
-    'stars scattered like fireflies against a deep muted sky. ' +
-    'No text, no frames, no watermarks. Wide panoramic composition.';
+// ── Idle image — antique constellation chart, random epic subject ─────────────
+const _CONSTELLATION_SUBJECTS = [
+    'a submarine seen from the side',
+    'a grandfather clock',
+    'a typewriter',
+    'a zeppelin airship',
+    'a lighthouse',
+    'a steam locomotive',
+    'a gramophone with its horn',
+    'a diving bell',
+    'a hot air balloon',
+    'a gothic cathedral',
+    'a spiral staircase',
+    'a compass rose',
+    'a full-rigged galleon',
+    'an astronomical orrery',
+    'a pipe organ',
+    'a giant skeleton key',
+    'a candelabra with seven candles',
+    'a medieval trebuchet',
+    'a camera obscura',
+    'a printing press',
+    'a sextant',
+    'an erupting volcano',
+    'a double helix',
+    'a throne with armrests',
+    'an hourglass',
+    'a hot air balloon basket with rigging',
+];
+
+function _idleImagePrompt() {
+    const subject = _CONSTELLATION_SUBJECTS[Math.floor(Math.random() * _CONSTELLATION_SUBJECTS.length)];
+    return {
+        subject,
+        prompt:
+            `Antique star atlas illustration, XVIII century engraving style. ` +
+            `A single large constellation in the shape of ${subject}. ` +
+            `Bright white dots (stars) connected by fine straight lines forming that exact silhouette. ` +
+            `A delicate line-drawing of the object is faintly sketched in pale gold over the star pattern. ` +
+            `Deep indigo-black sky. Style of Bode's Uranographia or Flamsteed's Atlas Coelestis. ` +
+            `Wide panoramic composition. No text, no labels, no watermarks.`,
+    };
+}
 
 export async function generateIdleImage() {
-    console.log('[idle-image] generating Van Gogh space image…');
+    const { subject, prompt } = _idleImagePrompt();
+    console.log(`[idle-image] generating constellation: "${subject}"…`);
     const _t0 = Date.now();
-    const response = await imagine(_IDLE_PROMPT);
+    const response = await imagine(prompt);
     const hit = response.output?.find(o => o.type === 'image_generation_call');
     if (!hit?.result) {
         console.error('[idle-image] no image_generation_call in response. output types:', response.output?.map(o => o.type));
         throw new Error('no image_generation_call in response output');
     }
-    console.log(`[idle-image] image ready ${Date.now() - _t0}ms  base64len=${hit.result.length}`);
+    console.log(`[idle-image] "${subject}" ready — ${Date.now() - _t0}ms  base64len=${hit.result.length}`);
     return hit.result;  // raw base64 webp string
 }
 
