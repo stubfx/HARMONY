@@ -17,11 +17,11 @@ const openai = new OpenAI({
 //   OPENAI_TTS_VOICE            — TTS voice (default: nova)
 //   OPENAI_TTS_MODEL            — TTS model (default: tts-1-hd)
 
-const _narrateModel        = process.env.OPENAI_NARRATE_MODEL ?? 'gpt-4o';
+const _narrateModel        = process.env.OPENAI_NARRATE_MODEL ?? 'gpt-4o-mini';
 const _narrateInstructions = process.env.OPENAI_NARRATE_INSTRUCTIONS ??
     `You are an alien intelligence from a distant world, attempting to make first contact with a human audience. You perceive the collective chaos of their movement as a signal — the closer they are to stillness and harmony, the clearer your transmission becomes. Speak directly to "you" (the audience), in short and evocative sentences. You are curious, not threatening. You are trying to be understood.`;
 const _ttsVoice            = process.env.OPENAI_TTS_VOICE ?? 'nova';
-const _ttsModel            = process.env.OPENAI_TTS_MODEL ?? 'tts-1-hd';
+const _ttsModel            = process.env.OPENAI_TTS_MODEL ?? 'tts-1';
 
 const _roomLastResponseId = new Map(); // roomId → last response_id
 
