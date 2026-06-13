@@ -8,6 +8,51 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
 
+// ── Narration (Responses API + TTS) ──────────────────────────────────────────
+// narrate(roomId, chaos) → { base64, text }
+// Uses previous_response_id per room for conversation memory.
+// Configured via env vars:
+//   OPENAI_NARRATE_MODEL        — model (default: gpt-4o)
+//   OPENAI_NARRATE_INSTRUCTIONS — system prompt
+//   OPENAI_TTS_VOICE            — TTS voice (default: nova)
+//   OPENAI_TTS_MODEL            — TTS model (default: tts-1-hd)
+
+const _narrateModel        = process.env.OPENAI_NARRATE_MODEL ?? 'gpt-4o';
+const _narrateInstructions = process.env.OPENAI_NARRATE_INSTRUCTIONS ??
+    `You are an alien intelligence from a distant world, attempting to make first contact with a human audience. You perceive the collective chaos of their movement as a signal — the closer they are to stillness and harmony, the clearer your transmission becomes. Speak directly to "you" (the audience), in short and evocative sentences. You are curious, not threatening. You are trying to be understood.`;
+const _ttsVoice            = process.env.OPENAI_TTS_VOICE ?? 'nova';
+const _ttsModel            = process.env.OPENAI_TTS_MODEL ?? 'tts-1-hd';
+
+const _roomLastResponseId = new Map(); // roomId → last response_id
+
+export async function narrate(roomId, chaos) {
+    const chaosVal           = typeof chaos === 'number' ? Math.max(0, Math.min(1, chaos)) : 1;
+    const previousResponseId = _roomLastResponseId.get(roomId) ?? null;
+
+    const response = await openai.responses.create({
+        model:    _narrateModel,
+        input:    `Valore chaos collettivo: ${chaosVal.toFixed(3)} (0 = armonia totale, 1 = caos massimo).`,
+        ...(_narrateInstructions && { instructions: _narrateInstructions }),
+        ...(previousResponseId   && { previous_response_id: previousResponseId }),
+        store: true,
+    });
+
+    _roomLastResponseId.set(roomId, response.id);
+
+    const text = response.output_text;
+    if (!text) throw new Error('no text output from narrate response');
+
+    const ttsResponse = await openai.audio.speech.create({
+        model:           _ttsModel,
+        voice:           _ttsVoice,
+        input:           text,
+        response_format: 'mp3',
+    });
+
+    const base64 = Buffer.from(await ttsResponse.arrayBuffer()).toString('base64');
+    return { base64, text };
+}
+
 export async function chat(text) {
     return await openai.responses.create({
         prompt: {

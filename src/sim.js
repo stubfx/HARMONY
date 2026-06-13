@@ -141,7 +141,7 @@ const params = {
     maxSpectators:  1,    // sim QR hides when connected count reaches this threshold
     respawnOnQR:      true,  // respawn free agents inside the QR rect to a random edge
     qrRespawnChance:  0.01,  // per-frame probability [0–1] for the respawn
-    n8nEnabled:        true,  // false = silence all n8n traffic (heartbeat + sim-event) without unsetting VITE_N8N_BASE_URL
+    n8nEnabled:        false, // false = silence all n8n traffic (heartbeat + sim-event) without unsetting VITE_N8N_BASE_URL
     n8nTestMode:       false, // true = /webhook-test/sim-event, false = /webhook/sim-event
     heartbeatInterval: 10,   // seconds between periodic param snapshots sent to n8n (0 = off)
     heartbeatTimeout:  60,   // seconds before a heartbeat fetch is aborted
@@ -1834,6 +1834,11 @@ let socket;
     });
 
     socket.on('connect_error', () => console.warn('[socket] connection failed, will retry…'));
+
+    socket.on('openai-audio', ({ base64, mimeType = 'audio/mpeg' } = {}) => {
+        if (!base64) return;
+        playAudio(base64, mimeType).catch(e => console.warn('[openai-audio]', e));
+    });
 }
 
 const voteCountdownEl = document.querySelector('#vote-countdown');
@@ -1987,6 +1992,11 @@ window.addEventListener('keydown', e => {
         const t = e.target;
         if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
         _captureRequested = true;
+    }
+    if (e.key === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const t = e.target;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+        socket.emit('openai-narrate', { chaos: smoothChaos });
     }
 });
 

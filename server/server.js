@@ -31,6 +31,7 @@ import path              from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID }    from 'node:crypto';
 import * as Utils        from './server-utils.js';
+import { narrate }       from './openai-api.js';
 
 dotenv.config();
 
@@ -346,6 +347,18 @@ io.on('connection', (socket) => {
         if (!room) return;
         const targetSocketId = room.spectators.get(spectatorId);
         if (targetSocketId) io.to(targetSocketId).emit('device-message', data);
+    });
+
+    // ── OpenAI narration (keypress 'f' on host) ───────────────────────────────
+    socket.on('openai-narrate', async ({ chaos } = {}) => {
+        if (!assignedRoom) return;
+        try {
+            const { base64, text } = await narrate(assignedRoom, chaos);
+            socket.emit('openai-audio', { base64, mimeType: 'audio/mpeg', text });
+            console.log('[openai] narrated — chaos:', (chaos ?? 1).toFixed(3), '| chars:', text.length);
+        } catch (err) {
+            console.error('[openai] narrate error:', err.message);
+        }
     });
 
     socket.on('disconnect', () => {
