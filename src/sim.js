@@ -1416,7 +1416,7 @@ let stateCtrl     = null;
 let qrStateCtrl   = null;
 let modeCtrl      = null;
 let colorModeCtrl = null;
-let gui, swarmDebug, dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence;
+let gui, swarmDebug, dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence, dbgChaos;
 let applyGUIVisibility, toggleGUI, updateGizmo;
 
 function updateStateDisplay() {
