@@ -1730,6 +1730,8 @@ let socket;
             activeSlots.push({ spectatorId, colorR: 1, colorG: 1, colorB: 1, spawnerX: 0.5, spawnerY: 0.5, spawnerLocationActive: 0, windX: 0, windY: 0, dx: 0, dy: 0, magnitude: 0, velocity: 0, _smoothDx: 0, _smoothDy: 0, lastInputTime: 0, burst: 0, burstSeed: 0 });
             uploadSpectatorSlots();
         }
+        // Push current UI state so the new spectator shows the right screen immediately.
+        socket.emit('remote-ui', _remoteUiPayload());
     });
 
     socket.on('spectator-left', ({ spectatorId, userCount } = {}) => {
