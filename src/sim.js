@@ -7,7 +7,7 @@
 // Speed drives brightness. A fading trail accumulates on an offscreen texture.
 
 import { initGUI }      from './gui.js';
-import { startMic, stopAudio, isActive, getVolume, playAudio, playAudioBg, unlockAudio, setDuckLevel, isAudioLocked, isAudioReady, onAudioStateChange } from './audio.js';
+import { startMic, stopAudio, isActive, getVolume, playAudio, playAudioBg, unlockAudio, setDuckLevel, isAudioLocked, isAudioReady, onAudioStateChange, setChaos } from './audio.js';
 import QRCode           from 'qrcode';
 import { io as ioConnect } from 'socket.io-client';
 import soloSimTemplate  from './shaders/compute.wgsl?raw';
@@ -2293,7 +2293,9 @@ function writeSoloUB(dt, time) {
     u[46] = params.golEnabled ? 1 : 0;
     f[47] = params.golStrength;
     f[48] = params.releaseBurstSpeed;
-    f[49] = activeSlots.length > 0 ? Math.min(smoothChaos / 0.3, 1.0) : 0;
+    const chaosGPU = activeSlots.length > 0 ? Math.min(smoothChaos / 0.3, 1.0) : 0;
+    f[49] = chaosGPU;
+    setChaos(chaosGPU);
     if (Math.random() < 0.01) console.log('[chaos] smoothChaos→GPU:', smoothChaos.toFixed(4));
     device.queue.writeBuffer(soloUB, 0, ab);
 }
