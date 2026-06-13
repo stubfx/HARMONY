@@ -115,12 +115,12 @@ export function setSynthChaos(chaos) {
 
     // Pad — emerges below chaos 0.6, filter opens further at harmony
     const padGain = c < 0.6 ? Math.pow(1 - c / 0.6, 1.5) * 0.55 : 0;
-    _padVol.volume.rampTo(padGain > 0 ? Tone.gainToDb(padGain) : SILENT, RAMP, t);
+    _padVol.volume.rampTo(padGain > 0 ? Math.max(SILENT, Tone.gainToDb(padGain)) : SILENT, RAMP, t);
     _padFilter.frequency.rampTo(300 + (1 - c) * 5500, RAMP, t);
 
     // Arp — only below chaos 0.35
     const arpGain = c < 0.35 ? Math.pow(1 - c / 0.35, 2) * 0.4 : 0;
-    _arpVol.volume.rampTo(arpGain > 0 ? Tone.gainToDb(arpGain) : SILENT, RAMP, t);
+    _arpVol.volume.rampTo(arpGain > 0 ? Math.max(SILENT, Tone.gainToDb(arpGain)) : SILENT, RAMP, t);
 }
 
 export function stopSynth() {
