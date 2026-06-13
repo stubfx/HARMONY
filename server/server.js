@@ -479,7 +479,7 @@ const _FILE_LIFESPAN = 24 * 60 * 60 * 1000; // 1 day in ms
 
 const _generating = { image: false, audio: false };
 
-async function _simAssFiles(dir) {
+async function _simAssFiles(dir, { checkExpiry = true } = {}) {
     const now   = Date.now();
     const names = await readdir(dir).catch(() => []);
     const valid = [];
@@ -488,7 +488,7 @@ async function _simAssFiles(dir) {
         const full = path.join(dir, name);
         try {
             const s = await stat(full);
-            if (now - s.mtimeMs > _FILE_LIFESPAN) {
+            if (checkExpiry && now - s.mtimeMs > _FILE_LIFESPAN) {
                 await unlink(full);
                 console.log(`[simAss] expired and deleted: ${name}`);
             } else {
@@ -553,7 +553,7 @@ app.get('/simAss-image', async (_req, res) => {
 
 app.get('/simAss-audio', async (_req, res) => {
     const dir   = path.join(_SIM_ASS_DIR, 'music');
-    const files = await _simAssFiles(dir);
+    const files = await _simAssFiles(dir, { checkExpiry: false });
     console.log(`[simAss-audio] request — ${files.length} file(s) available: [${files.join(', ')}]`);
     if (files.length === 0) {
         console.log('[simAss-audio] no files — generating synchronously…');
