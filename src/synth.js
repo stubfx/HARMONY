@@ -127,18 +127,19 @@ export function setSynthState(chaos, coherence = 0.5, biasX = 0, biasY = 0, temp
     _padFilter.frequency.rampTo(300 + (1 - c) * 5500, RAMP, t);
 
     // LFO frequency ← coherence: converged room = faster oscillation (0.05–0.8 Hz)
-    _padLFO.frequency.rampTo(0.05 + coh * 0.75, RAMP, t);
+    // Direct assignment avoids exponential ramp issues at sub-Hz values
+    _padLFO.frequency.value = 0.05 + coh * 0.75;
 
     // LFO amplitude ← wind magnitude: physical tilt deepens the filter sweep (0.3–1.0)
     const windMag = Math.min(1, Math.sqrt(biasX * biasX + biasY * biasY) / Math.SQRT2);
-    _padLFO.amplitude.rampTo(0.3 + windMag * 0.7, RAMP, t);
+    _padLFO.amplitude.value = 0.3 + windMag * 0.7;
 
     // Arp — only below chaos 0.35
     const arpGain = c < 0.35 ? Math.pow(1 - c / 0.35, 2) * 0.4 : 0;
     _arpVol.volume.rampTo(arpGain > 0 ? Math.max(SILENT, Tone.gainToDb(arpGain)) : SILENT, RAMP, t);
 
     // Arp tempo ← temperature: higher temp = faster arpeggiation (80–140 BPM)
-    Tone.getTransport().bpm.rampTo(80 + tmp * 60, RAMP);
+    Tone.getTransport().bpm.value = 80 + tmp * 60;
 }
 
 export function stopSynth() {
