@@ -635,10 +635,10 @@ window.addEventListener('touchcancel', (e) => {
 let motionEnabled = false;
 let tiltThrottle  = null;
 
-// Personal peace targets — generated once per session, unknown to the user.
-// Chaos = how far this device's current orientation is from its own secret target.
-const _peacePitch = Math.random();
-const _peaceRoll  = Math.random();
+// Peace target = phone held upright in portrait, pointing straight up.
+// Normalized values from gyro.js: portrait upright → pitch≈0.75, roll≈0.5.
+const _peacePitch = 0.75;
+const _peaceRoll  = 0.5;
 function _circDist(a, b) { const d = Math.abs(a - b); return Math.min(d, 1 - d) * 2; }
 
 // ── Harmony canvas draw loop ──────────────────────────────────────────────────
@@ -655,10 +655,11 @@ function _drawHarmony() {
 
     const targetR = min * 0.14;
     const dotR    = min * 0.035;
-    const tx = _peaceRoll  * W;
-    const ty = _peacePitch * H;
-    const dx = currentRoll  * W;
-    const dy = currentPitch * H;
+    const scale   = min * 1.2; // amplify small deviations so the full range fills the screen
+    const tx = W / 2;
+    const ty = H / 2;
+    const dx = tx + (currentRoll  - _peaceRoll)  * scale;
+    const dy = ty + (currentPitch - _peacePitch) * scale;
     const inside = Math.hypot(dx - tx, dy - ty) < targetR;
     const pulse  = 0.5 + 0.5 * Math.sin(performance.now() / 500);
 
