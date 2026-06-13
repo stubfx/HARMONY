@@ -93,6 +93,11 @@ function getOrCreateRoom(roomId) {
             votes:        new Map(), // socketId  → choice string (one vote per spectator)
             storyOptions: { a: null, b: null }, // current VOTE step options
             audioLocked:  null,      // null = unknown; true/false reported by sim
+            // Secret harmony targets — random per room, unknown to users.
+            // Chaos = average distance of all device rotations from these targets (0-1).
+            targetA: Math.random(), // alpha (yaw)   target, 0-1
+            targetB: Math.random(), // beta  (pitch) target, 0-1
+            targetG: Math.random(), // gamma (roll)  target, 0-1
         });
     }
     return rooms.get(roomId);
@@ -108,6 +113,7 @@ function updateUserState(roomId, socketId, type, data) {
     }
     user.lastSeen = Date.now();
     if (type === 'tilt') {
+        user.alpha = data.alpha ?? 0.5;
         user.pitch = data.pitch ?? 0.5;
         user.roll  = data.roll  ?? 0.5;
     }
@@ -148,6 +154,10 @@ async function callN8nSpectator(roomId, type, spectatorId, userCount, testMode) 
     }
 }
 
+// Circular distance between two 0-1 normalized angles (wraps around at 0/1).
+// Returns 0-1 (max distance = 0.5, scaled to 1).
+function circDist(a, b) { const d = Math.abs(a - b); return Math.min(d, 1 - d) * 2; }
+
 // ── Collective-state ticker ───────────────────────────────────────────────────
 // Every 300 ms: prune stale users, compute averages, emit to host simulation.
 // userCount reflects actual socket connections (room.connections), not active tilt senders.
@@ -159,11 +169,20 @@ setInterval(() => {
         }
         if (!room.hostSockets.size || !room.connections.size) continue;
 
-        let sp = 0, sr = 0, st = 0, sc = 0;
+        let sp = 0, sr = 0, st = 0, sc = 0, sChaos = 0;
         const activeUsers = [...room.users.values()];
         const n = activeUsers.length;
         if (n > 0) {
-            for (const u of activeUsers) { sp += u.pitch; sr += u.roll; st += u.temperature; sc += u.coherence; }
+            for (const u of activeUsers) {
+                sp += u.pitch;
+                sr += u.roll;
+                st += u.temperature;
+                sc += u.coherence;
+                // Chaos = average distance of each user's 3 axes from secret targets
+                sChaos += (circDist(u.alpha ?? 0.5, room.targetA)
+                         + circDist(u.pitch ?? 0.5, room.targetB)
+                         + circDist(u.roll  ?? 0.5, room.targetG)) / 3;
+            }
         }
 
         io.to(`${roomId}:hosts`).emit('collective-state', {
@@ -171,6 +190,7 @@ setInterval(() => {
             avgRoll:      n > 0 ? sr / n : 0.5,
             avgTemp:      n > 0 ? st / n : 0.5,
             avgCoherence: n > 0 ? sc / n : 0.5,
+            avgChaos:     n > 0 ? sChaos / n : 1,
             userCount:    room.connections.size,
         });
     }

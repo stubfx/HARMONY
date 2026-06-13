@@ -104,6 +104,7 @@ struct SoloParams {
     golEnabled:           u32,   // 1 = particles are attracted to Game-of-Life live cells
     golStrength:          f32,   // attraction strength toward live cells
     releaseBurstSpeed:    f32,   // fireworks scatter speed on joystick release (0 = disabled)
+    chaos:                f32,   // 0 = armonia (no noise), 1 = max random noise (from collective rotation)
 }
 
 // Per-spectator partition data — color, joystick spawner position, personal wind.
@@ -522,6 +523,12 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                 }
             }
         }
+    }
+
+    // Chaos noise — random impulse scaled by collective device rotation chaos (0=calm, 1=max).
+    if (params.chaos > 0.001) {
+        let noiseAngle = hash(i ^ u32(params.time * 17.0)) * TWO_PI;
+        vel += vec2f(cos(noiseAngle), sin(noiseAngle)) * params.chaos * params.maxSpeed * 2.0;
     }
 
     let spd = length(vel);

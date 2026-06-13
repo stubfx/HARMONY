@@ -640,7 +640,7 @@ function startTilt() {
         if (tiltThrottle || !motionEnabled) return;
         tiltThrottle = setTimeout(() => {
             tiltThrottle = null;
-            sendEvent('tilt', { pitch: currentPitch, roll: currentRoll });
+            sendEvent('tilt', { pitch: currentPitch, roll: currentRoll, alpha: d.a });
         }, 250);
     });
 }

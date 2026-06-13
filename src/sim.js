@@ -141,7 +141,7 @@ const params = {
     maxSpectators:  1,    // sim QR hides when connected count reaches this threshold
     respawnOnQR:      true,  // respawn free agents inside the QR rect to a random edge
     qrRespawnChance:  0.01,  // per-frame probability [0–1] for the respawn
-    n8nEnabled:        true,  // false = silence all n8n traffic (heartbeat + sim-event) without unsetting VITE_N8N_BASE_URL
+    n8nEnabled:        false, // false = silence all n8n traffic (heartbeat + sim-event) without unsetting VITE_N8N_BASE_URL
     n8nTestMode:       false, // true = /webhook-test/sim-event, false = /webhook/sim-event
     heartbeatInterval: 10,   // seconds between periodic param snapshots sent to n8n (0 = off)
     heartbeatTimeout:  60,   // seconds before a heartbeat fetch is aborted
@@ -1697,21 +1697,24 @@ let socket;
     // Collective swarm state — aggregated by the server from all spectators in the room.
     // Tilt bias: avgPitch/avgRoll are 0-1 (0.5 = phone held flat/neutral).
     // Temperature: 0 = cold (top of phone screen), 1 = warm (bottom of phone screen).
-    socket.on('collective-state', ({ avgPitch, avgRoll, avgTemp, avgCoherence, userCount }) => {
+    socket.on('collective-state', ({ avgPitch, avgRoll, avgTemp, avgCoherence, avgChaos, userCount }) => {
         // Tilt is now per-spectator via remote-event; collective-state only drives temp/coherence.
         collectiveTemp      = avgTemp      ?? 0.5;
         collectiveCoherence = avgCoherence ?? 0.5;
+        collectiveChaos     = avgChaos     ?? 1;
         // Mirror to GUI debug panel (manual refresh — no .listen() RAF loop)
         swarmDebug.users     = userCount ?? 0;
         swarmDebug.pitch     = +(avgPitch     ?? 0.5).toFixed(3);
         swarmDebug.roll      = +(avgRoll      ?? 0.5).toFixed(3);
         swarmDebug.temp      = +(avgTemp      ?? 0.5).toFixed(3);
         swarmDebug.coherence = +(avgCoherence ?? 0.5).toFixed(3);
+        swarmDebug.chaos     = +(avgChaos     ?? 1).toFixed(3);
         dbgUsers.updateDisplay();
         dbgPitch.updateDisplay();
         dbgRoll.updateDisplay();
         dbgTemp.updateDisplay();
         dbgCoherence.updateDisplay();
+        dbgChaos.updateDisplay();
         updateGizmo(avgPitch ?? 0.75, avgRoll ?? 0.5);
     });
 
@@ -1961,7 +1964,7 @@ function applySimParams(data) {
 ({
     gui, swarmDebug,
     modeCtrl, colorModeCtrl, stateCtrl, qrStateCtrl,
-    dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence,
+    dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence, dbgChaos,
     applyGUIVisibility, toggleGUI, updateGizmo,
 } = initGUI({
     params, socket, simState, MAX_AGENTS,
@@ -2169,11 +2172,13 @@ let collectiveBiasX   = 0;   // target wind bias X (from tilt)
 let collectiveBiasY   = 0;   // target wind bias Y (from tilt)
 let collectiveTemp    = 0.5; // target temperature [0=cold … 1=warm] (from touch Y)
 let collectiveCoherence = 0.5; // target coherence [0=chaos … 1=order] (from touch X)
+let collectiveChaos   = 1;   // target chaos [0=armonia … 1=max noise] (from device rotation average)
 
 let smoothBiasX       = 0;   // smoothed versions
 let smoothBiasY       = 0;
 let smoothTemp        = 0.5;
 let smoothCoherence   = 0.5;
+let smoothChaos       = 1;
 
 // ── Join burst state ──────────────────────────────────────────────────────────
 // When a spectator joins, a single brightness pulse fires across the field.
@@ -2197,6 +2202,7 @@ function writeSoloUB(dt, time) {
     smoothBiasY     = smoothBiasY     * a + collectiveBiasY     * (1 - a);
     smoothTemp      = smoothTemp      * a + collectiveTemp      * (1 - a);
     smoothCoherence = smoothCoherence * a + collectiveCoherence * (1 - a);
+    smoothChaos     = smoothChaos     * a + collectiveChaos     * (1 - a);
 
     // Decay join brightness pulse exponentially each frame
     burstBrightness *= BURST_DECAY;
@@ -2284,6 +2290,7 @@ function writeSoloUB(dt, time) {
     u[46] = params.golEnabled ? 1 : 0;
     f[47] = params.golStrength;
     f[48] = params.releaseBurstSpeed;
+    f[49] = smoothChaos;
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 

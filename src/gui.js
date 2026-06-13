@@ -40,7 +40,7 @@ export function initGUI({
     }
 
     // ── lil-gui instance ──────────────────────────────────────────────────────
-    const swarmDebug = { users: 0, pitch: 0.5, roll: 0.5, temp: 0.5, coherence: 0.5 };
+    const swarmDebug = { users: 0, pitch: 0.5, roll: 0.5, temp: 0.5, coherence: 0.5, chaos: 1 };
     const gui = new GUI({ title: 'Wind Particles', width: 260 });
     if (!guiVisible) gui.domElement.style.display = 'none';
 
@@ -245,6 +245,7 @@ export function initGUI({
     const dbgRoll      = fDebug.add(swarmDebug, 'roll',      0, 1).name('avg roll').disable();
     const dbgTemp      = fDebug.add(swarmDebug, 'temp',      0, 1).name('avg temp').disable();
     const dbgCoherence = fDebug.add(swarmDebug, 'coherence', 0, 1).name('avg coherence').disable();
+    const dbgChaos     = fDebug.add(swarmDebug, 'chaos',     0, 1).name('chaos (0=armonia)').disable();
 
     // ── Tilt gizmo ────────────────────────────────────────────────────────────
     let gizmoCtx   = null;
@@ -350,6 +351,7 @@ export function initGUI({
         dbgRoll,
         dbgTemp,
         dbgCoherence,
+        dbgChaos,
         applyGUIVisibility,
         toggleGUI,
         updateGizmo(pitch, roll) {
