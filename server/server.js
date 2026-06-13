@@ -93,11 +93,6 @@ function getOrCreateRoom(roomId) {
             votes:        new Map(), // socketId  → choice string (one vote per spectator)
             storyOptions: { a: null, b: null }, // current VOTE step options
             audioLocked:  null,      // null = unknown; true/false reported by sim
-            // Secret harmony targets — random per room, unknown to users.
-            // Chaos = average distance of all device rotations from these targets (0-1).
-            targetA: Math.random(), // alpha (yaw)   target, 0-1
-            targetB: Math.random(), // beta  (pitch) target, 0-1
-            targetG: Math.random(), // gamma (roll)  target, 0-1
         });
     }
     return rooms.get(roomId);
@@ -116,6 +111,7 @@ function updateUserState(roomId, socketId, type, data) {
         user.alpha = data.alpha ?? 0.5;
         user.pitch = data.pitch ?? 0.5;
         user.roll  = data.roll  ?? 0.5;
+        user.chaos = data.chaos ?? 1;
     }
     if (type === 'touch') {
         user.temperature = data.temp ?? 0.5;
@@ -154,10 +150,6 @@ async function callN8nSpectator(roomId, type, spectatorId, userCount, testMode) 
     }
 }
 
-// Circular distance between two 0-1 normalized angles (wraps around at 0/1).
-// Returns 0-1 (max distance = 0.5, scaled to 1).
-function circDist(a, b) { const d = Math.abs(a - b); return Math.min(d, 1 - d) * 2; }
-
 // ── Collective-state ticker ───────────────────────────────────────────────────
 // Every 300 ms: prune stale users, compute averages, emit to host simulation.
 // userCount reflects actual socket connections (room.connections), not active tilt senders.
@@ -178,10 +170,7 @@ setInterval(() => {
                 sr += u.roll;
                 st += u.temperature;
                 sc += u.coherence;
-                // Chaos = average distance of pitch+roll from secret targets (alpha excluded —
-                // compass yaw depends on room orientation and is not a natural gesture).
-                sChaos += (circDist(u.pitch ?? 0.5, room.targetB)
-                         + circDist(u.roll  ?? 0.5, room.targetG)) / 2;
+                sChaos += u.chaos ?? 1;
             }
         }
 

@@ -627,6 +627,12 @@ window.addEventListener('touchcancel', (e) => {
 let motionEnabled = false;
 let tiltThrottle  = null;
 
+// Personal peace targets — generated once per session, unknown to the user.
+// Chaos = how far this device's current orientation is from its own secret target.
+const _peacePitch = Math.random();
+const _peaceRoll  = Math.random();
+function _circDist(a, b) { const d = Math.abs(a - b); return Math.min(d, 1 - d) * 2; }
+
 function startTilt() {
     motionEnabled = true;
     tiltRingEl?.classList.add('visible');
@@ -640,7 +646,8 @@ function startTilt() {
         if (tiltThrottle || !motionEnabled) return;
         tiltThrottle = setTimeout(() => {
             tiltThrottle = null;
-            sendEvent('tilt', { pitch: currentPitch, roll: currentRoll, alpha: d.a });
+            const chaos = (_circDist(currentPitch, _peacePitch) + _circDist(currentRoll, _peaceRoll)) / 2;
+            sendEvent('tilt', { pitch: currentPitch, roll: currentRoll, alpha: d.a, chaos });
         }, 250);
     });
 }
