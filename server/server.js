@@ -178,10 +178,10 @@ setInterval(() => {
                 sr += u.roll;
                 st += u.temperature;
                 sc += u.coherence;
-                // Chaos = average distance of each user's 3 axes from secret targets
-                sChaos += (circDist(u.alpha ?? 0.5, room.targetA)
-                         + circDist(u.pitch ?? 0.5, room.targetB)
-                         + circDist(u.roll  ?? 0.5, room.targetG)) / 3;
+                // Chaos = average distance of pitch+roll from secret targets (alpha excluded —
+                // compass yaw depends on room orientation and is not a natural gesture).
+                sChaos += (circDist(u.pitch ?? 0.5, room.targetB)
+                         + circDist(u.roll  ?? 0.5, room.targetG)) / 2;
             }
         }
 
