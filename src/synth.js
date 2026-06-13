@@ -18,12 +18,14 @@ const ARP_POOL = ['A3','B3','C4','D4','E4','F4','G4','A4','B4','C5','E5','G5'];
 
 let _ready = false;
 let _noiseGain, _padVol, _padFilter, _padLFO, _droneVol, _arpVol, _arpSeq;
+let _synthBus = null;  // top-level synth bus volume
 
 export async function startSynth() {
     if (_ready) return;
     await Tone.start();
 
-    const master = new Tone.Gain(0.75).toDestination();
+    _synthBus   = new Tone.Volume(0).toDestination();
+    const master = new Tone.Gain(0.75).connect(_synthBus);
 
     // ── Drone — sub-bass pedal A1, always on ─────────────────────────────────
     const droneReverb = new Tone.Reverb({ decay: 6, wet: 0.4 });
@@ -134,12 +136,12 @@ export function setSynthState(chaos, coherence = 0.5, biasX = 0, biasY = 0, temp
     smoothTo(_padVol.volume, padGain > 0 ? Math.max(SILENT, Tone.gainToDb(padGain)) : SILENT);
     smoothTo(_padFilter.frequency, 300 + (1 - c) * 5500);
 
-    // LFO frequency ← coherence: converged room = faster oscillation (0.05–0.8 Hz)
-    _padLFO.frequency.value = 0.05 + coh * 0.75;
+    // LFO frequency ← (1-chaos): fast at harmony (2 Hz), near-still at full chaos (0.05 Hz)
+    _padLFO.frequency.value = 0.05 + (1 - c) * 2.0;
 
-    // LFO amplitude ← wind magnitude: physical tilt deepens the filter sweep (0.3–1.0)
+    // LFO amplitude ← wind magnitude + chaos: tilt deepens sweep, chaos suppresses it
     const windMag = Math.min(1, Math.sqrt(biasX * biasX + biasY * biasY) / Math.SQRT2);
-    _padLFO.amplitude.value = 0.3 + windMag * 0.7;
+    _padLFO.amplitude.value = (1 - c * 0.7) * (0.3 + windMag * 0.7);
 
     // Arp — only below chaos 0.35
     const arpGain = c < 0.35 ? Math.pow(1 - c / 0.35, 2) * 0.4 : 0;
@@ -147,6 +149,10 @@ export function setSynthState(chaos, coherence = 0.5, biasX = 0, biasY = 0, temp
 
     // Arp tempo ← temperature: higher temp = faster arpeggiation (80–140 BPM)
     Tone.getTransport().bpm.value = 80 + tmp * 60;
+}
+
+export function setSynthBusVolume(db) {
+    if (_synthBus) _synthBus.volume.value = db;
 }
 
 export function stopSynth() {
@@ -174,21 +180,24 @@ let _idleReverb     = null;   // reverb wash — chaos drives wet up
 let _idleVol        = null;   // chaos-driven level
 let _idleFadeGain   = null;   // fade in/out on user join/leave (0 = off)
 let _idleNoiseGain  = null;   // static noise level — chaos drives up
+let _musicBusVol    = null;   // independent music channel master volume
 
 async function _buildIdleChain() {
     if (_idleChainReady) return;
-    _idleFilter  = new Tone.Filter({ frequency: 4000, type: 'lowpass', rolloff: -24 });
-    _idleDist    = new Tone.Distortion(0);
-    _idleTremolo = new Tone.Tremolo({ frequency: 3, depth: 0 }).start();
-    _idleReverb  = new Tone.Reverb({ decay: 4, wet: 0.15 });
-    _idleVol     = new Tone.Volume(-3);
+    _idleFilter   = new Tone.Filter({ frequency: 4000, type: 'lowpass', rolloff: -24 });
+    _idleDist     = new Tone.Distortion(0);
+    _idleTremolo  = new Tone.Tremolo({ frequency: 3, depth: 0 }).start();
+    _idleReverb   = new Tone.Reverb({ decay: 4, wet: 0.15 });
+    _idleVol      = new Tone.Volume(-3);
     _idleFadeGain = new Tone.Gain(0);   // starts silent
-    _idlePlayer  = new Tone.Player({ loop: false, fadeOut: 0.1 });
+    _musicBusVol  = new Tone.Volume(0); // independent channel fader
+    _idlePlayer   = new Tone.Player({ loop: false, fadeOut: 0.1 });
 
-    // Music signal chain → fade gain → destination
+    // Music: player → effects → chaos vol → fade gain → music bus → destination
     _idlePlayer.chain(_idleFilter, _idleDist, _idleTremolo, _idleReverb, _idleVol, _idleFadeGain);
+    _idleFadeGain.connect(_musicBusVol);
 
-    // Static noise also routed through fade gain (fades with music)
+    // Static noise routed through fade gain (fades with music)
     const noiseBP  = new Tone.Filter({ frequency: 2000, type: 'bandpass', Q: 1.0 });
     _idleNoiseGain = new Tone.Gain(0);
     const noise    = new Tone.Noise('white');
@@ -196,11 +205,15 @@ async function _buildIdleChain() {
     noiseBP.connect(_idleNoiseGain);
     _idleNoiseGain.connect(_idleFadeGain);
 
-    _idleFadeGain.toDestination();
+    _musicBusVol.toDestination();
     noise.start();
 
     await _idleReverb.ready;
     _idleChainReady = true;
+}
+
+export function setMusicBusVolume(db) {
+    if (_musicBusVol) _musicBusVol.volume.value = db;
 }
 
 // chaos-driven radio degradation — call every frame alongside setSynthState
@@ -217,7 +230,7 @@ export function setIdleChaos(chaos) {
 
     smooth(_idleFilter.frequency, 4000 - c * 3600);   // 4000 Hz → 400 Hz
     smooth(_idleReverb.wet,       0.15 + c * 0.70);   // 0.15 → 0.85
-    smooth(_idleNoiseGain.gain,   c * 0.18);           // static noise 0 → 0.18
+    smooth(_idleNoiseGain.gain,   c * 0.04);           // static noise 0 → 0.04 (subtle)
     smooth(_idleVol.volume,       -3 - c * 12);        // -3 dB → -15 dB
 
     _idleDist.distortion         = c * 0.65;
@@ -225,9 +238,10 @@ export function setIdleChaos(chaos) {
     _idleTremolo.frequency.value = 2 + c * 6;         // 2 Hz → 8 Hz dropout
 }
 
-// fadeTime: 3s at harmony, 0.5s at full chaos (abrupt signal cut)
-function _fadeTime(chaos) {
-    return Math.max(0.4, 3 - Math.max(0, Math.min(1, chaos)) * 2.6);
+// TC = exponential time constant: 0.7s at chaos=1, 2.5s at chaos=0
+// Perceptible fade duration ≈ TC × 3.5
+function _fadeTC(chaos) {
+    return Math.max(0.7, 2.5 - Math.max(0, Math.min(1, chaos)) * 1.8);
 }
 
 export async function playIdleTrack(arrayBuffer, onEnded, fadeInChaos = null) {
@@ -240,11 +254,11 @@ export async function playIdleTrack(arrayBuffer, onEnded, fadeInChaos = null) {
     URL.revokeObjectURL(url);
     _idlePlayer.onstop = onEnded ?? null;
     if (fadeInChaos !== null) {
-        // cancel any ongoing fade, start from silence
-        const t = Tone.now();
+        const t  = Tone.now();
+        const TC = _fadeTC(fadeInChaos);
         _idleFadeGain.gain.cancelScheduledValues(t);
         _idleFadeGain.gain.setValueAtTime(0, t);
-        _idleFadeGain.gain.linearRampToValueAtTime(1, t + _fadeTime(fadeInChaos));
+        _idleFadeGain.gain.setTargetAtTime(1, t, TC);
     }
     _idlePlayer.start();
 }
@@ -253,14 +267,12 @@ export function stopIdleTrack() {
     if (_idlePlayer?.state === 'started') _idlePlayer.stop();
 }
 
-// Fade out music + noise together, then call onFaded when done.
-// Caller is responsible for stopping the track after the fade.
+// Smooth exponential fade out; calls onFaded when inaudible (~TC×3.5s)
 export function fadeOutIdleTrack(chaos, onFaded) {
     if (!_idleChainReady) { onFaded?.(); return; }
-    const ft = _fadeTime(chaos);
     const t  = Tone.now();
+    const TC = _fadeTC(chaos);
     _idleFadeGain.gain.cancelScheduledValues(t);
-    _idleFadeGain.gain.setValueAtTime(_idleFadeGain.gain.value ?? 1, t);
-    _idleFadeGain.gain.linearRampToValueAtTime(0, t + ft);
-    setTimeout(() => onFaded?.(), (ft + 0.1) * 1000);
+    _idleFadeGain.gain.setTargetAtTime(0, t, TC);
+    setTimeout(() => onFaded?.(), TC * 3.5 * 1000);
 }

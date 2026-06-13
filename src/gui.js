@@ -1,5 +1,6 @@
 import GUI from 'lil-gui';
 import { startMic, stopAudio, isActive, setDuckLevel } from './audio.js';
+import { setSynthBusVolume, setMusicBusVolume } from './synth.js';
 
 // ── GUI initialisation ────────────────────────────────────────────────────────
 // Call once after all sim functions are defined.
@@ -234,6 +235,9 @@ export function initGUI({
     });
     fAudio.add(params, 'color2AudioStr', 0, 1, 0.01).name('audio → color2');
     fAudio.add(params, 'duckLevel',  0, 1, 0.01).name('duck level').onChange(v => setDuckLevel(v));
+    const _busState = { synthVol: 0, musicVol: 0 };
+    fAudio.add(_busState, 'synthVol', -30, 6, 0.5).name('ch1: synth vol').onChange(v => setSynthBusVolume(v));
+    fAudio.add(_busState, 'musicVol', -30, 6, 0.5).name('ch2: music vol').onChange(v => setMusicBusVolume(v));
     fAudio.close();
 
     // ── Debug ─────────────────────────────────────────────────────────────────
