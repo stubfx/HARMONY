@@ -1,9 +1,9 @@
 {
     "type": "module",
     "scripts": {
-        "dev": "concurrently -n server,n8n,vite -c cyan,yellow,green \"NODE_ENV=development nodemon ./server/server.js\" \"n8n start\" \"vite\"",
+        "dev": "concurrently -n server,vite -c cyan,green \"NODE_ENV=development nodemon ./server/server.js\" \"vite\"",
         "build": "vite build",
-        "start": "concurrently -n server,n8n -c cyan,yellow \"node ./server/server.js\" \"n8n start\""
+        "start": "node ./server/server.js"
     },
     "dependencies": {
         "@elevenlabs/elevenlabs-js": "^2.52.0",
