@@ -292,17 +292,15 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             }
         }
 
-        // Probabilistic homing gate: already-homing agents keep going;
-        // newly-eligible ones commit with homingChance probability per frame.
+        // Probabilistic homing gate: per-frame probability scaled by (1 - chaos).
+        // At chaos=0 (armonia): wasHoming agents always stay, new agents get homingChance.
+        // At chaos=1 (max caos): no agent homes — probability collapses to 0.
         let homeQualifies = homeAlpha >= params.alphaThreshold;
         let wasHoming     = agents[i].primed > 0.5;
         if (homeQualifies) {
-            if (wasHoming) {
-                homeInImg = true;
-            } else {
-                let rng = hash(i ^ (u32(params.time * 73.0) + 5u));
-                homeInImg = rng < params.homingChance;
-            }
+            let rng        = hash(i ^ (u32(params.time * 73.0) + 5u));
+            let baseChance = select(params.homingChance, 1.0, wasHoming);
+            homeInImg      = rng < baseChance * (1.0 - params.chaos);
         }
         posAlpha = rawPosAlpha;
     }
