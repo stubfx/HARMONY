@@ -160,18 +160,20 @@ export function stopSynth() {
     }, 1600);
 }
 
-// ── Idle radio chain — fetched music routed through chaos-driven degradation ──
-// At low chaos: clean-ish signal. At high chaos: heavy lowpass + static noise +
-// reverb wash + dropout tremolo = sounds like a radio with no reception.
+// ── simAss radio chain — plays when users connected, off when room is empty ────
+// Music routed through chaos-driven degradation (radio with no signal at chaos=1).
+// _idleFadeGain controls presence (0 = silent, 1 = present) and is used for
+// fade in/out on user join/leave. Both music and static noise route through it.
 
 let _idleChainReady = false;
 let _idlePlayer     = null;
 let _idleFilter     = null;   // lowpass — chaos drives cutoff down
-let _idleDist       = null;   // waveshaper distortion — chaos drives up
-let _idleTremolo    = null;   // gain tremolo — chaos deepens dropout
-let _idleReverb     = null;   // reverb — chaos adds wash
-let _idleVol        = null;
-let _idleNoiseGain  = null;   // white noise static — chaos drives up
+let _idleDist       = null;   // distortion — chaos drives up
+let _idleTremolo    = null;   // dropout tremolo — chaos deepens
+let _idleReverb     = null;   // reverb wash — chaos drives wet up
+let _idleVol        = null;   // chaos-driven level
+let _idleFadeGain   = null;   // fade in/out on user join/leave (0 = off)
+let _idleNoiseGain  = null;   // static noise level — chaos drives up
 
 async function _buildIdleChain() {
     if (_idleChainReady) return;
@@ -180,38 +182,28 @@ async function _buildIdleChain() {
     _idleTremolo = new Tone.Tremolo({ frequency: 3, depth: 0 }).start();
     _idleReverb  = new Tone.Reverb({ decay: 4, wet: 0.15 });
     _idleVol     = new Tone.Volume(-3);
-    _idlePlayer  = new Tone.Player({ loop: false, fadeOut: 0.3 });
-    _idlePlayer.chain(_idleFilter, _idleDist, _idleTremolo, _idleReverb, _idleVol);
-    _idleVol.toDestination();
+    _idleFadeGain = new Tone.Gain(0);   // starts silent
+    _idlePlayer  = new Tone.Player({ loop: false, fadeOut: 0.1 });
 
-    const noiseBP   = new Tone.Filter({ frequency: 2000, type: 'bandpass', Q: 1.0 });
-    _idleNoiseGain  = new Tone.Gain(0);
-    const noise     = new Tone.Noise('white');
+    // Music signal chain → fade gain → destination
+    _idlePlayer.chain(_idleFilter, _idleDist, _idleTremolo, _idleReverb, _idleVol, _idleFadeGain);
+
+    // Static noise also routed through fade gain (fades with music)
+    const noiseBP  = new Tone.Filter({ frequency: 2000, type: 'bandpass', Q: 1.0 });
+    _idleNoiseGain = new Tone.Gain(0);
+    const noise    = new Tone.Noise('white');
     noise.connect(noiseBP);
     noiseBP.connect(_idleNoiseGain);
-    _idleNoiseGain.toDestination();
+    _idleNoiseGain.connect(_idleFadeGain);
+
+    _idleFadeGain.toDestination();
     noise.start();
 
     await _idleReverb.ready;
     _idleChainReady = true;
 }
 
-export async function playIdleTrack(arrayBuffer, onEnded) {
-    await Tone.start();
-    await _buildIdleChain();
-    if (_idlePlayer.state === 'started') _idlePlayer.stop();
-    const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
-    const url  = URL.createObjectURL(blob);
-    await _idlePlayer.load(url);
-    URL.revokeObjectURL(url);
-    _idlePlayer.onstop = onEnded ?? null;
-    _idlePlayer.start();
-}
-
-export function stopIdleTrack() {
-    if (_idlePlayer?.state === 'started') _idlePlayer.stop();
-}
-
+// chaos-driven radio degradation — call every frame alongside setSynthState
 export function setIdleChaos(chaos) {
     if (!_idleChainReady) return;
     const c  = Math.max(0, Math.min(1, chaos));
@@ -223,12 +215,52 @@ export function setIdleChaos(chaos) {
         signal.setTargetAtTime(value, t, TC);
     }
 
-    smooth(_idleFilter.frequency, 4000 - c * 3600);        // 4000 Hz → 400 Hz
-    smooth(_idleReverb.wet,       0.15 + c * 0.70);        // 0.15 → 0.85
-    smooth(_idleNoiseGain.gain,   c * 0.18);                // static noise
-    smooth(_idleVol.volume,       -3 - c * 12);             // -3 dB → -15 dB
+    smooth(_idleFilter.frequency, 4000 - c * 3600);   // 4000 Hz → 400 Hz
+    smooth(_idleReverb.wet,       0.15 + c * 0.70);   // 0.15 → 0.85
+    smooth(_idleNoiseGain.gain,   c * 0.18);           // static noise 0 → 0.18
+    smooth(_idleVol.volume,       -3 - c * 12);        // -3 dB → -15 dB
 
-    _idleDist.distortion          = c * 0.65;
-    _idleTremolo.depth.value      = c * 0.85;
-    _idleTremolo.frequency.value  = 2 + c * 6;             // 2 Hz → 8 Hz dropout
+    _idleDist.distortion         = c * 0.65;
+    _idleTremolo.depth.value     = c * 0.85;
+    _idleTremolo.frequency.value = 2 + c * 6;         // 2 Hz → 8 Hz dropout
+}
+
+// fadeTime: 3s at harmony, 0.5s at full chaos (abrupt signal cut)
+function _fadeTime(chaos) {
+    return Math.max(0.4, 3 - Math.max(0, Math.min(1, chaos)) * 2.6);
+}
+
+export async function playIdleTrack(arrayBuffer, onEnded, fadeInChaos = null) {
+    await Tone.start();
+    await _buildIdleChain();
+    if (_idlePlayer.state === 'started') _idlePlayer.stop();
+    const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+    const url  = URL.createObjectURL(blob);
+    await _idlePlayer.load(url);
+    URL.revokeObjectURL(url);
+    _idlePlayer.onstop = onEnded ?? null;
+    if (fadeInChaos !== null) {
+        // cancel any ongoing fade, start from silence
+        const t = Tone.now();
+        _idleFadeGain.gain.cancelScheduledValues(t);
+        _idleFadeGain.gain.setValueAtTime(0, t);
+        _idleFadeGain.gain.linearRampToValueAtTime(1, t + _fadeTime(fadeInChaos));
+    }
+    _idlePlayer.start();
+}
+
+export function stopIdleTrack() {
+    if (_idlePlayer?.state === 'started') _idlePlayer.stop();
+}
+
+// Fade out music + noise together, then call onFaded when done.
+// Caller is responsible for stopping the track after the fade.
+export function fadeOutIdleTrack(chaos, onFaded) {
+    if (!_idleChainReady) { onFaded?.(); return; }
+    const ft = _fadeTime(chaos);
+    const t  = Tone.now();
+    _idleFadeGain.gain.cancelScheduledValues(t);
+    _idleFadeGain.gain.setValueAtTime(_idleFadeGain.gain.value ?? 1, t);
+    _idleFadeGain.gain.linearRampToValueAtTime(0, t + ft);
+    setTimeout(() => onFaded?.(), (ft + 0.1) * 1000);
 }

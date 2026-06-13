@@ -19,7 +19,7 @@ import windVisWGSL      from './shaders/wind-vis.wgsl?raw';
 import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
 import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
-import { startSynth, setSynthState, playIdleTrack, stopIdleTrack, setIdleChaos } from './synth.js';
+import { startSynth, setSynthState, playIdleTrack, stopIdleTrack, fadeOutIdleTrack, setIdleChaos } from './synth.js';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const MAX_AGENTS = 5_000_000;
@@ -1727,7 +1727,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
     // A spectator joined — assign a slot, send them their color, brightness burst.
     socket.on('spectator-joined', ({ spectatorId, userCount } = {}) => {
         if (userCount !== undefined) simState.userCount = userCount;
-        if (userCount === 1) { clearAvoidMap(); _idleAudioGen++; stopIdleTrack(); } // remove idle attractor + audio
+        if (userCount === 1) { clearAvoidMap(); loadIdleAudio(true); } // first user — start music with fade in
         if (simState.status === 'DOT' && userCount >= 1) setStatus('NORMAL');
         lastRemoteActivity = Date.now();
         burstBrightness    = BURST_BRIGHTNESS;
@@ -1752,7 +1752,11 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
                 _lastIdleImageBytes = bytes;
                 return loadAvoidMap(new Blob([bytes], { type: 'image/webp' }));
             }).catch(e => console.warn('[idle-image]', e));
-            loadIdleAudio();
+            // last user left — fade out music, only synth remains
+            const _fadeGen = ++_idleAudioGen;
+            fadeOutIdleTrack(smoothChaos, () => {
+                if (_fadeGen === _idleAudioGen) stopIdleTrack();
+            });
         }
         if (spectatorId) {
             const idx = activeSlots.findIndex(s => s.spectatorId === spectatorId);
@@ -2095,7 +2099,7 @@ document.addEventListener('pointerdown', async () => {
     if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
     _syncAudioBanner();
     startSynth().then(() => setSynthState(1.0, smoothCoherence, smoothBiasX, smoothBiasY, smoothTemp));
-    if (simState.userCount === 0) loadIdleAudio();
+    if (simState.userCount > 0) loadIdleAudio(true);
 }, { once: true });
 
 // ── File input for trace image ────────────────────────────────────────────────
@@ -2931,22 +2935,23 @@ setInterval(async () => {
     }
 }, 30000);
 
-// ── Idle audio loader — chains tracks via Tone.js radio chain ────────────────
+// ── simAss audio loader — chains tracks via Tone.js radio chain ──────────────
+// Plays when users are connected. fadeIn=true on first track (user join).
 let _idleAudioGen = 0;
 
-async function loadIdleAudio() {
+async function loadIdleAudio(fadeIn = false) {
     const gen = ++_idleAudioGen;
     try {
         const res = await fetch(`${_apiBase}/simAss-audio`);
-        if (!res.ok) { console.warn('[idle-audio] HTTP', res.status); return; }
+        if (!res.ok) { console.warn('[simAss-audio] HTTP', res.status); return; }
         if (gen !== _idleAudioGen) return;
         const buf = await res.arrayBuffer();
-        console.log(`[idle-audio] loaded ${buf.byteLength}B — playing via Tone.js radio chain`);
+        console.log(`[simAss-audio] loaded ${buf.byteLength}B — playing${fadeIn ? ' (fade in)' : ''}`);
         await playIdleTrack(buf, () => {
-            if (gen === _idleAudioGen) loadIdleAudio();
-        });
+            if (gen === _idleAudioGen) loadIdleAudio(false);
+        }, fadeIn ? smoothChaos : null);
     } catch (e) {
-        console.warn('[idle-audio]', e);
+        console.warn('[simAss-audio]', e);
     }
 }
 
