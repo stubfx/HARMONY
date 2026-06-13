@@ -1744,6 +1744,7 @@ let socket;
             collectiveCoherence = 0.5;
             collectiveTemp      = 0.5;
             setSynthState(1.0, 0.5, 0, 0, 0.5);
+            loadTraceImageFromUrl('/idle-image');
         }
         if (spectatorId) {
             const idx = activeSlots.findIndex(s => s.spectatorId === spectatorId);

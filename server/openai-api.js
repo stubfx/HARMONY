@@ -136,6 +136,20 @@ export async function imagine(prompt) {
     });
 }
 
+// ── Idle image — Van Gogh space scene, served when 0 spectators ──────────────
+const _IDLE_PROMPT =
+    'Van Gogh post-impressionist oil painting. Deep space scene: swirling nebula in cobalt ' +
+    'blue, burnt gold and vivid violet with thick impasto brushstrokes exactly like Starry Night. ' +
+    'Spiral galaxies dissolving into painterly strokes, stars scattered like fireflies against ' +
+    'a dark sky. No text, no frames, no watermarks. Square composition.';
+
+export async function generateIdleImage() {
+    const response = await imagine(_IDLE_PROMPT);
+    const hit = response.output?.find(o => o.type === 'image_generation_call');
+    if (!hit?.result) throw new Error('no image_generation_call in response output');
+    return hit.result;  // raw base64 webp string
+}
+
 export async function saveFileInVectorStore(name, simConfig) {
     console.log('saving ', name);
     console.log('saving ', JSON.stringify(simConfig));

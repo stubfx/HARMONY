@@ -31,7 +31,7 @@ import path              from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID }    from 'node:crypto';
 import * as Utils        from './server-utils.js';
-import { narrate }       from './openai-api.js';
+import { narrate, generateIdleImage } from './openai-api.js';
 
 dotenv.config();
 
@@ -452,6 +452,26 @@ app.post('/rndImage', async (_req, res) => {
         res.json({ name: fileName, data: 'data:image/png;base64,' + data.toString('base64') });
     } catch {
         res.status(404).json(null);
+    }
+});
+
+// ── Idle image — Van Gogh space, 5-min server cache ──────────────────────────
+let _idleImage = null;  // { buf: Buffer, at: number }
+const IDLE_TTL = 5 * 60 * 1000;
+
+app.get('/idle-image', async (_req, res) => {
+    const now = Date.now();
+    if (_idleImage && now - _idleImage.at < IDLE_TTL) {
+        return res.type('image/webp').send(_idleImage.buf);
+    }
+    try {
+        const base64 = await generateIdleImage();
+        const buf = Buffer.from(base64, 'base64');
+        _idleImage = { buf, at: Date.now() };
+        res.type('image/webp').send(buf);
+    } catch (err) {
+        console.error('[idle-image]', err.message);
+        res.status(500).json({ error: err.message });
     }
 });
 
