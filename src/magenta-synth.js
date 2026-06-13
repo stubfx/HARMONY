@@ -35,15 +35,14 @@ export async function initMagentaSynth() {
         _vae = new mm.MusicVAE(CHECKPOINT);
         await _vae.initialize();
 
-        _vol = new Tone.Volume(-60);
+        _vol = new Tone.Volume(0);
 
         _synth = new Tone.Synth({
             oscillator: { type: 'triangle8' },
             envelope:   { attack: 0.03, decay: 0.15, sustain: 0.35, release: 1.2 },
-            volume:     -4,
+            volume:     0,
         });
-        _synth.connect(_vol);
-        _vol.toDestination();
+        _synth.toDestination();
 
         _ready = true;
         console.log('[magenta] initialized');
@@ -96,10 +95,8 @@ export function setMagentaState(chaos, _coherence = 0.5, _temp = 0.5) {
     if (!_ready) return;
     const c = Math.max(0, Math.min(1, chaos));
 
-    // Melody audible below chaos 0.6, same threshold as the pad layer
-    const gain = c < 0.6 ? Math.pow(1 - c / 0.6, 1.5) * 0.45 : 0;
-    const db   = gain > 0 ? Math.max(-60, Tone.gainToDb(gain)) : -60;
-    _vol.volume.value = db;
+    // volume always on for debug — controlled later
+
 
     // Re-sample when chaos crosses a significant threshold
     if (!_resampling && Math.abs(c - _lastChaos) > 0.15) {
