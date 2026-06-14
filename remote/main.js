@@ -753,12 +753,20 @@ function _initKeyboard() {
             _playNote(k.freq);
             sendEvent('note',       { index: i, freq: k.freq, color: k.color });
             sendEvent('color-pick', { color: k.color });
+            _motionChaos = Math.min(1, _motionChaos + 0.2);
+            _applyChaosVisuals();
         };
         const release = () => el.classList.remove('pressed');
         el.addEventListener('pointerdown',   (e) => { e.preventDefault(); trigger(); });
         el.addEventListener('pointerup',     release);
         el.addEventListener('pointercancel', release);
     });
+}
+
+function _applyChaosVisuals() {
+    if (keyboardGridEl)  keyboardGridEl.style.opacity  = (1 - _motionChaos * 0.88).toFixed(3);
+    if (noiseCanvasEl)   noiseCanvasEl.style.opacity   = (_motionChaos * 0.8).toFixed(3);
+    if (chaosVignetteEl) chaosVignetteEl.style.opacity = _motionChaos.toFixed(3);
 }
 
 // ── Static noise loop — radio-signal-loss effect on keys ─────────────────────
@@ -803,10 +811,7 @@ function startTilt() {
         _motionChaos = Math.max(0, _motionChaos - MOTION_DECAY_RATE * dt); // linear decay
         _motionChaos = Math.min(1, Math.max(_motionChaos, d.motion));       // spike to motion
 
-        // Visual feedback: keys fade out, noise static, vignette glows at edges
-        if (keyboardGridEl)  keyboardGridEl.style.opacity  = (1 - _motionChaos * 0.88).toFixed(3);
-        if (noiseCanvasEl)   noiseCanvasEl.style.opacity   = (_motionChaos * 0.8).toFixed(3);
-        if (chaosVignetteEl) chaosVignetteEl.style.opacity = _motionChaos.toFixed(3);
+        _applyChaosVisuals();
 
         if (tiltThrottle || !motionEnabled) return;
         tiltThrottle = setTimeout(() => {
