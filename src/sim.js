@@ -1821,7 +1821,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
                 uploadSpectatorSlots();
             }
         }
-        if (event.type === 'shake') {
+        if (event.type === 'shake' || event.type === 'note') {
             const slot = activeSlots.find(s => s.spectatorId === event.spectatorId);
             if (slot) {
                 triggerReleaseBurst(slot);
