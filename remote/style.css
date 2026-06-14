@@ -625,7 +625,7 @@ html, body {
     opacity: 0.72;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    touch-action: none;
+    touch-action: manipulation;
     transition: opacity 0.08s ease, transform 0.08s ease;
 }
 

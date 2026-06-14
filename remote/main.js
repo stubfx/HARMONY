@@ -755,11 +755,9 @@ function _initKeyboard() {
             sendEvent('color-pick', { color: k.color });
         };
         const release = () => el.classList.remove('pressed');
-        el.addEventListener('touchstart',  (e) => { e.preventDefault(); trigger(); }, { passive: false });
-        el.addEventListener('touchend',    release, { passive: true });
-        el.addEventListener('touchcancel', release, { passive: true });
-        el.addEventListener('mousedown',   trigger);
-        el.addEventListener('mouseup',     release);
+        el.addEventListener('pointerdown',   (e) => { e.preventDefault(); trigger(); });
+        el.addEventListener('pointerup',     release);
+        el.addEventListener('pointercancel', release);
     });
 }
 
