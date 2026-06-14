@@ -659,20 +659,24 @@ const MOTION_DECAY_RATE = 0.5; // chaos units/sec — full chaos → peace in ~2
 
 // ── Harmony canvas draw loop ──────────────────────────────────────────────────
 // ── Keyboard — 9 coloured keys, C major scale C4–D5 ─────────────────────────
+// A minor pentatonic across 2 octaves (A3–E5).
+// Any combination of keys is always consonant.
 const KEYS = [
-    { freq: 261.63, color: '#FF3B3B' },
-    { freq: 293.66, color: '#FF8C00' },
-    { freq: 329.63, color: '#FFD700' },
-    { freq: 349.23, color: '#7ED321' },
-    { freq: 392.00, color: '#00CC66' },
-    { freq: 440.00, color: '#00CFCF' },
-    { freq: 493.88, color: '#4A90E2' },
-    { freq: 523.25, color: '#9B59B6' },
-    { freq: 587.33, color: '#E91E8C' },
+    { freq: 220.00, color: '#FF3B3B' },  // A3
+    { freq: 261.63, color: '#FF8C00' },  // C4
+    { freq: 293.66, color: '#FFD700' },  // D4
+    { freq: 329.63, color: '#7ED321' },  // E4
+    { freq: 392.00, color: '#00CC66' },  // G4
+    { freq: 440.00, color: '#00CFCF' },  // A4
+    { freq: 523.25, color: '#4A90E2' },  // C5
+    { freq: 587.33, color: '#9B59B6' },  // D5
+    { freq: 659.25, color: '#E91E8C' },  // E5
 ];
 
-let _audioCtx   = null;
-let _kbInitted  = false;
+let _audioCtx    = null;
+let _kbInitted   = false;
+let _reverbNode  = null;
+let _reverbSend  = null;
 
 function _ensureAudioCtx() {
     if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -680,19 +684,60 @@ function _ensureAudioCtx() {
     return _audioCtx;
 }
 
+// Algorithmic reverb — exponentially-decaying white noise impulse response.
+// Built once, shared across all notes. Clearly synthetic/digital character.
+function _ensureReverb(ctx) {
+    if (_reverbNode) return;
+    const sr     = ctx.sampleRate;
+    const len    = Math.floor(sr * 1.8);
+    const buf    = ctx.createBuffer(2, len, sr);
+    for (let ch = 0; ch < 2; ch++) {
+        const d = buf.getChannelData(ch);
+        for (let i = 0; i < len; i++)
+            d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.5);
+    }
+    _reverbNode = ctx.createConvolver();
+    _reverbNode.buffer = buf;
+    _reverbSend = ctx.createGain();
+    _reverbSend.gain.value = 0.42;
+    _reverbNode.connect(_reverbSend);
+    _reverbSend.connect(ctx.destination);
+}
+
 function _playNote(freq) {
-    const ctx  = _ensureAudioCtx();
-    const osc  = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq, ctx.currentTime);
-    gain.gain.setValueAtTime(0, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.4);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 1.4);
+    const ctx = _ensureAudioCtx();
+    _ensureReverb(ctx);
+
+    const osc1     = ctx.createOscillator(); // fundamental
+    const osc2     = ctx.createOscillator(); // octave above — adds presence
+    const osc2Gain = ctx.createGain();
+    const filter   = ctx.createBiquadFilter();
+    const gain     = ctx.createGain();
+
+    osc1.type = 'triangle';
+    osc1.frequency.value = freq;
+    osc2.type = 'triangle';
+    osc2.frequency.value = freq * 2;
+    osc2Gain.gain.value  = 0.22;
+
+    filter.type            = 'lowpass';
+    filter.frequency.value = 2400;
+    filter.Q.value         = 0.4;
+
+    osc1.connect(filter);
+    osc2.connect(osc2Gain);
+    osc2Gain.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination); // dry
+    gain.connect(_reverbNode);     // wet
+
+    const t = ctx.currentTime;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.32, t + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 2.2);
+
+    osc1.start(t); osc1.stop(t + 2.2);
+    osc2.start(t); osc2.stop(t + 2.2);
 }
 
 function _initKeyboard() {
