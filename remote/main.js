@@ -764,9 +764,17 @@ function _initKeyboard() {
 }
 
 function _applyChaosVisuals() {
-    if (keyboardGridEl)  keyboardGridEl.style.opacity  = (1 - _motionChaos * 0.88).toFixed(3);
-    if (noiseCanvasEl)   noiseCanvasEl.style.opacity   = (_motionChaos * 0.8).toFixed(3);
-    if (chaosVignetteEl) chaosVignetteEl.style.opacity = _motionChaos.toFixed(3);
+    if (keyboardGridEl) keyboardGridEl.style.opacity = (1 - _motionChaos * 0.88).toFixed(3);
+    if (noiseCanvasEl)  noiseCanvasEl.style.opacity  = (_motionChaos * 0.8).toFixed(3);
+    if (chaosVignetteEl) {
+        // idle = Greek marine blue (0,86,179), chaos = blood red (183,28,28)
+        const r = Math.round(183 * _motionChaos);
+        const g = Math.round(86  - 58  * _motionChaos);
+        const b = Math.round(179 - 151 * _motionChaos);
+        const a = (0.25 + _motionChaos * 0.40).toFixed(2);
+        chaosVignetteEl.style.background =
+            `radial-gradient(ellipse at center, transparent 20%, rgba(${r},${g},${b},${a}) 100%)`;
+    }
 }
 
 // ── Static noise loop — radio-signal-loss effect on keys ─────────────────────
