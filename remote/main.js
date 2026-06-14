@@ -729,6 +729,7 @@ function startTilt() {
         if (tiltThrottle || !motionEnabled) return;
         tiltThrottle = setTimeout(() => {
             tiltThrottle = null;
+            if (_currentStepStatus === 'HARMONY') return; // orientation not a harmony metric
             const chaos = (_circDist(currentPitch, _peacePitch) + _circDist(currentRoll, _peaceRoll)) / 2;
             sendEvent('tilt', { pitch: currentPitch, roll: currentRoll, alpha: d.a, chaos });
         }, 250);

@@ -28,11 +28,11 @@ export async function startSynth() {
     const master = new Tone.Gain(0.75).connect(_synthBus);
 
     // ── Drone — sub-bass pedal A1, always on ─────────────────────────────────
-    const droneReverb = new Tone.Reverb({ decay: 6, wet: 0.4 });
+    const droneReverb = new Tone.Reverb({ decay: 10, wet: 0.6 });
     _droneVol = new Tone.Volume(-18);
     const drone = new Tone.Synth({
         oscillator: { type: 'sine' },
-        envelope:   { attack: 4, decay: 2, sustain: 1, release: 8 },
+        envelope:   { attack: 6, decay: 2, sustain: 1, release: 12 },
         volume:     -6,
     });
     drone.connect(droneReverb);
@@ -50,20 +50,20 @@ export async function startSynth() {
     _noiseGain.connect(master);
     noise.start();
 
-    // ── Pad — sawtooth chord with LFO filter sweep ────────────────────────────
-    const reverb   = new Tone.Reverb({ decay: 9, wet: 0.75 });
-    const chorus   = new Tone.Chorus(3, 2, 0.5).start();
+    // ── Pad — fatsawtooth chord with LFO filter sweep ────────────────────────
+    const reverb   = new Tone.Reverb({ decay: 15, wet: 0.88 });
+    const chorus   = new Tone.Chorus(2.5, 3.5, 0.7).start();
     _padFilter     = new Tone.Filter({ frequency: 250, type: 'lowpass', rolloff: -24 });
     _padVol        = new Tone.Volume(SILENT);
 
     // LFO sweeps the filter cutoff — frequency driven by coherence, amplitude by wind
-    _padLFO = new Tone.LFO({ frequency: 0.43, min: -600, max: 600, type: 'sine' });
+    _padLFO = new Tone.LFO({ frequency: 0.3, min: -800, max: 800, type: 'sine' });
     _padLFO.connect(_padFilter.frequency);
     _padLFO.start();
 
     const pad = new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: 'sawtooth' },
-        envelope:   { attack: 2.5, decay: 1.5, sustain: 0.7, release: 5 },
+        oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
+        envelope:   { attack: 4.0, decay: 2.0, sustain: 0.65, release: 8 },
         volume:     -12,
     });
     pad.connect(_padFilter);
@@ -75,13 +75,13 @@ export async function startSynth() {
     pad.triggerAttack(['A2', 'E3', 'A3', 'C4', 'E4', 'G4']);
 
     // ── Arp — random notes from A minor scale ─────────────────────────────────
-    const arpDelay  = new Tone.FeedbackDelay({ delayTime: '8n', feedback: 0.35, wet: 0.5 });
-    const arpReverb = new Tone.Reverb({ decay: 3, wet: 0.35 });
+    const arpDelay  = new Tone.FeedbackDelay({ delayTime: '8n', feedback: 0.5, wet: 0.6 });
+    const arpReverb = new Tone.Reverb({ decay: 8, wet: 0.65 });
     _arpVol         = new Tone.Volume(SILENT);
 
     const arpSynth = new Tone.Synth({
-        oscillator: { type: 'square4' },
-        envelope:   { attack: 0.01, decay: 0.12, sustain: 0.25, release: 0.6 },
+        oscillator: { type: 'triangle' },
+        envelope:   { attack: 0.04, decay: 0.18, sustain: 0.2, release: 1.8 },
         volume:     -18,
     });
     arpSynth.connect(arpDelay);
@@ -134,7 +134,7 @@ export function setSynthState(chaos, coherence = 0.5, biasX = 0, biasY = 0, temp
     // Pad — emerges below chaos 0.6, filter opens further at harmony
     const padGain = c < 0.6 ? Math.pow(1 - c / 0.6, 1.5) * 0.55 : 0;
     smoothTo(_padVol.volume, padGain > 0 ? Math.max(SILENT, Tone.gainToDb(padGain)) : SILENT);
-    smoothTo(_padFilter.frequency, 300 + (1 - c) * 5500);
+    smoothTo(_padFilter.frequency, 300 + (1 - c) * 9000);
 
     // LFO frequency ← (1-chaos): fast at harmony (2 Hz), near-still at full chaos (0.05 Hz)
     _padLFO.frequency.value = 0.05 + (1 - c) * 2.0;
