@@ -650,17 +650,10 @@ window.addEventListener('touchcancel', (e) => {
 let motionEnabled = false;
 let tiltThrottle  = null;
 
-// Peace target = phone lying flat, screen facing up (face-up on a table).
-// beta=0°, gamma=0° → both normalize to 0.5 in gyro.js.
-let _peacePitch = Math.random();
-let _peaceRoll  = Math.random();
+// Peace target = phone lying flat, screen facing up (beta=0°, gamma=0° → 0.5 normalised).
+const _peacePitch = 0.5;
+const _peaceRoll  = 0.5;
 function _circDist(a, b) { const d = Math.abs(a - b); return Math.min(d, 1 - d) * 2; }
-
-(function _rotatePeacePoint() {
-    _peacePitch = Math.random();
-    _peaceRoll  = Math.random();
-    setTimeout(_rotatePeacePoint, 20000 + Math.random() * 10000);
-})();
 
 // ── Harmony canvas draw loop ──────────────────────────────────────────────────
 let _harmonyRAF = null;
