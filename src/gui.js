@@ -1,5 +1,5 @@
 import GUI from 'lil-gui';
-import { startMic, stopAudio, isActive, setDuckLevel } from './audio.js';
+import { stopAudio, isActive, setDuckLevel } from './audio.js';
 import { setSynthBusVolume, setMusicBusVolume } from './synth.js';
 
 // ── GUI initialisation ────────────────────────────────────────────────────────
@@ -221,20 +221,6 @@ export function initGUI({
 
     // ── Audio ─────────────────────────────────────────────────────────────────
     const fAudio = gui.addFolder('Audio');
-    const _audioState = { mic: false };
-    fAudio.add(_audioState, 'mic').name('microphone').onChange(async v => {
-        if (v) {
-            try {
-                await startMic();
-            } catch (e) {
-                console.warn('[audio] mic denied:', e);
-                _audioState.mic = false;
-                fAudio.controllersRecursive().find(c => c.property === 'mic')?.updateDisplay();
-            }
-        } else {
-            stopAudio();
-        }
-    });
     fAudio.add(params, 'color2AudioStr', 0, 1, 0.01).name('audio → color2');
     fAudio.add(params, 'duckLevel',  0, 1, 0.01).name('duck level').onChange(v => setDuckLevel(v));
     const _busState = { synthVol: 0, musicVol: 0 };

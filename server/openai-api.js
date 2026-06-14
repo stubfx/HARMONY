@@ -184,52 +184,44 @@ export async function generateIdleAudio() {
 }
 
 // ── Idle image — antique constellation chart, random epic subject ─────────────
-const _CONSTELLATION_SUBJECTS = [
-    'a submarine seen from the side',
-    'a grandfather clock',
-    'a typewriter',
-    'a zeppelin airship',
-    'a lighthouse',
-    'a steam locomotive',
-    'a gramophone with its horn',
-    'a diving bell',
-    'a hot air balloon',
-    'a gothic cathedral',
-    'a spiral staircase',
-    'a compass rose',
-    'a full-rigged galleon',
-    'an astronomical orrery',
-    'a pipe organ',
-    'a giant skeleton key',
-    'a candelabra with seven candles',
-    'a medieval trebuchet',
-    'a camera obscura',
-    'a printing press',
-    'a sextant',
-    'an erupting volcano',
-    'a double helix',
-    'a throne with armrests',
-    'an hourglass',
-    'a hot air balloon basket with rigging',
+const _IMAGE_SUBJECTS = [
+    // savanna animals
+    { type: 'animal', label: 'a lion resting in golden grass' },
+    { type: 'animal', label: 'a leopard draped across a tree branch' },
+    { type: 'animal', label: 'a herd of elephants at dusk' },
+    { type: 'animal', label: 'a giraffe silhouette against a red sky' },
+    { type: 'animal', label: 'a cheetah in full sprint' },
+    { type: 'animal', label: 'a zebra herd kicking up dust' },
+    { type: 'animal', label: 'a solitary wildebeest on the open plain' },
+    { type: 'animal', label: 'a secretary bird standing tall in dry grass' },
+    { type: 'animal', label: 'meerkats on a termite mound at sunrise' },
+    { type: 'animal', label: 'a hyena emerging from the shadows' },
+    // floral patterns
+    { type: 'floral', label: 'dense tropical hibiscus blossoms' },
+    { type: 'floral', label: 'a sprawling field of protea flowers' },
+    { type: 'floral', label: 'acacia blossom clusters up close' },
+    { type: 'floral', label: 'bird-of-paradise flowers in vivid orange and blue' },
+    { type: 'floral', label: 'a repeating batik pattern of large lotus flowers' },
+    { type: 'floral', label: 'dense jungle ferns and unfurling fronds' },
+    { type: 'floral', label: 'an overhead view of a mandala made of marigolds' },
+    { type: 'floral', label: 'sunflowers filling the entire frame' },
+    { type: 'floral', label: 'wild African daisy meadow in yellow and white' },
+    { type: 'floral', label: 'close-up of a giant water lily pad and bloom' },
 ];
 
 function _idleImagePrompt() {
-    const subject = _CONSTELLATION_SUBJECTS[Math.floor(Math.random() * _CONSTELLATION_SUBJECTS.length)];
+    const subject = _IMAGE_SUBJECTS[Math.floor(Math.random() * _IMAGE_SUBJECTS.length)];
+    const styleAnimal = `Ultra-detailed wildlife photography style, dramatic natural light, rich warm tones, high contrast. Subject: ${subject.label}. Full-bleed composition, no text, no watermarks.`;
+    const styleFloral = `Vivid macro botanical photography, lush saturated colours, soft bokeh background. Subject: ${subject.label}. Full-bleed composition, no text, no watermarks.`;
     return {
-        subject,
-        prompt:
-            `Antique star atlas illustration, XVIII century engraving style. ` +
-            `A single large constellation in the shape of ${subject}. ` +
-            `Bright white dots (stars) connected by fine straight lines forming that exact silhouette. ` +
-            `A delicate line-drawing of the object is faintly sketched in pale gold over the star pattern. ` +
-            `Deep indigo-black sky. Style of Bode's Uranographia or Flamsteed's Atlas Coelestis. ` +
-            `Wide panoramic composition. No text, no labels, no watermarks.`,
+        subject: subject.label,
+        prompt: subject.type === 'animal' ? styleAnimal : styleFloral,
     };
 }
 
 export async function generateIdleImage() {
     const { subject, prompt } = _idleImagePrompt();
-    console.log(`[idle-image] generating constellation: "${subject}"…`);
+    console.log(`[idle-image] generating: "${subject}"…`);
     const _t0 = Date.now();
     const response = await imagine(prompt);
     const hit = response.output?.find(o => o.type === 'image_generation_call');
