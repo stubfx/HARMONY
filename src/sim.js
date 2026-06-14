@@ -1729,7 +1729,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
     // A spectator joined — assign a slot, send them their color, brightness burst.
     socket.on('spectator-joined', ({ spectatorId, userCount } = {}) => {
         if (userCount !== undefined) simState.userCount = userCount;
-        if (userCount === 1) { clearAvoidMap(); loadIdleAudio(true); } // first user — start music with fade in
+        if (userCount === 1) { clearAvoidMap(); loadIdleAudio(true); _startIdleImageCycle(); } // first user — start music with fade in
         if (simState.status === 'DOT' && userCount >= 1) setStatus('NORMAL');
         lastRemoteActivity = Date.now();
         burstBrightness    = BURST_BRIGHTNESS;
@@ -1750,10 +1750,6 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
             collectiveCoherence = 0.5;
             collectiveTemp      = 0.5;
             setSynthState(1.0, 0.5, 0, 0, 0.5);
-            _fetchIdleImageBytes().then(bytes => {
-                _lastIdleImageBytes = bytes;
-                return loadAvoidMap(new Blob([bytes], { type: 'image/webp' }));
-            }).catch(e => console.warn('[idle-image]', e));
             // last user left — fade out music, only synth remains
             const _fadeGen = ++_idleAudioGen;
             fadeOutIdleTrack(smoothChaos, () => {
@@ -2964,13 +2960,9 @@ function frame(ts) {
     fpsFrames++;
 }
 
-// ── Idle image rotation — refresh every 30s when no spectators ───────────────
+// ── Idle image rotation — only while spectators are connected ─────────────────
 let _lastIdleImageBytes = null;
-
-_fetchIdleImageBytes().then(bytes => {
-    _lastIdleImageBytes = bytes;
-    return loadAvoidMap(new Blob([bytes], { type: 'image/webp' }));
-}).catch(e => console.warn('[idle-image]', e));
+let _imageRotationActive = false;
 
 async function _fetchIdleImageBytes() {
     const res = await fetch(`${_apiBase}/simAss-image`, { cache: 'no-store' });
@@ -2987,21 +2979,37 @@ function _simpleHash(bytes) {
     return h;
 }
 
-setInterval(async () => {
-    try {
-        const bytes = await _fetchIdleImageBytes();
-        const hash  = _simpleHash(bytes);
-        const lastHash = _lastIdleImageBytes ? _simpleHash(_lastIdleImageBytes) : null;
-        if (hash === lastHash) return;
+function _scheduleNextImageCheck() {
+    const delay = 20000 + Math.random() * 10000; // 20–30s random
+    setTimeout(async () => {
+        if (!activeSlots.length) { _imageRotationActive = false; return; }
+        try {
+            const bytes    = await _fetchIdleImageBytes();
+            const hash     = _simpleHash(bytes);
+            const lastHash = _lastIdleImageBytes ? _simpleHash(_lastIdleImageBytes) : null;
+            if (hash !== lastHash) {
+                _lastIdleImageBytes = bytes;
+                clearAvoidMap();
+                await new Promise(r => setTimeout(r, 5000 + Math.random() * 5000));
+                if (activeSlots.length) await loadAvoidMap(new Blob([bytes], { type: 'image/webp' }));
+            }
+        } catch (e) {
+            console.warn('[idle-image-rotation]', e);
+        }
+        if (activeSlots.length) _scheduleNextImageCheck();
+        else _imageRotationActive = false;
+    }, delay);
+}
+
+function _startIdleImageCycle() {
+    if (_imageRotationActive) return;
+    _imageRotationActive = true;
+    _fetchIdleImageBytes().then(bytes => {
         _lastIdleImageBytes = bytes;
-        clearAvoidMap();
-        await new Promise(r => setTimeout(r, 5000 + Math.random() * 5000));
-        const blob = new Blob([bytes], { type: 'image/webp' });
-        await loadAvoidMap(blob);
-    } catch (e) {
-        console.warn('[idle-image-rotation]', e);
-    }
-}, 30000);
+        return loadAvoidMap(new Blob([bytes], { type: 'image/webp' }));
+    }).catch(e => console.warn('[idle-image]', e));
+    _scheduleNextImageCheck();
+}
 
 // ── simAss audio loader — chains tracks via Tone.js radio chain ──────────────
 // Plays when users are connected. fadeIn=true on first track (user join).
