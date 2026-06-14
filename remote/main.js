@@ -383,7 +383,7 @@ function updateAura() {
     if (!auraEl) return;
     const ax = 50 + (currentRoll  - 0.5) * 40;
     const ay = 50 + (currentPitch - 0.5) * 40;
-    const centerColor = pushedColor ?? 'hsl(215,45%,9%)';
+    const centerColor = pushedColor ?? '#2495FF';
     auraEl.style.background =
         `radial-gradient(circle at ${ax}% ${ay}%, ${centerColor} 0%, #000 65%)`;
 }
