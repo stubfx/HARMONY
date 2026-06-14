@@ -19,7 +19,7 @@ import windVisWGSL      from './shaders/wind-vis.wgsl?raw';
 import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
 import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
-import { startSynth, setSynthState, playIdleTrack, stopIdleTrack, fadeOutIdleTrack, setIdleChaos } from './synth.js';
+import { startSynth, setSynthState, playIdleTrack, stopIdleTrack, fadeOutIdleTrack, setIdleChaos, addArpInfluence } from './synth.js';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const MAX_AGENTS = 5_000_000;
@@ -1827,6 +1827,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
                 triggerReleaseBurst(slot);
                 uploadSpectatorSlots();
             }
+            if (event.type === 'note' && event.data?.freq) addArpInfluence(event.data.freq);
         }
         if (event.type === 'pulse-tap') {
             pulseEnergy = Math.min(pulseEnergy + PULSE_INCREMENT, PULSE_MAX);

@@ -20,6 +20,11 @@ let _ready = false;
 let _noiseGain, _padVol, _padFilter, _padLFO, _droneVol, _arpVol, _arpSeq;
 let _synthBus = null;  // top-level synth bus volume
 
+// Influence pool: remote note presses bias the arp toward pressed pitches
+const _influenceNotes      = [];
+const _INFLUENCE_WINDOW_MS = 8000;
+const _INFLUENCE_BLEND     = 0.65;  // prob of picking from influence vs free pool
+
 export async function startSynth() {
     if (_ready) return;
     await Tone.start();
@@ -92,7 +97,16 @@ export async function startSynth() {
 
     _arpSeq = new Tone.Sequence(
         (time) => {
-            const note = ARP_POOL[Math.floor(Math.random() * ARP_POOL.length)];
+            const now = Date.now();
+            while (_influenceNotes.length && now - _influenceNotes[0].ts > _INFLUENCE_WINDOW_MS) {
+                _influenceNotes.shift();
+            }
+            let note;
+            if (_influenceNotes.length > 0 && Math.random() < _INFLUENCE_BLEND) {
+                note = _influenceNotes[Math.floor(Math.random() * _influenceNotes.length)].note;
+            } else {
+                note = ARP_POOL[Math.floor(Math.random() * ARP_POOL.length)];
+            }
             arpSynth.triggerAttackRelease(note, '16n', time);
         },
         new Array(8).fill(null),
@@ -149,6 +163,17 @@ export function setSynthState(chaos, coherence = 0.5, biasX = 0, biasY = 0, temp
 
     // Arp tempo ← temperature: higher temp = faster arpeggiation (80–140 BPM)
     Tone.getTransport().bpm.value = 80 + tmp * 60;
+}
+
+// Called from sim.js on each remote 'note' event.
+// Freq is converted to note name; notes below A3 are shifted up an octave to stay in arp range.
+export function addArpInfluence(freq) {
+    if (!_ready) return;
+    let midi = Tone.Frequency(freq, 'hz').toMidi();
+    if (midi < 57) midi += 12;
+    const note = Tone.Frequency(midi, 'midi').toNote();
+    _influenceNotes.push({ note, ts: Date.now() });
+    if (_influenceNotes.length > 20) _influenceNotes.shift();
 }
 
 export function setSynthBusVolume(db) {
