@@ -147,6 +147,7 @@ socket.on('device-message', (data) => {
 const harmonyPanelEl  = document.querySelector('#harmony-panel');
 const chaosVignetteEl = document.querySelector('#chaos-vignette');
 const keyboardGridEl  = document.getElementById('keyboard-grid');
+const noiseCanvasEl   = document.getElementById('noise-canvas');
 const votePanelEl    = document.querySelector('#vote-panel');
 const voteBtnA       = document.querySelector('#vote-btn-a');
 const voteBtnB       = document.querySelector('#vote-btn-b');
@@ -235,7 +236,7 @@ function setRemoteUI({ stepStatus, optionA, optionB, voteDuration, color1, color
 
     if (harmonyPanelEl) {
         harmonyPanelEl.classList.toggle('visible', isHarmony);
-        if (isHarmony) _initKeyboard();
+        if (isHarmony) { _initKeyboard(); _startNoiseLoop(); }
     }
 
     if (isWave) checkSensorSupport(waveNoteEl);
@@ -718,6 +719,30 @@ function _initKeyboard() {
     });
 }
 
+// ── Static noise loop — radio-signal-loss effect on keys ─────────────────────
+let _noiseCtx     = null;
+let _noiseImgData = null;
+let _noiseFrame   = 0;
+
+function _startNoiseLoop() {
+    if (_noiseCtx) return;
+    if (!noiseCanvasEl) return;
+    _noiseCtx     = noiseCanvasEl.getContext('2d');
+    _noiseImgData = _noiseCtx.createImageData(noiseCanvasEl.width, noiseCanvasEl.height);
+    for (let i = 3; i < _noiseImgData.data.length; i += 4) _noiseImgData.data[i] = 255;
+    (function loop() {
+        requestAnimationFrame(loop);
+        if (_motionChaos < 0.02) return;
+        if (++_noiseFrame % 3 !== 0) return; // ~20fps
+        const d = _noiseImgData.data;
+        for (let i = 0; i < d.length; i += 4) {
+            const v = (Math.random() * 255) | 0;
+            d[i] = d[i + 1] = d[i + 2] = v;
+        }
+        _noiseCtx.putImageData(_noiseImgData, 0, 0);
+    })();
+}
+
 function startTilt() {
     motionEnabled = true;
     tiltRingEl?.classList.add('visible');
@@ -736,8 +761,9 @@ function startTilt() {
         _motionChaos = Math.max(0, _motionChaos - MOTION_DECAY_RATE * dt); // linear decay
         _motionChaos = Math.min(1, Math.max(_motionChaos, d.motion));       // spike to motion
 
-        // Visual feedback: keys fade out, vignette glows at edges
+        // Visual feedback: keys fade out, noise static, vignette glows at edges
         if (keyboardGridEl)  keyboardGridEl.style.opacity  = (1 - _motionChaos * 0.88).toFixed(3);
+        if (noiseCanvasEl)   noiseCanvasEl.style.opacity   = (_motionChaos * 0.8).toFixed(3);
         if (chaosVignetteEl) chaosVignetteEl.style.opacity = _motionChaos.toFixed(3);
 
         if (tiltThrottle || !motionEnabled) return;

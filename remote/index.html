@@ -34,7 +34,6 @@
 
         <!-- Harmony panel — default screen; 9-key colour keyboard -->
         <div id="harmony-panel">
-            <div id="chaos-vignette"></div>
             <div id="keyboard-grid">
                 <button class="key" data-key="0"></button>
                 <button class="key" data-key="1"></button>
@@ -46,6 +45,8 @@
                 <button class="key" data-key="7"></button>
                 <button class="key" data-key="8"></button>
             </div>
+            <canvas id="noise-canvas" width="80" height="160"></canvas>
+            <div id="chaos-vignette"></div>
         </div>
 
         <!-- Pulse panel — full-screen tap surface, visible only in PULSE step status -->
