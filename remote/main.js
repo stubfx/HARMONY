@@ -704,7 +704,8 @@ function _initKeyboard() {
         const trigger = () => {
             el.classList.add('pressed');
             _playNote(k.freq);
-            sendEvent('note', { index: i, freq: k.freq, color: k.color });
+            sendEvent('note',       { index: i, freq: k.freq, color: k.color });
+            sendEvent('color-pick', { color: k.color });
         };
         const release = () => el.classList.remove('pressed');
         el.addEventListener('touchstart',  (e) => { e.preventDefault(); trigger(); }, { passive: false });
