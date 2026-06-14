@@ -1774,6 +1774,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
         'color-pick': { sendToN8n: false },
         rotation:   { sendToN8n: false },
         text:       { sendToN8n: true  },
+        note:       { sendToN8n: false },
     };
 
     socket.on('remote-event', (event) => {

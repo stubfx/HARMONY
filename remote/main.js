@@ -145,7 +145,6 @@ socket.on('device-message', (data) => {
 // DRAW — joystick active (default when no story step is running)
 // VOTE — vote panel shown; joystick hidden
 const harmonyPanelEl  = document.querySelector('#harmony-panel');
-const harmonyCanvasEl = document.querySelector('#harmony-canvas');
 const votePanelEl    = document.querySelector('#vote-panel');
 const voteBtnA       = document.querySelector('#vote-btn-a');
 const voteBtnB       = document.querySelector('#vote-btn-b');
@@ -234,7 +233,7 @@ function setRemoteUI({ stepStatus, optionA, optionB, voteDuration, color1, color
 
     if (harmonyPanelEl) {
         harmonyPanelEl.classList.toggle('visible', isHarmony);
-        if (isHarmony) _startHarmonyLoop(); else _stopHarmonyLoop();
+        if (isHarmony) _initKeyboard();
     }
 
     if (isWave) checkSensorSupport(waveNoteEl);
@@ -656,73 +655,65 @@ const _peaceRoll  = 0.5;
 function _circDist(a, b) { const d = Math.abs(a - b); return Math.min(d, 1 - d) * 2; }
 
 // ── Harmony canvas draw loop ──────────────────────────────────────────────────
-let _harmonyRAF = null;
+// ── Keyboard — 9 coloured keys, C major scale C4–D5 ─────────────────────────
+const KEYS = [
+    { freq: 261.63, color: '#FF3B3B' },
+    { freq: 293.66, color: '#FF8C00' },
+    { freq: 329.63, color: '#FFD700' },
+    { freq: 349.23, color: '#7ED321' },
+    { freq: 392.00, color: '#00CC66' },
+    { freq: 440.00, color: '#00CFCF' },
+    { freq: 493.88, color: '#4A90E2' },
+    { freq: 523.25, color: '#9B59B6' },
+    { freq: 587.33, color: '#E91E8C' },
+];
 
-function _drawHarmony() {
-    const canvas = harmonyCanvasEl;
-    if (!canvas) return;
-    const W   = canvas.width;
-    const H   = canvas.height;
-    const ctx = canvas.getContext('2d');
-    const min = Math.min(W, H);
-    ctx.clearRect(0, 0, W, H);
+let _audioCtx   = null;
+let _kbInitted  = false;
 
-    const targetR = min * 0.14;
-    const dotR    = min * 0.035;
-    const scale   = min * 1.2; // amplify small deviations so the full range fills the screen
-    const tx = W / 2;
-    const ty = H / 2;
-    const dx = tx + (currentRoll  - _peaceRoll)  * scale;
-    const dy = ty + (currentPitch - _peacePitch) * scale;
-    const inside = Math.hypot(dx - tx, dy - ty) < targetR;
-    const pulse  = 0.5 + 0.5 * Math.sin(performance.now() / 500);
-
-    // Target ring
-    ctx.beginPath();
-    ctx.arc(tx, ty, targetR, 0, Math.PI * 2);
-    ctx.strokeStyle = inside
-        ? `rgba(255,255,255,${0.6 + 0.4 * pulse})`
-        : `rgba(255,255,255,${0.2 + 0.1 * pulse})`;
-    ctx.lineWidth = inside ? 2 : 1;
-    ctx.stroke();
-
-    // Dot
-    ctx.beginPath();
-    ctx.arc(dx, dy, dotR, 0, Math.PI * 2);
-    ctx.fillStyle = inside ? 'rgba(255,255,255,1)' : 'rgba(255,255,255,0.8)';
-    ctx.fill();
-
-    // Glow when inside
-    if (inside) {
-        const g = ctx.createRadialGradient(dx, dy, dotR, dx, dy, dotR * 4);
-        g.addColorStop(0, 'rgba(255,255,255,0.25)');
-        g.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.beginPath();
-        ctx.arc(dx, dy, dotR * 4, 0, Math.PI * 2);
-        ctx.fillStyle = g;
-        ctx.fill();
-    }
-
-    _harmonyRAF = requestAnimationFrame(_drawHarmony);
+function _ensureAudioCtx() {
+    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (_audioCtx.state === 'suspended') _audioCtx.resume();
+    return _audioCtx;
 }
 
-function _startHarmonyLoop() {
-    if (_harmonyRAF) cancelAnimationFrame(_harmonyRAF);
-    if (!harmonyCanvasEl) return;
-    harmonyCanvasEl.width  = harmonyCanvasEl.offsetWidth  || window.innerWidth;
-    harmonyCanvasEl.height = harmonyCanvasEl.offsetHeight || window.innerHeight;
-    _harmonyRAF = requestAnimationFrame(_drawHarmony);
+function _playNote(freq) {
+    const ctx  = _ensureAudioCtx();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.4);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 1.4);
 }
 
-function _stopHarmonyLoop() {
-    if (_harmonyRAF) { cancelAnimationFrame(_harmonyRAF); _harmonyRAF = null; }
+function _initKeyboard() {
+    if (_kbInitted) return;
+    _kbInitted = true;
+    const grid = document.getElementById('keyboard-grid');
+    if (!grid) return;
+    KEYS.forEach((k, i) => {
+        const el = grid.children[i];
+        if (!el) return;
+        el.style.background = k.color;
+        const trigger = () => {
+            el.classList.add('pressed');
+            _playNote(k.freq);
+            sendEvent('note', { index: i, freq: k.freq, color: k.color });
+        };
+        const release = () => el.classList.remove('pressed');
+        el.addEventListener('touchstart',  (e) => { e.preventDefault(); trigger(); }, { passive: false });
+        el.addEventListener('touchend',    release, { passive: true });
+        el.addEventListener('touchcancel', release, { passive: true });
+        el.addEventListener('mousedown',   trigger);
+        el.addEventListener('mouseup',     release);
+    });
 }
-
-window.addEventListener('resize', () => {
-    if (!harmonyCanvasEl || !harmonyPanelEl?.classList.contains('visible')) return;
-    harmonyCanvasEl.width  = harmonyCanvasEl.offsetWidth;
-    harmonyCanvasEl.height = harmonyCanvasEl.offsetHeight;
-});
 
 function startTilt() {
     motionEnabled = true;
