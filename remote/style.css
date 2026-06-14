@@ -589,6 +589,14 @@ html, body {
     animation: vote-panel-in 0.5s ease both;
 }
 
+#chaos-vignette {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 20%, rgba(36,149,255,0.6) 100%);
+    opacity: 0;
+}
+
 #keyboard-grid {
     position: absolute;
     inset: 0;

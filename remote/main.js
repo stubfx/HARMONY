@@ -145,6 +145,8 @@ socket.on('device-message', (data) => {
 // DRAW — joystick active (default when no story step is running)
 // VOTE — vote panel shown; joystick hidden
 const harmonyPanelEl  = document.querySelector('#harmony-panel');
+const chaosVignetteEl = document.querySelector('#chaos-vignette');
+const keyboardGridEl  = document.getElementById('keyboard-grid');
 const votePanelEl    = document.querySelector('#vote-panel');
 const voteBtnA       = document.querySelector('#vote-btn-a');
 const voteBtnB       = document.querySelector('#vote-btn-b');
@@ -733,6 +735,10 @@ function startTilt() {
         _motionTickT = now;
         _motionChaos = Math.max(0, _motionChaos - MOTION_DECAY_RATE * dt); // linear decay
         _motionChaos = Math.min(1, Math.max(_motionChaos, d.motion));       // spike to motion
+
+        // Visual feedback: keys fade out, vignette glows at edges
+        if (keyboardGridEl)  keyboardGridEl.style.opacity  = (1 - _motionChaos * 0.88).toFixed(3);
+        if (chaosVignetteEl) chaosVignetteEl.style.opacity = _motionChaos.toFixed(3);
 
         if (tiltThrottle || !motionEnabled) return;
         tiltThrottle = setTimeout(() => {
