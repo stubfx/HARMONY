@@ -659,18 +659,17 @@ const MOTION_DECAY_RATE = 0.5; // chaos units/sec — full chaos → peace in ~2
 
 // ── Harmony canvas draw loop ──────────────────────────────────────────────────
 // ── Keyboard — 9 coloured keys, C major scale C4–D5 ─────────────────────────
-// A minor pentatonic across 2 octaves (A3–E5).
-// Any combination of keys is always consonant.
+// A minor pentatonic D3–A4. Any combination is always consonant.
 const KEYS = [
-    { freq: 220.00, color: '#FF3B3B' },  // A3
-    { freq: 261.63, color: '#FF8C00' },  // C4
-    { freq: 293.66, color: '#FFD700' },  // D4
-    { freq: 329.63, color: '#7ED321' },  // E4
-    { freq: 392.00, color: '#00CC66' },  // G4
-    { freq: 440.00, color: '#00CFCF' },  // A4
-    { freq: 523.25, color: '#4A90E2' },  // C5
-    { freq: 587.33, color: '#9B59B6' },  // D5
-    { freq: 659.25, color: '#E91E8C' },  // E5
+    { freq: 146.83, color: '#FF3B3B' },  // D3
+    { freq: 164.81, color: '#FF8C00' },  // E3
+    { freq: 196.00, color: '#FFD700' },  // G3
+    { freq: 220.00, color: '#7ED321' },  // A3
+    { freq: 261.63, color: '#00CC66' },  // C4
+    { freq: 293.66, color: '#00CFCF' },  // D4
+    { freq: 329.63, color: '#4A90E2' },  // E4
+    { freq: 392.00, color: '#9B59B6' },  // G4
+    { freq: 440.00, color: '#E91E8C' },  // A4
 ];
 
 let _audioCtx    = null;
