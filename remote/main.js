@@ -649,10 +649,10 @@ window.addEventListener('touchcancel', (e) => {
 let motionEnabled = false;
 let tiltThrottle  = null;
 
-// Peace target = phone lying flat, screen facing up (beta=0°, gamma=0° → 0.5 normalised).
-const _peacePitch = 0.5;
-const _peaceRoll  = 0.5;
-function _circDist(a, b) { const d = Math.abs(a - b); return Math.min(d, 1 - d) * 2; }
+// Motion-based chaos: rises with movement (d.motion from gyro), decays linearly to 0 at rest.
+let _motionChaos  = 0;
+let _motionTickT  = null;
+const MOTION_DECAY_RATE = 0.5; // chaos units/sec — full chaos → peace in ~2s of stillness
 
 // ── Harmony canvas draw loop ──────────────────────────────────────────────────
 // ── Keyboard — 9 coloured keys, C major scale C4–D5 ─────────────────────────
@@ -726,12 +726,18 @@ function startTilt() {
         currentPitch = d.b;
         updateAura();
         updateTiltDot(currentRoll, currentPitch);
+
+        // Update motion chaos every gyro tick (20 Hz): spike on movement, linear decay at rest
+        const now = performance.now() / 1000;
+        const dt  = _motionTickT !== null ? now - _motionTickT : 0;
+        _motionTickT = now;
+        _motionChaos = Math.max(0, _motionChaos - MOTION_DECAY_RATE * dt); // linear decay
+        _motionChaos = Math.min(1, Math.max(_motionChaos, d.motion));       // spike to motion
+
         if (tiltThrottle || !motionEnabled) return;
         tiltThrottle = setTimeout(() => {
             tiltThrottle = null;
-            if (_currentStepStatus === 'HARMONY') return; // orientation not a harmony metric
-            const chaos = (_circDist(currentPitch, _peacePitch) + _circDist(currentRoll, _peaceRoll)) / 2;
-            sendEvent('tilt', { pitch: currentPitch, roll: currentRoll, alpha: d.a, chaos });
+            sendEvent('tilt', { pitch: currentPitch, roll: currentRoll, alpha: d.a, chaos: _motionChaos });
         }, 250);
     });
 }
