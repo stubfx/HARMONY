@@ -23,7 +23,7 @@ let _synthBus = null;  // top-level synth bus volume
 // Influence pool: remote note presses bias the arp toward pressed pitches
 const _influenceNotes      = [];
 const _INFLUENCE_WINDOW_MS = 8000;
-const _INFLUENCE_BLEND     = 0.65;  // prob of picking from influence vs free pool
+const _INFLUENCE_BLEND     = 0.90;  // prob of picking from influence vs free pool
 
 export async function startSynth() {
     if (_ready) return;
