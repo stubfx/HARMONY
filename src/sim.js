@@ -2555,6 +2555,7 @@ function writeRenderUB() {
     f[29] = params.blendAmount;
     // Avoid map options for per-particle color sampling. Gated on chaos threshold
     // so high chaos suppresses the avoidMap without unloading the texture.
+    const avoidMapActive = hasAvoidMap && smoothChaos <= params.chaosAvoidMapThreshold;
     u[30] = avoidMapActive ? 1 : 0;
     f[31] = params.avoidMapScale;
     u[32] = params.avoidMapInvert ? 1 : 0;
