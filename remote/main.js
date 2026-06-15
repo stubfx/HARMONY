@@ -1,7 +1,7 @@
 // ─── Remote spectator page ────────────────────────────────────────────────────
 // Three channels feed the swarm:
 //   joystick — moves the spectator's spawner location across the canvas
-//   motion   — device shake/movement → chaos level
+//   motion   — note changes + movement → chaos level (decay over time)
 //   text     — typed word → trace attractor in the simulation
 //
 // Signal path (outbound): this page → socket → server → [n8n →] socket → simulation
@@ -298,10 +298,7 @@ raisePanelEl?.addEventListener('touchend', (e) => {
 }, { passive: false });
 
 // ── Wave detection ────────────────────────────────────────────────────────────
-// Reuses shake magnitude threshold — same gesture, different step context.
-let _waveDone     = false;
-let _waveLastEmit = 0;
-const WAVE_COOLDOWN = 2000;
+let _waveDone = false;
 
 function triggerWave() {
     if (_waveDone) return;
@@ -531,37 +528,6 @@ function _randomSimColor() {
     return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
 }
 
-// ── Shake detection ───────────────────────────────────────────────────────────
-let _shakeLastTime = 0;
-const SHAKE_THRESHOLD = 22; // m/s²
-const SHAKE_COOLDOWN  = 1200; // ms between shakes
-
-window.addEventListener('devicemotion', (e) => {
-    if (!motionEnabled) return;
-    const a = e.accelerationIncludingGravity;
-    if (!a) return;
-    const now = Date.now();
-    const mag = Math.sqrt((a.x ?? 0) ** 2 + (a.y ?? 0) ** 2 + (a.z ?? 0) ** 2);
-
-    const _isDraw    = !_currentStepStatus || _currentStepStatus === 'DRAW';
-    const _isHarmony = _currentStepStatus === 'HARMONY';
-    if ((_isDraw || _isHarmony) && mag > SHAKE_THRESHOLD && now - _shakeLastTime > SHAKE_COOLDOWN) {
-        _shakeLastTime = now;
-        navigator.vibrate?.(60);
-        // Pick a new random palette color — updates swatch UI on phone and sends color-pick to sim
-        const newIdx = Math.random() * PALETTE_SIZE | 0;
-        pickColor(newIdx);
-        if (!_isHarmony) sendEvent('shake', {}); // burst on sim
-    }
-
-    // WAVE — same shake magnitude, different step context
-    if (_currentStepStatus === 'WAVE' && !_waveDone) {
-        if (mag > SHAKE_THRESHOLD && now - _waveLastEmit > WAVE_COOLDOWN) {
-            _waveLastEmit = now;
-            triggerWave();
-        }
-    }
-});
 
 joystickBaseEl?.addEventListener('touchstart', (e) => {
     e.preventDefault();
@@ -884,10 +850,7 @@ function dismissOverlay() {
     setTimeout(() => joinOverlayEl.remove(), 650);
 }
 
-joinBtnEl?.addEventListener('click', async () => {
-    if (typeof DeviceMotionEvent?.requestPermission === 'function') {
-        try { await DeviceMotionEvent.requestPermission(); } catch { /* denied or unsupported */ }
-    }
+joinBtnEl?.addEventListener('click', () => {
     startTilt();
     dismissOverlay();
 });
