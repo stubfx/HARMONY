@@ -166,6 +166,7 @@ export function initGUI({
     fProbe.add(params, 'probeForceStr',    0, 200,               1   ).name('probe force');
     fProbe.add(params, 'probeSensorAngle', 0.05, Math.PI * 0.75, 0.01).name('probe sensor angle');
     fProbe.add(params, 'respawnOnCollide').name('respawn on collide');
+    fProbe.add(params, 'randomTeleportChance', 0, 0.2, 0.001).name('random teleport chance');
 
     // ── Eraser ────────────────────────────────────────────────────────────────
     const fEraser = gui.addFolder('Eraser');

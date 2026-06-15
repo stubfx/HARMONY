@@ -53,6 +53,8 @@
 //   [184] golEnabled           u32
 //   [188] golStrength          f32
 //   [192] releaseBurstSpeed    f32   (initial speed of the fireworks scatter when a joystick is released; 0 = off)
+//   [196] chaos                f32
+//   [200] randomTeleportChance f32   (per-frame probability [0–1] that any agent teleports to a random canvas position)
 
 struct SoloParams {
     agentCount:     u32,
@@ -105,6 +107,7 @@ struct SoloParams {
     golStrength:          f32,   // attraction strength toward live cells
     releaseBurstSpeed:    f32,   // fireworks scatter speed on joystick release (0 = disabled)
     chaos:                f32,   // 0 = armonia (no noise), 1 = max random noise (from collective rotation)
+    randomTeleportChance: f32,   // per-frame probability that any agent jumps to a random canvas position
 }
 
 // Per-spectator partition data — color, joystick spawner position, personal wind.
@@ -635,6 +638,19 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                     np = vec2<f32>(slot.spawnerX * params.canvasW, slot.spawnerY * params.canvasH);
                 }
             }
+        }
+    }
+
+    // Random global teleport: any agent has a per-frame chance to jump to a random position.
+    if (params.randomTeleportChance > 0.0) {
+        let tRng = hash(i ^ (u32(params.time * 1013.0) + 29u));
+        if (tRng < params.randomTeleportChance) {
+            let rx = hash(i ^ (u32(params.time * 997.0)  + 3u));
+            let ry = hash(i ^ (u32(params.time * 971.0)  + 11u));
+            agents[i].pos    = vec2f(rx * params.canvasW, ry * params.canvasH);
+            agents[i].vel    = vec2f(0.0, 0.0);
+            agents[i].primed = 0.0;
+            return;
         }
     }
 
