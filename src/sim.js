@@ -2429,7 +2429,7 @@ function writeRenderUB() {
     f[44] = ic[0];
     f[45] = ic[1];
     f[46] = ic[2];
-    f[47] = isActive() ? 0.0 : params.idleColorFraction;
+    f[47] = activeSlots.length === 0 ? params.idleColorFraction : 0.0;
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 

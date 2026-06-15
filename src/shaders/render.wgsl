@@ -247,16 +247,17 @@ fn avoidMapColorAt(canvasPx: vec2<f32>) -> vec4<f32> {
 
     var color = select(defaultColor, slotColor, slotIsActive);
 
-    // Idle override — fraction passed from JS is 0 when spectators connected, > 0 when idle.
-    if (hash(agentId ^ 0xd1e0c01au) < params.idleColorFraction) {
-        color = vec3f(params.idleColorR, params.idleColorG, params.idleColorB);
-    }
-
     // Chaos override — a chaos-driven fraction of ALL agents (spectator or free) ignores
     // everything above and takes the raw chaosColor. Probability = chaosColorFraction * chaos.
     let chaosThreshold = params.chaosColorFraction * params.avoidMapSampleChaos;
     if (hash(agentId ^ 0xbad1deau) < chaosThreshold) {
         color = vec3f(params.chaosColorR, params.chaosColorG, params.chaosColorB);
+    }
+
+    // Idle override — runs last so it wins over chaos color when no spectators connected.
+    // JS sets idleColorFraction to 0 the moment any spectator connects.
+    if (hash(agentId ^ 0xd1e0c01au) < params.idleColorFraction) {
+        color = vec3f(params.idleColorR, params.idleColorG, params.idleColorB);
     }
 
     let homeUV = vec2<f32>(
