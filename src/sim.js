@@ -93,7 +93,7 @@ const params = {
     // Champion point size — applied ONLY while a champion is free (not homing);
     // homing champions render at the normal agent size like everyone else.
     championSize:      15,
-    champLinesAlpha:   0.18,
+    champLinesAlpha:   0.01,
     // Game of Life mode — toggle
     golEnabled:      false,
     golStrength:     0.5,  // attraction of particles toward live cells
