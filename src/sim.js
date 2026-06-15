@@ -47,8 +47,10 @@ const params = {
     pointSize:      1.3,
     color1:      '#00ff00',   // first palette colour
     color2:      '#0000ff',   // second palette colour (assigned by agent index % 2)
-    chaosColor:  '#ff2244',   // colour taken by chaosColorFraction of all agents at full chaos
-    chaosColorFraction: 0.5, // max fraction of agents that use chaosColor (at chaos=1)
+    chaosColor:         '#ff2244',  // colour taken by chaosColorFraction of all agents at full chaos
+    chaosColorFraction: 0.5,        // max fraction of agents that use chaosColor (at chaos=1)
+    idleColor:          '#0057B8',  // colour shown when no spectators connected (Greek marine blue)
+    idleColorFraction:  0.7,        // fraction of agents that take idleColor when idle
     brightness:  0.06,        // per-particle alpha; prevents additive saturation to white
     additiveBlend: true,      // true = additive (glow, accumulates); false = max blend (no over-brightness)
     blendAmount:   1.0,       // 0–1 multiplier on per-particle fragment output; lowers contribution in both blend modes
@@ -383,7 +385,7 @@ const soloUB = device.createBuffer({
     size: 208, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
-    size: 176, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 192, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const fadeUB = device.createBuffer({
     size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -2422,6 +2424,12 @@ function writeRenderUB() {
     f[41] = cc[1];
     f[42] = cc[2];
     f[43] = params.chaosColorFraction;
+    // Idle color override — only active when no spectators connected (JS zeroes fraction when active)
+    const ic = hexToF(params.idleColor);
+    f[44] = ic[0];
+    f[45] = ic[1];
+    f[46] = ic[2];
+    f[47] = isActive() ? 0.0 : params.idleColorFraction;
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 

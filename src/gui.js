@@ -105,6 +105,8 @@ export function initGUI({
     fVis.addColor(params, 'color2').name('color 2');
     fVis.addColor(params, 'chaosColor').name('chaos color');
     fVis.add(params, 'chaosColorFraction', 0, 1, 0.01).name('chaos color %');
+    fVis.addColor(params, 'idleColor').name('idle color');
+    fVis.add(params, 'idleColorFraction', 0, 1, 0.01).name('idle color %');
     fVis.add(params, 'brightness', 0.01, 0.5, 0.005).name('brightness');
     fVis.add(params, 'additiveBlend').name('additive blend');
     fVis.add(params, 'blendAmount', 0, 1, 0.01).name('blend amount');

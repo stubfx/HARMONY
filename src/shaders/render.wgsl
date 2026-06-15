@@ -44,6 +44,10 @@
 //   [164] chaosColorG          f32   (chaos override color G)
 //   [168] chaosColorB          f32   (chaos override color B)
 //   [172] chaosColorFraction   f32   (max fraction of all agents that use chaosColor at chaos=1)
+//   [176] idleColorR           f32   (idle override color R — active when no spectators connected)
+//   [180] idleColorG           f32
+//   [184] idleColorB           f32
+//   [188] idleColorFraction    f32   (fraction of agents that take idleColor; set to 0 by JS when active)
 
 struct SoloRenderParams {
     agentCount:           u32,
@@ -90,6 +94,10 @@ struct SoloRenderParams {
     chaosColorG:          f32,
     chaosColorB:          f32,
     chaosColorFraction:   f32,
+    idleColorR:           f32,
+    idleColorG:           f32,
+    idleColorB:           f32,
+    idleColorFraction:    f32,
 }
 
 struct Agent {
@@ -238,6 +246,11 @@ fn avoidMapColorAt(canvasPx: vec2<f32>) -> vec4<f32> {
     }
 
     var color = select(defaultColor, slotColor, slotIsActive);
+
+    // Idle override — fraction passed from JS is 0 when spectators connected, > 0 when idle.
+    if (hash(agentId ^ 0xd1e0c01au) < params.idleColorFraction) {
+        color = vec3f(params.idleColorR, params.idleColorG, params.idleColorB);
+    }
 
     // Chaos override — a chaos-driven fraction of ALL agents (spectator or free) ignores
     // everything above and takes the raw chaosColor. Probability = chaosColorFraction * chaos.
