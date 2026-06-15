@@ -1678,7 +1678,7 @@ function _recalcNoteFormulas() {
     let sum = 0;
     for (const idx of _activeNotesBySpectator.values()) sum += idx;
 
-    const wantHarmony = _activeNotesBySpectator.size > 0 && (sum % 10 === 0);
+    const wantHarmony = _activeNotesBySpectator.size > 0 && (sum % 4 === 0);
     if (wantHarmony && !_harmonyActive)  _enterHarmony();
     else if (!wantHarmony && _harmonyActive) _exitHarmony();
 
