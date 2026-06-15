@@ -1,0 +1,13 @@
+INTRODUZIONE
+
+---
+
+C'è qualcosa che non torna nel modo in cui oggi parliamo di intelligenza artificiale. La trattiamo come un servizio, la convochiamo quando ci serve, otteniamo quello che cercavamo e poi la conversazione finisce. Il formato è sempre lo stesso: noi scriviamo, il sistema risponde, noi riscriviamo. Un turno alla volta, in sequenza. Il sistema non fa mai la prima mossa. Vive in uno stato di attesa permanente, pronto a rispondere ma incapace di proporre.
+
+Guardando il cielo stellato di notte mi sono sempre chiesto come appariamo dall'alto, che tracce lasciamo, se il modo in cui ci muoviamo e ci aggreghiamo, visto da lontano, dice qualcosa su chi siamo.
+
+Questa tesi nasce da quella domanda e da un progetto che prova a risponderle. HARMONY è un sistema generativo che esiste prima che qualcuno lo guardi e continua dopo che se ne è andato. Non usa modelli linguistici, non genera immagini da prompt, non chiede di essere usato. Chiede di essere ascoltato. È costruito su regole semplici, basilari, capaci di rivelare possibilità infinite, e in questo somiglia più alle stelle nel cielo che a un programma in esecuzione.
+
+Il primo capitolo costruisce il contesto: la musica come ambiente nel lavoro di Brian Eno, il Flow come stato di ascolto profondo, le stelle come immagine di un sistema semplice che produce qualcosa di straordinario. Il secondo capitolo descrive HARMONY, il suo funzionamento, la nota come scelta personale, l'emozione che diventa collettiva, l'esperienza di entrare in qualcosa già in moto. Il terzo riflette su cosa tutto questo dice dell'AI, di noi, e di quello che resta ancora aperto.
+
+Non è un esperimento sul fare di un sistema complesso. È una domanda su cosa può rivelare un sistema semplice quando gli si lascia abbastanza spazio.
