@@ -1641,17 +1641,18 @@ const _activeNotesBySpectator = new Map(); // spectatorId → noteIndex (0–8)
 let _noteFormulaTimer = null; // debounce — evita recompile pipeline ad ogni cambio nota
 
 // ── Harmony state ─────────────────────────────────────────────────────────────
-// Each sum%4 value (0-3) maps to its own persistent avoidMap image.
-// Images are cached in localStorage so the same tonal "key" always shows the same image.
+// The cache key is the raw note sum — each unique note combination gets its own
+// persistent avoidMap image. No speculative prefetch: images are fetched on demand
+// and cached in localStorage for instant reuse on the same sum.
 let _harmonyActive     = false;
-let _currentHarmonyKey = -1;        // active modulo key (0-3), -1 = no harmony
-const _harmonyFetching = new Set(); // keys currently being fetched
+let _currentHarmonyKey = -1;        // active sum value, -1 = no harmony
+const _harmonyFetching = new Set(); // sums currently being fetched
 
 const _HARMONY_LS = 'harmony_img_';
 
-function _harmonyLsRead(key) {
+function _harmonyLsRead(sum) {
     try {
-        const raw = localStorage.getItem(_HARMONY_LS + key);
+        const raw = localStorage.getItem(_HARMONY_LS + sum);
         if (!raw) return null;
         const entry = JSON.parse(raw);
         if (!entry?.data) return null;
@@ -1662,52 +1663,37 @@ function _harmonyLsRead(key) {
     } catch { return null; }
 }
 
-function _harmonyLsWrite(key, bytes) {
+function _harmonyLsWrite(sum, bytes) {
     try {
         let bin = '';
         for (const b of bytes) bin += String.fromCharCode(b);
-        localStorage.setItem(_HARMONY_LS + key, JSON.stringify({ data: btoa(bin), savedAt: Date.now() }));
+        localStorage.setItem(_HARMONY_LS + sum, JSON.stringify({ data: btoa(bin), savedAt: Date.now() }));
     } catch (e) {
-        console.warn('[harmony] localStorage write failed:', e.message);
+        console.warn('[harmony] localStorage write failed (sum=' + sum + '):', e.message);
     }
 }
 
-async function _prefetchHarmonyKey(key) {
-    if (_harmonyFetching.has(key) || _harmonyLsRead(key) !== null) return;
-    _harmonyFetching.add(key);
-    try {
-        const bytes = await _fetchIdleImageBytes();
-        _harmonyLsWrite(key, bytes);
-    } catch (e) {
-        console.warn('[harmony] prefetch key', key, 'failed:', e.message);
-    } finally {
-        _harmonyFetching.delete(key);
-    }
-}
-
-function _prefetchMissingHarmonyKeys() {
-    for (let k = 0; k < 4; k++) {
-        if (_harmonyLsRead(k) === null && !_harmonyFetching.has(k)) _prefetchHarmonyKey(k);
-    }
-}
-
-async function _enterHarmony(key) {
+async function _enterHarmony(sum) {
+    if (_harmonyActive && _currentHarmonyKey === sum) return;
     _harmonyActive     = true;
-    _currentHarmonyKey = key;
-    let bytes = _harmonyLsRead(key);
+    _currentHarmonyKey = sum;
+    let bytes = _harmonyLsRead(sum);
     if (!bytes) {
+        if (_harmonyFetching.has(sum)) return; // fetch already in flight for this sum
+        _harmonyFetching.add(sum);
         try {
             bytes = await _fetchIdleImageBytes();
-            _harmonyLsWrite(key, bytes);
+            _harmonyLsWrite(sum, bytes);
         } catch (e) {
-            console.warn('[harmony] enter key', key, 'failed:', e.message);
+            console.warn('[harmony] enter sum', sum, 'failed:', e.message);
             return;
+        } finally {
+            _harmonyFetching.delete(sum);
         }
     }
-    if (_currentHarmonyKey === key) { // guard: key may have changed while awaiting
+    if (_currentHarmonyKey === sum) { // guard: sum may have changed while awaiting
         await loadAvoidMap(new Blob([bytes], { type: 'image/webp' }));
     }
-    _prefetchMissingHarmonyKeys();
 }
 
 function _exitHarmony() {
@@ -1715,7 +1701,6 @@ function _exitHarmony() {
     _harmonyActive     = false;
     _currentHarmonyKey = -1;
     clearAvoidMap();
-    _prefetchMissingHarmonyKeys();
 }
 
 function _recalcNoteFormulas() {
@@ -1723,9 +1708,8 @@ function _recalcNoteFormulas() {
     for (const idx of _activeNotesBySpectator.values()) sum += idx;
 
     const hasNotes = _activeNotesBySpectator.size > 0;
-    const modKey   = sum % 4;
 
-    if (hasNotes && (!_harmonyActive || modKey !== _currentHarmonyKey)) _enterHarmony(modKey);
+    if (hasNotes && (!_harmonyActive || sum !== _currentHarmonyKey)) _enterHarmony(sum);
     else if (!hasNotes && _harmonyActive) _exitHarmony();
 
     if (_activeNotesBySpectator.size === 0) return;
@@ -3144,8 +3128,7 @@ async function _fetchIdleImageBytes() {
     return new Uint8Array(await res.arrayBuffer());
 }
 
-// Prefetch all 4 harmony keys on load so first transitions are instant.
-_prefetchMissingHarmonyKeys();
+// Harmony images are fetched on demand and cached in localStorage by note sum.
 
 // ── simAss audio loader — chains tracks via Tone.js radio chain ──────────────
 // Plays when users are connected. fadeIn=true on first track (user join).
