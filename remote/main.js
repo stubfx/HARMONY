@@ -896,19 +896,18 @@ function startTilt() {
     tiltRingEl?.classList.add('visible');
 
     startDeviceTilt(20, (d) => {
+        // Decay always runs — even without gyro (desktop) so vignette fades after note touches
+        const now = performance.now() / 1000;
+        const dt  = _motionTickT !== null ? now - _motionTickT : 0;
+        _motionTickT = now;
+        _motionChaos = Math.max(0, _motionChaos - MOTION_DECAY_RATE * dt);
+        _applyChaosVisuals();
+
         if (!d.enabled) return;
         currentRoll  = d.g;
         currentPitch = d.b;
         updateAura();
         updateTiltDot(currentRoll, currentPitch);
-
-        // Decay note-activity chaos each gyro tick (20 Hz)
-        const now = performance.now() / 1000;
-        const dt  = _motionTickT !== null ? now - _motionTickT : 0;
-        _motionTickT = now;
-        _motionChaos = Math.max(0, _motionChaos - MOTION_DECAY_RATE * dt);
-
-        _applyChaosVisuals();
 
         if (tiltThrottle || !motionEnabled) return;
         tiltThrottle = setTimeout(() => {
