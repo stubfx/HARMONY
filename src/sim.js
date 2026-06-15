@@ -106,8 +106,9 @@ const params = {
     homingProximityRange: 300, // canvas px — distance over which homing agents fade in
     homingMinAlpha:       0.1, // minimum alpha for a homing agent at max distance (0–1)
     // Avoidance
-    avoidForceStr:   1.0, // multiplier on image-trace avoidance forces
-    avoidMapScale:   1.0, // avoidance map coverage as fraction of canvas (1.0 = full)
+    avoidForceStr:        1.0,  // multiplier on image-trace avoidance forces
+    avoidMapScale:        1.0,  // avoidance map coverage as fraction of canvas (1.0 = full)
+    chaosAvoidMapThreshold: 0.6, // above this smoothChaos, avoidMap is suppressed visually
     avoidMapInvert:  false, // true = read the map as 1 - r, so light areas become non-avoid and dark areas become the avoid signal
     avoidMapSampleColor: true,  // true = non-homing particles take their base color from the avoid map sample at their position
     avoidMapFixedColor:  true,  // true (paired with sampleColor) = use the sampled pixel exactly
@@ -2438,7 +2439,8 @@ function writeSoloUB(dt, time) {
     f[21] = 0;
     f[22] = params.avoidForceStr;
     u[23] = isQR ? 1 : 0;  // qrMode — rect-based homing when QR is active
-    u[24] = hasAvoidMap ? 1 : 0;
+    const avoidMapActive = hasAvoidMap && smoothChaos <= params.chaosAvoidMapThreshold;
+    u[24] = avoidMapActive ? 1 : 0;
     f[25] = params.avoidMapScale;
     u[26] = params.bounceEdges ? 1 : 0;
     f[27] = params.probeLen;
@@ -2553,10 +2555,9 @@ function writeRenderUB() {
         f[28] = 1;
     }
     f[29] = params.blendAmount;
-    // Avoid map options for per-particle color sampling. hasAvoidMap mirrors the
-    // global flag so the shader can early-out when no map is loaded (the binding
-    // is still valid — it falls back to placeholderTexView).
-    u[30] = hasAvoidMap ? 1 : 0;
+    // Avoid map options for per-particle color sampling. Gated on chaos threshold
+    // so high chaos suppresses the avoidMap without unloading the texture.
+    u[30] = avoidMapActive ? 1 : 0;
     f[31] = params.avoidMapScale;
     u[32] = params.avoidMapInvert ? 1 : 0;
     u[33] = params.avoidMapSampleColor ? 1 : 0;

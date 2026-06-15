@@ -191,6 +191,7 @@ export function initGUI({
 
     // ── Avoidance map ─────────────────────────────────────────────────────────
     const fAvoid = gui.addFolder('Avoidance map');
+    fAvoid.add(params, 'chaosAvoidMapThreshold', 0, 1, 0.01).name('chaos threshold (hide above)');
     fAvoid.add(params, 'avoidMapScale', 0.05, 1.0, 0.01).name('scale');
     fAvoid.add(params, 'avoidMapInvert').name('invert colors');
     fAvoid.add(params, 'avoidMapSampleColor').name('sample color');
