@@ -1642,34 +1642,48 @@ let _noteFormulaTimer = null; // debounce — evita recompile pipeline ad ogni c
 
 // ── Harmony state ─────────────────────────────────────────────────────────────
 // The cache key is the raw note sum — each unique note combination gets its own
-// persistent avoidMap image. No speculative prefetch: images are fetched on demand
-// and cached in localStorage for instant reuse on the same sum.
+// persistent avoidMap image. Images are stored in IndexedDB (binary, no size limit)
+// and fetched on demand; no speculative prefetch.
 let _harmonyActive     = false;
 let _currentHarmonyKey = -1;        // active sum value, -1 = no harmony
 const _harmonyFetching = new Set(); // sums currently being fetched
 
-const _HARMONY_LS = 'harmony_img_';
+// ── IndexedDB helpers ─────────────────────────────────────────────────────────
+const _HARMONY_DB_NAME  = 'thesis-sim-harmony';
+const _HARMONY_DB_STORE = 'images';
+let _harmonyDb = null;
 
-function _harmonyLsRead(sum) {
+function _openHarmonyDb() {
+    if (_harmonyDb) return Promise.resolve(_harmonyDb);
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(_HARMONY_DB_NAME, 1);
+        req.onupgradeneeded = (e) => e.target.result.createObjectStore(_HARMONY_DB_STORE, { keyPath: 'sum' });
+        req.onsuccess = (e) => { _harmonyDb = e.target.result; resolve(_harmonyDb); };
+        req.onerror   = (e) => reject(e.target.error);
+    });
+}
+
+async function _harmonyDbRead(sum) {
     try {
-        const raw = localStorage.getItem(_HARMONY_LS + sum);
-        if (!raw) return null;
-        const entry = JSON.parse(raw);
-        if (!entry?.data) return null;
-        const bin = atob(entry.data);
-        const arr = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-        return arr;
+        const db = await _openHarmonyDb();
+        return new Promise((resolve) => {
+            const req = db.transaction(_HARMONY_DB_STORE, 'readonly').objectStore(_HARMONY_DB_STORE).get(sum);
+            req.onsuccess = (e) => resolve(e.target.result?.bytes ?? null);
+            req.onerror   = () => resolve(null);
+        });
     } catch { return null; }
 }
 
-function _harmonyLsWrite(sum, bytes) {
+async function _harmonyDbWrite(sum, bytes) {
     try {
-        let bin = '';
-        for (const b of bytes) bin += String.fromCharCode(b);
-        localStorage.setItem(_HARMONY_LS + sum, JSON.stringify({ data: btoa(bin), savedAt: Date.now() }));
+        const db = await _openHarmonyDb();
+        return new Promise((resolve, reject) => {
+            const req = db.transaction(_HARMONY_DB_STORE, 'readwrite').objectStore(_HARMONY_DB_STORE).put({ sum, bytes, savedAt: Date.now() });
+            req.onsuccess = () => resolve();
+            req.onerror   = (e) => reject(e.target.error);
+        });
     } catch (e) {
-        console.warn('[harmony] localStorage write failed (sum=' + sum + '):', e.message);
+        console.warn('[harmony] IndexedDB write failed (sum=' + sum + '):', e.message);
     }
 }
 
@@ -1677,13 +1691,13 @@ async function _enterHarmony(sum) {
     if (_harmonyActive && _currentHarmonyKey === sum) return;
     _harmonyActive     = true;
     _currentHarmonyKey = sum;
-    let bytes = _harmonyLsRead(sum);
+    let bytes = await _harmonyDbRead(sum);
     if (!bytes) {
         if (_harmonyFetching.has(sum)) return; // fetch already in flight for this sum
         _harmonyFetching.add(sum);
         try {
             bytes = await _fetchIdleImageBytes();
-            _harmonyLsWrite(sum, bytes);
+            await _harmonyDbWrite(sum, bytes);
         } catch (e) {
             console.warn('[harmony] enter sum', sum, 'failed:', e.message);
             return;
