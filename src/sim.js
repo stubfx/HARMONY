@@ -2264,6 +2264,37 @@ setInterval(() => {
 
 function apply() { applyFormulas(dirInput.value, windInput.value); }
 applyBtn.addEventListener('click', apply);
+
+// ── Save config ───────────────────────────────────────────────────────────────
+const saveConfigRow = document.querySelector('#save-config-row');
+const saveConfigBtn = document.querySelector('#save-config-btn');
+
+if (_n8nPassword && saveConfigRow) saveConfigRow.style.display = '';
+
+saveConfigBtn?.addEventListener('click', async () => {
+    const name = window.prompt('Nome della config (verrà salvata in simAss/config/):');
+    if (!name?.trim()) return;
+    const config = {
+        dir:       dirInput.value,
+        wind:      windInput.value,
+        colorMode: simState.colorMode,
+        mode:      simState.mode,
+        status:    simState.status,
+        ...params,
+    };
+    try {
+        const res = await fetch(`/simAss-config?password=${encodeURIComponent(_n8nPassword)}`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ name: name.trim(), config }),
+        });
+        const data = await res.json();
+        if (res.ok) alert(`Salvato: ${data.filename}`);
+        else        alert(`Errore: ${data.error}`);
+    } catch (e) {
+        alert(`Errore di rete: ${e.message}`);
+    }
+});
 [dirInput, windInput].forEach(el => {
     el.addEventListener('keydown', e => { if (e.key === 'Enter') apply(); });
 });

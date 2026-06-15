@@ -44,9 +44,10 @@ const port        = process.env.PORT ?? 3000;
 const isDev       = process.env.NODE_ENV === 'development';
 const VITE_PORT   = process.env.VITE_PORT ?? 5173;
 
-const ADMIN_PASS = (process.env.ADMIN_PASSWORD ?? '').trim();
-const N8N_BASE   = (process.env.VITE_N8N_BASE_URL ?? '').replace(/\/$/, '');
-const N8N_SECRET = process.env.N8N_SECRET ?? '';
+const ADMIN_PASS  = (process.env.ADMIN_PASSWORD ?? '').trim();
+const CONFIG_PASS = (process.env.PASSWORD ?? '').trim();
+const N8N_BASE    = (process.env.VITE_N8N_BASE_URL ?? '').replace(/\/$/, '');
+const N8N_SECRET  = process.env.N8N_SECRET ?? '';
 
 if (!ADMIN_PASS)  console.warn('[server] ADMIN_PASSWORD not set — /admin will be inaccessible');
 if (!N8N_BASE)    console.warn('[server] N8N_BASE_URL not set — spectator presence will not call n8n');
@@ -561,6 +562,21 @@ app.get('/simAss-config', async (_req, res) => {
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
+});
+
+app.post('/simAss-config', express.json({ limit: '512kb' }), async (req, res) => {
+    const { password } = req.query;
+    if (!CONFIG_PASS || password !== CONFIG_PASS)
+        return res.status(401).json({ error: 'unauthorized' });
+    const { name, config } = req.body ?? {};
+    if (!name || typeof name !== 'string' || !config || typeof config !== 'object')
+        return res.status(400).json({ error: 'body must be { name, config }' });
+    const safe     = name.trim().replace(/[^a-zA-Z0-9_\-\s]/g, '').trim().replace(/\s+/g, '_') || 'config';
+    const filename = `${safe}.json`;
+    const filepath = path.join(_SIM_ASS_DIR, 'config', filename);
+    await writeFile(filepath, JSON.stringify(config, null, 2), 'utf8');
+    console.log(`[simAss-config] saved ${filename}`);
+    res.json({ ok: true, filename });
 });
 
 app.get('/simAss-audio', async (_req, res) => {
