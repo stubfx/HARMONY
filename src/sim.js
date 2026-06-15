@@ -223,7 +223,6 @@ const BASE_DIR_FORMULAS = [
     'sin((x + y) * 0.005 + t * 0.3) * TWO_PI',
     'sin(y * 0.007 + t * 0.25) * PI',
     'atan2(y-cy,x-cx) + cos(length(vec2(x-cx,y-cy)) * 0.008 - t * 0.8) * PI',
-    'atan2(cy - y, cx - x)',
     'atan2(y - cy, x - cx) + sin(t * 1.2) * PI * 0.5',
     'sin(x * 0.005 + sin(y * 0.007 + t * 0.3) * 2.0) * TWO_PI',
     'sin(x * 0.008) * cos(y * 0.008) * PI + t * 0.15',
@@ -233,6 +232,16 @@ const BASE_DIR_FORMULAS = [
     'sin(length(vec2(x-cx,y-cy)) * 0.015 - t * 2.5) * TWO_PI',
     'atan2(y - cy, x - cx) * 2.0 + t * 0.2',
     'sin(x * 0.003 + y * 0.002 + t * 0.15) * TWO_PI',
+    // sinusoidal — varie direzioni
+    'sin(y * 0.010 + t * 0.5) * TWO_PI',
+    'sin((x - y) * 0.006 + t * 0.3) * TWO_PI',
+    'sin((x + y) * 0.007 - t * 0.4) * TWO_PI',
+    'sin(x * 0.005 + t * 0.3) * PI + sin(y * 0.007 - t * 0.25) * PI',
+    'sin(x * cos(t * 0.15) * 0.006 + y * sin(t * 0.15) * 0.006) * TWO_PI',
+    'sin(x * 0.004 - t * 0.3) * PI + cos(y * 0.006 + t * 0.2) * PI',
+    'sin(x * 0.003 + t * 0.1) * TWO_PI',
+    'cos(x * 0.005 - y * 0.003 + t * 0.35) * TWO_PI',
+    'sin(x * 0.007 + t * 0.45) * PI + sin(y * 0.005 + t * 0.3) * PI',
 ];
 
 // Line / cell / grid heading patterns — the family we want to favour (like 'cells').
