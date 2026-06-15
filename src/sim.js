@@ -18,6 +18,7 @@ import downsampleWGSL   from './shaders/downsample.wgsl?raw';
 import windVisWGSL      from './shaders/wind-vis.wgsl?raw';
 import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
 import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
+import champLinesWGSL   from './shaders/champLines.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
 import { startSynth, setSynthState, playIdleTrack, stopIdleTrack, fadeOutIdleTrack, setIdleChaos, addArpInfluence } from './synth.js';
 
@@ -619,6 +620,32 @@ const agentShadowDensityPipe = device.createRenderPipeline({
 });
 let agentShadowBG        = null;
 let agentShadowDensityBG = null;
+
+// ── Champion Lines — LINE_STRIP overlay connecting champion agents ─────────────
+const champLinesUB  = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+const champLinesMod = device.createShaderModule({ code: champLinesWGSL });
+const champLinesPipe = device.createRenderPipeline({
+    layout: 'auto',
+    vertex:   { module: champLinesMod, entryPoint: 'vs' },
+    fragment: {
+        module: champLinesMod, entryPoint: 'fs',
+        targets: [{
+            format: canvasFormat,
+            blend: {
+                color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+                alpha: { srcFactor: 'one',        dstFactor: 'one-minus-src-alpha', operation: 'add' },
+            },
+        }],
+    },
+    primitive: { topology: 'line-strip' },
+});
+const champLinesBG = device.createBindGroup({
+    layout: champLinesPipe.getBindGroupLayout(0),
+    entries: [
+        { binding: 0, resource: { buffer: champLinesUB } },
+        { binding: 1, resource: { buffer: agentBuf } },
+    ],
+});
 
 // Game of Life: a Conway automaton on a small grid; particles are attracted to live cells.
 const golStepMod  = device.createShaderModule({ code: golStepWGSL });
@@ -2915,6 +2942,27 @@ function frame(ts) {
         bp.draw(6);   // 2-triangle quad covering the image region
     }
     bp.end();
+
+    // Champion lines — LINE_STRIP overlay on the swap-chain texture
+    if (params.championsEnabled && params.champions > 0) {
+        const champCount = Math.floor(agentCount / params.champions);
+        if (champCount >= 2) {
+            const clF = new Float32Array([canvas.width, canvas.height]);
+            const clU = new Uint32Array([agentCount, params.champions]);
+            device.queue.writeBuffer(champLinesUB, 0,  clF);
+            device.queue.writeBuffer(champLinesUB, 8,  clU);
+            const lp = enc.beginRenderPass({
+                colorAttachments: [{
+                    view: curTex.createView(),
+                    loadOp: 'load', storeOp: 'store',
+                }],
+            });
+            lp.setPipeline(champLinesPipe);
+            lp.setBindGroup(0, champLinesBG);
+            lp.draw(champCount);
+            lp.end();
+        }
+    }
 
     // Screenshot: copy the just-blitted swap-chain texture into a staging buffer
     // within the same encoder, then map and download asynchronously after submit.
