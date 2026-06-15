@@ -122,6 +122,7 @@ export function initGUI({
 
     // ── Trace ─────────────────────────────────────────────────────────────────
     const fMagnet = gui.addFolder('Trace');
+    fMagnet.add(params, 'traceEnabled').name('enabled');
     fMagnet.add(params, 'magnetStr',      0, 50,   0.1  ).name('homing speed');
     fMagnet.add(params, 'alphaThreshold', 0,  1,   0.01 ).name('alpha threshold');
     fMagnet.add(params, 'blackThreshold', 0,  0.5, 0.005).name('black cutoff');

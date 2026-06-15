@@ -62,6 +62,7 @@ const params = {
     pixelGrid:      false,    // chunky low-res grid (downsample → nearest-sample blit) — final stage before canvas
     pixelGridCells: 700,      // cell count along the X axis; Y count is derived from canvas aspect ratio
     // Magnet
+    traceEnabled:   false, // master on/off for trace image homing (image stays loaded)
     magnetStr:      30.0, // homing speed: px/frame agents move toward their home position
     alphaThreshold: 0.1,  // min image alpha to trigger homing (0–1)
     blackThreshold: 0.05, // luminance below which pixels are treated as transparent
@@ -2424,7 +2425,7 @@ function writeSoloUB(dt, time) {
     f[7] = params.turnRate * coherenceMult;  // coherence scales how sharply agents follow the formula
     f[8] = params.maxSpeed;
     f[9] = params.minSpeed;
-    u[10] = hasImage ? 1 : 0;
+    u[10] = (hasImage && params.traceEnabled) ? 1 : 0;
     f[11] = params.magnetStr;
     f[12] = x0;
     f[13] = y0;
@@ -2523,7 +2524,7 @@ function writeRenderUB() {
     f[5] = _c1g;
     f[6] = _c1b;
     f[7] = params.maxSpeed;
-    u[8]  = hasImage ? 1 : 0;
+    u[8]  = (hasImage && params.traceEnabled) ? 1 : 0;
     f[9]  = x0;
     f[10] = y0;
     f[11] = x1;
@@ -2630,7 +2631,7 @@ function writeAgentShadowUB() {
     _shadowF[1] = canvas.height;
     _shadowF[2] = params.agentShadowRadius;
     _shadowF[3] = params.agentShadowStr;
-    _shadowU[4] = hasImage ? 1 : 0;
+    _shadowU[4] = (hasImage && params.traceEnabled) ? 1 : 0;
     _shadowF[5] = params.homingProximityRange;
     _shadowF[6] = params.homingMinAlpha;
     _shadowU[7] = params.championsEnabled ? params.champions : 0;
