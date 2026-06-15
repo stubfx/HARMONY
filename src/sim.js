@@ -1723,8 +1723,9 @@ function _recalcNoteFormulas() {
 
     const hasNotes = _activeNotesBySpectator.size > 0;
 
-    if (hasNotes && (!_harmonyActive || sum !== _currentHarmonyKey)) _enterHarmony(sum);
-    else if (!hasNotes && _harmonyActive) _exitHarmony();
+    const wantHarmony = hasNotes && (sum % 4 === 0);
+    if (wantHarmony && (!_harmonyActive || sum !== _currentHarmonyKey)) _enterHarmony(sum);
+    else if (!wantHarmony && _harmonyActive) _exitHarmony();
 
     if (_activeNotesBySpectator.size === 0) return;
 
