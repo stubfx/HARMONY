@@ -1663,6 +1663,7 @@ const _HEAT_DECAY_RATE = 0.5;         // decade del 50% al secondo → freddo in
 let _harmonyActive     = false;
 let _currentHarmonyKey = -1;        // active sum value, -1 = no harmony
 const _harmonyFetching = new Set(); // sums currently being fetched
+let _harmonySnapshot   = null;      // params+formulas snapshot taken just before a config is applied
 
 // ── IndexedDB helpers ─────────────────────────────────────────────────────────
 const _HARMONY_DB_NAME  = 'thesis-sim-harmony';
@@ -1724,6 +1725,29 @@ async function _enterHarmony(sum) {
     if (_currentHarmonyKey === sum) { // guard: sum may have changed while awaiting
         await loadAvoidMap(new Blob([bytes], { type: 'image/webp' }));
     }
+
+    // Fetch and apply a random scene config from simAss/config/ (if any exist)
+    if (_currentHarmonyKey === sum) {
+        try {
+            const res = await fetch('/simAss-config');
+            if (res.ok) {
+                const config = await res.json();
+                // Snapshot current state before overwriting it
+                _harmonySnapshot = {
+                    dir:       document.querySelector('#dir-input')?.value  ?? '',
+                    wind:      document.querySelector('#wind-input')?.value ?? '',
+                    colorMode: simState.colorMode,
+                    mode:      simState.mode,
+                    status:    simState.status,
+                    params:    { ...params },
+                };
+                applySimParams(config);
+                gui?.controllersRecursive().forEach(c => c.updateDisplay());
+            }
+        } catch (e) {
+            console.warn('[harmony] config fetch failed:', e.message);
+        }
+    }
 }
 
 function _exitHarmony() {
@@ -1731,6 +1755,18 @@ function _exitHarmony() {
     _harmonyActive     = false;
     _currentHarmonyKey = -1;
     clearAvoidMap();
+    if (_harmonySnapshot) {
+        const s = _harmonySnapshot;
+        _harmonySnapshot = null;
+        Object.assign(params, s.params);
+        applySimParams({ colorMode: s.colorMode, mode: s.mode, status: s.status });
+        applyFormulas(s.dir, s.wind);
+        const di = document.querySelector('#dir-input');
+        const wi = document.querySelector('#wind-input');
+        if (di) di.value = s.dir;
+        if (wi) wi.value = s.wind;
+        gui?.controllersRecursive().forEach(c => c.updateDisplay());
+    }
 }
 
 function _recalcNoteFormulas() {

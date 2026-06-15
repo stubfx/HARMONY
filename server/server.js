@@ -548,6 +548,21 @@ app.get('/simAss-image', async (_req, res) => {
     }
 });
 
+app.get('/simAss-config', async (_req, res) => {
+    const dir = path.join(_SIM_ASS_DIR, 'config');
+    try {
+        const all   = await readdir(dir);
+        const files = all.filter(f => f.endsWith('.json'));
+        if (files.length === 0) return res.status(404).json({ error: 'no configs' });
+        const chosen = files[Math.floor(Math.random() * files.length)];
+        console.log(`[simAss-config] serving ${chosen}`);
+        const text = await readFile(path.join(dir, chosen), 'utf8');
+        res.json(JSON.parse(text));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.get('/simAss-audio', async (_req, res) => {
     const dir   = path.join(_SIM_ASS_DIR, 'music');
     const files = await _simAssFiles(dir, { checkExpiry: false });
