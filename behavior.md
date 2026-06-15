@@ -16,12 +16,6 @@ This is the sensation we are designing for: participation without authorship.
 
 ## How the body speaks to the swarm
 
-### Tilt — the phone knows where it is
-
-The atmospheric glow behind the screen follows the physical lean of the device. Tip the phone and the light shifts — the gradient anchors itself to the direction of gravity.
-
-This is private and immediate. The swarm on the main screen does not change. The tilt is only felt here, on this glass, in this hand. A small confirmation that the phone is alive to the body holding it.
-
 ### Touch — your own swarm
 
 Each person who joins is assigned a color and a slice of the particle field. Those particles are yours in color only: they live everywhere, mixed into the whole. When you move the joystick, a small fraction of them teleport to wherever the spawner is heading, as though the field is orienting toward you. Hold still and they collect. Move quickly and they scatter and regroup. Lift your finger and they drift back into the current.
@@ -56,7 +50,7 @@ The screen is dark. There are no instructions.
 
 The only visible thing is a faint trace of the session — proof that this phone is tethered to the projection happening somewhere else in the room. This is enough. The person holding the phone does not need to know more.
 
-They find the interactions through their body. Tilting. Pressing. The aura behind the screen shifts color as they touch — a small, private reflection of the temperature they are sending into the collective. They cannot see what the others are sending. They can only feel the gap between their contribution and the result.
+They find the interactions through their body. Pressing. Moving. The aura behind the screen shifts color and intensity — a small, private reflection of the temperature and chaos they are sending into the collective. They cannot see what the others are sending. They can only feel the gap between their contribution and the result.
 
 That gap is where the piece lives.
 

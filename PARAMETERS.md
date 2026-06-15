@@ -504,6 +504,11 @@ The avoidance map is uploaded as an `rgba8unorm` GPU texture at shader binding 4
 
 The force magnitude uses the same `avoid force` multiplier as image-trace avoidance.
 
+### chaos threshold — hide above (`chaosAvoidMapThreshold`)
+**Range:** 0 – 1 | **Default:** 0.6
+
+When `smoothChaos` exceeds this value, the avoidance map is suppressed: the compute shader receives `avoidMapActive = 0` and agents ignore it, as if no map were loaded. The texture itself stays resident on the GPU — when chaos drops back below the threshold the map resumes instantly without any network round-trip. This prevents the map from appearing at exactly the moment when chaos is peaking and the field looks most turbulent.
+
 ### scale (`avoidMapScale`)
 **Range:** 0.05 – 1.0 | **Default:** 1.0
 
@@ -604,15 +609,16 @@ The server maintains a per-room state table (one entry per connected spectator, 
 
 ---
 
-### Tilt
+### Motion / Shake
 
-**Phone gesture:** hold the phone upright in portrait orientation (neutral) and tilt in any direction.
-**Data sent:** `pitch` and `roll` (0–1 each). Portrait upright = `pitch ≈ 0.75`, `roll ≈ 0.5`.
-**Routing:** forwarded to the sim as `remote-event`; the server also aggregates all spectators' pitch/roll into `avgPitch`/`avgRoll` in the `collective-state` broadcast.
-**Effect:** three simultaneous effects.
-1. **Aura feedback** — tilt shifts the anchor point of the atmospheric gradient on the spectator's own phone screen, giving tactile visual feedback of the physical lean.
-2. **Collective wind bias** — the server averages all active spectators' tilt vectors and emits them as `avgPitch`/`avgRoll`. The simulation writes this as a wind bias (`windBiasX`/`windBiasY`) directly into the compute uniform buffer, so the whole particle field leans in the direction the crowd tilts.
-3. **Synth LFO depth** — the magnitude of the collective tilt vector drives the amplitude of the pad filter LFO in the Tone.js synth: a crowd tilted strongly to one side deepens the filter sweep; a neutral, upright crowd minimises it.
+**Phone gesture:** move or shake the phone.
+**Data sent:** `chaos` (0–1), derived from `devicemotion` acceleration magnitude, decaying over time at rest.
+**Routing:** forwarded to the sim as `remote-event`; the server aggregates all spectators' chaos values into `avgChaos` in the `collective-state` broadcast.
+**Effect:** two simultaneous effects.
+1. **Aura feedback** — chaos level modulates the vignette intensity of the atmospheric gradient on the spectator's own phone screen. More motion = darker, more intense aura edge.
+2. **Collective chaos** — the server averages all active spectators' chaos and emits `avgChaos`. The simulation smooths this and uses it to drive noise magnitude, avoidMap suppression (above `chaosAvoidMapThreshold`), chaos color fraction, and all synth parameters.
+
+**Shake detection** (used only for color reset): acceleration magnitude above 22 m/s² with a 1.2 s cooldown. Triggers `color-pick` + `shake` events — resets the spectator's color to the simulation base palette.
 
 ---
 
@@ -871,6 +877,16 @@ The moment a spectator **stops** controlling (joystick released, or gone silent 
 Implementation: the release transition (both the explicit "joystick up" event and the inactivity timeout) sets a one-shot `burst` flag + random seed on the spectator's slot (the slot's former `_p1`/`_p2` padding). The compute shader, for that slot's assigned free agents, overrides velocity with `randomDir × releaseBurstSpeed`. The flag is cleared the frame after the compute consumes it, so it fires exactly once per release. Homing agents (those forming a loaded image) are not affected.
 
 ---
+
+### random teleport chance (`randomTeleportChance`)
+**Range:** 0 – 0.02 | **Default:** 0.003
+
+Per-frame probability that any free agent jumps to a completely random canvas position, independent of the spectator spawner system. Creates a slow, background redistribution that prevents dead zones accumulating during long steady-state periods. Has no effect on homing agents.
+
+### random teleport on avoidMap only (`randomTeleportOnAvoidMap`)
+**Default:** on
+
+When on, `randomTeleportChance` is active only while an avoidance map is loaded. This ties the redistribution behaviour to the presence of the map — the random jumps help agents explore the map's repulsion structure. When off, random teleport fires regardless of map state.
 
 ### respawn on QR (`respawnOnQR`)
 **Default:** on

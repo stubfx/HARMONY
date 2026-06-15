@@ -76,10 +76,10 @@ Host browser — simulation display (WebGPU)
     │                            → restores QR when room reaches 0
     │
     │  'collective-state'  ←─── server ticker every 300 ms
-    │                            { avgPitch, avgRoll, avgTemp, avgCoherence, userCount }
-    │                            → wind bias, turnRate scale, speed-color tint
+    │                            { avgTemp, avgCoherence, avgChaos, userCount }
+    │                            → turnRate scale, speed-color tint, chaos level
     │
-    │  'remote-event'  ←──── server (always direct — tilt aggregated only)
+    │  'remote-event'  ←──── server (always direct — chaos aggregated only)
     │
     │  HTTPS POST /webhook/sim-event  ──→  n8n  (on every remote-event, if VITE_N8N_BASE_URL set)
     │  ←── JSON response ─────────────────────  applySimParams()
@@ -96,9 +96,9 @@ Spectators  (/remote/?s=<uuid>)
     │  Socket.IO  'peer-left'     ←─  server  { userCount }  — QR reappears if count drops below max
     ▼
 Node.js server  (:3000)
-    │  always: io.to(room).emit('remote-event', ...)  — tilt events aggregated only, not forwarded
-    │  always: updates room state (pitch, roll, temperature, coherence per user)
-    │  ticker: emits 'collective-state' to host every 300 ms
+    │  always: io.to(room).emit('remote-event', ...)  — chaos aggregated, other events forwarded directly
+    │  always: updates room state (temperature, coherence, chaos per user)
+    │  ticker: emits 'collective-state' + 'note-debounce' to spectators every 300 ms
 ```
 
 ### Session lifecycle
@@ -129,11 +129,9 @@ The server maintains a per-room user table. Every 300 ms it averages all active 
 
 | Field | Source | Effect in simulation | Effect in synth |
 |-------|--------|----------------------|-----------------|
-| `avgPitch` | phone tilt (Y axis) | wind bias Y — field tilts forward/back | pad LFO amplitude (via wind magnitude) |
-| `avgRoll` | phone tilt (X axis) | wind bias X — field tilts left/right | pad LFO amplitude (via wind magnitude) |
 | `avgTemp` | touch Y position | speed-color hue: blue (top/cold) → amber (bottom/warm), 65% blend | arp BPM (80–140) |
 | `avgCoherence` | touch X position | turnRate multiplier: 0.08× (left/chaos) → 3.0× (right/order) | — |
-| `avgChaos` | distance from peace point rotation | noise magnitude in agent compute; chaos color fraction on all agents | all synth layers + radio chain; pad LFO frequency (0.05→2 Hz as chaos→0) |
+| `avgChaos` | device motion magnitude | noise magnitude in agent compute; chaos color fraction on all agents; avoidMap suppressed above threshold | all synth layers + radio chain; pad LFO frequency (0.05→2 Hz as chaos→0) |
 | `userCount` | active connections | DOT→NORMAL at first join; chaos reset when all leave | synth at chaos=1 when empty; simAss music fades in on first join, out on last leave |
 
 All collective values are smoothed with an exponential moving average (~0.8 s time constant) in the simulation before being written to the GPU, preventing jarring jumps when spectators join or leave.
@@ -146,7 +144,7 @@ All computation runs on the GPU. No Three.js. No WebGL.
 
 | Pass | Shader | Type | Description |
 |------|--------|------|-------------|
-| **Compute** | `compute.wgsl` | Compute | Agent physics (soloUB 144 bytes): formula steering, wind force + collective tilt bias, image-trace avoidance (gradient + lookahead), contamination circle avoidance, avoidance map (binding 4), edge bounce/wrap |
+| **Compute** | `compute.wgsl` | Compute | Agent physics: formula steering, wind force, image-trace avoidance (gradient + lookahead), contamination circle avoidance, avoidance map (binding 4, suppressed above `chaosAvoidMapThreshold`), note-wind formula injection, edge bounce/wrap |
 | **Agent shadow density** | `agentShadow.wgsl` | Render | Greyscale splat texture — one soft disk per homing agent; used as a density probe by the compute shader. Champions are excluded so they don't repel the swarm |
 | **Agent shadow visual** | `agentShadow.wgsl` | Render | Dark soft splats blended onto the offscreen accumulation texture to create depth under homing agents. Also drives **champion** trails — every Nth agent (Champions folder: `enabled` toggle + `1 in N`) drops a constant shadow under itself even while free, with no change to its movement. Free champions also render slightly larger (`champion size`, applied in `render.wgsl` only while not homing) |
 | **Fade** | `fade.wgsl` | Render | Black fullscreen quad with alpha blend — exponential trail decay each frame |
@@ -162,9 +160,7 @@ without reallocation.
 
 The offscreen accumulation texture is `rgba16float`, allowing HDR values beyond [0,1] without clipping. The blit pass tone-maps the result to the display range.
 
-The compute uniform buffer (`soloUB`, 144 bytes) carries physics params plus:
-- `windBiasX` / `windBiasY` — smoothed collective tilt vector, added directly to formula wind
-- `avoidForceStr` — multiplier applied to all image-trace avoidance force vectors
+The compute uniform buffer (`soloUB`) carries physics params including `avoidForceStr` (image-trace avoidance multiplier), `avoidMapActive` (0/1 gate suppressing the avoidance map when `smoothChaos > chaosAvoidMapThreshold`), and `noteWindStr` (injected note-wind formula strength).
 
 The render uniform buffer (`renderUB`, 176 bytes — 44 fields) carries visual params, including `additiveBlend` (field 24) which selects between additive and max-blend render pipelines; `spectatorCount` / `spectatorAgentShare` (fields 23/25) which assign the first N% of agents to spectator slots with per-slot colors; `avoidMapSampleChaos` (field 39) which drives the avoidmap color sampling probability (30%→100% as chaos→1); and `chaosColorR/G/B` / `chaosColorFraction` (fields 40–43) which force a configurable fraction of all agents — spectator-controlled or free — to a single "chaos color", scaling linearly with chaos so at harmony=0 no agents are affected.
 
@@ -241,14 +237,18 @@ Spectators open the `/remote/` page on their phones. The page has a virtual joys
 | **Joystick** | Use the virtual joystick | Forwarded directly as `remote-event` | Moves the spectator's spawner across the canvas; agents teleport to spawner at scaled spawn chance |
 | **Color** | Color picker at top of page | Forwarded directly to simulation | Assigned color for that spectator's agents |
 | **Shake** | Shake the phone | Forwarded as `color-pick` + `shake` | Bursts the spectator's agents outward AND picks a new random color from the local palette |
-| **Tilt** | Hold and tilt phone in any direction | Server averages pitch/roll; computes chaos as distance from peace point | Collective wind bias; chaos level — the whole field responds to how close the group is to the shared target orientation |
+| **Tilt / Motion** | Move phone in any direction | Server aggregates motion magnitude into `avgChaos` | Chaos level — device motion increases chaos; stillness decays it toward harmony |
+| **Note (HARMONY)** | Touch the HARMONY canvas on the remote page | `note` event debounced server-side before forwarding | Drives formula injection into the compute shader (note wind) and triggers harmony avoidMap on `sum % 4 === 0` |
 | **Text** | Type in the text input at top | Forwarded directly to simulation | Trace attractor — particle field writes the word |
+
+### Note send debounce
+
+To prevent server flooding when users slide across notes rapidly, the `note` socket event is debounced on each spectator's device. The oscillator and aura visuals update immediately on every note change; only the server send is delayed. The debounce duration is broadcast by the server as `note-debounce: { ms }` and equals `userCount × 10 ms` — so at 1 user the delay is 10 ms; at 10 users it is 100 ms. The server re-broadcasts this value to all spectators on join, on disconnect, and every 300 ms in the collective-state ticker.
 
 ### Feedback loops
 
 - **On the big screen**: every new spectator join fires a brief directional gust in the particle field — a visible pulse that confirms the join without any text or notification
-- **On the phone**: the aura behind the screen reflects the selected color (center hue) and tilt (gradient anchor point). When another spectator joins, all phones feel a brief aura dimming pulse.
-- **Tilt indicator**: after motion permission is granted, a small bubble appears at the center of the phone screen and moves with the physical phone orientation.
+- **On the phone**: the aura behind the screen reflects the selected color (center hue) and motion chaos (vignette intensity). When another spectator joins, all phones feel a brief aura dimming pulse.
 
 See [behavior.md](behavior.md) for the full art-direction intent behind these interactions.
 
@@ -464,11 +464,16 @@ At startup, and whenever the room is empty, the simulation fetches `/simAss-imag
 
 Each generated image is an **antique star atlas illustration** in XVIII-century engraving style: bright star dots connected by fine lines forming a constellation in the shape of a randomly chosen epic/mythic object (submarine, grandfather clock, zeppelin, lighthouse, gothic cathedral, etc. — 26 subjects in the pool). Style reference: Bode's Uranographia / Flamsteed's Atlas Coelestis.
 
-The map is refreshed every 30 seconds — if the hash changes, the old map is cleared and the new one loads after a 5–10 s random delay. On each image change the sim also emits `reset-chaos-target` to the server, which generates a new random peace point (`pitch`/`roll`) and broadcasts it to all connected spectators, encouraging collective movement to find the new harmony orientation.
+The map is refreshed every 30 seconds — if the hash changes, the old map is cleared and the new one loads after a 5–10 s random delay.
+
+**Chaos threshold:** when `smoothChaos` exceeds `chaosAvoidMapThreshold` (default 0.6), the avoidance map is temporarily suppressed — agents ignore it without unloading the texture. It reactivates immediately when chaos drops back below the threshold.
+
+**Harmony mode:** when active spectators' note indices sum to a multiple of 4 (`sum % 4 === 0`), `_enterHarmony(sum)` is called. The simulation fetches a flat-color AI-generated image from the server (prompt: subject from the pool, pure black background, minimal flat shapes, `gpt-image-1-mini`) and loads it as the avoidance map, replacing the background star atlas for the duration of the harmony state. Each unique `sum` value gets its own cached image stored in **IndexedDB** (`thesis-sim-harmony` database, `images` store, key = `sum`) as raw binary (`Uint8Array`) — no size limit, no base64 conversion. Subsequent entries into the same harmony state load instantly from cache. The map reverts to the star atlas when the note combination is released or changes to a non-harmonic sum.
 
 | Control | Description |
 |---------|-------------|
 | scale | Coverage as a fraction of the canvas (1.0 = full canvas); the map is always centered |
+| chaos threshold (hide above) | `chaosAvoidMapThreshold` — avoidMap is suppressed when `smoothChaos` exceeds this value (texture stays loaded; default 0.6) |
 | QR margin | Extra padding around QR avoid zone, as fraction of `min(canvasW, canvasH)`; default 0.01 |
 | QR fade | Blur radius of QR avoid zone edge, as fraction of `min(canvasW, canvasH)`; default 0.01 |
 | Load map… | File picker — any browser-supported image (grayscale PNG recommended) |
