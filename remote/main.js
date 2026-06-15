@@ -1,7 +1,7 @@
 // ─── Remote spectator page ────────────────────────────────────────────────────
 // Three channels feed the swarm:
 //   joystick — moves the spectator's spawner location across the canvas
-//   tilt     — phone orientation (pitch + roll) → collective wind direction
+//   motion   — device shake/movement → chaos level
 //   text     — typed word → trace attractor in the simulation
 //
 // Signal path (outbound): this page → socket → server → [n8n →] socket → simulation
@@ -9,7 +9,6 @@
 
 import './style.css';
 import { io as ioConnect } from 'socket.io-client';
-import { startDeviceTilt, requestMotionOrientationPermission } from './gyro';
 
 // ── Session ───────────────────────────────────────────────────────────────────
 const urlParams   = new URLSearchParams(window.location.search);
@@ -864,20 +863,18 @@ function _applyChaosVisuals() {
 // ── Static noise loop — radio-signal-loss effect on keys ─────────────────────
 function startTilt() {
     motionEnabled = true;
-
-    startDeviceTilt(20, (d) => {
+    setInterval(() => {
         const now = performance.now() / 1000;
         const dt  = _motionTickT !== null ? now - _motionTickT : 0;
         _motionTickT = now;
         _motionChaos = Math.max(0, _motionChaos - MOTION_DECAY_RATE * dt);
         _applyChaosVisuals();
-
         if (tiltThrottle) return;
         tiltThrottle = setTimeout(() => {
             tiltThrottle = null;
             sendEvent('tilt', { chaos: _motionChaos });
         }, 250);
-    });
+    }, 50);
 }
 
 function dismissOverlay() {
@@ -888,7 +885,9 @@ function dismissOverlay() {
 }
 
 joinBtnEl?.addEventListener('click', async () => {
-    try { await requestMotionOrientationPermission(); } catch { /* denied or unsupported */ }
+    if (typeof DeviceMotionEvent?.requestPermission === 'function') {
+        try { await DeviceMotionEvent.requestPermission(); } catch { /* denied or unsupported */ }
+    }
     startTilt();
     dismissOverlay();
 });
