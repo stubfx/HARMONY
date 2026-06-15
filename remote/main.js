@@ -785,6 +785,7 @@ function _silenceContNote() {
     if (!_contOscReady) return;
     _contGainNode.gain.setTargetAtTime(0, _audioCtx.currentTime, 0.12);
     _activeNoteIdx = -1;
+    sendEvent('note-off', {});
 }
 
 function _spawnSmoke(x, y, cf) {

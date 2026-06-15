@@ -1634,6 +1634,20 @@ const SPECTATOR_PALETTE = [
 //   windX, windY, dx, dy, magnitude, lastInputTime }
 const activeSlots = [];
 
+// Note-driven formula selection: sum of active note indices → modulo on formula arrays.
+const _activeNotesBySpectator = new Map(); // spectatorId → noteIndex (0–8)
+
+function _recalcNoteFormulas() {
+    if (_activeNotesBySpectator.size === 0) return;
+    let sum = 0;
+    for (const idx of _activeNotesBySpectator.values()) sum += idx;
+    const newDir  = DIR_FORMULAS[sum % DIR_FORMULAS.length];
+    const newWind = WIND_FORMULAS[sum % WIND_FORMULAS.length];
+    if (dirInput)  dirInput.value  = newDir;
+    if (windInput) windInput.value = newWind;
+    applyFormulas(newDir, newWind);
+}
+
 function uploadSpectatorSlots() {
     const ab = new ArrayBuffer(768);
     const f  = new Float32Array(ab);
@@ -1792,6 +1806,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
                 activeSlots.splice(idx, 1);
                 uploadSpectatorSlots();
             }
+            _activeNotesBySpectator.delete(spectatorId);
         }
     });
 
@@ -1858,6 +1873,13 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
                 uploadSpectatorSlots();
             }
             if (event.type === 'note' && event.data?.freq) addArpInfluence(event.data.freq);
+            if (event.type === 'note' && typeof event.data?.index === 'number') {
+                _activeNotesBySpectator.set(event.spectatorId, event.data.index);
+                _recalcNoteFormulas();
+            }
+        }
+        if (event.type === 'note-off') {
+            _activeNotesBySpectator.delete(event.spectatorId);
         }
         if (event.type === 'pulse-tap') {
             pulseEnergy = Math.min(pulseEnergy + PULSE_INCREMENT, PULSE_MAX);
@@ -2548,7 +2570,7 @@ function writeContamUB() {
 
 // ── Pre-allocated uniform buffers (reused every frame to avoid GC pressure) ──
 const _soloAB  = new ArrayBuffer(208); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
-const _renderAB= new ArrayBuffer(176); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
+const _renderAB= new ArrayBuffer(192); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
 const _fadeAB  = new ArrayBuffer(16);  const _fadeF  = new Float32Array(_fadeAB);
 const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB); const _blitU  = new Uint32Array(_blitAB);
 const _downsampleAB = new ArrayBuffer(16); const _downsampleF = new Float32Array(_downsampleAB);
