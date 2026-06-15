@@ -143,7 +143,8 @@ const params = {
     spawnerSteering:        6,    // direction-change rate (1/s); lower = wider curves, higher = tighter turns
     spawnerInactiveTimeout: 5,    // seconds of joystick silence before spawner goes inactive
     releaseBurstSpeed:      30,   // fireworks: speed agents scatter at when a joystick is released (0 = disabled)
-    randomTeleportChance:   0.003, // per-frame probability [0–1] any agent jumps to a random canvas position
+    randomTeleportChance:         0.003, // per-frame probability [0–1] any agent jumps to a random canvas position
+    randomTeleportOnAvoidMap:     true,  // when true, random teleport is active only while an avoidMap is loaded
     // Session / QR restore
     remoteTimeout:  0,    // seconds of silence from all remotes before QR is restored (0 = disabled)
     maxSpectators:  1,    // sim QR hides when connected count reaches this threshold
@@ -2386,7 +2387,8 @@ function writeSoloUB(dt, time) {
     f[48] = params.releaseBurstSpeed;
     const chaosGPU = activeSlots.length > 0 ? Math.min(smoothChaos / 0.3, 1.0) : 0;
     f[49] = chaosGPU;
-    f[50] = params.randomTeleportChance;
+    const teleportActive = !params.randomTeleportOnAvoidMap || hasAvoidMap;
+    f[50] = teleportActive ? params.randomTeleportChance : 0;
     setChaos(chaosGPU);
     const _synthNow = performance.now();
     if (_synthNow - _lastSynthTick >= 200) {
