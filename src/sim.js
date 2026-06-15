@@ -1729,7 +1729,7 @@ async function _enterHarmony(sum) {
     // Fetch and apply a random scene config from simAss/config/ (if any exist)
     if (_currentHarmonyKey === sum) {
         try {
-            const res = await fetch('/simAss-config');
+            const res = await fetch(`${_apiBase}/simAss-config`);
             if (res.ok) {
                 const config = await res.json();
                 // Snapshot current state before overwriting it
@@ -2283,7 +2283,7 @@ saveConfigBtn?.addEventListener('click', async () => {
         ...params,
     };
     try {
-        const res = await fetch(`/simAss-config?password=${encodeURIComponent(_n8nPassword)}`, {
+        const res = await fetch(`${_apiBase}/simAss-config?password=${encodeURIComponent(_n8nPassword)}`, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ name: name.trim(), config }),
