@@ -113,7 +113,7 @@ function updateUserState(roomId, socketId, type, data) {
         user.alpha = data.alpha ?? 0.5;
         user.pitch = data.pitch ?? 0.5;
         user.roll  = data.roll  ?? 0.5;
-        user.chaos = data.chaos ?? 1;
+        user.chaos = data.chaos ?? 0;
     }
     if (type === 'touch') {
         user.temperature = data.temp ?? 0.5;
@@ -172,7 +172,7 @@ setInterval(() => {
                 sr += u.roll;
                 st += u.temperature;
                 sc += u.coherence;
-                sChaos += u.chaos ?? 1;
+                sChaos += u.chaos ?? 0;
             }
         }
 
