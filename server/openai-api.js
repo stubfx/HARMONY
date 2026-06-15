@@ -211,12 +211,8 @@ const _IMAGE_SUBJECTS = [
 
 function _idleImagePrompt() {
     const subject = _IMAGE_SUBJECTS[Math.floor(Math.random() * _IMAGE_SUBJECTS.length)];
-    const styleAnimal = `Ultra-detailed wildlife photography style, dramatic natural light, rich warm tones, high contrast. Subject: ${subject.label}. Full-bleed composition, no text, no watermarks.`;
-    const styleFloral = `Vivid macro botanical photography, lush saturated colours, soft bokeh background. Subject: ${subject.label}. Full-bleed composition, no text, no watermarks.`;
-    return {
-        subject: subject.label,
-        prompt: subject.type === 'animal' ? styleAnimal : styleFloral,
-    };
+    const prompt = `Flat graphic illustration, pure solid black background with no exceptions, minimal flat colors only — no gradients, no textures, no shadows, no photographic detail. Render only the bare minimum shapes needed to recognize the subject. Subject: ${subject.label}. Full-bleed composition, no text, no watermarks.`;
+    return { subject: subject.label, prompt };
 }
 
 export async function generateIdleImage() {
