@@ -336,6 +336,10 @@ socket.on('host-reconnected', () => {
 });
 
 // ── Peer events ───────────────────────────────────────────────────────────────
+socket.on('note-debounce', ({ ms } = {}) => {
+    _noteDebounceMs = ms ?? 0;
+});
+
 socket.on('peer-joined', () => {
     if (!auraEl) return;
     auraEl.style.transition = 'background 0s, opacity 0.05s ease';
@@ -611,8 +615,10 @@ let motionEnabled = false;
 let tiltThrottle  = null;
 
 // Note-activity chaos: rises on each note touch (+0.05), decays linearly to 0 at rest.
-let _motionChaos  = 0;
-let _motionTickT  = null;
+let _motionChaos      = 0;
+let _motionTickT      = null;
+let _noteDebounceMs   = 0;   // updated by server 'note-debounce' event
+let _noteDebounceTimer = null;
 const MOTION_DECAY_RATE = 0.5; // chaos units/sec — full chaos → peace in ~2s of stillness
 
 // ── Harmony canvas draw loop ──────────────────────────────────────────────────
@@ -732,15 +738,21 @@ function _setContNote(noteIdx) {
     if (noteIdx !== _activeNoteIdx) {
         _contOsc.frequency.setTargetAtTime(KEYS[noteIdx].freq, t, 0.04);
         _activeNoteIdx = noteIdx;
-        sendEvent('note', { index: noteIdx, freq: KEYS[noteIdx].freq, color: KEYS[noteIdx].color });
         _motionChaos = Math.min(1, _motionChaos + 0.05);
         _applyChaosVisuals();
+        // Debounce the socket send — oscillator and visuals update immediately
+        clearTimeout(_noteDebounceTimer);
+        _noteDebounceTimer = setTimeout(() => {
+            sendEvent('note', { index: noteIdx, freq: KEYS[noteIdx].freq, color: KEYS[noteIdx].color });
+        }, _noteDebounceMs);
     }
     _contGainNode.gain.setTargetAtTime(0.25, t, 0.05);
 }
 
 function _silenceContNote() {
     if (!_contOscReady) return;
+    clearTimeout(_noteDebounceTimer); // cancel any pending note send
+    _noteDebounceTimer = null;
     _contGainNode.gain.setTargetAtTime(0, _audioCtx.currentTime, 0.12);
     _activeNoteIdx = -1;
     sendEvent('note-off', {});

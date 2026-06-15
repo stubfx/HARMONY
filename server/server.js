@@ -174,12 +174,14 @@ setInterval(() => {
         const avgChaos = n > 0 ? sChaos / n : 1;
         room.lastAvgChaos = avgChaos;
 
+        const totalUsers = room.connections.size;
         io.to(`${roomId}:hosts`).emit('collective-state', {
             avgTemp:      n > 0 ? st / n : 0.5,
             avgCoherence: n > 0 ? sc / n : 0.5,
             avgChaos,
-            userCount:    room.connections.size,
+            userCount:    totalUsers,
         });
+        io.to(`${roomId}:spectators`).emit('note-debounce', { ms: totalUsers * 10 });
     }
 }, 300);
 
@@ -274,7 +276,7 @@ io.on('connection', (socket) => {
         const roomData  = getOrCreateRoom(room);
         const sid       = spectatorId ?? socket.id;
 
-        roomData.users.set(socket.id, { pitch: 0.5, roll: 0.5, temperature: 0.5, coherence: 0.5, lastSeen: Date.now() });
+        roomData.users.set(socket.id, { temperature: 0.5, coherence: 0.5, lastSeen: Date.now() });
         roomData.connections.set(socket.id, sid);
         roomData.spectators.set(sid, socket.id);
         socket.join(`${room}:spectators`);
@@ -286,6 +288,7 @@ io.on('connection', (socket) => {
         if (roomData.hostSockets.size) {
             io.to(`${room}:hosts`).emit('spectator-joined', { userCount, spectatorId: sid });
         }
+        io.to(`${room}:spectators`).emit('note-debounce', { ms: userCount * 10 });
         socket.to(`${room}:spectators`).emit('peer-joined', { userCount });
         io.to(`${room}:admin`).emit('spectator-count', { count: userCount });
 
@@ -395,6 +398,7 @@ io.on('connection', (socket) => {
                     io.to(`${assignedRoom}:hosts`).emit('spectator-left', { userCount: remaining, spectatorId });
                 }
                 io.to(`${assignedRoom}:spectators`).emit('peer-left', { userCount: remaining });
+                io.to(`${assignedRoom}:spectators`).emit('note-debounce', { ms: remaining * 10 });
                 io.to(`${assignedRoom}:admin`).emit('spectator-count', { count: remaining });
                 console.log('[socket] spectator left    room:', assignedRoom, '| remaining:', remaining);
 
