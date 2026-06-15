@@ -1844,28 +1844,19 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
     });
 
     // Collective swarm state — aggregated by the server from all spectators in the room.
-    // Tilt bias: avgPitch/avgRoll are 0-1 (0.5 = phone held flat/neutral).
-    // Temperature: 0 = cold (top of phone screen), 1 = warm (bottom of phone screen).
-    socket.on('collective-state', ({ avgPitch, avgRoll, avgTemp, avgCoherence, avgChaos, userCount }) => {
-        // Tilt is now per-spectator via remote-event; collective-state only drives temp/coherence.
+    socket.on('collective-state', ({ avgTemp, avgCoherence, avgChaos, userCount }) => {
         collectiveTemp      = avgTemp      ?? 0.5;
         collectiveCoherence = avgCoherence ?? 0.5;
         collectiveChaos     = avgChaos     ?? 1;
         console.log('[chaos] raw avgChaos:', avgChaos?.toFixed(4), '| users:', userCount);
-        // Mirror to GUI debug panel (manual refresh — no .listen() RAF loop)
         swarmDebug.users     = userCount ?? 0;
-        swarmDebug.pitch     = +(avgPitch     ?? 0.5).toFixed(3);
-        swarmDebug.roll      = +(avgRoll      ?? 0.5).toFixed(3);
         swarmDebug.temp      = +(avgTemp      ?? 0.5).toFixed(3);
         swarmDebug.coherence = +(avgCoherence ?? 0.5).toFixed(3);
         swarmDebug.chaos     = +(avgChaos     ?? 1).toFixed(3);
         dbgUsers.updateDisplay();
-        dbgPitch.updateDisplay();
-        dbgRoll.updateDisplay();
         dbgTemp.updateDisplay();
         dbgCoherence.updateDisplay();
         dbgChaos.updateDisplay();
-        updateGizmo(avgPitch ?? 0.75, avgRoll ?? 0.5);
     });
 
     // A spectator joined — assign a slot, send them their color, brightness burst.
@@ -2249,7 +2240,7 @@ document.addEventListener('pointerdown', async () => {
     await unlockAudio();
     if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
     _syncAudioBanner();
-    startSynth().then(() => setSynthState(1.0, smoothCoherence, smoothBiasX, smoothBiasY, smoothTemp));
+    startSynth().then(() => setSynthState(1.0, smoothCoherence, 0, 0, smoothTemp));
     if (simState.userCount > 0) loadIdleAudio(true);
 }, { once: true });
 
@@ -2356,14 +2347,10 @@ canvas.addEventListener('mouseleave', () => { mouseCanvasX = -1; mouseCanvasY = 
 
 // ── Collective swarm state (written by 'collective-state' socket events) ───────
 // Smoothed each frame via exponential moving average to avoid jarring jumps.
-let collectiveBiasX   = 0;   // target wind bias X (from tilt)
-let collectiveBiasY   = 0;   // target wind bias Y (from tilt)
-let collectiveTemp    = 0.5; // target temperature [0=cold … 1=warm] (from touch Y)
+let collectiveTemp      = 0.5; // target temperature [0=cold … 1=warm] (from touch Y)
 let collectiveCoherence = 0.5; // target coherence [0=chaos … 1=order] (from touch X)
-let collectiveChaos   = 1;   // target chaos [0=armonia … 1=max noise] (from device rotation average)
+let collectiveChaos     = 1;   // target chaos [0=armonia … 1=max noise] (from note activity)
 
-let smoothBiasX       = 0;   // smoothed versions
-let smoothBiasY       = 0;
 let smoothTemp        = 0.5;
 let smoothCoherence   = 0.5;
 let smoothChaos       = 1;
@@ -2387,8 +2374,6 @@ let pulseEnergy = 0;
 function writeSoloUB(dt, time) {
     // Smooth collective state toward targets (~0.8 s time constant)
     const a = Math.exp(-dt / 0.8);
-    smoothBiasX     = smoothBiasX     * a + collectiveBiasX     * (1 - a);
-    smoothBiasY     = smoothBiasY     * a + collectiveBiasY     * (1 - a);
     smoothTemp      = smoothTemp      * a + collectiveTemp      * (1 - a);
     smoothCoherence = smoothCoherence * a + collectiveCoherence * (1 - a);
     smoothChaos     = smoothChaos     * a + collectiveChaos     * (1 - a);
@@ -2436,8 +2421,8 @@ function writeSoloUB(dt, time) {
     f[18] = params.blackThreshold;
     const isQR = simState.qrStatus === 'SHOW';
     f[19] = isQR ? 0 : params.vignetteEdge;
-    f[20] = smoothBiasX;  // collective tilt bias
-    f[21] = smoothBiasY;
+    f[20] = 0;  // tilt bias removed
+    f[21] = 0;
     f[22] = params.avoidForceStr;
     u[23] = isQR ? 1 : 0;  // qrMode — rect-based homing when QR is active
     u[24] = hasAvoidMap ? 1 : 0;
@@ -2489,7 +2474,7 @@ function writeSoloUB(dt, time) {
     const _synthNow = performance.now();
     if (_synthNow - _lastSynthTick >= 200) {
         _lastSynthTick = _synthNow;
-        setSynthState(smoothChaos, smoothCoherence, smoothBiasX, smoothBiasY, smoothTemp);
+        setSynthState(smoothChaos, smoothCoherence, 0, 0, smoothTemp);
         setIdleChaos(smoothChaos);
     }
     if (Math.random() < 0.01) console.log('[chaos] smoothChaos→GPU:', smoothChaos.toFixed(4));

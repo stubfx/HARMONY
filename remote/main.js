@@ -25,8 +25,6 @@ const spectatorId = sessionStorage.getItem('spectator-id') ?? (() => {
 const sessionInfoEl   = document.querySelector('#session-info');
 const connDotEl       = document.querySelector('#conn-dot');
 const auraEl          = document.querySelector('#aura');
-const tiltRingEl      = document.querySelector('#tilt-ring');
-const tiltDotEl       = document.querySelector('#tilt-dot');
 const joystickBaseEl  = document.querySelector('#joystick-base');
 const joystickStickEl = document.querySelector('#joystick-stick');
 const starCanvas      = document.querySelector('#star-field');
@@ -203,7 +201,6 @@ function setRemoteUI({ stepStatus, optionA, optionB, voteDuration, color1, color
     // Reset one-shot state on mode enter
     if (isRaise) { _raiseDone = false; _raiseSwipeStartY = null; raisePanelEl?.classList.remove('completed'); }
     if (isWave)  { _waveDone  = false; wavePanelEl?.classList.remove('completed'); }
-    if (!isWave) clearTimeout(_sensorCheckTimer);
 
     if (votePanelEl) {
         if (isVote) {
@@ -238,7 +235,6 @@ function setRemoteUI({ stepStatus, optionA, optionB, voteDuration, color1, color
         if (isHarmony) { _initNoteCanvas(); }
     }
 
-    if (isWave) checkSensorSupport(waveNoteEl);
 
     if (topBarEl) {
         topBarEl.style.opacity       = showColors ? '1' : '0';
@@ -318,27 +314,6 @@ function triggerWave() {
 
 // ── Sensor unsupported check ──────────────────────────────────────────────────
 // Immediate check on state change; delayed fallback for permission-denied cases.
-let _motionReceived  = false;
-let _sensorCheckTimer = null;
-
-function checkSensorSupport(noteEl) {
-    clearTimeout(_sensorCheckTimer);
-    if (!noteEl) return;
-    noteEl.classList.remove('visible');
-
-    if (typeof DeviceMotionEvent === 'undefined') {
-        noteEl.textContent = 'questo dispositivo non supporta il sensore — aspetta il passo successivo';
-        noteEl.classList.add('visible');
-        return;
-    }
-
-    _sensorCheckTimer = setTimeout(() => {
-        if (!_motionReceived) {
-            noteEl.textContent = 'questo dispositivo non supporta il sensore — aspetta il passo successivo';
-            noteEl.classList.add('visible');
-        }
-    }, 2500);
-}
 
 // ── Pulse tap ─────────────────────────────────────────────────────────────────
 let _lastPulseEmit = 0;
@@ -377,27 +352,12 @@ function sendEvent(type, data) {
 }
 
 // ── Aura ──────────────────────────────────────────────────────────────────────
-// Tilt drives the anchor point; selected/pushed color drives the center hue.
-let currentRoll  = 0.5;
-let currentPitch = 0.5;
-
 function updateAura() {
     if (!auraEl) return;
-    const ax = 50 + (currentRoll  - 0.5) * 40;
-    const ay = 50 + (currentPitch - 0.5) * 40;
     const centerColor = pushedColor ?? '#2495FF';
-    auraEl.style.background =
-        `radial-gradient(circle at ${ax}% ${ay}%, ${centerColor} 0%, #000 65%)`;
+    auraEl.style.background = `radial-gradient(circle at 50% 50%, ${centerColor} 0%, #000 65%)`;
 }
 updateAura();
-
-// ── Tilt indicator ────────────────────────────────────────────────────────────
-function updateTiltDot(roll, pitch) {
-    if (!tiltDotEl) return;
-    const x = (roll  - 0.5) * 18;
-    const y = (pitch - 0.5) * 18;
-    tiltDotEl.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
-}
 
 // ── Star field ─────────────────────────────────────────────────────────────────
 // 65 stars with random depth drift counter to the joystick direction.
@@ -575,7 +535,6 @@ const SHAKE_COOLDOWN  = 1200; // ms between shakes
 
 window.addEventListener('devicemotion', (e) => {
     if (!motionEnabled) return;
-    _motionReceived = true;
     const a = e.accelerationIncludingGravity;
     if (!a) return;
     const now = Date.now();
@@ -893,26 +852,18 @@ function _applyChaosVisuals() {
 // ── Static noise loop — radio-signal-loss effect on keys ─────────────────────
 function startTilt() {
     motionEnabled = true;
-    tiltRingEl?.classList.add('visible');
 
     startDeviceTilt(20, (d) => {
-        // Decay always runs — even without gyro (desktop) so vignette fades after note touches
         const now = performance.now() / 1000;
         const dt  = _motionTickT !== null ? now - _motionTickT : 0;
         _motionTickT = now;
         _motionChaos = Math.max(0, _motionChaos - MOTION_DECAY_RATE * dt);
         _applyChaosVisuals();
 
-        if (!d.enabled) return;
-        currentRoll  = d.g;
-        currentPitch = d.b;
-        updateAura();
-        updateTiltDot(currentRoll, currentPitch);
-
-        if (tiltThrottle || !motionEnabled) return;
+        if (tiltThrottle) return;
         tiltThrottle = setTimeout(() => {
             tiltThrottle = null;
-            sendEvent('tilt', { pitch: currentPitch, roll: currentRoll, alpha: d.a, chaos: _motionChaos });
+            sendEvent('tilt', { chaos: _motionChaos });
         }, 250);
     });
 }

@@ -105,14 +105,11 @@ function updateUserState(roomId, socketId, type, data) {
     if (!room) return;
     let user = room.users.get(socketId);
     if (!user) {
-        user = { pitch: 0.5, roll: 0.5, temperature: 0.5, coherence: 0.5, lastSeen: Date.now() };
+        user = { temperature: 0.5, coherence: 0.5, lastSeen: Date.now() };
         room.users.set(socketId, user);
     }
     user.lastSeen = Date.now();
     if (type === 'tilt') {
-        user.alpha = data.alpha ?? 0.5;
-        user.pitch = data.pitch ?? 0.5;
-        user.roll  = data.roll  ?? 0.5;
         user.chaos = data.chaos ?? 0;
     }
     if (type === 'touch') {
@@ -163,13 +160,11 @@ setInterval(() => {
         }
         if (!room.hostSockets.size || !room.connections.size) continue;
 
-        let sp = 0, sr = 0, st = 0, sc = 0, sChaos = 0;
+        let st = 0, sc = 0, sChaos = 0;
         const activeUsers = [...room.users.values()];
         const n = activeUsers.length;
         if (n > 0) {
             for (const u of activeUsers) {
-                sp += u.pitch;
-                sr += u.roll;
                 st += u.temperature;
                 sc += u.coherence;
                 sChaos += u.chaos ?? 0;
@@ -180,8 +175,6 @@ setInterval(() => {
         room.lastAvgChaos = avgChaos;
 
         io.to(`${roomId}:hosts`).emit('collective-state', {
-            avgPitch:     n > 0 ? sp / n : 0.5,
-            avgRoll:      n > 0 ? sr / n : 0.5,
             avgTemp:      n > 0 ? st / n : 0.5,
             avgCoherence: n > 0 ? sc / n : 0.5,
             avgChaos,
