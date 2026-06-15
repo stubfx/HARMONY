@@ -1666,15 +1666,22 @@ const _harmonyFetching = new Set(); // sums currently being fetched
 let _harmonySnapshot   = null;      // params+formulas snapshot taken just before a config is applied
 
 // ── IndexedDB helpers ─────────────────────────────────────────────────────────
-const _HARMONY_DB_NAME  = 'thesis-sim-harmony';
-const _HARMONY_DB_STORE = 'images';
+const _HARMONY_DB_NAME   = 'thesis-sim-harmony';
+const _HARMONY_DB_IMAGES = 'images';
+const _HARMONY_DB_CONFIGS = 'configs';
 let _harmonyDb = null;
 
 function _openHarmonyDb() {
     if (_harmonyDb) return Promise.resolve(_harmonyDb);
     return new Promise((resolve, reject) => {
-        const req = indexedDB.open(_HARMONY_DB_NAME, 1);
-        req.onupgradeneeded = (e) => e.target.result.createObjectStore(_HARMONY_DB_STORE, { keyPath: 'sum' });
+        const req = indexedDB.open(_HARMONY_DB_NAME, 2);
+        req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(_HARMONY_DB_IMAGES))
+                db.createObjectStore(_HARMONY_DB_IMAGES,  { keyPath: 'sum' });
+            if (!db.objectStoreNames.contains(_HARMONY_DB_CONFIGS))
+                db.createObjectStore(_HARMONY_DB_CONFIGS, { keyPath: 'sum' });
+        };
         req.onsuccess = (e) => { _harmonyDb = e.target.result; resolve(_harmonyDb); };
         req.onerror   = (e) => reject(e.target.error);
     });
@@ -1684,7 +1691,7 @@ async function _harmonyDbRead(sum) {
     try {
         const db = await _openHarmonyDb();
         return new Promise((resolve) => {
-            const req = db.transaction(_HARMONY_DB_STORE, 'readonly').objectStore(_HARMONY_DB_STORE).get(sum);
+            const req = db.transaction(_HARMONY_DB_IMAGES, 'readonly').objectStore(_HARMONY_DB_IMAGES).get(sum);
             req.onsuccess = (e) => resolve(e.target.result?.bytes ?? null);
             req.onerror   = () => resolve(null);
         });
@@ -1695,12 +1702,36 @@ async function _harmonyDbWrite(sum, bytes) {
     try {
         const db = await _openHarmonyDb();
         return new Promise((resolve, reject) => {
-            const req = db.transaction(_HARMONY_DB_STORE, 'readwrite').objectStore(_HARMONY_DB_STORE).put({ sum, bytes, savedAt: Date.now() });
+            const req = db.transaction(_HARMONY_DB_IMAGES, 'readwrite').objectStore(_HARMONY_DB_IMAGES).put({ sum, bytes, savedAt: Date.now() });
             req.onsuccess = () => resolve();
             req.onerror   = (e) => reject(e.target.error);
         });
     } catch (e) {
         console.warn('[harmony] IndexedDB write failed (sum=' + sum + '):', e.message);
+    }
+}
+
+async function _harmonyConfigRead(sum) {
+    try {
+        const db = await _openHarmonyDb();
+        return new Promise((resolve) => {
+            const req = db.transaction(_HARMONY_DB_CONFIGS, 'readonly').objectStore(_HARMONY_DB_CONFIGS).get(sum);
+            req.onsuccess = (e) => resolve(e.target.result?.config ?? null);
+            req.onerror   = () => resolve(null);
+        });
+    } catch { return null; }
+}
+
+async function _harmonyConfigWrite(sum, config) {
+    try {
+        const db = await _openHarmonyDb();
+        return new Promise((resolve, reject) => {
+            const req = db.transaction(_HARMONY_DB_CONFIGS, 'readwrite').objectStore(_HARMONY_DB_CONFIGS).put({ sum, config, savedAt: Date.now() });
+            req.onsuccess = () => resolve();
+            req.onerror   = (e) => reject(e.target.error);
+        });
+    } catch (e) {
+        console.warn('[harmony] IndexedDB config write failed (sum=' + sum + '):', e.message);
     }
 }
 
@@ -1726,26 +1757,31 @@ async function _enterHarmony(sum) {
         await loadAvoidMap(new Blob([bytes], { type: 'image/webp' }));
     }
 
-    // Fetch and apply a random scene config from simAss/config/ (if any exist)
+    // Load scene config — cache-first via IndexedDB, fallback to server fetch
     if (_currentHarmonyKey === sum) {
-        try {
-            const res = await fetch(`${_apiBase}/simAss-config`);
-            if (res.ok) {
-                const config = await res.json();
-                // Snapshot current state before overwriting it
-                _harmonySnapshot = {
-                    dir:       document.querySelector('#dir-input')?.value  ?? '',
-                    wind:      document.querySelector('#wind-input')?.value ?? '',
-                    colorMode: simState.colorMode,
-                    mode:      simState.mode,
-                    status:    simState.status,
-                    params:    { ...params },
-                };
-                applySimParams(config);
-                gui?.controllersRecursive().forEach(c => c.updateDisplay());
+        let config = await _harmonyConfigRead(sum);
+        if (!config) {
+            try {
+                const res = await fetch(`${_apiBase}/simAss-config`);
+                if (res.ok) {
+                    config = await res.json();
+                    await _harmonyConfigWrite(sum, config);
+                }
+            } catch (e) {
+                console.warn('[harmony] config fetch failed:', e.message);
             }
-        } catch (e) {
-            console.warn('[harmony] config fetch failed:', e.message);
+        }
+        if (config && _currentHarmonyKey === sum) {
+            _harmonySnapshot = {
+                dir:       document.querySelector('#dir-input')?.value  ?? '',
+                wind:      document.querySelector('#wind-input')?.value ?? '',
+                colorMode: simState.colorMode,
+                mode:      simState.mode,
+                status:    simState.status,
+                params:    { ...params },
+            };
+            applySimParams(config);
+            gui?.controllersRecursive().forEach(c => c.updateDisplay());
         }
     }
 }
