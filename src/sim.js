@@ -143,7 +143,7 @@ const params = {
     spawnerSteering:        6,    // direction-change rate (1/s); lower = wider curves, higher = tighter turns
     spawnerInactiveTimeout: 5,    // seconds of joystick silence before spawner goes inactive
     releaseBurstSpeed:      30,   // fireworks: speed agents scatter at when a joystick is released (0 = disabled)
-    randomTeleportChance:   0.02, // per-frame probability [0–1] any agent jumps to a random canvas position
+    randomTeleportChance:   0.003, // per-frame probability [0–1] any agent jumps to a random canvas position
     // Session / QR restore
     remoteTimeout:  0,    // seconds of silence from all remotes before QR is restored (0 = disabled)
     maxSpectators:  1,    // sim QR hides when connected count reaches this threshold
