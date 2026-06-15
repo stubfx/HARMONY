@@ -2093,6 +2093,7 @@ windInput.value = DOT_WIND;
 // STATUS=FREEROAM suspends cycling; followFormula / windEnabled guard the rest.
 setInterval(() => {
     if (simState.status !== 'NORMAL') return;
+    if (activeSlots.length > 0) return; // idle only — freeze formula while users are connected
 
     let newDir  = dirInput.value;
     let newWind = windInput.value;
