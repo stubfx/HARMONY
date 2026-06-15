@@ -1647,7 +1647,13 @@ const activeSlots = [];
 
 // Note-driven formula selection: sum of active note indices → modulo on formula arrays.
 const _activeNotesBySpectator = new Map(); // spectatorId → noteIndex (0–8)
-let _noteFormulaTimer = null; // debounce — evita recompile pipeline ad ogni cambio nota
+let _noteFormulaTimer  = null;
+let _formulaHeat       = 0;           // [0,1] — cresce ad ogni cambio nota, decade nel tempo
+let _formulaHeatLastT  = Date.now();  // timestamp ultimo cambio (per calcolare dt decay)
+const _FORMULA_DEBOUNCE_MIN  = 200;   // ms — debounce a freddo
+const _FORMULA_DEBOUNCE_MAX  = 1000;  // ms — debounce a caldo (massimo)
+const _HEAT_PER_CHANGE = 0.25;        // ogni cambio nota aggiunge 25% di calore
+const _HEAT_DECAY_RATE = 0.5;         // decade del 50% al secondo → freddo in ~2s senza input
 
 // ── Harmony state ─────────────────────────────────────────────────────────────
 // The cache key is the raw note sum — each unique note combination gets its own
@@ -1742,8 +1748,15 @@ function _recalcNoteFormulas() {
     const newWind = WIND_FORMULAS[sum % WIND_FORMULAS.length];
     if (dirInput)  dirInput.value  = newDir;
     if (windInput) windInput.value = newWind;
+
+    const now = Date.now();
+    const dt  = (now - _formulaHeatLastT) / 1000;
+    _formulaHeatLastT = now;
+    _formulaHeat = Math.min(1, Math.max(0, _formulaHeat - _HEAT_DECAY_RATE * dt) + _HEAT_PER_CHANGE);
+    const debounceMs = _FORMULA_DEBOUNCE_MIN + _formulaHeat * (_FORMULA_DEBOUNCE_MAX - _FORMULA_DEBOUNCE_MIN);
+
     clearTimeout(_noteFormulaTimer);
-    _noteFormulaTimer = setTimeout(() => applyFormulas(newDir, newWind), 400);
+    _noteFormulaTimer = setTimeout(() => applyFormulas(newDir, newWind), debounceMs);
 }
 
 function uploadSpectatorSlots() {
