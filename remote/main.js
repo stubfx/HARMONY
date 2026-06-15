@@ -146,8 +146,7 @@ socket.on('device-message', (data) => {
 // VOTE — vote panel shown; joystick hidden
 const harmonyPanelEl  = document.querySelector('#harmony-panel');
 const chaosVignetteEl = document.querySelector('#chaos-vignette');
-const keyboardGridEl  = document.getElementById('keyboard-grid');
-const noiseCanvasEl   = document.getElementById('noise-canvas');
+const noteCanvasEl    = document.getElementById('note-canvas');
 const votePanelEl    = document.querySelector('#vote-panel');
 const voteBtnA       = document.querySelector('#vote-btn-a');
 const voteBtnB       = document.querySelector('#vote-btn-b');
@@ -236,7 +235,7 @@ function setRemoteUI({ stepStatus, optionA, optionB, voteDuration, color1, color
 
     if (harmonyPanelEl) {
         harmonyPanelEl.classList.toggle('visible', isHarmony);
-        if (isHarmony) { _initKeyboard(); _startNoiseLoop(); }
+        if (isHarmony) { _initNoteCanvas(); }
     }
 
     if (isWave) checkSensorSupport(waveNoteEl);
@@ -672,10 +671,13 @@ const KEYS = [
     { freq: 440.00, color: '#E91E8C' },  // A4
 ];
 
-let _audioCtx    = null;
-let _kbInitted   = false;
-let _reverbNode  = null;
-let _reverbSend  = null;
+let _audioCtx      = null;
+let _reverbNode    = null;
+let _reverbSend    = null;
+let _contOsc       = null;
+let _contGainNode  = null;
+let _contOscReady  = false;
+let _activeNoteIdx = -1;
 
 function _ensureAudioCtx() {
     if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -739,60 +741,146 @@ function _playNote(freq) {
     osc2.start(t); osc2.stop(t + 2.2);
 }
 
-function _initKeyboard() {
-    if (_kbInitted) return;
-    _kbInitted = true;
-    const grid = document.getElementById('keyboard-grid');
-    if (!grid) return;
-    KEYS.forEach((k, i) => {
-        const el = grid.children[i];
-        if (!el) return;
-        el.style.background = k.color;
-        const trigger = () => {
-            el.classList.add('pressed');
-            _playNote(k.freq);
-            sendEvent('note',       { index: i, freq: k.freq, color: k.color });
-            sendEvent('color-pick', { color: k.color });
-            _motionChaos = Math.min(1, _motionChaos + 0.2);
-            _applyChaosVisuals();
-        };
-        const release = () => el.classList.remove('pressed');
-        el.addEventListener('pointerdown',   (e) => { e.preventDefault(); trigger(); });
-        el.addEventListener('pointerup',     release);
-        el.addEventListener('pointercancel', release);
+// ── Continuous note canvas — touch surface + digital smoke ───────────────────
+
+const _smoke    = [];
+const _SMOKE_MAX = 60;
+
+function _startContOsc() {
+    if (_contOscReady) return;
+    const ctx = _ensureAudioCtx();
+    _ensureReverb(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 2200;
+    filter.Q.value = 0.5;
+    _contGainNode = ctx.createGain();
+    _contGainNode.gain.value = 0;
+    _contOsc = ctx.createOscillator();
+    _contOsc.type = 'triangle';
+    _contOsc.frequency.value = KEYS[4].freq;
+    _contOsc.connect(filter);
+    filter.connect(_contGainNode);
+    _contGainNode.connect(ctx.destination);
+    _contGainNode.connect(_reverbNode);
+    _contOsc.start();
+    _contOscReady = true;
+}
+
+function _setContNote(noteIdx, vol) {
+    if (!_contOscReady) return;
+    const t = _audioCtx.currentTime;
+    if (noteIdx !== _activeNoteIdx) {
+        _contOsc.frequency.setTargetAtTime(KEYS[noteIdx].freq, t, 0.04);
+        _activeNoteIdx = noteIdx;
+        sendEvent('note',       { index: noteIdx, freq: KEYS[noteIdx].freq, color: KEYS[noteIdx].color });
+        sendEvent('color-pick', { color: KEYS[noteIdx].color });
+        _motionChaos = Math.min(1, _motionChaos + 0.05);
+        _applyChaosVisuals();
+    }
+    _contGainNode.gain.setTargetAtTime(vol, t, 0.05);
+}
+
+function _silenceContNote() {
+    if (!_contOscReady) return;
+    _contGainNode.gain.setTargetAtTime(0, _audioCtx.currentTime, 0.12);
+    _activeNoteIdx = -1;
+}
+
+function _spawnSmoke(x, y, cf) {
+    if (_smoke.length >= _SMOKE_MAX) return;
+    const spread = 6 + (1 - cf) * 44;
+    const n = 1 + Math.round(cf * 2);
+    for (let i = 0; i < n; i++) {
+        _smoke.push({
+            x:     x + (Math.random() - 0.5) * spread,
+            y:     y + (Math.random() - 0.5) * spread * 0.4,
+            vx:    (Math.random() - 0.5) * 0.5,
+            vy:    -(0.5 + Math.random() * 1.2),
+            life:  1.0,
+            decay: 0.010 + (1 - cf) * 0.018,
+            size:  cf > 0.6 ? 2 : 3 + Math.round((1 - cf) * 4),
+        });
+    }
+}
+
+function _tickSmoke(ctx2d, w, h) {
+    ctx2d.clearRect(0, 0, w, h);
+    for (let i = _smoke.length - 1; i >= 0; i--) {
+        const p = _smoke[i];
+        p.x  += p.vx;
+        p.y  += p.vy;
+        p.life -= p.decay;
+        if (p.life <= 0) { _smoke.splice(i, 1); continue; }
+        ctx2d.globalAlpha = Math.pow(p.life, 1.4) * 0.9;
+        ctx2d.fillStyle = '#ffffff';
+        const s = p.size;
+        ctx2d.fillRect(Math.round(p.x) - s, Math.round(p.y) - s, s * 2, s * 2);
+    }
+    ctx2d.globalAlpha = 1;
+}
+
+function _initNoteCanvas() {
+    if (!noteCanvasEl) return;
+
+    function resize() {
+        noteCanvasEl.width  = noteCanvasEl.offsetWidth;
+        noteCanvasEl.height = noteCanvasEl.offsetHeight;
+    }
+    resize();
+    new ResizeObserver(resize).observe(noteCanvasEl);
+
+    const ctx2d = noteCanvasEl.getContext('2d');
+    let _touching = false, _touchX = 0, _touchY = 0;
+
+    function _cf(x, y) {
+        const w = noteCanvasEl.width, h = noteCanvasEl.height;
+        const dx = (x / w - 0.5) * 2, dy = (y / h - 0.5) * 2;
+        return Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / Math.SQRT2);
+    }
+
+    function _noteIdx(x) {
+        return Math.min(KEYS.length - 1, Math.floor(Math.max(0, x / noteCanvasEl.width) * KEYS.length));
+    }
+
+    function _vol(y) {
+        return 0.15 + (1 - Math.max(0, Math.min(1, y / noteCanvasEl.height))) * 0.25;
+    }
+
+    noteCanvasEl.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        noteCanvasEl.setPointerCapture(e.pointerId);
+        _startContOsc();
+        _touching = true;
+        _touchX = e.offsetX; _touchY = e.offsetY;
+        _setContNote(_noteIdx(_touchX), _vol(_touchY));
     });
+
+    noteCanvasEl.addEventListener('pointermove', (e) => {
+        if (!_touching) return;
+        _touchX = e.offsetX; _touchY = e.offsetY;
+        _setContNote(_noteIdx(_touchX), _vol(_touchY));
+    });
+
+    noteCanvasEl.addEventListener('pointerup',     () => { _touching = false; _silenceContNote(); });
+    noteCanvasEl.addEventListener('pointercancel', () => { _touching = false; _silenceContNote(); });
+
+    let _lastSpawn = 0;
+    (function loop(ts) {
+        requestAnimationFrame(loop);
+        if (_touching && ts - _lastSpawn > 25) {
+            _spawnSmoke(_touchX, _touchY, _cf(_touchX, _touchY));
+            _lastSpawn = ts;
+        }
+        _tickSmoke(ctx2d, noteCanvasEl.width, noteCanvasEl.height);
+    })(0);
 }
 
 function _applyChaosVisuals() {
-    if (keyboardGridEl)  keyboardGridEl.style.opacity  = (1 - _motionChaos * 0.88).toFixed(3);
-    if (noiseCanvasEl)   noiseCanvasEl.style.opacity   = (_motionChaos * 0.8).toFixed(3);
     if (chaosVignetteEl) chaosVignetteEl.style.opacity = _motionChaos.toFixed(3);
 }
 
 // ── Static noise loop — radio-signal-loss effect on keys ─────────────────────
-let _noiseCtx     = null;
-let _noiseImgData = null;
-let _noiseFrame   = 0;
-
-function _startNoiseLoop() {
-    if (_noiseCtx) return;
-    if (!noiseCanvasEl) return;
-    _noiseCtx     = noiseCanvasEl.getContext('2d');
-    _noiseImgData = _noiseCtx.createImageData(noiseCanvasEl.width, noiseCanvasEl.height);
-    for (let i = 3; i < _noiseImgData.data.length; i += 4) _noiseImgData.data[i] = 255;
-    (function loop() {
-        requestAnimationFrame(loop);
-        if (_motionChaos < 0.02) return;
-        if (++_noiseFrame % 3 !== 0) return; // ~20fps
-        const d = _noiseImgData.data;
-        for (let i = 0; i < d.length; i += 4) {
-            const v = (Math.random() * 255) | 0;
-            d[i] = d[i + 1] = d[i + 2] = v;
-        }
-        _noiseCtx.putImageData(_noiseImgData, 0, 0);
-    })();
-}
-
 function startTilt() {
     motionEnabled = true;
     tiltRingEl?.classList.add('visible');
