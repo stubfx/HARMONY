@@ -1640,10 +1640,50 @@ const activeSlots = [];
 const _activeNotesBySpectator = new Map(); // spectatorId → noteIndex (0–8)
 let _noteFormulaTimer = null; // debounce — evita recompile pipeline ad ogni cambio nota
 
+// ── Harmony state ─────────────────────────────────────────────────────────────
+let _harmonyPendingBytes = null;  // Uint8Array prefetchata, pronta per il prossimo harmony
+let _harmonyActive       = false; // true = avoidMap caricata da harmony corrente
+let _harmonyFetching     = false; // guard anti double-fetch
+
+async function _prefetchHarmonyImage() {
+    if (_harmonyFetching) return;
+    _harmonyFetching = true;
+    try {
+        _harmonyPendingBytes = await _fetchIdleImageBytes();
+    } catch (e) {
+        console.warn('[harmony] prefetch failed:', e.message);
+    } finally {
+        _harmonyFetching = false;
+    }
+}
+
+async function _enterHarmony() {
+    if (_harmonyActive) return;
+    _harmonyActive = true;
+    if (_harmonyPendingBytes) {
+        await loadAvoidMap(new Blob([_harmonyPendingBytes], { type: 'image/webp' }));
+        _harmonyPendingBytes = null;
+    }
+    _prefetchHarmonyImage(); // prepara subito la prossima
+}
+
+function _exitHarmony() {
+    if (!_harmonyActive) return;
+    _harmonyActive = false;
+    clearAvoidMap();
+    _prefetchHarmonyImage(); // prepara per il prossimo ingresso in harmony
+}
+
 function _recalcNoteFormulas() {
-    if (_activeNotesBySpectator.size === 0) return;
     let sum = 0;
     for (const idx of _activeNotesBySpectator.values()) sum += idx;
+
+    const wantHarmony = _activeNotesBySpectator.size > 0 && (sum % 10 === 0);
+    if (wantHarmony && !_harmonyActive)  _enterHarmony();
+    else if (!wantHarmony && _harmonyActive) _exitHarmony();
+
+    if (_activeNotesBySpectator.size === 0) return;
+
     const newDir  = DIR_FORMULAS[sum % DIR_FORMULAS.length];
     const newWind = WIND_FORMULAS[sum % WIND_FORMULAS.length];
     if (dirInput)  dirInput.value  = newDir;
@@ -1777,7 +1817,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
     // A spectator joined — assign a slot, send them their color, brightness burst.
     socket.on('spectator-joined', ({ spectatorId, userCount } = {}) => {
         if (userCount !== undefined) simState.userCount = userCount;
-        if (userCount === 1) { clearAvoidMap(); loadIdleAudio(true); _startIdleImageCycle(); } // first user — start music with fade in
+        if (userCount === 1) { loadIdleAudio(true); } // first user — start music with fade in
         if (simState.status === 'DOT' && userCount >= 1) setStatus('NORMAL');
         lastRemoteActivity = Date.now();
         burstBrightness    = BURST_BRIGHTNESS;
@@ -1794,6 +1834,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
     socket.on('spectator-left', ({ spectatorId, userCount } = {}) => {
         if (userCount !== undefined) simState.userCount = userCount;
         if (userCount === 0) {
+            _exitHarmony();
             collectiveChaos     = 1;
             collectiveCoherence = 0.5;
             collectiveTemp      = 0.5;
@@ -3050,56 +3091,15 @@ function frame(ts) {
     fpsFrames++;
 }
 
-// ── Idle image rotation — only while spectators are connected ─────────────────
-let _lastIdleImageBytes = null;
-let _imageRotationActive = false;
-
+// ── simAss image fetch — shared by harmony prefetch ──────────────────────────
 async function _fetchIdleImageBytes() {
     const res = await fetch(`${_apiBase}/simAss-image`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return new Uint8Array(await res.arrayBuffer());
 }
 
-function _simpleHash(bytes) {
-    let h = 0x811c9dc5;
-    for (let i = 0; i < Math.min(bytes.length, 4096); i++) {
-        h ^= bytes[i];
-        h = (h * 0x01000193) >>> 0;
-    }
-    return h;
-}
-
-function _scheduleNextImageCheck() {
-    const delay = 20000 + Math.random() * 10000; // 20–30s random
-    setTimeout(async () => {
-        if (!activeSlots.length) { _imageRotationActive = false; return; }
-        try {
-            const bytes    = await _fetchIdleImageBytes();
-            const hash     = _simpleHash(bytes);
-            const lastHash = _lastIdleImageBytes ? _simpleHash(_lastIdleImageBytes) : null;
-            if (hash !== lastHash) {
-                _lastIdleImageBytes = bytes;
-                clearAvoidMap();
-                await new Promise(r => setTimeout(r, 5000 + Math.random() * 5000));
-                if (activeSlots.length) await loadAvoidMap(new Blob([bytes], { type: 'image/webp' }));
-            }
-        } catch (e) {
-            console.warn('[idle-image-rotation]', e);
-        }
-        if (activeSlots.length) _scheduleNextImageCheck();
-        else _imageRotationActive = false;
-    }, delay);
-}
-
-function _startIdleImageCycle() {
-    if (_imageRotationActive) return;
-    _imageRotationActive = true;
-    _fetchIdleImageBytes().then(bytes => {
-        _lastIdleImageBytes = bytes;
-        return loadAvoidMap(new Blob([bytes], { type: 'image/webp' }));
-    }).catch(e => console.warn('[idle-image]', e));
-    _scheduleNextImageCheck();
-}
+// Prefetch on load so the first harmony transition is instant.
+_prefetchHarmonyImage();
 
 // ── simAss audio loader — chains tracks via Tone.js radio chain ──────────────
 // Plays when users are connected. fadeIn=true on first track (user join).
