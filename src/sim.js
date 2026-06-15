@@ -1637,6 +1637,7 @@ const activeSlots = [];
 
 // Note-driven formula selection: sum of active note indices → modulo on formula arrays.
 const _activeNotesBySpectator = new Map(); // spectatorId → noteIndex (0–8)
+let _noteFormulaTimer = null; // debounce — evita recompile pipeline ad ogni cambio nota
 
 function _recalcNoteFormulas() {
     if (_activeNotesBySpectator.size === 0) return;
@@ -1646,7 +1647,8 @@ function _recalcNoteFormulas() {
     const newWind = WIND_FORMULAS[sum % WIND_FORMULAS.length];
     if (dirInput)  dirInput.value  = newDir;
     if (windInput) windInput.value = newWind;
-    applyFormulas(newDir, newWind);
+    clearTimeout(_noteFormulaTimer);
+    _noteFormulaTimer = setTimeout(() => applyFormulas(newDir, newWind), 400);
 }
 
 function uploadSpectatorSlots() {
