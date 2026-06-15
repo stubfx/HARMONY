@@ -767,18 +767,17 @@ function _startContOsc() {
     _contOscReady = true;
 }
 
-function _setContNote(noteIdx, vol) {
+function _setContNote(noteIdx) {
     if (!_contOscReady) return;
     const t = _audioCtx.currentTime;
     if (noteIdx !== _activeNoteIdx) {
         _contOsc.frequency.setTargetAtTime(KEYS[noteIdx].freq, t, 0.04);
         _activeNoteIdx = noteIdx;
-        sendEvent('note',       { index: noteIdx, freq: KEYS[noteIdx].freq, color: KEYS[noteIdx].color });
-        sendEvent('color-pick', { color: KEYS[noteIdx].color });
+        sendEvent('note', { index: noteIdx, freq: KEYS[noteIdx].freq, color: KEYS[noteIdx].color });
         _motionChaos = Math.min(1, _motionChaos + 0.05);
         _applyChaosVisuals();
     }
-    _contGainNode.gain.setTargetAtTime(vol, t, 0.05);
+    _contGainNode.gain.setTargetAtTime(0.25, t, 0.05);
 }
 
 function _silenceContNote() {
@@ -833,6 +832,7 @@ function _initNoteCanvas() {
 
     const ctx2d = noteCanvasEl.getContext('2d');
     let _touching = false, _touchX = 0, _touchY = 0;
+    let _lastSentHue = -1;
 
     function _cf(x, y) {
         const w = noteCanvasEl.width, h = noteCanvasEl.height;
@@ -844,8 +844,15 @@ function _initNoteCanvas() {
         return Math.min(KEYS.length - 1, Math.floor(Math.max(0, x / noteCanvasEl.width) * KEYS.length));
     }
 
-    function _vol(y) {
-        return 0.15 + (1 - Math.max(0, Math.min(1, y / noteCanvasEl.height))) * 0.25;
+    // Y axis → HSL hue 0 (top, red) → 270 (bottom, violet). Quantised to 10° steps.
+    function _applyColor(y) {
+        const hue = Math.round((Math.max(0, Math.min(1, y / noteCanvasEl.height)) * 270) / 10) * 10;
+        if (hue === _lastSentHue) return;
+        _lastSentHue = hue;
+        const hex = hslToHex(hue, 80, 50);
+        pushedColor = hex;
+        updateAura();
+        sendEvent('color-pick', { color: hex });
     }
 
     noteCanvasEl.addEventListener('pointerdown', (e) => {
@@ -854,13 +861,15 @@ function _initNoteCanvas() {
         _startContOsc();
         _touching = true;
         _touchX = e.offsetX; _touchY = e.offsetY;
-        _setContNote(_noteIdx(_touchX), _vol(_touchY));
+        _setContNote(_noteIdx(_touchX));
+        _applyColor(_touchY);
     });
 
     noteCanvasEl.addEventListener('pointermove', (e) => {
         if (!_touching) return;
         _touchX = e.offsetX; _touchY = e.offsetY;
-        _setContNote(_noteIdx(_touchX), _vol(_touchY));
+        _setContNote(_noteIdx(_touchX));
+        _applyColor(_touchY);
     });
 
     noteCanvasEl.addEventListener('pointerup',     () => { _touching = false; _silenceContNote(); });
