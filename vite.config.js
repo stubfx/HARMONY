@@ -28,8 +28,9 @@ export default defineConfig({
             // Socket.IO connects directly to Express (no proxy) — see sim.js / remote/main.js.
             '/rndImage':   'http://localhost:3000',
             '/admin-auth': 'http://localhost:3000',
-            '/simAss-image': 'http://localhost:3000',
-            '/simAss-audio': 'http://localhost:3000',
+            '/simAss-image':  'http://localhost:3000',
+            '/simAss-audio':  'http://localhost:3000',
+            '/simAss-config': 'http://localhost:3000',
         },
     },
 });
