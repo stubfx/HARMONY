@@ -1356,8 +1356,11 @@ let windVisBG   = null;
 
 function rebuildSimBG() {
     if (!simPipe) return;
-    const texView           = (hasImage    && imageTexView)    ? imageTexView    : placeholderTexView;
-    const avoidMapView      = (hasAvoidMap && avoidMapTexView) ? avoidMapTexView : placeholderTexView;
+    const useAvoidAsTrace = _noteTraceModeActive && hasAvoidMap && avoidMapTexView;
+    const texView      = useAvoidAsTrace          ? avoidMapTexView
+                       : (hasImage && imageTexView) ? imageTexView : placeholderTexView;
+    const avoidMapView = useAvoidAsTrace               ? placeholderTexView
+                       : (hasAvoidMap && avoidMapTexView) ? avoidMapTexView : placeholderTexView;
     const shadowDensityRes  = shadowDensityView ?? placeholderTexView;
     simBG = device.createBindGroup({
         layout: simPipe.getBindGroupLayout(0),
@@ -1636,11 +1639,20 @@ const activeSlots = [];
 
 // Note-driven formula selection: sum of active note indices → modulo on formula arrays.
 const _activeNotesBySpectator = new Map(); // spectatorId → noteIndex (0–8)
+let _noteTraceModeActive = false; // true when sum of active note indices is a multiple of 10
 
 function _recalcNoteFormulas() {
-    if (_activeNotesBySpectator.size === 0) return;
     let sum = 0;
     for (const idx of _activeNotesBySpectator.values()) sum += idx;
+
+    const wantTrace = _activeNotesBySpectator.size > 0 && (sum % 10 === 0);
+    if (wantTrace !== _noteTraceModeActive) {
+        _noteTraceModeActive = wantTrace;
+        rebuildSimBG();
+    }
+
+    if (_activeNotesBySpectator.size === 0) return;
+
     const newDir  = DIR_FORMULAS[sum % DIR_FORMULAS.length];
     const newWind = WIND_FORMULAS[sum % WIND_FORMULAS.length];
     if (dirInput)  dirInput.value  = newDir;
@@ -1807,6 +1819,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
                 uploadSpectatorSlots();
             }
             _activeNotesBySpectator.delete(spectatorId);
+            _recalcNoteFormulas();
         }
     });
 
@@ -1880,6 +1893,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
         }
         if (event.type === 'note-off') {
             _activeNotesBySpectator.delete(event.spectatorId);
+            _recalcNoteFormulas();
         }
         if (event.type === 'pulse-tap') {
             pulseEnergy = Math.min(pulseEnergy + PULSE_INCREMENT, PULSE_MAX);
@@ -2325,7 +2339,7 @@ function writeSoloUB(dt, time) {
     f[7] = params.turnRate * coherenceMult;  // coherence scales how sharply agents follow the formula
     f[8] = params.maxSpeed;
     f[9] = params.minSpeed;
-    u[10] = hasImage ? 1 : 0;
+    u[10] = (hasImage || (_noteTraceModeActive && hasAvoidMap)) ? 1 : 0;
     f[11] = params.magnetStr;
     f[12] = x0;
     f[13] = y0;
@@ -2340,7 +2354,7 @@ function writeSoloUB(dt, time) {
     f[21] = smoothBiasY;
     f[22] = params.avoidForceStr;
     u[23] = isQR ? 1 : 0;  // qrMode — rect-based homing when QR is active
-    u[24] = hasAvoidMap ? 1 : 0;
+    u[24] = (hasAvoidMap && !_noteTraceModeActive) ? 1 : 0;
     f[25] = params.avoidMapScale;
     u[26] = params.bounceEdges ? 1 : 0;
     f[27] = params.probeLen;
@@ -2416,7 +2430,7 @@ function writeRenderUB() {
     f[5] = _c1g;
     f[6] = _c1b;
     f[7] = params.maxSpeed;
-    u[8]  = hasImage ? 1 : 0;
+    u[8]  = (hasImage || (_noteTraceModeActive && hasAvoidMap)) ? 1 : 0;
     f[9]  = x0;
     f[10] = y0;
     f[11] = x1;
@@ -2456,7 +2470,7 @@ function writeRenderUB() {
     // Avoid map options for per-particle color sampling. hasAvoidMap mirrors the
     // global flag so the shader can early-out when no map is loaded (the binding
     // is still valid — it falls back to placeholderTexView).
-    u[30] = hasAvoidMap ? 1 : 0;
+    u[30] = (hasAvoidMap && !_noteTraceModeActive) ? 1 : 0;
     f[31] = params.avoidMapScale;
     u[32] = params.avoidMapInvert ? 1 : 0;
     u[33] = params.avoidMapSampleColor ? 1 : 0;
@@ -2523,7 +2537,7 @@ function writeAgentShadowUB() {
     _shadowF[1] = canvas.height;
     _shadowF[2] = params.agentShadowRadius;
     _shadowF[3] = params.agentShadowStr;
-    _shadowU[4] = hasImage ? 1 : 0;
+    _shadowU[4] = (hasImage || (_noteTraceModeActive && hasAvoidMap)) ? 1 : 0;
     _shadowF[5] = params.homingProximityRange;
     _shadowF[6] = params.homingMinAlpha;
     _shadowU[7] = params.championsEnabled ? params.champions : 0;
@@ -2891,7 +2905,7 @@ function frame(ts) {
     // Shadow density pass: clear to black, render bright additive splats per homing agent.
     // Result is read by compute.wgsl binding 5 on the *next* frame (same-frame read is fine
     // because the density pass runs after compute, and compute runs first next frame).
-    if (hasImage && agentShadowDensityBG && shadowDensityView) {
+    if ((hasImage || (_noteTraceModeActive && hasAvoidMap)) && agentShadowDensityBG && shadowDensityView) {
         const dp = enc.beginRenderPass({
             colorAttachments: [{
                 view: shadowDensityView,
@@ -2921,7 +2935,7 @@ function frame(ts) {
     rp.draw(3);
     // Agent shadow is a soft splat — incoherent with chunky cells, skip in pixel mode.
     // Runs when an image is loaded (homing shadows) or champions are active (constant shadows).
-    if ((hasImage || (params.championsEnabled && params.champions > 0)) && agentShadowBG && !usingPixel) {
+    if (((hasImage || (_noteTraceModeActive && hasAvoidMap)) || (params.championsEnabled && params.champions > 0)) && agentShadowBG && !usingPixel) {
         rp.setPipeline(agentShadowPipe);
         rp.setBindGroup(0, agentShadowBG);
         rp.draw(params.agentCount * 6);
