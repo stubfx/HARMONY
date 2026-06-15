@@ -77,7 +77,7 @@ export function initGUI({
     // ── Game of Life ────────────────────────────────────────────────────────────
     // Conway automaton on a grid; particles are pulled toward the live cells.
     const fGol = gui.addFolder('Game of Life');
-    fGol.add(params, 'golEnabled').name('enabled').onChange(v => { if (v) seedGoL(); });
+    const golEnabledCtrl = fGol.add(params, 'golEnabled').name('enabled').onChange(v => { if (v) seedGoL(); });
     fGol.add(params, 'golStrength',     0, 2,  0.01).name('attraction');
     fGol.add(params, 'golStepInterval', 1, 30, 1   ).name('frames / step');
     fGol.add(params, 'golSpark',        0, 0.1, 0.001).name('life spark');
@@ -350,6 +350,7 @@ export function initGUI({
         dbgTemp,
         dbgCoherence,
         dbgChaos,
+        golEnabledCtrl,
         applyGUIVisibility,
         toggleGUI,
         updateGizmo(pitch, roll) {

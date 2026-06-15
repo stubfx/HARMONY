@@ -1462,6 +1462,7 @@ let modeCtrl      = null;
 let colorModeCtrl = null;
 let gui, swarmDebug, dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence, dbgChaos;
 let applyGUIVisibility, toggleGUI, updateGizmo;
+let golEnabledCtrl = null;
 
 function updateStateDisplay() {
     modeCtrl?.updateDisplay();
@@ -2150,6 +2151,7 @@ function applySimParams(data) {
     gui, swarmDebug,
     modeCtrl, colorModeCtrl, stateCtrl, qrStateCtrl,
     dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence, dbgChaos,
+    golEnabledCtrl,
     applyGUIVisibility, toggleGUI, updateGizmo,
 } = initGUI({
     params, socket, simState, MAX_AGENTS,
@@ -2474,8 +2476,13 @@ function writeSoloUB(dt, time) {
         f[41] = 0; f[42] = 0; f[43] = 0; f[44] = 0;
     }
     u[45] = params.avoidMapInvert ? 1 : 0;
-    // GoL activated automatically when collective chaos exceeds the freeroam threshold
-    params.golEnabled = smoothChaos > 0.3;
+    // GoL driven by chaos threshold — updates params.golEnabled only on crossing so GUI toggle works
+    const wantGoL = smoothChaos > 0.3;
+    if (wantGoL !== params.golEnabled) {
+        params.golEnabled = wantGoL;
+        if (wantGoL) seedGoL();
+        golEnabledCtrl?.updateDisplay();
+    }
     u[46] = params.golEnabled ? 1 : 0;
     f[47] = params.golStrength;
     f[48] = params.releaseBurstSpeed;
