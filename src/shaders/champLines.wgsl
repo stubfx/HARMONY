@@ -2,17 +2,19 @@
 // Draws a LINE_STRIP connecting all champion agents (every Nth) in array order.
 // Rendered as a final overlay pass onto the swap-chain texture (loadOp:'load').
 //
-// ChampLinesParams layout (16 bytes):
+// ChampLinesParams layout (32 bytes):
 //   [0]  canvasW    f32
 //   [4]  canvasH    f32
 //   [8]  agentCount u32
 //   [12] champions  u32   (stride — same value as AgentShadowParams.champions)
+//   [16] alpha      f32   (GUI-controlled line opacity)
 
 struct ChampLinesParams {
     canvasW:    f32,
     canvasH:    f32,
     agentCount: u32,
     champions:  u32,
+    alpha:      f32,
 }
 
 struct Agent {
@@ -37,5 +39,5 @@ struct Agent {
 }
 
 @fragment fn fs() -> @location(0) vec4f {
-    return vec4f(1.0, 1.0, 1.0, 0.18);
+    return vec4f(1.0, 1.0, 1.0, p.alpha);
 }

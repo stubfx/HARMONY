@@ -93,6 +93,7 @@ const params = {
     // Champion point size — applied ONLY while a champion is free (not homing);
     // homing champions render at the normal agent size like everyone else.
     championSize:      15,
+    champLinesAlpha:   0.18,
     // Game of Life mode — toggle
     golEnabled:      false,
     golStrength:     0.5,  // attraction of particles toward live cells
@@ -622,7 +623,7 @@ let agentShadowBG        = null;
 let agentShadowDensityBG = null;
 
 // ── Champion Lines — LINE_STRIP overlay connecting champion agents ─────────────
-const champLinesUB  = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+const champLinesUB  = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
 const champLinesMod = device.createShaderModule({ code: champLinesWGSL });
 const champLinesPipe = device.createRenderPipeline({
     layout: 'auto',
@@ -632,8 +633,8 @@ const champLinesPipe = device.createRenderPipeline({
         targets: [{
             format: canvasFormat,
             blend: {
-                color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-                alpha: { srcFactor: 'one',        dstFactor: 'one-minus-src-alpha', operation: 'add' },
+                color: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' },
+                alpha: { srcFactor: 'zero',       dstFactor: 'one', operation: 'add' },
             },
         }],
     },
@@ -2947,10 +2948,13 @@ function frame(ts) {
     if (params.championsEnabled && params.champions > 0) {
         const champCount = Math.floor(params.agentCount / params.champions);
         if (champCount >= 2) {
-            const clF = new Float32Array([canvas.width, canvas.height]);
-            const clU = new Uint32Array([params.agentCount, params.champions]);
-            device.queue.writeBuffer(champLinesUB, 0,  clF);
-            device.queue.writeBuffer(champLinesUB, 8,  clU);
+            const clAB = new ArrayBuffer(32);
+            const clF  = new Float32Array(clAB);
+            const clU  = new Uint32Array(clAB);
+            clF[0] = canvas.width; clF[1] = canvas.height;
+            clU[2] = params.agentCount; clU[3] = params.champions;
+            clF[4] = params.champLinesAlpha;
+            device.queue.writeBuffer(champLinesUB, 0, clAB);
             const lp = enc.beginRenderPass({
                 colorAttachments: [{
                     view: curTex.createView(),
