@@ -2945,10 +2945,10 @@ function frame(ts) {
 
     // Champion lines — LINE_STRIP overlay on the swap-chain texture
     if (params.championsEnabled && params.champions > 0) {
-        const champCount = Math.floor(agentCount / params.champions);
+        const champCount = Math.floor(params.agentCount / params.champions);
         if (champCount >= 2) {
             const clF = new Float32Array([canvas.width, canvas.height]);
-            const clU = new Uint32Array([agentCount, params.champions]);
+            const clU = new Uint32Array([params.agentCount, params.champions]);
             device.queue.writeBuffer(champLinesUB, 0,  clF);
             device.queue.writeBuffer(champLinesUB, 8,  clU);
             const lp = enc.beginRenderPass({
