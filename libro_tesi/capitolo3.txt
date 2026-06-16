@@ -12,7 +12,7 @@ Eppure, guardandoli oggi, questi sistemi sembrano quasi esauriti. Non perché ab
 
 Questa sensazione mi dava fastidio, e credo sia stata una delle molle che ha spinto verso HARMONY. Non perché volessi restaurare quei sistemi o aggiornarli, ma perché mi chiedevo dove fosse andata a finire quella meraviglia. Cosa c'era di diverso tra guardare le cellule di Conway e guardare un modello linguistico che risponde? La risposta, alla fine, era semplice: la variabile umana. Il Game of Life è un sistema chiuso. I Boids sono un sistema chiuso. Nessuno entra, nessuno cambia le regole dall'interno. La complessità emerge, ma non incontra nessuno mentre lo fa.
 
-HARMONY nasce da questa mancanza. Il Sistema usa il Game of Life come base su cui costruire i momenti di caos, non come decorazione ma come motore, come lingua. Quel caos che a prima vista sembra assenza di immagine ha in realtà un suo modo di essere, una grammatica che si impara guardando senza aspettarsi di capire subito. Ma a differenza di Conway, questo caos incontra qualcuno: la nota che qualcuno ha scelto, il momento che qualcuno ha portato, la presenza che cambia il sistema dall'interno mentre il sistema cambia chi lo abita.
+Da quella osservazione nasce HARMONY. Il Sistema usa il Game of Life come base su cui costruire i momenti di caos, non come decorazione ma come motore, come lingua. Quel caos che a prima vista sembra assenza di immagine ha in realtà un suo modo di essere, una grammatica che si impara guardando senza aspettarsi di capire subito. Ma a differenza di Conway, questo caos incontra qualcuno: la nota che qualcuno ha scelto, il momento che qualcuno ha portato, la presenza che cambia il sistema dall'interno mentre il sistema cambia chi lo abita.
 
 HARMONY non è nato tutto insieme. C'è stato un lungo periodo prima, fatto di tentativi che non portavano da nessuna parte, direzioni abbandonate a metà, versioni che sembravano giuste finché non lo erano più. Mesi in cui si provava qualcosa, si guardava cosa succedeva, e si smontava tutto per ricominciare.
 
@@ -27,11 +27,11 @@ Il problema non era il risultato. Il problema era la logica che ci stava dietro.
 
 Il momento in cui ho smesso di chiedere non è stato drammatico. Non c'è stata una decisione consapevole, una sera in cui mi sono detto basta. È successo più lentamente, come quando si smette di guardare dove si mettono i piedi e si comincia a guardare intorno.
 
-Ho cominciato a fare cose senza giustificazione. A scegliere non perché aveva senso ma perché sentivo che era giusta. A lasciare che qualcosa mi sembrasse bello senza dovermi spiegare perché. È un modo di lavorare che la logica considera inefficiente, e probabilmente lo è. Ma era l'unico modo in cui qualcosa di interessante cominciava ad emergere.
+Ho cominciato a fare cose senza giustificazione. A scegliere non perché aveva senso ma perché lo sentivo giusto. A lasciare che qualcosa mi sembrasse bello senza dovermi spiegare perché. È un modo di lavorare che la logica considera inefficiente, e probabilmente lo è. Ma era l'unico modo in cui qualcosa di interessante cominciava ad emergere.
 
 C'è una scelta precisa che ricordo più delle altre. All'inizio cercavo di usare i punti per costruire immagini: guidarli verso configurazioni che avevo in mente, farli occupare lo spazio secondo un disegno. Il risultato era sbagliato in un modo che ho impiegato del tempo a nominare. Non era sbagliato visivamente, era sbagliato come logica. Stavo controllando il sistema, e un sistema controllato smette di essere vivo.
 
-Ho ribaltato il principio. L'immagine non sarebbe stata qualcosa che i punti costruivano: sarebbe diventata un ostacolo da rivelare. I punti l'avrebbero evitata, e quella forma avrebbe preso vita attraverso la loro assenza. Non la presenza degli elementi, ma la loro mancanza. Un'immagine che si rivela da dove il sistema non è.
+Ho ribaltato il principio. L'immagine non sarebbe stata qualcosa che i punti costruivano: sarebbe diventata un ostacolo da rivelare. I punti l'avrebbero evitata, e quella forma avrebbe preso vita attraverso la loro assenza. Non la presenza degli elementi, ma la loro mancanza. Un'immagine che vive nello spazio che i punti non occupano.
 
 Non poteva arrivare finché continuavo a stare nei confini di quello che riuscivo a spiegare. Dovevo smettere di spiegare per cominciare a sentire.
 
@@ -44,7 +44,7 @@ Costruire nel buio significa questo: avanzare senza vedere dove si va, fidandosi
 
 C'è un'immagine che torna spesso in questo periodo, quella di un bambino che guarda il cielo stellato. Un bambino non ha strumenti per misurare la distanza delle stelle, non conosce le equazioni che descrivono le orbite, non sa spiegare perché alcune brillano di più di altre. Eppure guarda, e in quello sguardo c'è qualcosa di completamente aperto: meraviglia senza aspettative, curiosità senza agenda, la capacità di restare lì a lungo senza dover arrivare da nessuna parte.
 
-Quello che un bambino porta a quel cielo è esattamente quello che la logica non riesce a portarci: la libertà di non capire e trovare che sia abbastanza. Di guardare un sistema vastissimo e complesso e non sentire il bisogno di ridurlo a qualcosa di spiegabile. Di lasciare che la bellezza faccia il suo lavoro senza interferire.
+Quello che un bambino porta a quel cielo è esattamente quello che la logica non riesce a portarci: la libertà di non capire e non sentirne il bisogno. Di guardare un sistema vastissimo e complesso e non sentire il bisogno di ridurlo a qualcosa di spiegabile. Di lasciare che la bellezza faccia il suo lavoro senza interferire.
 
 HARMONY è nato da lì. Non da una specifica tecnica o da un problema risolto, ma da quello sguardo. Dal momento in cui ho smesso di chiedermi se aveva senso e ho cominciato a chiedermi se era quello che volevo guardare.
 
