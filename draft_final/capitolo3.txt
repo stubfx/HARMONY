@@ -6,7 +6,7 @@
 
 Prima di HARMONY c'erano già altri sistemi che mi avevano sempre affascinato. Il Game of Life di John Conway (1970) e i Boids di Craig Reynolds (1987) sono due esempi di qualcosa che mi ha tenuto incollato allo schermo per ore: sistemi autonomi guidati da regole semplicissime, capaci di produrre comportamenti che nessuna delle regole conteneva da sola. Il Game of Life funziona con quattro regole su nascita e morte delle cellule. I Boids si muovono seguendo tre principi elementari di separazione, allineamento e coesione. Eppure da quei pochi principi emergono forme, pattern, strutture che sembrano avere intenzione, che sembrano vive.
 
-Quello che mi colpiva guardando questi sistemi era qualcosa che ho faticato a lungo a mettere in parole. Quando si guarda girare il Game of Life si comincia quasi sempre dalla stessa parte: si seguono le singole cellule, si fa il tifo per quelle che sopravvivono, si immagina che possano in qualche modo vincere rispetto alle altre. Poi a un certo punto lo sguardo si allarga, e ci si accorge che il tutto è qualcosa di più del singolo. Quello che sembrava un insieme di sopravvissuti è in realtà un'unica cosa, un organismo che respira, che cambia, che ha una logica propria che nessuna cellula conosce.
+Guardando girare il Game of Life si comincia quasi sempre dalla stessa parte: si seguono le singole cellule, si fa il tifo per quelle che sopravvivono, si immagina che possano in qualche modo vincere rispetto alle altre. Poi a un certo punto lo sguardo si allarga, e ci si accorge che il tutto è qualcosa di più del singolo. Quello che sembrava un insieme di sopravvissuti è in realtà un'unica cosa, un organismo che respira, che cambia, che ha una logica propria che nessuna cellula conosce.
 
 Eppure, guardandoli oggi, questi sistemi sembrano quasi esauriti. Non perché abbiano smesso di funzionare, ma perché in un'epoca di modelli generativi enormi, di sistemi che producono linguaggio e immagini su richiesta, Game of Life e Boids sembrano non avere più niente di nascosto da cercare. La meraviglia che producevano apparteneva a un momento preciso, quando la complessità emergente era ancora una scoperta. Ora è quasi ovvia.
 
@@ -29,7 +29,7 @@ Il momento in cui ho smesso di chiedere non è stato drammatico. Non c'è stata 
 
 Ho cominciato a fare cose senza giustificazione. A scegliere non perché aveva senso ma perché sentivo che era giusta. A lasciare che qualcosa mi sembrasse bello senza dovermi spiegare perché. È un modo di lavorare che la logica considera inefficiente, e probabilmente lo è. Ma era l'unico modo in cui qualcosa di interessante cominciava ad emergere.
 
-Per me non poteva arrivare finché continuavo a stare nei confini di quello che riuscivo a spiegare. Dovevo smettere di spiegare per cominciare a sentire.
+Non poteva arrivare finché continuavo a stare nei confini di quello che riuscivo a spiegare. Dovevo smettere di spiegare per cominciare a sentire.
 
 Non significa che la tecnica non conti. La tecnica è necessaria, è il modo in cui le mani traducono quello che sente il resto. Ma la direzione non può venire dalla tecnica, viene da un posto diverso, più antico, più silenzioso. Viene dal genere di sensazione che si ha quando qualcosa è giusto prima ancora di sapere perché è giusto.
 
@@ -44,6 +44,6 @@ Quello che un bambino porta a quel cielo è esattamente quello che la logica non
 
 HARMONY è nato da lì. Non da una specifica tecnica o da un problema risolto, ma da quello sguardo. Dal momento in cui ho smesso di chiedermi se aveva senso e ho cominciato a chiedermi se era quello che volevo guardare.
 
-C'è qualcosa di paradossale in questo, perché HARMONY è anche un sistema molto preciso, costruito con regole matematiche, ottimizzato per girare in tempo reale su hardware grafico. Ma quella precisione è al servizio di qualcosa che non è preciso per niente: la sensazione di essere dentro qualcosa di vivo, di sentire un'energia che si muove, di poterci entrare con una nota e vedere cosa succede.
+HARMONY è anche un sistema molto preciso, costruito con regole matematiche, ottimizzato per girare in tempo reale su hardware grafico. Ma quella precisione è al servizio di qualcosa che non è preciso per niente: la sensazione di essere dentro qualcosa di vivo, di sentire un'energia che si muove, di poterci entrare con una nota e vedere cosa succede.
 
-La tecnica è stata il mezzo. Lo sguardo era il fine. E per trovare quello sguardo ho dovuto prima perdere quello che pensavo di sapere, smettere di costruire verso una risposta già pronta, e imparare a stare nel buio abbastanza a lungo da cominciare a vedere.
+La tecnica è stata il mezzo. Lo sguardo era il fine. Per trovare quello sguardo ho dovuto perdere quello che pensavo di sapere. Imparare a stare nel buio abbastanza a lungo da cominciare a vedere.
