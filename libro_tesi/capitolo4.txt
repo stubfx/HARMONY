@@ -8,7 +8,7 @@ HARMONY è costruito su regole semplici, basilari, che si ripetono migliaia di v
 
 Quello che oggi viene chiamato intelligenza artificiale nella conversazione comune è quasi sempre una cosa precisa: sistemi che rispondono, che generano, che imitano. L'AI come specchio accelerato di quello che già esiste. HARMONY va nella direzione opposta, perché la domanda da cui nasce è diversa. Non cosa riesce a produrre un sistema complesso, ma cosa può rivelare un sistema semplice quando gli si lascia abbastanza spazio.
 
-Strauss Zelnick, CEO di Take-Two Interactive, ha osservato che i dataset per natura guardano indietro, mentre la creatività per natura guarda avanti (Gould, 2026). Non è una critica: è una descrizione precisa di come funziona l'AI generativa. Un sistema che produce immagini, testo o musica impara da quello che già esiste, lo riorganizza, lo ricombina. Il futuro che genera è fatto di passato.
+Margaret Boden, nel suo studio sulla creatività computazionale, distingue tra creatività combinatoria ed esplorativa, capace di ricombinare e navigare spazi concettuali esistenti, e creatività trasformativa, che quegli spazi li altera (Boden, 2004, p. [N]). L'AI generativa, nella sua forma attuale, opera quasi interamente nel primo tipo: impara da quello che già esiste, lo riorganizza, lo ricombina. «Datasets by their very nature are backward looking, creativity by its very nature is forward looking»: Strauss Zelnick, CEO di Take-Two Interactive, lo ha riconosciuto con una sintesi efficace dall'interno dell'industria (Gould, 2026). Il futuro che l'AI generativa produce è fatto di passato.
 
 HARMONY non ha un dataset. Non ha memoria di niente che sia venuto prima. Ogni volta che si accende ricomincia da zero, e quello che produce dipende solo da quello che sta succedendo adesso: le note di questo momento, le persone di questa sera, la stanza in questo istante preciso. Non guarda indietro come l'AI generativa. Non guarda avanti come fa chi progetta con un obiettivo. Guarda il presente, e in quello che rivela non c'è niente che esistesse prima e niente che esisterà dopo.
 
@@ -22,7 +22,7 @@ La risposta è ogni volta sorprendente. Regole semplici, possibilità infinite.
 4.2 Noi siamo quei punti
 
 
-In HARMONY succede la stessa cosa che con le stelle: ogni punto fa qualcosa di straordinario solo nell'insieme. La differenza è che quei punti, stavolta, siamo noi.
+La differenza è che quei punti, stavolta, siamo noi.
 
 Chi partecipa non è uno spettatore che si limita ad osservare. La nota che suona entra nell'insieme e cambia qualcosa, in modo impercettibile o visibile, e quella traccia appartiene all'esperienza collettiva di chiunque sia nella stanza in quel momento. Partecipante o meno.
 

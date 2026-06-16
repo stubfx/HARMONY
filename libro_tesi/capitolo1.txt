@@ -6,7 +6,7 @@
 
 Nel 1978 Brian Eno pubblica Ambient 1: Music for Airports, e non è un album nel senso in cui si intende di solito: non chiede di essere ascoltato, non ha un inizio che invita e una fine che congeda, è fatto di loop di nastro di lunghezze diverse che si sfasano tra loro producendo combinazioni sempre nuove, senza che nessuno le abbia scritte o le possa prevedere. Eno lo descrive con una distinzione precisa: deve poter essere ignorata quanto essere interessante.
 
-La musica come oggetto chiede attenzione, la occupa e la dirige, mentre la musica come ambiente è altra cosa — è presente senza imporsi, esiste anche quando nessuno la ascolta, cambia senza che nessuno la stia guidando, entra nella stanza prima che tu ci entri e continua dopo che sei uscito.
+La musica come oggetto chiede attenzione, la occupa e la dirige, mentre la musica come ambiente è altra cosa: è presente senza imporsi, esiste anche quando nessuno la ascolta, cambia senza che nessuno la stia guidando, entra nella stanza prima che tu ci entri e continua dopo che sei uscito.
 
 Questa idea ha un nome che Eno stesso ha coniato, musica generativa: un sistema che produce suono seguendo regole semplici, senza un esecutore che lo governi momento per momento, in cui il compositore costruisce il giardino e poi si fa da parte, lasciando che quello che cresce non lo decida nessuno.
 
@@ -40,7 +40,7 @@ In un sistema che ascolta prima di parlare, questo processo diventa visibile. No
 
 Ho studiato musica per anni in conservatorio, e la cosa che ricordo di più non è la tecnica né lo spartito. È quella libertà che si apre quando chiudi gli occhi e smetti di leggere, quando le vibrazioni nell'aria cominciano a guidarti alla nota successiva senza che tu debba decidere dove andare. Non è improvvisazione nel senso di fare qualcosa a caso. È il contrario: è ascoltare così bene da sapere cosa viene dopo senza averlo pianificato.
 
-«Flow». È così che si chiama quella sensazione nella psicologia cognitiva, lo stato in cui l'azione e la consapevolezza si fondono, in cui si smette di osservare se stessi mentre si fa qualcosa e ci si ritrova semplicemente a farlo. Non è un risultato che si raggiunge sforzandosi. Arriva quando il sistema in cui si è immersi è abbastanza ricco da rispondere a ogni gesto con qualcosa di nuovo, abbastanza aperto da non imporre mai dove andare.
+«Flow». È così che Mihaly Csikszentmihalyi ha chiamato quello stato nella psicologia cognitiva: lo stato in cui l'azione e la consapevolezza si fondono, in cui si smette di osservare se stessi mentre si fa qualcosa e ci si ritrova semplicemente a farlo (Csikszentmihalyi, 1990). Non è un risultato che si raggiunge sforzandosi. Arriva quando il sistema in cui si è immersi è abbastanza ricco da rispondere a ogni gesto con qualcosa di nuovo, abbastanza aperto da non imporre mai dove andare.
 
 La musica mi ha insegnato che la libertà non sta nell'assenza di regole ma nel trovare il proprio posto dentro un sistema che ha già una logica. Le vibrazioni erano lì prima che suonassi. Il mio compito era entrare in sintonia con quello che già esisteva nell'aria, non sovrascriverlo. È lo stesso principio per il quale anche una persona che non ha mai studiato musica è in grado di riconoscere una nota stonata, perché le vibrazioni della musica parlano all'inconscio prima ancora che la mente le possa nominare.
 
