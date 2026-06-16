@@ -10,4 +10,6 @@ Eno ha costruito musica che esiste prima che qualcuno la ascolti. Rubin scrive c
 
 Il settore della Visual AI sta esplorando cosa possono fare i sistemi generativi quando si tratta di produrre, classificare, trasformare. Questo progetto esplora qualcosa di diverso: cosa succede quando un sistema smette di produrre e comincia a esistere. Quando non si vede più la tecnologia ma si sente qualcosa nell'aria, nelle vibrazioni, nel piccolo ma in grande.
 
+Strauss Zelnick, CEO di Take-Two Interactive, ha detto in un'intervista che «datasets by their very nature are backward looking, creativity by its very nature is forward looking». È un'osservazione che colpisce, anche se mi riservo una piccola obiezione: anche la nostra creatività è costruita su esperienze che abbiamo vissuto, su qualcosa che già conosciamo. Non partiamo mai dal nulla. Eppure c'è una differenza che conta: siamo umani che fanno prodotti per umani. Rimuovere questo fattore toglie all'opera la sua ragione più profonda di esistere.
+
 Regole semplici. Possibilità infinite. E in mezzo, noi. Uno specchio del nostro universo. Interiore ed esteriore.
