@@ -41,7 +41,7 @@ Chi ha appena vissuto HARMONY non pensa di aver interagito con un sistema di int
 
 In HARMONY l'AI non si vede. Il Sistema è lì, per fatti suoi, a vivere il suo momento liberandosi nello spazio. Chi entra nella stanza non deve sapere come funziona, non deve sentire la tecnologia sotto l'esperienza. Deve solo decidere se ascoltare o partecipare, e poi lasciarsi andare a quello che succede.
 
-Nel 1991 Mark Weiser descrisse quella stessa qualità in termini di design: le tecnologie più profonde sono quelle che spariscono, che si integrano nell'ambiente fino a non essere più percepite (Weiser, 1991). La chiamò calm technology. Non era una previsione, era un principio: la tecnologia che non chiede attenzione lascia più spazio a quello che viene fatto con essa.
+Nel 1991 Mark Weiser descrisse quella stessa qualità in termini di design: le tecnologie più profonde sono quelle che spariscono, che si integrano nell'ambiente fino a non essere più percepite (Weiser, 1991). La chiamò calm technology (Weiser & Brown, 1995). Non era una previsione, era un principio: la tecnologia che non chiede attenzione lascia più spazio a quello che viene fatto con essa.
 
 Quasi tutta la tecnologia che usiamo vuole essere riconosciuta. Vuole che tu sappia che c'è, che noti cosa fa, che la ringrazii in qualche modo per averti dato quello che cercavi. HARMONY non vuole niente di tutto questo. Non si presenta, non si spiega, non chiede attenzione. Si limita a esistere, e lascia che chi entra nella stanza decida da solo cosa farsene.
 
