@@ -6,7 +6,7 @@ Boden, Margaret A. The Creative Mind: Myths and Mechanisms. 2nd ed. London: Rout
 
 Eraclito. Frammenti. Traduzione e cura di Angelo Tonelli. Milano: Feltrinelli, 1993.
 
-Conway, John H. Game of Life. 1970.
+Gardner, Martin. "Mathematical Games: The Fantastic Combinations of John Conway's New Solitaire Game 'Life'." Scientific American, vol. 223, no. 4, 1970, pp. 120–123.
 
 Reynolds, Craig W. "Flocks, Herds, and Schools: A Distributed Behavioral Model." Computer Graphics, vol. 21, no. 4, 1987, pp. 25–34.
 

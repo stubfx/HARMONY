@@ -36,6 +36,8 @@ In HARMONY questa partecipazione è fisica. Passa per la nota che si sceglie, pe
 
 Chi ha appena vissuto HARMONY non pensa di aver interagito con un sistema di intelligenza artificiale. Non sbaglia. Quella domanda appartiene a un altro tipo di esperienza: quella in cui l'AI si annuncia, si mostra, chiede di essere usata.
 
+Usare la parola intelligenza non significa allinearsi a quell'immaginario. In questa tesi, intelligenza indica una qualità relazionale: la capacità di un sistema di esistere autonomamente, percepire variazioni nell'ambiente e trasformarle in comportamento, senza che nessuno lo interroghi per farlo.
+
 Il Sistema è lì, per fatti suoi, a vivere il suo momento liberandosi nello spazio. Chi entra nella stanza non deve sapere come funziona, non deve sentire la tecnologia sotto l'esperienza. Deve solo decidere se ascoltare o partecipare, e poi lasciarsi andare a quello che succede.
 
 Nel 1991 Mark Weiser descrisse quella stessa qualità in termini di design: le tecnologie più profonde sono quelle che spariscono, che si integrano nell'ambiente fino a non essere più percepite (Weiser, 1991). Quattro anni dopo, con John Seely Brown, avrebbe dato un nome a quell'idea: calm technology (Weiser & Brown, 1995). Non era una previsione, era un principio: la tecnologia che non chiede attenzione lascia più spazio a quello che viene fatto con essa.
@@ -51,7 +53,7 @@ HARMONY è costruito per rendere visibile qualcosa che di solito non si vede: l'
 
 HARMONY è un punto di partenza, non un punto di arrivo. Come ogni sistema vivo, genera domande che non risolve e direzioni che non ha ancora percorso.
 
-Il Sistema non ricorda. Quando si spegne, porta via con sé tutto quello che è successo, senza memoria delle sessioni precedenti, senza traccia di chi è passato. È potente nel presente ma cieco a lungo termine. Cosa diventerebbe un sistema che porta con sé la storia di chi lo ha attraversato, che si modifica lentamente nel corso di settimane, che mostra ai nuovi arrivati le impronte invisibili di chi c'era prima?
+Il Sistema non archivia. Quando si spegne, porta via con sé tutto quello che è successo, senza conservare memoria delle sessioni precedenti, senza traccia permanente di chi è passato. È potente nel presente ma cieco a lungo termine. Cosa diventerebbe un sistema che porta con sé la storia di chi lo ha attraversato, che si modifica lentamente nel corso di settimane, che mostra ai nuovi arrivati le impronte invisibili di chi c'era prima?
 
 Questa direzione porta alla stessa domanda di fondo: cosa diventa un sistema quando smette di essere un oggetto e comincia a essere un rapporto. Non uno strumento che si usa e si ripone, ma un'opera che cambia nel tempo perché è stata vissuta, che porta i segni di chi ci è passato dentro, che cresce nella stessa direzione in cui crescono le persone che la abitano.
 
