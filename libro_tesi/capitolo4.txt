@@ -14,7 +14,7 @@ HARMONY non ha un dataset. Non ha memoria di niente che sia venuto prima. Ogni v
 
 In un momento in cui la complessità viene celebrata come misura del valore (modelli più grandi, dataset più estesi, parametri in miliardi), HARMONY va dall'altra parte. Il risultato non è meno ricco, è diverso, perché quella profondità non viene dall'interno ma dall'incontro con chi lo abita.
 
-Un sistema semplice, d'altro canto, ha bisogno di qualcuno: della nota che qualcuno ha scelto, del momento che qualcuno ha portato, della presenza che ha cambiato l'ambiente dentro cui le regole si ripetono.
+Un sistema semplice ha però bisogno di qualcuno: della nota che qualcuno ha scelto, del momento che qualcuno ha portato, della presenza che ha cambiato l'ambiente dentro cui le regole si ripetono.
 
 Quello che il Sistema restituisce non è mai quello che ci si aspettava.
 
@@ -36,7 +36,7 @@ In HARMONY questa partecipazione è fisica. Passa per la nota che si sceglie, pe
 
 Chi ha appena vissuto HARMONY non pensa di aver interagito con un sistema di intelligenza artificiale. Non sbaglia. Quella domanda appartiene a un altro tipo di esperienza: quella in cui l'AI si annuncia, si mostra, chiede di essere usata.
 
-In HARMONY l'AI non si vede. Il Sistema è lì, per fatti suoi, a vivere il suo momento liberandosi nello spazio. Chi entra nella stanza non deve sapere come funziona, non deve sentire la tecnologia sotto l'esperienza. Deve solo decidere se ascoltare o partecipare, e poi lasciarsi andare a quello che succede.
+Il Sistema è lì, per fatti suoi, a vivere il suo momento liberandosi nello spazio. Chi entra nella stanza non deve sapere come funziona, non deve sentire la tecnologia sotto l'esperienza. Deve solo decidere se ascoltare o partecipare, e poi lasciarsi andare a quello che succede.
 
 Nel 1991 Mark Weiser descrisse quella stessa qualità in termini di design: le tecnologie più profonde sono quelle che spariscono, che si integrano nell'ambiente fino a non essere più percepite (Weiser, 1991). Quattro anni dopo, con John Seely Brown, avrebbe dato un nome a quell'idea: calm technology (Weiser & Brown, 1995). Non era una previsione, era un principio: la tecnologia che non chiede attenzione lascia più spazio a quello che viene fatto con essa.
 
@@ -61,5 +61,5 @@ C'è una domanda che HARMONY pone senza rispondere: a chi appartiene quello che 
 
 La risposta è doppia, e la dualità non è un problema da risolvere. Il design è mio: le regole, le scelte estetiche, i vincoli dentro cui il sistema si muove. Ma quello che accade dentro quelle regole non appartiene a me. Appartiene a chi era lì, alle note che ha scelto, al momento che ha portato. L'opera finisce dove il progetto finisce, e da lì comincia qualcosa che non ho scritto.
 
-Questa divisione non indebolisce il lavoro. Lo definisce. Umberto Eco nel 1962 aveva già nominato questo spazio: opera aperta, un'opera che per struttura richiede a chi la abita di completarla (Eco, 1962). HARMONY è questo. Il confine tra autore e pubblico non scompare, si sposta.
+Questa divisione non indebolisce il lavoro. Lo definisce. Umberto Eco nel 1962 aveva già nominato questo spazio: opera aperta, un'opera che per struttura richiede a chi la abita di completarla (Eco, 1962). HARMONY è questo. Il confine tra autore e pubblico non scompare, si sposta. Le domande che restano aperte partono da lì.
 
