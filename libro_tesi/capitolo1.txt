@@ -10,7 +10,7 @@ La musica come oggetto chiede attenzione, la occupa e la dirige, mentre la music
 
 Questa idea ha un nome che Eno stesso ha coniato, musica generativa: un sistema che produce suono seguendo regole semplici, senza un esecutore che lo governi momento per momento, in cui il compositore costruisce il giardino e poi si fa da parte, lasciando che quello che cresce non lo decida nessuno.
 
-È un modo diverso di pensare il rapporto tra chi crea e quello che viene creato — non più un autore che trasmette qualcosa a un pubblico, ma un sistema messo in moto che produce forme che nemmeno chi lo ha costruito riesce del tutto a prevedere, perché emergono e non vengono disegnate.
+È un modo diverso di pensare il rapporto tra chi crea e quello che viene creato: non più un autore che trasmette qualcosa a un pubblico, ma un sistema messo in moto che produce forme che nemmeno chi lo ha costruito riesce del tutto a prevedere, perché emergono e non vengono disegnate.
 
 Pensare alla musica come ambiente significa accettare che possa esistere senza essere ascoltata. È un paradosso solo in apparenza, perché chiunque abbia passato del tempo in uno spazio sonoro sa che il suono agisce anche quando non ci si fa caso. Cambia il ritmo del respiro, modifica la percezione del tempo, altera il modo in cui si percepisce la distanza dalle altre persone. Lo si scopre quando smette, quando il silenzio arriva all'improvviso e ci si accorge di quanto quella presenza pesasse, quanto la si fosse incorporata senza accorgersene.
 
@@ -46,7 +46,7 @@ La musica mi ha insegnato che la libertà non sta nell'assenza di regole ma nel 
 
 Il Flow non è un'esperienza rara. È quello che succede ogni volta che si è abbastanza presenti da smettere di gestire quello che si sta facendo e cominciare semplicemente a farlo. Il problema è che la maggior parte dei sistemi con cui interagiamo ogni giorno non lo rendono possibile: sono progettati per essere efficienti, non per essere abitati. Ti portano da A a B nel modo più breve possibile, e quella brevità impedisce qualsiasi cosa che assomigli all'immersione.
 
-Un sistema che produce Flow è un sistema che sa quando farsi da parte. Che dà abbastanza da rispondere, abbastanza da sorprendere, abbastanza da non lasciare mai la sensazione di aver capito tutto. È il paradosso di ogni buona esperienza: deve essere abbastanza controllabile da non spaventare e abbastanza libera da non annoiare. Trovare quel margine, quella soglia dove l'incertezza smette di essere ansia e diventa curiosità, è forse la cosa più difficile da progettare e la più semplice da riconoscere quando la si vive.
+Un sistema che produce Flow è un sistema che sa quando farsi da parte. Che dà abbastanza da rispondere, abbastanza da sorprendere, abbastanza da non lasciare mai la sensazione di aver capito tutto. È il paradosso di ogni buona esperienza: deve essere abbastanza controllabile da non spaventare e abbastanza libera da non annoiare. Trovare quel margine, quella soglia dove l'incertezza smette di essere ansia e diventa curiosità, è forse la cosa più difficile da progettare e la più semplice da riconoscere quando la si vive. HARMONY è costruito per stare su quella soglia.
 
 
 1.4 I punti nel cielo
