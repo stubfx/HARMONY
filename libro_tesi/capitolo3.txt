@@ -14,7 +14,7 @@ Questa sensazione mi dava fastidio, e credo sia stata una delle molle che ha spi
 
 Da quella osservazione nasce HARMONY. Il Sistema usa il Game of Life come base su cui costruire i momenti di caos, non come decorazione ma come motore, come lingua. Quel caos che a prima vista sembra assenza di immagine ha in realtà un suo modo di essere, una grammatica che si impara guardando senza aspettarsi di capire subito. Ma a differenza di Conway, questo caos incontra qualcuno: la nota che qualcuno ha scelto, il momento che qualcuno ha portato, la presenza che cambia il sistema dall'interno mentre il sistema cambia chi lo abita.
 
-HARMONY non è nato tutto insieme. C'è stato un lungo periodo prima, fatto di tentativi che non portavano da nessuna parte, direzioni abbandonate a metà, versioni che sembravano giuste finché non lo erano più. Mesi in cui si provava qualcosa, si guardava cosa succedeva, e si smontava tutto per ricominciare.
+Arrivarci ha richiesto mesi. C'è stato un lungo periodo prima, fatto di tentativi che non portavano da nessuna parte, direzioni abbandonate a metà, versioni che sembravano giuste finché non lo erano più. Mesi in cui si provava qualcosa, si guardava cosa succedeva, e si smontava tutto per ricominciare.
 
 In quel periodo ho usato molto l'intelligenza artificiale come strumento di lavoro. Non per generare l'opera in sé, ma per costruire, per risolvere problemi tecnici, per esplorare possibilità in modo più veloce. È un modo di lavorare che ha senso, e per un certo tempo ha funzionato bene.
 

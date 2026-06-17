@@ -8,7 +8,7 @@ HARMONY è costruito su regole semplici, basilari, che si ripetono migliaia di v
 
 Quello che oggi viene chiamato intelligenza artificiale nella conversazione comune è quasi sempre una cosa precisa: sistemi che rispondono, che generano, che imitano. L'AI come specchio accelerato di quello che già esiste. HARMONY va nella direzione opposta, perché la domanda da cui nasce è diversa. Non cosa riesce a produrre un sistema complesso, ma cosa può rivelare un sistema semplice quando gli si lascia abbastanza spazio.
 
-Margaret Boden, nel suo studio sulla creatività computazionale, distingue tra creatività combinatoria ed esplorativa, capace di ricombinare e navigare spazi concettuali esistenti, e creatività trasformativa, che quegli spazi li altera (Boden, 2004). L'AI generativa, nella sua forma attuale, opera quasi interamente nel primo tipo: impara da quello che già esiste, lo riorganizza, lo ricombina. «Datasets by their very nature are backward looking, creativity by its very nature is forward looking»: Strauss Zelnick, CEO di Take-Two Interactive, lo ha riconosciuto con una sintesi efficace dall'interno dell'industria (Gould, 2026). Il futuro che l'AI generativa produce è fatto di passato.
+Margaret Boden, nel suo studio sulla creatività computazionale, distingue tra creatività esplorativa, capace di navigare e ricombinare spazi concettuali esistenti, e creatività trasformativa, che quegli spazi li altera (Boden, 2004). L'AI generativa, nella sua forma attuale, opera quasi interamente nel primo tipo: impara da quello che già esiste, lo riorganizza, lo ricombina. «Datasets by their very nature are backward looking, creativity by its very nature is forward looking»: Strauss Zelnick, CEO di Take-Two Interactive, lo ha riconosciuto con una sintesi efficace dall'interno dell'industria (Gould, 2026). Il futuro che l'AI generativa produce è fatto di passato.
 
 HARMONY non ha un dataset. Non ha memoria di niente che sia venuto prima. Ogni volta che si accende ricomincia da zero, e quello che produce dipende solo da quello che sta succedendo adesso: le note di questo momento, le persone di questa sera, la stanza in questo istante preciso. Non guarda indietro come l'AI generativa. Non guarda avanti come fa chi progetta con un obiettivo. Guarda il presente, e in quello che rivela non c'è niente che esistesse prima e niente che esisterà dopo.
 
@@ -21,16 +21,13 @@ La risposta è ogni volta sorprendente.
 
 4.2 Noi siamo quei punti
 
-
-La differenza è che quei punti, stavolta, siamo noi.
-
 Chi partecipa suona una nota che entra nell'insieme e lo cambia, in modo impercettibile o visibile, e quella traccia appartiene all'esperienza collettiva di chiunque sia nella stanza in quel momento. Partecipante o meno.
 
 Ogni giorno facciamo cose che non lasciano traccia visibile, gesti che si disperdono nell'aria senza che nessuno li registri. Qui invece, anche il gesto più piccolo, anche la nota più breve suonata quasi per sbaglio, entra nel Sistema e lo cambia.
 
-È una forma di testimonianza silenziosa. Si è passati di qua. Si è lasciata una traccia. Anche se nessuno lo sa, anche se lo si è già dimenticato, quel momento è accaduto ed era parte dell'insieme.
+È una forma di testimonianza silenziosa. Si è passati di qua. Si è lasciata una traccia. Anche se nessuno lo sa, anche se lo si è già dimenticato, quel momento è accaduto, e contava.
 
-Quello che rimane, alla fine, è semplice: la sensazione di essere stati parte dell'insieme. Non il ricordo di un'immagine bella, ma la certezza di aver cambiato l'insieme, anche senza saperlo.
+Quello che rimane, alla fine, è semplice: la sensazione di essere stati dentro qualcosa che non si sarebbe formato senza di te. Non il ricordo di un'immagine bella, ma la certezza di aver lasciato qualcosa lì.
 
 In HARMONY questa partecipazione è fisica. Passa per la nota che si sceglie, per il momento in cui si decide di entrare o di restare fuori.
 
@@ -54,7 +51,7 @@ HARMONY è costruito per rendere visibile qualcosa che di solito non si vede: l'
 
 HARMONY è un punto di partenza, non un punto di arrivo. Come ogni sistema vivo, genera domande che non risolve e direzioni che non ha ancora percorso.
 
-Il Sistema non ricorda. Ogni volta che si accende ricomincia da zero, senza memoria delle sessioni precedenti, senza traccia di chi è passato. È potente nel presente ma cieco a lungo termine. Cosa diventerebbe un sistema che porta con sé la storia di chi lo ha attraversato, che si modifica lentamente nel corso di settimane, che mostra ai nuovi arrivati le impronte invisibili di chi c'era prima?
+Il Sistema non ricorda. Quando si spegne, porta via con sé tutto quello che è successo — senza memoria delle sessioni precedenti, senza traccia di chi è passato. È potente nel presente ma cieco a lungo termine. Cosa diventerebbe un sistema che porta con sé la storia di chi lo ha attraversato, che si modifica lentamente nel corso di settimane, che mostra ai nuovi arrivati le impronte invisibili di chi c'era prima?
 
 Questa direzione porta alla stessa domanda di fondo: cosa diventa un sistema quando smette di essere un oggetto e comincia a essere un rapporto. Non uno strumento che si usa e si ripone, ma un'opera che cambia nel tempo perché è stata vissuta, che porta i segni di chi ci è passato dentro, che cresce nella stessa direzione in cui crescono le persone che la abitano.
 

@@ -4,6 +4,10 @@ BIBLIOGRAFIA
 
 Boden, Margaret A. The Creative Mind: Myths and Mechanisms. 2nd ed. London: Routledge, 2004.
 
+Conway, John H. Game of Life. 1970.
+
+Reynolds, Craig W. "Flocks, Herds, and Schools: A Distributed Behavioral Model." Computer Graphics, vol. 21, no. 4, 1987, pp. 25–34.
+
 Csikszentmihalyi, Mihaly. Flow: The Psychology of Optimal Experience. New York: Harper & Row, 1990.
 
 Eco, Umberto. Opera Aperta. Milano: Bompiani, 1962.
