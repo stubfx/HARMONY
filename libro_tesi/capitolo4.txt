@@ -12,7 +12,7 @@ Margaret Boden, nel suo studio sulla creatività computazionale, distingue tre f
 
 HARMONY non ha un dataset. Non ha memoria di niente che sia venuto prima. Ogni volta che si accende ricomincia da zero, e quello che produce dipende solo da quello che sta succedendo adesso: le note di questo momento, le persone di questa sera, la stanza in questo istante preciso. Non guarda indietro come l'AI generativa. Non guarda avanti come fa chi progetta con un obiettivo. Guarda il presente, e in quello che rivela non c'è niente che esistesse prima e niente che esisterà dopo.
 
-In un momento in cui la complessità viene celebrata come misura del valore (modelli più grandi, dataset più estesi, parametri in miliardi) HARMONY va dall'altra parte. Il risultato non è meno ricco, è diverso, perché quella profondità non viene dall'interno del sistema ma dall'incontro tra il sistema e chi lo abita.
+In un momento in cui la complessità viene celebrata come misura del valore (modelli più grandi, dataset più estesi, parametri in miliardi), HARMONY va dall'altra parte. Il risultato non è meno ricco, è diverso, perché quella profondità non viene dall'interno del sistema ma dall'incontro tra il sistema e chi lo abita.
 
 Un sistema semplice, d'altro canto, ha bisogno di qualcuno: della nota che qualcuno ha scelto, del momento che qualcuno ha portato, della presenza che ha cambiato l'ambiente dentro cui le regole si ripetono.
 
@@ -57,7 +57,7 @@ Questa direzione porta alla stessa domanda di fondo: cosa diventa un sistema qua
 
 C'è poi la questione della scala. HARMONY è pensato per una stanza, per un gruppo raccolto che condivide lo stesso spazio fisico. Ma queste esperienze non conoscono confini. Cosa succederebbe con persone in luoghi diversi che entrano nello stesso Sistema in tempo reale, portando ciascuna il proprio momento, il proprio umore, la propria notte? L'energia collettiva cambierebbe natura, e con essa quello che il Sistema potrebbe rivelare.
 
-C'è una domanda che HARMONY pone senza rispondere: chi ha fatto quello che è successo in quella stanza?
+C'è una domanda che HARMONY pone senza rispondere: a chi appartiene quello che è successo in quella stanza?
 
 La risposta è doppia, e la doppiezza non è un problema da risolvere. Il design è mio: le regole, le scelte estetiche, i vincoli dentro cui il sistema si muove. Ma quello che accade dentro quelle regole non appartiene a me. Appartiene a chi era lì, alle note che ha scelto, al momento che ha portato. L'opera finisce dove il progetto finisce, e da lì comincia qualcosa che non ho scritto.
 
