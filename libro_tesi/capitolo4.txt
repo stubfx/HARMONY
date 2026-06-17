@@ -8,7 +8,7 @@ HARMONY è costruito su regole semplici, basilari, che si ripetono migliaia di v
 
 Quello che oggi viene chiamato intelligenza artificiale nella conversazione comune è quasi sempre una cosa precisa: sistemi che rispondono, che generano, che imitano. L'AI come specchio accelerato di quello che già esiste. HARMONY va nella direzione opposta, perché la domanda da cui nasce è diversa. Non cosa riesce a produrre un sistema complesso, ma cosa può rivelare un sistema semplice quando gli si lascia abbastanza spazio.
 
-Margaret Boden, nel suo studio sulla creatività computazionale, distingue tra creatività esplorativa, capace di navigare e ricombinare spazi concettuali esistenti, e creatività trasformativa, che quegli spazi li altera (Boden, 2004). L'AI generativa, nella sua forma attuale, opera quasi interamente nel primo tipo: impara da quello che già esiste, lo riorganizza, lo ricombina. «Datasets by their very nature are backward looking, creativity by its very nature is forward looking»: Strauss Zelnick, CEO di Take-Two Interactive, lo ha riconosciuto con una sintesi efficace dall'interno dell'industria (Gould, 2026). Il futuro che l'AI generativa produce è fatto di passato.
+Margaret Boden, nel suo studio sulla creatività computazionale, distingue tre forme: la creatività combinatoria, che ricombina elementi già noti; quella esplorativa, capace di navigare spazi concettuali esistenti; e quella trasformativa, che quegli spazi li altera (Boden, 2004). L'AI generativa, nella sua forma attuale, opera quasi interamente nel primo tipo: impara da quello che già esiste, lo riorganizza, lo ricombina. «Datasets by their very nature are backward looking, creativity by its very nature is forward looking»: Strauss Zelnick, CEO di Take-Two Interactive, lo ha osservato dall'interno dell'industria (Gould, 2026). Il futuro che l'AI generativa produce è fatto di passato.
 
 HARMONY non ha un dataset. Non ha memoria di niente che sia venuto prima. Ogni volta che si accende ricomincia da zero, e quello che produce dipende solo da quello che sta succedendo adesso: le note di questo momento, le persone di questa sera, la stanza in questo istante preciso. Non guarda indietro come l'AI generativa. Non guarda avanti come fa chi progetta con un obiettivo. Guarda il presente, e in quello che rivela non c'è niente che esistesse prima e niente che esisterà dopo.
 
@@ -16,7 +16,7 @@ In un momento in cui la complessità viene celebrata come misura del valore (mod
 
 Un sistema semplice, d'altro canto, ha bisogno di qualcuno: della nota che qualcuno ha scelto, del momento che qualcuno ha portato, della presenza che ha cambiato l'ambiente dentro cui le regole si ripetono.
 
-La risposta è ogni volta sorprendente.
+Quello che il Sistema restituisce non è mai quello che ci si aspettava.
 
 
 4.2 Noi siamo quei punti
@@ -38,7 +38,7 @@ Chi ha appena vissuto HARMONY non pensa di aver interagito con un sistema di int
 
 In HARMONY l'AI non si vede. Il Sistema è lì, per fatti suoi, a vivere il suo momento liberandosi nello spazio. Chi entra nella stanza non deve sapere come funziona, non deve sentire la tecnologia sotto l'esperienza. Deve solo decidere se ascoltare o partecipare, e poi lasciarsi andare a quello che succede.
 
-Nel 1991 Mark Weiser descrisse quella stessa qualità in termini di design: le tecnologie più profonde sono quelle che spariscono, che si integrano nell'ambiente fino a non essere più percepite (Weiser, 1991). La chiamò calm technology (Weiser & Brown, 1995). Non era una previsione, era un principio: la tecnologia che non chiede attenzione lascia più spazio a quello che viene fatto con essa.
+Nel 1991 Mark Weiser descrisse quella stessa qualità in termini di design: le tecnologie più profonde sono quelle che spariscono, che si integrano nell'ambiente fino a non essere più percepite (Weiser, 1991). Quattro anni dopo, con John Seely Brown, avrebbe dato un nome a quell'idea: calm technology (Weiser & Brown, 1995). Non era una previsione, era un principio: la tecnologia che non chiede attenzione lascia più spazio a quello che viene fatto con essa.
 
 Quasi tutta la tecnologia che usiamo vuole essere riconosciuta. Vuole che tu sappia che c'è, che noti cosa fa, che la ringrazii in qualche modo per averti dato quello che cercavi. HARMONY non vuole niente di tutto questo. Non si presenta, non si spiega, non chiede attenzione. Si limita a esistere, e lascia che chi entra nella stanza decida da solo cosa farsene.
 
