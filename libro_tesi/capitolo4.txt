@@ -12,7 +12,7 @@ Margaret Boden, nel suo studio sulla creatività computazionale, distingue tre f
 
 HARMONY non ha un dataset. Non ha memoria di niente che sia venuto prima. Ogni volta che si accende ricomincia da zero, e quello che produce dipende solo da quello che sta succedendo adesso: le note di questo momento, le persone di questa sera, la stanza in questo istante preciso. Non guarda indietro come l'AI generativa. Non guarda avanti come fa chi progetta con un obiettivo. Guarda il presente, e in quello che rivela non c'è niente che esistesse prima e niente che esisterà dopo.
 
-In un momento in cui la complessità viene celebrata come misura del valore (modelli più grandi, dataset più estesi, parametri in miliardi), HARMONY va dall'altra parte. Il risultato non è meno ricco, è diverso, perché quella profondità non viene dall'interno del sistema ma dall'incontro tra il sistema e chi lo abita.
+In un momento in cui la complessità viene celebrata come misura del valore (modelli più grandi, dataset più estesi, parametri in miliardi), HARMONY va dall'altra parte. Il risultato non è meno ricco, è diverso, perché quella profondità non viene dall'interno ma dall'incontro con chi lo abita.
 
 Un sistema semplice, d'altro canto, ha bisogno di qualcuno: della nota che qualcuno ha scelto, del momento che qualcuno ha portato, della presenza che ha cambiato l'ambiente dentro cui le regole si ripetono.
 
@@ -23,7 +23,7 @@ Quello che il Sistema restituisce non è mai quello che ci si aspettava.
 
 Chi partecipa suona una nota che entra nell'insieme e lo cambia, in modo impercettibile o visibile, e quella traccia appartiene all'esperienza collettiva di chiunque sia nella stanza in quel momento. Partecipante o meno.
 
-Ogni giorno facciamo cose che non lasciano traccia visibile, gesti che si disperdono nell'aria senza che nessuno li registri. Qui invece, anche il gesto più piccolo, anche la nota più breve suonata quasi per sbaglio, entra nel Sistema e lo cambia.
+Ogni giorno facciamo cose che non lasciano traccia visibile, gesti che si disperdono nell'aria senza che nessuno li registri. Qui invece, anche il gesto più piccolo, anche la nota più breve suonata quasi per sbaglio, entra nel Sistema e lascia il segno.
 
 È una forma di testimonianza silenziosa. Si è passati di qua. Si è lasciata una traccia. Anche se nessuno lo sa, anche se lo si è già dimenticato, quel momento è accaduto, e contava.
 
@@ -59,7 +59,7 @@ C'è poi la questione della scala. HARMONY è pensato per una stanza, per un gru
 
 C'è una domanda che HARMONY pone senza rispondere: a chi appartiene quello che è successo in quella stanza?
 
-La risposta è doppia, e la doppiezza non è un problema da risolvere. Il design è mio: le regole, le scelte estetiche, i vincoli dentro cui il sistema si muove. Ma quello che accade dentro quelle regole non appartiene a me. Appartiene a chi era lì, alle note che ha scelto, al momento che ha portato. L'opera finisce dove il progetto finisce, e da lì comincia qualcosa che non ho scritto.
+La risposta è doppia, e la dualità non è un problema da risolvere. Il design è mio: le regole, le scelte estetiche, i vincoli dentro cui il sistema si muove. Ma quello che accade dentro quelle regole non appartiene a me. Appartiene a chi era lì, alle note che ha scelto, al momento che ha portato. L'opera finisce dove il progetto finisce, e da lì comincia qualcosa che non ho scritto.
 
 Questa divisione non indebolisce il lavoro. Lo definisce. Umberto Eco nel 1962 aveva già nominato questo spazio: opera aperta, un'opera che per struttura richiede a chi la abita di completarla (Eco, 1962). HARMONY è questo. Il confine tra autore e pubblico non scompare, si sposta.
 
