@@ -40,16 +40,16 @@ html, body {
 
 .controls { gap: 18px; }
 
-/* File button */
-#file-btn {
+/* File / mask load buttons */
+#file-btn, #mask-btn {
   background: #111;
   color: #fff;
   padding: 4px 10px;
   cursor: pointer;
   letter-spacing: 0.08em;
 }
-#file-btn:hover { background: #444; }
-#file-input { display: none; }
+#file-btn:hover, #mask-btn:hover { background: #444; }
+#file-input, #mask-input { display: none; }
 
 #file-name {
   opacity: 0.4;

@@ -17,6 +17,52 @@ function setSize() {
   canvas.height = window.innerHeight;
   W = Math.floor(canvas.width  / CELL);
   H = Math.floor(canvas.height / CELL);
+  rebuildMaskGrid();
+}
+
+// ── Mask state ────────────────────────────────────────────────────────────────
+let maskBitmap = null;  // raw ImageBitmap from loaded file
+let maskGrid   = null;  // Float32Array W×H, 0=hide 1=reveal (grayscale luminance)
+
+async function loadMask(file) {
+  maskBitmap = await createImageBitmap(file);
+  rebuildMaskGrid();
+  document.getElementById('mask-name').textContent = file.name;
+  document.getElementById('btn-clear-mask').hidden = false;
+}
+
+function clearMask() {
+  maskBitmap = null;
+  maskGrid   = null;
+  document.getElementById('mask-name').textContent = '—';
+  document.getElementById('btn-clear-mask').hidden = true;
+}
+
+function rebuildMaskGrid() {
+  if (!maskBitmap || W === 0 || H === 0) return;
+  const oc   = new OffscreenCanvas(canvas.width, canvas.height);
+  const octx = oc.getContext('2d');
+  // Stretch mask to fill canvas exactly
+  octx.drawImage(maskBitmap, 0, 0, canvas.width, canvas.height);
+  const px = octx.getImageData(0, 0, canvas.width, canvas.height).data;
+
+  maskGrid = new Float32Array(W * H);
+  for (let r = 0; r < H; r++) {
+    for (let c = 0; c < W; c++) {
+      let sum = 0, n = 0;
+      const x0 = c * CELL, x1 = Math.min(x0 + CELL, canvas.width);
+      const y0 = r * CELL, y1 = Math.min(y0 + CELL, canvas.height);
+      for (let y = y0; y < y1; y++) {
+        for (let x = x0; x < x1; x++) {
+          const i = (y * canvas.width + x) * 4;
+          // Rec.709 luminance → grayscale
+          sum += (0.2126 * px[i] + 0.7152 * px[i+1] + 0.0722 * px[i+2]) / 255;
+          n++;
+        }
+      }
+      maskGrid[r * W + c] = n > 0 ? sum / n : 1;
+    }
+  }
 }
 
 // ── Audio state ───────────────────────────────────────────────────────────────
@@ -247,7 +293,9 @@ function render() {
 
     for (let r = rTop; r <= rBot; r++) {
       const dist  = half > 0.001 ? Math.abs(r - center) / half : 0;
-      const alpha = fadeVal === 0 ? 1 : Math.pow(Math.max(0, 1 - dist), fadeVal);
+      const wave  = fadeVal === 0 ? 1 : Math.pow(Math.max(0, 1 - dist), fadeVal);
+      const mask  = maskGrid ? maskGrid[r * W + c] : 1;
+      const alpha = wave * mask;
       if (alpha < 0.01) continue;
       ctx.fillStyle = alpha >= 0.995 ? '#000' : `rgba(0,0,0,${alpha.toFixed(3)})`;
       ctx.fillRect(c * CELL + 1, r * CELL + 1, CELL - 1, CELL - 1);
@@ -270,6 +318,10 @@ function setupToolbar() {
   document.getElementById('file-input').addEventListener('change', e => {
     const f = e.target.files[0]; if (f) loadFile(f);
   });
+  document.getElementById('mask-input').addEventListener('change', e => {
+    const f = e.target.files[0]; if (f) loadMask(f);
+  });
+  document.getElementById('btn-clear-mask').addEventListener('click', clearMask);
   document.getElementById('btn-sine').addEventListener('click', generateSine);
   document.getElementById('btn-play').addEventListener('click', () => {
     isPlaying ? stopPlayback() : startPlayback();
@@ -289,7 +341,7 @@ function setupToolbar() {
     cb(+sl.value);
   }
 
-  bind('s-density', 'v-density', 0, 'px', v => { CELL = v; setSize(); computeRawPeaks(); });
+  bind('s-density', 'v-density', 0, 'px', v => { CELL = v; setSize(); computeRawPeaks(); rebuildMaskGrid(); });
   bind('s-amp',     'v-amp',     1, '',   v => { ampVal    = v; });
   bind('s-fade',    'v-fade',    1, '',   v => { fadeVal   = v; });
   bind('s-smooth',  'v-smooth',  0, '',   v => { smoothVal = v; });
