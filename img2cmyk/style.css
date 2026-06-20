@@ -1,0 +1,106 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  background: #fff;
+  overflow: hidden;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  color: #111;
+}
+
+#grid {
+  display: block;
+  position: fixed;
+  inset: 0;
+  width: 100%; height: 100%;
+}
+
+#toolbar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(255,255,255,0.93);
+  border: 1px solid #111;
+  padding: 10px 16px;
+  z-index: 10;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.controls { gap: 18px; }
+
+/* File / mask / ICC load buttons */
+#file-btn, #mask-btn, #icc-btn {
+  background: #111;
+  color: #fff;
+  padding: 4px 10px;
+  cursor: pointer;
+  letter-spacing: 0.08em;
+}
+#file-btn:hover, #mask-btn:hover, #icc-btn:hover { background: #444; }
+#file-input, #mask-input, #icc-input { display: none; }
+
+#file-name, #mask-name, #icc-name {
+  opacity: 0.4;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Sliders */
+.ctrl {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.ctrl label {
+  opacity: 0.5;
+  min-width: 38px;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 72px;
+  height: 2px;
+  background: #111;
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 9px; height: 9px;
+  background: #111;
+  border-radius: 50%;
+}
+.ctrl span {
+  opacity: 0.4;
+  min-width: 30px;
+  font-size: 11px;
+}
+
+/* Buttons */
+button {
+  background: #111;
+  color: #fff;
+  border: none;
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  letter-spacing: 0.08em;
+}
+button:hover   { background: #444; }
+button.active  { background: #555; }
+button:disabled { opacity: 0.3; cursor: default; }

@@ -18,6 +18,7 @@ export default defineConfig({
                 admin:  path.resolve(__dirname, 'admin/index.html'),
                 wavegen: path.resolve(__dirname, 'wavegen/index.html'),
                 life:    path.resolve(__dirname, 'life/index.html'),
+                img2cmyk: path.resolve(__dirname, 'img2cmyk/index.html'),
             },
         },
     },

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>img → CMYK</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <canvas id="grid"></canvas>
+
+  <div id="toolbar">
+    <div class="row">
+      <label id="file-btn">load image<input type="file" id="file-input" accept="image/*" /></label>
+      <span id="file-name">—</span>
+      <label id="icc-btn">load profile<input type="file" id="icc-input" accept=".icc,.icm" /></label>
+      <span id="icc-name">—</span>
+      <button id="btn-clear-icc" hidden>✕</button>
+      <button id="btn-export" disabled>export cmyk</button>
+    </div>
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
