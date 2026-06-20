@@ -40,20 +40,20 @@ html, body {
 
 .controls { gap: 18px; }
 
-/* File / mask load buttons */
-#file-btn, #mask-btn {
+/* File / mask / ICC load buttons */
+#file-btn, #mask-btn, #icc-btn {
   background: #111;
   color: #fff;
   padding: 4px 10px;
   cursor: pointer;
   letter-spacing: 0.08em;
 }
-#file-btn:hover, #mask-btn:hover { background: #444; }
-#file-input, #mask-input { display: none; }
+#file-btn:hover, #mask-btn:hover, #icc-btn:hover { background: #444; }
+#file-input, #mask-input, #icc-input { display: none; }
 
-#file-name {
+#file-name, #mask-name, #icc-name {
   opacity: 0.4;
-  max-width: 160px;
+  max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
 }

@@ -20,6 +20,21 @@ function setSize() {
   rebuildMaskGrid();
 }
 
+// ── ICC profile state ─────────────────────────────────────────────────────────
+let iccData = null; // Uint8Array of the loaded .icc file
+
+async function loadICC(file) {
+  iccData = new Uint8Array(await file.arrayBuffer());
+  document.getElementById('icc-name').textContent = file.name;
+  document.getElementById('btn-clear-icc').hidden = false;
+}
+
+function clearICC() {
+  iccData = null;
+  document.getElementById('icc-name').textContent = '—';
+  document.getElementById('btn-clear-icc').hidden = true;
+}
+
 // ── Mask state ────────────────────────────────────────────────────────────────
 let maskBitmap = null;  // raw ImageBitmap from loaded file
 let maskGrid   = null;  // Float32Array W×H, 0=hide 1=reveal (grayscale luminance)
@@ -191,19 +206,31 @@ function syncPlayBtn() {
 
 // ── CMYK TIFF export ──────────────────────────────────────────────────────────
 //
-// Layout (little-endian TIFF, 14 IFD entries):
+// Without ICC (14 entries):
 //   0     header           8 bytes
 //   8     IFD              2 + 14×12 + 4 = 174 bytes  → ends at 182
-//   182   BitsPerSample    4×SHORT = 8 bytes           → ends at 190
-//   190   XResolution      RATIONAL = 8 bytes          → ends at 198
-//   198   YResolution      RATIONAL = 8 bytes          → ends at 206
-//   206   image data       W × H × 4 bytes (CMYK interleaved)
+//   182   BitsPerSample    8 bytes  → ends at 190
+//   190   XResolution      8 bytes  → ends at 198
+//   198   YResolution      8 bytes  → ends at 206
+//   206   image data
 //
-function buildTIFF(w, h, cmykData) {
-  const bpsOff  = 8 + 2 + 14 * 12 + 4; // 182
-  const xResOff = bpsOff + 8;           // 190
-  const yResOff = xResOff + 8;          // 198
-  const imgOff  = yResOff + 8;          // 206
+// With ICC profile (15 entries):
+//   0     header           8 bytes
+//   8     IFD              2 + 15×12 + 4 = 186 bytes  → ends at 194
+//   194   BitsPerSample    8 bytes  → ends at 202
+//   202   XResolution      8 bytes  → ends at 210
+//   210   YResolution      8 bytes  → ends at 218
+//   218   ICC profile      icc.length bytes
+//   218+N image data
+//
+function buildTIFF(w, h, cmykData, icc) {
+  const hasICC  = icc && icc.length > 0;
+  const nEnt    = hasICC ? 15 : 14;
+  const bpsOff  = 8 + 2 + nEnt * 12 + 4;
+  const xResOff = bpsOff + 8;
+  const yResOff = xResOff + 8;
+  const iccOff  = yResOff + 8;
+  const imgOff  = hasICC ? iccOff + icc.length : iccOff;
   const imgSz   = w * h * 4;
   const buf     = new ArrayBuffer(imgOff + imgSz);
   const dv      = new DataView(buf);
@@ -217,32 +244,34 @@ function buildTIFF(w, h, cmykData) {
   // Header
   u8(0x49); u8(0x49); u16(42); u32(8);
 
-  // IFD — 14 entries, tags in ascending order
-  u16(14);
-  ent(256, 4, 1, w);         // ImageWidth
-  ent(257, 4, 1, h);         // ImageLength
-  ent(258, 3, 4, bpsOff);    // BitsPerSample → offset to [8,8,8,8]
-  ent(259, 3, 1, 1);         // Compression: none
-  ent(262, 3, 1, 5);         // PhotometricInterpretation: CMYK (Separated)
-  ent(273, 4, 1, imgOff);    // StripOffsets
-  ent(277, 3, 1, 4);         // SamplesPerPixel
-  ent(278, 4, 1, h);         // RowsPerStrip
-  ent(279, 4, 1, imgSz);     // StripByteCounts
-  ent(282, 5, 1, xResOff);   // XResolution → RATIONAL 300/1
-  ent(283, 5, 1, yResOff);   // YResolution → RATIONAL 300/1
-  ent(284, 3, 1, 1);         // PlanarConfiguration: chunky
-  ent(296, 3, 1, 2);         // ResolutionUnit: inch
-  ent(332, 3, 1, 1);         // InkSet: CMYK
-  u32(0);                    // next IFD = none
+  // IFD — tags in ascending order
+  u16(nEnt);
+  ent(256, 4, 1, w);                          // ImageWidth
+  ent(257, 4, 1, h);                          // ImageLength
+  ent(258, 3, 4, bpsOff);                     // BitsPerSample → offset [8,8,8,8]
+  ent(259, 3, 1, 1);                          // Compression: none
+  ent(262, 3, 1, 5);                          // PhotometricInterpretation: CMYK
+  ent(273, 4, 1, imgOff);                     // StripOffsets
+  ent(277, 3, 1, 4);                          // SamplesPerPixel
+  ent(278, 4, 1, h);                          // RowsPerStrip
+  ent(279, 4, 1, imgSz);                      // StripByteCounts
+  ent(282, 5, 1, xResOff);                    // XResolution → 300/1
+  ent(283, 5, 1, yResOff);                    // YResolution → 300/1
+  ent(284, 3, 1, 1);                          // PlanarConfiguration: chunky
+  ent(296, 3, 1, 2);                          // ResolutionUnit: inch
+  ent(332, 3, 1, 1);                          // InkSet: CMYK
+  if (hasICC) ent(34675, 1, icc.length, iccOff); // ICCProfile
+  u32(0);                                     // next IFD = none
 
   // BitsPerSample [8, 8, 8, 8]
   p = bpsOff; u16(8); u16(8); u16(8); u16(8);
 
-  // XResolution: 300/1
+  // XResolution / YResolution: 300/1
   p = xResOff; u32(300); u32(1);
-
-  // YResolution: 300/1
   p = yResOff; u32(300); u32(1);
+
+  // ICC profile bytes (if present)
+  if (hasICC) new Uint8Array(buf, iccOff, icc.length).set(icc);
 
   // Image data
   new Uint8Array(buf, imgOff).set(cmykData);
@@ -281,7 +310,7 @@ function exportCMYK() {
     }
   }
 
-  const buf  = buildTIFF(ew, eh, cmyk);
+  const buf  = buildTIFF(ew, eh, cmyk, iccData);
   const blob = new Blob([buf], { type: 'image/tiff' });
   const url  = URL.createObjectURL(blob);
   const a    = Object.assign(document.createElement('a'), {
@@ -343,6 +372,10 @@ function setupToolbar() {
     const f = e.target.files[0]; if (f) loadMask(f);
   });
   document.getElementById('btn-clear-mask').addEventListener('click', clearMask);
+  document.getElementById('icc-input').addEventListener('change', e => {
+    const f = e.target.files[0]; if (f) loadICC(f);
+  });
+  document.getElementById('btn-clear-icc').addEventListener('click', clearICC);
   document.getElementById('btn-sine').addEventListener('click', generateSine);
   document.getElementById('btn-play').addEventListener('click', () => {
     isPlaying ? stopPlayback() : startPlayback();
