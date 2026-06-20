@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Game of Life</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <canvas id="grid"></canvas>
+
+  <div id="toolbar">
+    <div class="row">
+      <button id="btn-random">random</button>
+      <button id="btn-clear">clear</button>
+      <button id="btn-step">step</button>
+      <button id="btn-play">play</button>
+    </div>
+
+    <div class="row controls">
+      <div class="ctrl">
+        <label>density</label>
+        <input type="range" id="s-density" min="2" max="24" value="5" step="1" />
+        <span id="v-density">5px</span>
+      </div>
+      <div class="ctrl">
+        <label>speed</label>
+        <input type="range" id="s-speed" min="1" max="30" value="10" step="1" />
+        <span id="v-speed">10fps</span>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

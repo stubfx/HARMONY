@@ -17,6 +17,7 @@ export default defineConfig({
                 remote: path.resolve(__dirname, 'remote/index.html'),
                 admin:  path.resolve(__dirname, 'admin/index.html'),
                 wavegen: path.resolve(__dirname, 'wavegen/index.html'),
+                life:    path.resolve(__dirname, 'life/index.html'),
             },
         },
     },
