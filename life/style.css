@@ -22,16 +22,25 @@ html, body {
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  align-items: center;
-  gap: 14px;
-  background: rgba(255,255,255,0.92);
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(255,255,255,0.93);
   border: 1px solid #111;
-  padding: 8px 16px;
+  padding: 10px 16px;
   z-index: 10;
   user-select: none;
   white-space: nowrap;
 }
 
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.controls { gap: 18px; }
+
+/* File button */
 #file-btn {
   background: #111;
   color: #fff;
@@ -43,24 +52,27 @@ html, body {
 #file-input { display: none; }
 
 #file-name {
-  opacity: 0.45;
-  max-width: 140px;
+  opacity: 0.4;
+  max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
-  letter-spacing: 0.04em;
 }
 
-.control {
+/* Sliders */
+.ctrl {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
-.control label { opacity: 0.5; }
+.ctrl label {
+  opacity: 0.5;
+  min-width: 38px;
+}
 
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
-  width: 90px;
+  width: 72px;
   height: 2px;
   background: #111;
   outline: none;
@@ -68,13 +80,17 @@ input[type="range"] {
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 10px; height: 10px;
+  width: 9px; height: 9px;
   background: #111;
   border-radius: 50%;
 }
+.ctrl span {
+  opacity: 0.4;
+  min-width: 30px;
+  font-size: 11px;
+}
 
-#density-val { opacity: 0.5; min-width: 28px; }
-
+/* Buttons */
 button {
   background: #111;
   color: #fff;

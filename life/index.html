@@ -10,20 +10,40 @@
   <canvas id="grid"></canvas>
 
   <div id="toolbar">
-    <label id="file-btn">
-      load audio
-      <input type="file" id="file-input" accept="audio/*" />
-    </label>
-
-    <span id="file-name">—</span>
-
-    <div class="control">
-      <label for="density">density</label>
-      <input type="range" id="density" min="2" max="24" value="8" step="1" />
-      <span id="density-val">8px</span>
+    <div class="row">
+      <label id="file-btn">load audio<input type="file" id="file-input" accept="audio/*" /></label>
+      <span id="file-name">—</span>
+      <button id="btn-sine">sine wave</button>
+      <button id="btn-play" disabled>play</button>
     </div>
 
-    <button id="btn-play" disabled>play</button>
+    <div class="row controls">
+      <div class="ctrl">
+        <label>density</label>
+        <input type="range" id="s-density" min="2"   max="24"  value="8"   step="1"    />
+        <span id="v-density">8px</span>
+      </div>
+      <div class="ctrl">
+        <label>amp</label>
+        <input type="range" id="s-amp"     min="0.1" max="3"   value="1"   step="0.05" />
+        <span id="v-amp">1.0</span>
+      </div>
+      <div class="ctrl">
+        <label>fade</label>
+        <input type="range" id="s-fade"    min="0"   max="4"   value="0"   step="0.1"  />
+        <span id="v-fade">0.0</span>
+      </div>
+      <div class="ctrl">
+        <label>smooth</label>
+        <input type="range" id="s-smooth"  min="0"   max="40"  value="0"   step="1"    />
+        <span id="v-smooth">0</span>
+      </div>
+      <div class="ctrl">
+        <label>jitter</label>
+        <input type="range" id="s-jitter"  min="0"   max="8"   value="0"   step="0.25" />
+        <span id="v-jitter">0</span>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="./main.js"></script>
