@@ -14,7 +14,7 @@ html, body {
   position: fixed;
   top: 0; left: 0;
   width: 100%; height: 100%;
-  cursor: crosshair;
+  cursor: default;
 }
 
 #toolbar {
@@ -24,50 +24,25 @@ html, body {
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 10px;
   background: rgba(255,255,255,0.92);
   border: 1px solid #111;
-  padding: 8px 16px;
-  user-select: none;
+  padding: 8px 14px;
   z-index: 10;
+  user-select: none;
+  white-space: nowrap;
 }
 
-#msg-wrap {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-#msg-wrap label {
-  letter-spacing: 0.05em;
-  opacity: 0.5;
-}
-
-#msg-input {
+select {
   border: none;
   border-bottom: 1px solid #111;
   background: transparent;
   font-family: inherit;
   font-size: inherit;
-  width: 120px;
   outline: none;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-}
-
-#char-indicator {
-  min-width: 90px;
-  text-align: center;
-}
-
-#char-queue {
-  letter-spacing: 0.15em;
-  font-size: 11px;
-}
-
-#controls {
-  display: flex;
-  gap: 8px;
+  cursor: pointer;
+  padding: 0 2px;
+  letter-spacing: 0.05em;
 }
 
 button {
@@ -81,12 +56,5 @@ button {
   letter-spacing: 0.08em;
 }
 
-button:hover { background: #444; }
+button:hover  { background: #444; }
 button.active { background: #555; }
-
-#hint {
-  font-size: 10px;
-  opacity: 0.4;
-  white-space: nowrap;
-  letter-spacing: 0.05em;
-}
