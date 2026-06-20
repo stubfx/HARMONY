@@ -254,26 +254,34 @@ function exportCMYK() {
   const name    = prompt('Export filename (without extension):', defName);
   if (name === null) return;
 
-  const w  = canvas.width, h = canvas.height;
-  const px = ctx.getImageData(0, 0, w, h).data; // RGBA composited on white
+  // Re-render at 300 DPI by scaling cells up (screen assumed ~96 DPI)
+  const scale   = 300 / 96;
+  const cellSz  = Math.max(2, Math.round(CELL * scale)); // scaled cell size
+  const ew      = W * cellSz;  // export canvas width  (exact grid multiple)
+  const eh      = H * cellSz;  // export canvas height
+
+  const oc   = new OffscreenCanvas(ew, eh);
+  const octx = oc.getContext('2d');
+  drawWaveform(octx, W, H, cellSz);
+
+  const px = octx.getImageData(0, 0, ew, eh).data;
 
   // Find darkest pixel to anchor 100% K
   let minR = 255;
   for (let i = 0; i < px.length; i += 4) if (px[i] < minR) minR = px[i];
   const maxK = (255 - minR) / 255;
 
-  const cmyk = new Uint8Array(w * h * 4); // zero = (0,0,0,0) = white
+  const cmyk = new Uint8Array(ew * eh * 4); // zero = (0,0,0,0) = white
   if (maxK > 0.001) {
-    for (let i = 0; i < w * h; i++) {
+    for (let i = 0; i < ew * eh; i++) {
       const kRaw = (255 - px[i * 4]) / 255;
-      if (kRaw < 0.01) continue; // leave as white (0,0,0,0)
-      // Normalise to [0,1] so darkest square = 100%, then snap to 5% grid
+      if (kRaw < 0.01) continue;
       const kPct  = Math.max(5, Math.round((kRaw / maxK) * 100 / 5) * 5);
-      cmyk[i * 4 + 3] = Math.round(kPct / 100 * 255); // K; C=M=Y stay 0
+      cmyk[i * 4 + 3] = Math.round(kPct / 100 * 255);
     }
   }
 
-  const buf  = buildTIFF(w, h, cmyk);
+  const buf  = buildTIFF(ew, eh, cmyk);
   const blob = new Blob([buf], { type: 'image/tiff' });
   const url  = URL.createObjectURL(blob);
   const a    = Object.assign(document.createElement('a'), {
@@ -284,20 +292,20 @@ function exportCMYK() {
   URL.revokeObjectURL(url);
 }
 
-// ── Render ────────────────────────────────────────────────────────────────────
-function render() {
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  if (!rawPeaks || rawPeaks.length !== W) return;
+// ── Render core — works on any context at any cell size ───────────────────────
+function drawWaveform(rctx, rW, rH, cellSz) {
+  rctx.fillStyle = '#fff';
+  rctx.fillRect(0, 0, rW * cellSz, rH * cellSz);
+  if (!rawPeaks || rawPeaks.length < rW) return;
 
   const smoothed = applySmooth(rawPeaks);
-  const cb = H / 2;
+  const cb = rH / 2;
 
-  for (let c = 0; c < W; c++) {
+  for (let c = 0; c < rW; c++) {
     const half   = smoothed[c] * cb * ampVal;
     const center = cb + jitterAt(c) * jitterVal;
-    const rTop   = Math.max(0,     Math.floor(center - half));
-    const rBot   = Math.min(H - 1, Math.ceil (center + half));
+    const rTop   = Math.max(0,      Math.floor(center - half));
+    const rBot   = Math.min(rH - 1, Math.ceil (center + half));
 
     for (let r = rTop; r <= rBot; r++) {
       const dist  = half > 0.001 ? Math.abs(r - center) / half : 0;
@@ -305,10 +313,15 @@ function render() {
       const mask  = maskGrid ? maskGrid[r * W + c] : 1;
       const alpha = wave * mask;
       if (alpha < 0.01) continue;
-      ctx.fillStyle = alpha >= 0.995 ? '#000' : `rgba(0,0,0,${alpha.toFixed(3)})`;
-      ctx.fillRect(c * CELL + 1, r * CELL + 1, CELL - 1, CELL - 1);
+      rctx.fillStyle = alpha >= 0.995 ? '#000' : `rgba(0,0,0,${alpha.toFixed(3)})`;
+      rctx.fillRect(c * cellSz + 1, r * cellSz + 1, cellSz - 1, cellSz - 1);
     }
   }
+}
+
+// ── Render (screen) ───────────────────────────────────────────────────────────
+function render() {
+  drawWaveform(ctx, W, H, CELL);
 
   // Playhead
   if (audioBuffer && isPlaying) {
