@@ -23,10 +23,24 @@ function setSize() {
 // ── ICC profile state ─────────────────────────────────────────────────────────
 let iccData = null; // Uint8Array of the loaded .icc file
 
-async function loadICC(file) {
-  iccData = new Uint8Array(await file.arrayBuffer());
-  document.getElementById('icc-name').textContent = file.name;
+function setICC(bytes, label) {
+  iccData = bytes;
+  document.getElementById('icc-name').textContent = label;
   document.getElementById('btn-clear-icc').hidden = false;
+}
+
+async function loadICC(file) {
+  setICC(new Uint8Array(await file.arrayBuffer()), file.name);
+}
+
+async function fetchFOGRA39() {
+  try {
+    const res = await fetch('/fogra39.icc');
+    if (!res.ok) throw new Error();
+    setICC(new Uint8Array(await res.arrayBuffer()), 'ISOcoated_v2 (FOGRA39)');
+  } catch {
+    alert('Scarica ISOcoated_v2_eci.icc da eci.org e salvalo in public/fogra39.icc');
+  }
 }
 
 function clearICC() {
@@ -375,6 +389,7 @@ function setupToolbar() {
   document.getElementById('icc-input').addEventListener('change', e => {
     const f = e.target.files[0]; if (f) loadICC(f);
   });
+  document.getElementById('btn-fogra39').addEventListener('click', fetchFOGRA39);
   document.getElementById('btn-clear-icc').addEventListener('click', clearICC);
   document.getElementById('btn-sine').addEventListener('click', generateSine);
   document.getElementById('btn-play').addEventListener('click', () => {
