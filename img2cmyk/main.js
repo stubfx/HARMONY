@@ -61,6 +61,12 @@ function clearICC() {
 }
 
 // ── RGB → CMYK ────────────────────────────────────────────────────────────────
+// Grayscale: K-only via Rec.709 luminance, C=M=Y=0
+function grayToCMYK(r, g, b) {
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return [0, 0, 0, Math.round((1 - lum / 255) * 255)];
+}
+
 // Naive conversion + FOGRA39 TAC limit (330 %)
 function rgbToCMYK(r, g, b) {
   const R = r / 255, G = g / 255, B = b / 255;
@@ -145,9 +151,12 @@ function exportCMYK() {
   octx.drawImage(imageBitmap, 0, 0, iw, ih);
   const px = octx.getImageData(0, 0, iw, ih).data; // RGBA
 
+  const grayscale = document.getElementById('cb-grayscale').checked;
+  const convert   = grayscale ? grayToCMYK : rgbToCMYK;
+
   const cmyk = new Uint8Array(iw * ih * 4);
   for (let i = 0; i < iw * ih; i++) {
-    const [C, M, Y, K] = rgbToCMYK(px[i*4], px[i*4+1], px[i*4+2]);
+    const [C, M, Y, K] = convert(px[i*4], px[i*4+1], px[i*4+2]);
     cmyk[i*4]   = C;
     cmyk[i*4+1] = M;
     cmyk[i*4+2] = Y;
