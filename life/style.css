@@ -84,11 +84,9 @@ button {
 button:hover { background: #444; }
 button.active { background: #555; }
 
-#char-queue span { opacity: 0.3; }
-#char-queue span.next { opacity: 1; text-decoration: underline; }
-
-#legend {
+#hint {
   font-size: 10px;
   opacity: 0.4;
   white-space: nowrap;
+  letter-spacing: 0.05em;
 }
