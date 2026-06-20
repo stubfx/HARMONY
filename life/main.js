@@ -1,11 +1,11 @@
-// Audio waveform visualizer — pixel grid (black squares on white)
+// Audio waveform visualizer — pixel grid, CMYK export
 
 // ── Parameters ────────────────────────────────────────────────────────────────
-let CELL       = 8;   // px per cell
-let ampVal     = 1.0; // vertical scale multiplier
-let fadeVal    = 0.0; // edge fade exponent (0 = flat black, >0 = fade to transparent)
-let smoothVal  = 0;   // moving-average half-window in columns
-let jitterVal  = 0;   // max vertical jitter in cells
+let CELL       = 5;
+let ampVal     = 1.0;
+let fadeVal    = 4.0;
+let smoothVal  = 2;
+let jitterVal  = 0;
 
 // ── Canvas ────────────────────────────────────────────────────────────────────
 const canvas = document.getElementById('grid');
@@ -20,94 +20,80 @@ function setSize() {
 }
 
 // ── Audio state ───────────────────────────────────────────────────────────────
-let audioCtx    = null;
-let audioBuffer = null;
-let rawPeaks    = null; // Float32Array[W]: normalised peak per column (source of truth)
-let sourceNode  = null;
-let startTime   = 0;
-let startOffset = 0;
-let isPlaying   = false;
+let audioCtx       = null;
+let audioBuffer    = null;
+let rawPeaks       = null;
+let sourceNode     = null;
+let startTime      = 0;
+let startOffset    = 0;
+let isPlaying      = false;
+let currentName    = '';
 
 function ensureCtx() {
   if (!audioCtx) audioCtx = new AudioContext();
 }
 
-// ── Load from file ────────────────────────────────────────────────────────────
+// ── Load file ─────────────────────────────────────────────────────────────────
 async function loadFile(file) {
   ensureCtx();
   if (isPlaying) stopPlayback();
   startOffset = 0;
-  const buf   = await file.arrayBuffer();
-  audioBuffer = await audioCtx.decodeAudioData(buf);
+  currentName = file.name.replace(/\.[^.]+$/, '');
+  audioBuffer = await audioCtx.decodeAudioData(await file.arrayBuffer());
   document.getElementById('file-name').textContent = file.name;
   document.getElementById('btn-play').disabled = false;
   computeRawPeaks();
 }
 
-// ── Generate sine wave ────────────────────────────────────────────────────────
-// Creates a 4-second buffer mixing 2–4 random sine components.
+// ── Sine wave generator ───────────────────────────────────────────────────────
 function generateSine() {
   ensureCtx();
   if (isPlaying) stopPlayback();
   startOffset = 0;
-
   const sr  = audioCtx.sampleRate;
-  const dur = 4; // seconds
-  const len = sr * dur;
+  const len = sr * 4;
   audioBuffer = audioCtx.createBuffer(1, len, sr);
   const data  = audioBuffer.getChannelData(0);
-
-  // Pick 2–4 random harmonics
-  const nComponents = 2 + Math.floor(Math.random() * 3);
-  const components  = Array.from({ length: nComponents }, () => ({
-    freq: 80 + Math.random() * 800,
-    amp:  0.3 + Math.random() * 0.7,
-    phase: Math.random() * Math.PI * 2,
+  const n     = 2 + Math.floor(Math.random() * 3);
+  const comps = Array.from({ length: n }, () => ({
+    f: 80 + Math.random() * 800,
+    a: 0.3 + Math.random() * 0.7,
+    p: Math.random() * Math.PI * 2,
   }));
-  const totalAmp = components.reduce((s, c) => s + c.amp, 0);
-
+  const tot = comps.reduce((s, c) => s + c.a, 0);
   for (let i = 0; i < len; i++) {
-    let v = 0;
-    const t = i / sr;
-    for (const c of components) v += c.amp * Math.sin(2 * Math.PI * c.freq * t + c.phase);
-    data[i] = v / totalAmp;
+    let v = 0, t = i / sr;
+    for (const c of comps) v += c.a * Math.sin(2 * Math.PI * c.f * t + c.p);
+    data[i] = v / tot;
   }
-
-  document.getElementById('file-name').textContent = `sine ×${nComponents}`;
+  currentName = `sine_x${n}`;
+  document.getElementById('file-name').textContent = `sine ×${n}`;
   document.getElementById('btn-play').disabled = false;
   computeRawPeaks();
 }
 
 // ── Peak computation ──────────────────────────────────────────────────────────
 function computeRawPeaks() {
-  if (!audioBuffer) return;
-  const nCh  = audioBuffer.numberOfChannels;
+  if (!audioBuffer || W === 0) return;
+  const nCh = audioBuffer.numberOfChannels;
   const len  = audioBuffer.length;
-
-  // Mix to mono
   const mono = new Float32Array(len);
   for (let ch = 0; ch < nCh; ch++) {
     const d = audioBuffer.getChannelData(ch);
     for (let i = 0; i < len; i++) mono[i] += d[i] / nCh;
   }
-
-  // Peak per column
   rawPeaks = new Float32Array(W);
   for (let c = 0; c < W; c++) {
-    const s0 = Math.floor(c       / W * len);
-    const s1 = Math.floor((c + 1) / W * len);
+    const s0 = Math.floor(c / W * len), s1 = Math.floor((c + 1) / W * len);
     let pk = 0;
     for (let i = s0; i < s1; i++) { const a = Math.abs(mono[i]); if (a > pk) pk = a; }
     rawPeaks[c] = pk;
   }
-
-  // Normalize
   let mx = 0;
   for (let c = 0; c < W; c++) if (rawPeaks[c] > mx) mx = rawPeaks[c];
   if (mx > 0) for (let c = 0; c < W; c++) rawPeaks[c] /= mx;
 }
 
-// Apply box-filter smoothing (half-window = smoothVal columns).
 function applySmooth(src) {
   if (smoothVal === 0) return src;
   const out = new Float32Array(src.length);
@@ -122,7 +108,7 @@ function applySmooth(src) {
   return out;
 }
 
-// Deterministic per-column jitter value in [-1, 1] (sin-hash, stable every frame).
+// Deterministic per-column jitter in [-1, 1]
 function jitterAt(c) {
   const v = Math.sin(c * 127.1 + 311.7) * 43758.5453;
   return (v - Math.floor(v)) * 2 - 1;
@@ -132,12 +118,12 @@ function jitterAt(c) {
 function startPlayback() {
   if (!audioBuffer || isPlaying) return;
   ensureCtx();
-  const offset = startOffset % audioBuffer.duration;
-  sourceNode   = audioCtx.createBufferSource();
+  const off = startOffset % audioBuffer.duration;
+  sourceNode = audioCtx.createBufferSource();
   sourceNode.buffer = audioBuffer;
   sourceNode.connect(audioCtx.destination);
-  sourceNode.start(0, offset);
-  startTime = audioCtx.currentTime - offset;
+  sourceNode.start(0, off);
+  startTime = audioCtx.currentTime - off;
   isPlaying = true;
   sourceNode.onended = () => { isPlaying = false; startOffset = 0; syncPlayBtn(); };
   syncPlayBtn();
@@ -147,114 +133,167 @@ function stopPlayback() {
   if (!isPlaying) return;
   sourceNode?.stop();
   startOffset = audioCtx.currentTime - startTime;
-  isPlaying   = false;
+  isPlaying = false;
   syncPlayBtn();
 }
 
 function syncPlayBtn() {
-  const btn = document.getElementById('btn-play');
-  btn.textContent = isPlaying ? 'pause' : 'play';
-  btn.classList.toggle('active', isPlaying);
+  const b = document.getElementById('btn-play');
+  b.textContent = isPlaying ? 'pause' : 'play';
+  b.classList.toggle('active', isPlaying);
+}
+
+// ── CMYK TIFF export ──────────────────────────────────────────────────────────
+//
+// Layout (little-endian TIFF):
+//   0     header          8 bytes
+//   8     IFD             2 + 11×12 + 4 = 138 bytes  → ends at 146
+//   146   BitsPerSample   4×SHORT = 8 bytes           → ends at 154
+//   154   image data      W × H × 4 bytes  (CMYK interleaved)
+//
+// CMYK mapping:
+//   white pixel  → C=0 M=0 Y=0 K=0
+//   darkest pixel → K=255 (100 %)
+//   in-between   → K quantised to nearest 5 % step
+//
+function buildTIFF(w, h, cmykData) {
+  const bpsOff = 8 + 2 + 11 * 12 + 4;   // 146
+  const imgOff = bpsOff + 8;             // 154
+  const imgSz  = w * h * 4;
+  const buf    = new ArrayBuffer(imgOff + imgSz);
+  const dv     = new DataView(buf);
+  let p = 0;
+
+  const u8  = v  => dv.setUint8(p++, v);
+  const u16 = v  => { dv.setUint16(p, v, true); p += 2; };
+  const u32 = v  => { dv.setUint32(p, v, true); p += 4; };
+  const ent = (tag, type, count, val) => { u16(tag); u16(type); u32(count); u32(val); };
+
+  // Header
+  u8(0x49); u8(0x49); u16(42); u32(8);
+
+  // IFD — 11 entries, tags in ascending order
+  u16(11);
+  ent(256, 4, 1, w);         // ImageWidth
+  ent(257, 4, 1, h);         // ImageLength
+  ent(258, 3, 4, bpsOff);    // BitsPerSample → offset to [8,8,8,8]
+  ent(259, 3, 1, 1);         // Compression: none
+  ent(262, 3, 1, 5);         // PhotometricInterpretation: CMYK (Separated)
+  ent(273, 4, 1, imgOff);    // StripOffsets
+  ent(277, 3, 1, 4);         // SamplesPerPixel
+  ent(278, 4, 1, h);         // RowsPerStrip
+  ent(279, 4, 1, imgSz);     // StripByteCounts
+  ent(284, 3, 1, 1);         // PlanarConfiguration: chunky
+  ent(332, 3, 1, 1);         // InkSet: CMYK
+  u32(0);                    // next IFD = none
+
+  // BitsPerSample extra data
+  p = bpsOff; u16(8); u16(8); u16(8); u16(8);
+
+  // Image data
+  new Uint8Array(buf, imgOff).set(cmykData);
+  return buf;
+}
+
+function exportCMYK() {
+  const defName = currentName || 'waveform';
+  const name    = prompt('Export filename (without extension):', defName);
+  if (name === null) return;
+
+  const w  = canvas.width, h = canvas.height;
+  const px = ctx.getImageData(0, 0, w, h).data; // RGBA composited on white
+
+  // Find darkest pixel to anchor 100% K
+  let minR = 255;
+  for (let i = 0; i < px.length; i += 4) if (px[i] < minR) minR = px[i];
+  const maxK = (255 - minR) / 255;
+
+  const cmyk = new Uint8Array(w * h * 4); // zero = (0,0,0,0) = white
+  if (maxK > 0.001) {
+    for (let i = 0; i < w * h; i++) {
+      const kRaw = (255 - px[i * 4]) / 255;
+      if (kRaw < 0.01) continue; // leave as white (0,0,0,0)
+      // Normalise to [0,1] so darkest square = 100%, then snap to 5% grid
+      const kPct  = Math.max(5, Math.round((kRaw / maxK) * 100 / 5) * 5);
+      cmyk[i * 4 + 3] = Math.round(kPct / 100 * 255); // K; C=M=Y stay 0
+    }
+  }
+
+  const buf  = buildTIFF(w, h, cmyk);
+  const blob = new Blob([buf], { type: 'image/tiff' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), {
+    href: url,
+    download: (name || defName).replace(/\.tiff?$/i, '') + '.tiff',
+  });
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
 function render() {
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-
   if (!rawPeaks || rawPeaks.length !== W) return;
 
-  // Pipeline: smooth → amp → jitter (applied per column at render time)
   const smoothed = applySmooth(rawPeaks);
-  const centerBase = H / 2;
+  const cb = H / 2;
 
   for (let c = 0; c < W; c++) {
-    const half   = smoothed[c] * centerBase * ampVal;        // half-bar height in cells
-    const center = centerBase + jitterAt(c) * jitterVal;     // shifted centre
-
-    const rTop = Math.max(0,     Math.floor(center - half));
-    const rBot = Math.min(H - 1, Math.ceil (center + half));
+    const half   = smoothed[c] * cb * ampVal;
+    const center = cb + jitterAt(c) * jitterVal;
+    const rTop   = Math.max(0,     Math.floor(center - half));
+    const rBot   = Math.min(H - 1, Math.ceil (center + half));
 
     for (let r = rTop; r <= rBot; r++) {
-      // Normalised distance from bar centre [0 = centre, 1 = edge]
       const dist  = half > 0.001 ? Math.abs(r - center) / half : 0;
-      const alpha = Math.pow(Math.max(0, 1 - dist), fadeVal === 0 ? 0 : fadeVal);
+      const alpha = fadeVal === 0 ? 1 : Math.pow(Math.max(0, 1 - dist), fadeVal);
       if (alpha < 0.01) continue;
-
-      if (fadeVal === 0) {
-        ctx.fillStyle = '#111';
-      } else {
-        ctx.fillStyle = `rgba(17,17,17,${alpha.toFixed(2)})`;
-      }
+      ctx.fillStyle = alpha >= 0.995 ? '#000' : `rgba(0,0,0,${alpha.toFixed(3)})`;
       ctx.fillRect(c * CELL + 1, r * CELL + 1, CELL - 1, CELL - 1);
     }
   }
 
   // Playhead
   if (audioBuffer && isPlaying) {
-    const progress = Math.min(1, (audioCtx.currentTime - startTime) / audioBuffer.duration);
-    const px = Math.round(progress * W) * CELL;
-    ctx.fillStyle = 'rgba(0,0,0,0.25)';
-    ctx.fillRect(px, 0, Math.max(1, CELL * 0.3), canvas.height);
+    const prog = Math.min(1, (audioCtx.currentTime - startTime) / audioBuffer.duration);
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.fillRect(Math.round(prog * W) * CELL, 0, Math.max(1, CELL * 0.3), canvas.height);
   }
 }
 
 // ── Loop ─────────────────────────────────────────────────────────────────────
-function loop() {
-  requestAnimationFrame(loop);
-  render();
-}
+function loop() { requestAnimationFrame(loop); render(); }
 
-// ── Toolbar wiring ────────────────────────────────────────────────────────────
-function slider(id, valId, onchange) {
-  const el  = document.getElementById(id);
-  const val = document.getElementById(valId);
-  const update = () => { onchange(+el.value); val.textContent = (+el.value).toFixed(el.step && +el.step < 1 ? 1 : 0) + (el.dataset.unit || ''); };
-  el.addEventListener('input', update);
-  update(); // set initial display
-}
-
+// ── Toolbar ───────────────────────────────────────────────────────────────────
 function setupToolbar() {
   document.getElementById('file-input').addEventListener('change', e => {
     const f = e.target.files[0]; if (f) loadFile(f);
   });
-
   document.getElementById('btn-sine').addEventListener('click', generateSine);
-
   document.getElementById('btn-play').addEventListener('click', () => {
     isPlaying ? stopPlayback() : startPlayback();
   });
+  document.getElementById('btn-export').addEventListener('click', exportCMYK);
 
-  // Density changes grid dimensions → recompute peaks
-  const densEl  = document.getElementById('s-density');
-  const densVal = document.getElementById('v-density');
-  densEl.addEventListener('input', () => {
-    CELL = +densEl.value;
-    densVal.textContent = CELL + 'px';
-    setSize();
-    computeRawPeaks();
-  });
-  densVal.textContent = CELL + 'px';
+  function bind(sid, vid, decimals, unit, cb) {
+    const sl = document.getElementById(sid);
+    const vl = document.getElementById(vid);
+    sl.addEventListener('input', () => {
+      const v = +sl.value;
+      vl.textContent = v.toFixed(decimals) + (unit || '');
+      cb(v);
+    });
+    // fire once to sync display with HTML default value
+    vl.textContent = (+sl.value).toFixed(decimals) + (unit || '');
+    cb(+sl.value);
+  }
 
-  document.getElementById('s-amp').addEventListener('input', e => {
-    ampVal = +e.target.value;
-    document.getElementById('v-amp').textContent = ampVal.toFixed(1);
-  });
-
-  document.getElementById('s-fade').addEventListener('input', e => {
-    fadeVal = +e.target.value;
-    document.getElementById('v-fade').textContent = fadeVal.toFixed(1);
-  });
-
-  document.getElementById('s-smooth').addEventListener('input', e => {
-    smoothVal = +e.target.value;
-    document.getElementById('v-smooth').textContent = smoothVal;
-  });
-
-  document.getElementById('s-jitter').addEventListener('input', e => {
-    jitterVal = +e.target.value;
-    document.getElementById('v-jitter').textContent = (+e.target.value).toFixed(2);
-  });
+  bind('s-density', 'v-density', 0, 'px', v => { CELL = v; setSize(); computeRawPeaks(); });
+  bind('s-amp',     'v-amp',     1, '',   v => { ampVal    = v; });
+  bind('s-fade',    'v-fade',    1, '',   v => { fadeVal   = v; });
+  bind('s-smooth',  'v-smooth',  0, '',   v => { smoothVal = v; });
+  bind('s-jitter',  'v-jitter',  2, '',   v => { jitterVal = v; });
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
