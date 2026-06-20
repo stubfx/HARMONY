@@ -191,35 +191,34 @@ function syncPlayBtn() {
 
 // ── CMYK TIFF export ──────────────────────────────────────────────────────────
 //
-// Layout (little-endian TIFF):
-//   0     header          8 bytes
-//   8     IFD             2 + 11×12 + 4 = 138 bytes  → ends at 146
-//   146   BitsPerSample   4×SHORT = 8 bytes           → ends at 154
-//   154   image data      W × H × 4 bytes  (CMYK interleaved)
-//
-// CMYK mapping:
-//   white pixel  → C=0 M=0 Y=0 K=0
-//   darkest pixel → K=255 (100 %)
-//   in-between   → K quantised to nearest 5 % step
+// Layout (little-endian TIFF, 14 IFD entries):
+//   0     header           8 bytes
+//   8     IFD              2 + 14×12 + 4 = 174 bytes  → ends at 182
+//   182   BitsPerSample    4×SHORT = 8 bytes           → ends at 190
+//   190   XResolution      RATIONAL = 8 bytes          → ends at 198
+//   198   YResolution      RATIONAL = 8 bytes          → ends at 206
+//   206   image data       W × H × 4 bytes (CMYK interleaved)
 //
 function buildTIFF(w, h, cmykData) {
-  const bpsOff = 8 + 2 + 11 * 12 + 4;   // 146
-  const imgOff = bpsOff + 8;             // 154
-  const imgSz  = w * h * 4;
-  const buf    = new ArrayBuffer(imgOff + imgSz);
-  const dv     = new DataView(buf);
+  const bpsOff  = 8 + 2 + 14 * 12 + 4; // 182
+  const xResOff = bpsOff + 8;           // 190
+  const yResOff = xResOff + 8;          // 198
+  const imgOff  = yResOff + 8;          // 206
+  const imgSz   = w * h * 4;
+  const buf     = new ArrayBuffer(imgOff + imgSz);
+  const dv      = new DataView(buf);
   let p = 0;
 
-  const u8  = v  => dv.setUint8(p++, v);
-  const u16 = v  => { dv.setUint16(p, v, true); p += 2; };
-  const u32 = v  => { dv.setUint32(p, v, true); p += 4; };
+  const u8  = v => dv.setUint8(p++, v);
+  const u16 = v => { dv.setUint16(p, v, true); p += 2; };
+  const u32 = v => { dv.setUint32(p, v, true); p += 4; };
   const ent = (tag, type, count, val) => { u16(tag); u16(type); u32(count); u32(val); };
 
   // Header
   u8(0x49); u8(0x49); u16(42); u32(8);
 
-  // IFD — 11 entries, tags in ascending order
-  u16(11);
+  // IFD — 14 entries, tags in ascending order
+  u16(14);
   ent(256, 4, 1, w);         // ImageWidth
   ent(257, 4, 1, h);         // ImageLength
   ent(258, 3, 4, bpsOff);    // BitsPerSample → offset to [8,8,8,8]
@@ -229,12 +228,21 @@ function buildTIFF(w, h, cmykData) {
   ent(277, 3, 1, 4);         // SamplesPerPixel
   ent(278, 4, 1, h);         // RowsPerStrip
   ent(279, 4, 1, imgSz);     // StripByteCounts
+  ent(282, 5, 1, xResOff);   // XResolution → RATIONAL 300/1
+  ent(283, 5, 1, yResOff);   // YResolution → RATIONAL 300/1
   ent(284, 3, 1, 1);         // PlanarConfiguration: chunky
+  ent(296, 3, 1, 2);         // ResolutionUnit: inch
   ent(332, 3, 1, 1);         // InkSet: CMYK
   u32(0);                    // next IFD = none
 
-  // BitsPerSample extra data
+  // BitsPerSample [8, 8, 8, 8]
   p = bpsOff; u16(8); u16(8); u16(8); u16(8);
+
+  // XResolution: 300/1
+  p = xResOff; u32(300); u32(1);
+
+  // YResolution: 300/1
+  p = yResOff; u32(300); u32(1);
 
   // Image data
   new Uint8Array(buf, imgOff).set(cmykData);
