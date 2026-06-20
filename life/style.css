@@ -12,9 +12,8 @@ html, body {
 #grid {
   display: block;
   position: fixed;
-  top: 0; left: 0;
+  inset: 0;
   width: 100%; height: 100%;
-  cursor: default;
 }
 
 #toolbar {
@@ -24,26 +23,57 @@ html, body {
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
   background: rgba(255,255,255,0.92);
   border: 1px solid #111;
-  padding: 8px 14px;
+  padding: 8px 16px;
   z-index: 10;
   user-select: none;
   white-space: nowrap;
 }
 
-select {
-  border: none;
-  border-bottom: 1px solid #111;
-  background: transparent;
-  font-family: inherit;
-  font-size: inherit;
+#file-btn {
+  background: #111;
+  color: #fff;
+  padding: 4px 10px;
+  cursor: pointer;
+  letter-spacing: 0.08em;
+}
+#file-btn:hover { background: #444; }
+#file-input { display: none; }
+
+#file-name {
+  opacity: 0.45;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.04em;
+}
+
+.control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.control label { opacity: 0.5; }
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 90px;
+  height: 2px;
+  background: #111;
   outline: none;
   cursor: pointer;
-  padding: 0 2px;
-  letter-spacing: 0.05em;
 }
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px; height: 10px;
+  background: #111;
+  border-radius: 50%;
+}
+
+#density-val { opacity: 0.5; min-width: 28px; }
 
 button {
   background: #111;
@@ -55,6 +85,6 @@ button {
   cursor: pointer;
   letter-spacing: 0.08em;
 }
-
-button:hover  { background: #444; }
-button.active { background: #555; }
+button:hover   { background: #444; }
+button.active  { background: #555; }
+button:disabled { opacity: 0.3; cursor: default; }

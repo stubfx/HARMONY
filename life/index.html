@@ -3,17 +3,27 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Life — Pattern Field</title>
+  <title>Waveform</title>
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
   <canvas id="grid"></canvas>
 
   <div id="toolbar">
-    <select id="formula-select"></select>
-    <button id="btn-gen">generate</button>
-    <button id="btn-play">play</button>
-    <button id="btn-clear">clear</button>
+    <label id="file-btn">
+      load audio
+      <input type="file" id="file-input" accept="audio/*" />
+    </label>
+
+    <span id="file-name">—</span>
+
+    <div class="control">
+      <label for="density">density</label>
+      <input type="range" id="density" min="2" max="24" value="8" step="1" />
+      <span id="density-val">8px</span>
+    </div>
+
+    <button id="btn-play" disabled>play</button>
   </div>
 
   <script type="module" src="./main.js"></script>
