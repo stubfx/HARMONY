@@ -19,6 +19,7 @@ export default defineConfig({
                 wavegen: path.resolve(__dirname, 'wavegen/index.html'),
                 life:    path.resolve(__dirname, 'life/index.html'),
                 img2cmyk: path.resolve(__dirname, 'img2cmyk/index.html'),
+                chladni: path.resolve(__dirname, 'chladni/index.html'),
             },
         },
     },

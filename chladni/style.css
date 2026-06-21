@@ -1,0 +1,105 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  background: #0a0a0a;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Courier New', monospace;
+}
+
+#canvas {
+  display: block;
+  image-rendering: crisp-edges;
+}
+
+/* ── floating UI at bottom ── */
+#ui {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: min(580px, 92vw);
+}
+
+#text-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255,255,255,0.18);
+  color: #e8e8e8;
+  font-family: inherit;
+  font-size: clamp(1.1rem, 3vw, 1.6rem);
+  letter-spacing: 0.18em;
+  text-align: center;
+  text-transform: uppercase;
+  outline: none;
+  padding: 8px 0;
+  caret-color: rgba(255,255,255,0.5);
+}
+
+#text-input::placeholder {
+  color: rgba(255,255,255,0.12);
+  letter-spacing: 0.12em;
+}
+
+#controls {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.35);
+}
+
+.ctrl {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+/* range slider */
+input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 72px;
+  height: 1px;
+  background: rgba(255,255,255,0.18);
+  outline: none;
+  cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.55);
+  cursor: pointer;
+}
+input[type=range]::-moz-range-thumb {
+  width: 9px; height: 9px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.55);
+}
+
+button {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.18);
+  color: rgba(255,255,255,0.38);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  padding: 5px 16px;
+  transition: border-color 0.15s, color 0.15s;
+}
+button:hover {
+  border-color: rgba(255,255,255,0.45);
+  color: rgba(255,255,255,0.75);
+}

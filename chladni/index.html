@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Chladni</title>
+  <link rel="stylesheet" href="./style.css"/>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div id="ui">
+    <input
+      type="text"
+      id="text-input"
+      autocomplete="off"
+      spellcheck="false"
+      placeholder="type something"
+    />
+    <div id="controls">
+      <div class="ctrl">
+        <label>threshold</label>
+        <input type="range" id="s-threshold" min="0.04" max="0.45" value="0.15" step="0.01"/>
+        <span id="v-threshold">0.15</span>
+      </div>
+      <button id="btn-play">play</button>
+      <button id="btn-export">export svg</button>
+    </div>
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
