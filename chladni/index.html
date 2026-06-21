@@ -18,13 +18,38 @@
       placeholder="type something"
     />
     <div id="controls">
-      <div class="ctrl">
-        <label>threshold</label>
-        <input type="range" id="s-threshold" min="0.04" max="0.45" value="0.15" step="0.01"/>
-        <span id="v-threshold">0.15</span>
+      <!-- row 1: visual controls + play -->
+      <div class="row">
+        <div class="ctrl">
+          <label>threshold</label>
+          <input type="range" id="s-threshold" min="0.04" max="0.45" value="0.15" step="0.01"/>
+          <span id="v-threshold">0.15</span>
+        </div>
+        <div class="ctrl">
+          <label>density</label>
+          <select id="s-density">
+            <option value="5">light</option>
+            <option value="3" selected>medium</option>
+            <option value="2">fine</option>
+          </select>
+        </div>
+        <button id="btn-play">play</button>
       </div>
-      <button id="btn-play">play</button>
-      <button id="btn-export">export svg</button>
+      <!-- row 2: export dimensions -->
+      <div class="row">
+        <div class="ctrl dim">
+          <input type="number" id="s-width"  value="80" min="1" max="9999" step="0.5"/>
+          <span class="sep">×</span>
+          <input type="number" id="s-height" value="80" min="1" max="9999" step="0.5"/>
+          <select id="s-unit">
+            <option value="mm" selected>mm</option>
+            <option value="cm">cm</option>
+            <option value="pt">pt</option>
+            <option value="in">in</option>
+          </select>
+        </div>
+        <button id="btn-export">export svg</button>
+      </div>
     </div>
   </div>
 

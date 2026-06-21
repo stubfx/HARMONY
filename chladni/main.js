@@ -9,6 +9,10 @@ const btnPlay     = document.getElementById('btn-play');
 const btnExport   = document.getElementById('btn-export');
 const sliderThr   = document.getElementById('s-threshold');
 const vThr        = document.getElementById('v-threshold');
+const selDensity  = document.getElementById('s-density');
+const inWidth     = document.getElementById('s-width');
+const inHeight    = document.getElementById('s-height');
+const selUnit     = document.getElementById('s-unit');
 
 let audioCtx    = null;
 let currentDots = [];
@@ -63,9 +67,8 @@ function chladniValue(x, y, modes) {
 
 // Sample a grid; keep points near the nodal surface (|Z| < threshold).
 // Slight jitter gives the organic, sand-like quality.
-function generateDots(modes, size, threshold) {
+function generateDots(modes, size, threshold, step = 3) {
   const dots = [];
-  const step = 3;
   for (let px = 0; px < size; px += step) {
     for (let py = 0; py < size; py += step) {
       const val = chladniValue(px / size, py / size, modes);
@@ -127,13 +130,29 @@ function playAudio(modes) {
 
 // ── SVG export ───────────────────────────────────────────────────────────────
 
-// Mirrors the thesis SVG aesthetic: black dots on transparent background.
-function exportSVG(dots, size) {
+// mm equivalent of each unit — used to compute an adaptive dot radius so
+// points appear at a consistent physical size regardless of canvas dimensions.
+const TO_MM = { mm: 1, cm: 10, pt: 0.3528, in: 25.4 };
+
+function exportSVG(modes, threshold) {
+  const step     = parseInt(selDensity.value);
+  const width    = parseFloat(inWidth.value)  || 80;
+  const height   = parseFloat(inHeight.value) || 80;
+  const unit     = selUnit.value;
+  const viewSize = 800; // internal viewBox resolution
+
+  // Dot radius scaled so each dot is ≈ 0.2 mm on the printed page.
+  const sizeMm = Math.max(width, height) * (TO_MM[unit] ?? 1);
+  const r      = Math.max(0.4, Math.min(4, 160 / sizeMm)).toFixed(2);
+
+  // Regenerate at export density (independent from canvas preview density).
+  const dots  = generateDots(modes, viewSize, threshold, step);
   const lines = dots.map(({ x, y }) =>
-    `  <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="1.2" fill="#3d3d3d"/>`
+    `  <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="#3d3d3d"/>`
   );
+
   const svg = [
-    `<svg viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">`,
+    `<svg width="${width}${unit}" height="${height}${unit}" viewBox="0 0 ${viewSize} ${viewSize}" xmlns="http://www.w3.org/2000/svg">`,
     ...lines,
     '</svg>',
   ].join('\n');
@@ -193,7 +212,11 @@ btnPlay.addEventListener('click', () => {
 });
 
 btnExport.addEventListener('click', () => {
-  if (currentDots.length) exportSVG(currentDots, canvas.width);
+  const text = input.value.trim();
+  if (!text) return;
+  const modes     = textToModes(text);
+  const threshold = parseFloat(sliderThr.value);
+  exportSVG(modes, threshold);
 });
 
 window.addEventListener('resize', resize);
