@@ -63,19 +63,27 @@ function chladniValue(x, y, modes) {
 
 // ── Dot generation ───────────────────────────────────────────────────────────
 
-// scatter: position jitter multiplier (0=on-grid, 3=very spread)
-// Each dot stores a random `size` [0,1] used consistently in canvas + export.
+// Each dot is placed on the nodal line first, then scatter is applied radially —
+// pushing it outward in a random direction by up to scatter × (W/30) pixels.
+// This mimics stars distributed around constellation lines, not locked to a grid.
 function generateDots(modes, W, H, threshold, step, scatter) {
-  const dots = [];
+  const dots     = [];
+  const maxDrift = scatter * (W / 30); // scale with domain size, not step
   for (let px = 0; px < W; px += step) {
     for (let py = 0; py < H; py += step) {
       const val = chladniValue(px / W, py / H, modes);
       if (Math.abs(val) < threshold) {
+        // Tiny base jitter so dots don't sit on a visible grid
+        const bx    = px + (Math.random() - 0.5) * step * 0.4;
+        const by    = py + (Math.random() - 0.5) * step * 0.4;
+        // Radial scatter applied after filtering: direction + distance are independent
+        const angle = Math.random() * 6.2832;
+        const dist  = Math.random() * maxDrift;
         dots.push({
-          x:         px + (Math.random() - 0.5) * step * scatter,
-          y:         py + (Math.random() - 0.5) * step * scatter,
+          x:         bx + Math.cos(angle) * dist,
+          y:         by + Math.sin(angle) * dist,
           intensity: 1 - Math.abs(val) / threshold,
-          size:      Math.random(), // drives radius jitter
+          size:      Math.random(),
         });
       }
     }
