@@ -11,6 +11,10 @@ const sliderThr   = document.getElementById('s-threshold');
 const vThr        = document.getElementById('v-threshold');
 const selDensity  = document.getElementById('s-density');
 const selMode     = document.getElementById('s-mode');
+const sliderScatter = document.getElementById('s-scatter');
+const vScatter      = document.getElementById('v-scatter');
+const sliderJitter  = document.getElementById('s-jitter');
+const vJitter       = document.getElementById('v-jitter');
 const inWidth     = document.getElementById('s-width');
 const inHeight    = document.getElementById('s-height');
 const selUnit     = document.getElementById('s-unit');
@@ -59,16 +63,19 @@ function chladniValue(x, y, modes) {
 
 // ── Dot generation ───────────────────────────────────────────────────────────
 
-function generateDots(modes, W, H, threshold, step) {
+// scatter: position jitter multiplier (0=on-grid, 3=very spread)
+// Each dot stores a random `size` [0,1] used consistently in canvas + export.
+function generateDots(modes, W, H, threshold, step, scatter) {
   const dots = [];
   for (let px = 0; px < W; px += step) {
     for (let py = 0; py < H; py += step) {
       const val = chladniValue(px / W, py / H, modes);
       if (Math.abs(val) < threshold) {
         dots.push({
-          x:         px + (Math.random() - 0.5) * step * 0.75,
-          y:         py + (Math.random() - 0.5) * step * 0.75,
+          x:         px + (Math.random() - 0.5) * step * scatter,
+          y:         py + (Math.random() - 0.5) * step * scatter,
           intensity: 1 - Math.abs(val) / threshold,
+          size:      Math.random(), // drives radius jitter
         });
       }
     }
@@ -147,14 +154,16 @@ function marchingSquares(modes, W, H, gridW, gridH) {
 
 // ── Canvas rendering ─────────────────────────────────────────────────────────
 
-function renderDots(dots) {
+// jitter: radius variation factor (0=uniform, 1=max spread like star magnitudes)
+function renderDots(dots, jitter) {
   const { width: W, height: H } = canvas;
   ctx.fillStyle = '#0a0a0a';
   ctx.fillRect(0, 0, W, H);
-  for (const { x, y, intensity } of dots) {
+  for (const { x, y, intensity, size } of dots) {
+    const r = Math.max(0.15, 1.1 * (1 + jitter * (size * 2 - 1)));
     ctx.fillStyle = `rgba(208,208,208,${(0.30 + intensity * 0.70).toFixed(2)})`;
     ctx.beginPath();
-    ctx.arc(x, y, 1.1, 0, 6.2832);
+    ctx.arc(x, y, r, 0, 6.2832);
     ctx.fill();
   }
 }
@@ -218,12 +227,15 @@ function exportSVG(modes, threshold) {
   let elements;
 
   if (mode === 'dots') {
-    const step = parseInt(selDensity.value);
-    const r    = Math.max(0.4, Math.min(4, 160 / widthMm)).toFixed(2);
-    const dots = generateDots(modes, viewW, viewH, threshold, step);
-    elements   = dots.map(({ x, y }) =>
-      `  <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="#3d3d3d"/>`
-    );
+    const step    = parseInt(selDensity.value);
+    const scatter = parseFloat(sliderScatter.value);
+    const jitter  = parseFloat(sliderJitter.value);
+    const baseR   = Math.max(0.4, Math.min(4, 160 / widthMm));
+    const dots    = generateDots(modes, viewW, viewH, threshold, step, scatter);
+    elements      = dots.map(({ x, y, size }) => {
+      const r = Math.max(0.1, baseR * (1 + jitter * (size * 2 - 1))).toFixed(2);
+      return `  <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="#3d3d3d"/>`;
+    });
   } else {
     // Marching squares: true vector contours, print-safe.
     const GRID  = { '5': 150, '3': 300, '2': 500 }[selDensity.value] ?? 300;
@@ -276,7 +288,9 @@ function update() {
   const modes = textToModes(text);
 
   if (mode === 'dots') {
-    renderDots(generateDots(modes, size, size, threshold, 3));
+    const scatter = parseFloat(sliderScatter.value);
+    const jitter  = parseFloat(sliderJitter.value);
+    renderDots(generateDots(modes, size, size, threshold, 3, scatter), jitter);
   } else {
     // Canvas preview: 200-cell grid keeps updates snappy.
     renderLines(marchingSquares(modes, size, size, 200, 200));
@@ -301,6 +315,16 @@ selMode.addEventListener('change', scheduleUpdate);
 
 sliderThr.addEventListener('input', () => {
   vThr.textContent = parseFloat(sliderThr.value).toFixed(2);
+  scheduleUpdate();
+});
+
+sliderScatter.addEventListener('input', () => {
+  vScatter.textContent = parseFloat(sliderScatter.value).toFixed(2);
+  scheduleUpdate();
+});
+
+sliderJitter.addEventListener('input', () => {
+  vJitter.textContent = parseFloat(sliderJitter.value).toFixed(2);
   scheduleUpdate();
 });
 
