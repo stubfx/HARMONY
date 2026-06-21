@@ -1,0 +1,28 @@
+<svg viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
+  <!-- Equal dots, scattered, no connections: we are those points -->
+  <circle cx="340" cy="280" r="3" fill="#3d3d3d"/>
+  <circle cx="400" cy="262" r="3" fill="#3d3d3d"/>
+  <circle cx="460" cy="275" r="3" fill="#3d3d3d"/>
+  <circle cx="520" cy="258" r="3" fill="#3d3d3d"/>
+  <circle cx="348" cy="318" r="3" fill="#3d3d3d"/>
+  <circle cx="408" cy="305" r="3" fill="#3d3d3d"/>
+  <circle cx="465" cy="292" r="3" fill="#3d3d3d"/>
+  <circle cx="522" cy="308" r="3" fill="#3d3d3d"/>
+  <circle cx="325" cy="355" r="3" fill="#3d3d3d"/>
+  <circle cx="382" cy="342" r="3" fill="#3d3d3d"/>
+  <circle cx="440" cy="330" r="3" fill="#3d3d3d"/>
+  <circle cx="498" cy="345" r="3" fill="#3d3d3d"/>
+  <circle cx="302" cy="392" r="3" fill="#3d3d3d"/>
+  <circle cx="360" cy="378" r="3" fill="#3d3d3d"/>
+  <circle cx="418" cy="368" r="3" fill="#3d3d3d"/>
+  <circle cx="475" cy="382" r="3" fill="#3d3d3d"/>
+  <circle cx="530" cy="368" r="3" fill="#3d3d3d"/>
+  <circle cx="340" cy="415" r="3" fill="#3d3d3d"/>
+  <circle cx="398" cy="405" r="3" fill="#3d3d3d"/>
+  <circle cx="455" cy="418" r="3" fill="#3d3d3d"/>
+  <circle cx="512" cy="405" r="3" fill="#3d3d3d"/>
+  <circle cx="318" cy="450" r="3" fill="#3d3d3d"/>
+  <circle cx="375" cy="440" r="3" fill="#3d3d3d"/>
+  <circle cx="432" cy="452" r="3" fill="#3d3d3d"/>
+  <circle cx="490" cy="440" r="3" fill="#3d3d3d"/>
+</svg>

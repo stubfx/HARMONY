@@ -1,0 +1,19 @@
+<svg viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
+  <!-- Loose scatter of points + partial connections: "noi siamo quei punti" -->
+  <!-- Connecting lines first, behind dots -->
+  <line x1="335" y1="285" x2="455" y2="258" stroke="#3d3d3d" stroke-width="0.8"/>
+  <line x1="455" y1="258" x2="515" y2="348" stroke="#3d3d3d" stroke-width="0.8"/>
+  <line x1="515" y1="348" x2="478" y2="462" stroke="#3d3d3d" stroke-width="0.8"/>
+  <line x1="295" y1="372" x2="398" y2="422" stroke="#3d3d3d" stroke-width="0.8"/>
+  <line x1="398" y1="422" x2="478" y2="462" stroke="#3d3d3d" stroke-width="0.8"/>
+  <line x1="348" y1="505" x2="398" y2="422" stroke="#3d3d3d" stroke-width="0.8"/>
+  <!-- Points -->
+  <circle cx="335" cy="285" r="3.5" fill="#3d3d3d"/>
+  <circle cx="455" cy="258" r="2.5" fill="#3d3d3d"/>
+  <circle cx="515" cy="348" r="4"   fill="#3d3d3d"/>
+  <circle cx="295" cy="372" r="2.5" fill="#3d3d3d"/>
+  <circle cx="398" cy="422" r="3"   fill="#3d3d3d"/>
+  <circle cx="478" cy="462" r="3.5" fill="#3d3d3d"/>
+  <circle cx="348" cy="505" r="2.5" fill="#3d3d3d"/>
+  <circle cx="562" cy="390" r="2"   fill="#3d3d3d"/>
+</svg>

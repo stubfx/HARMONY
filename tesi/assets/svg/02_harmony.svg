@@ -1,0 +1,9 @@
+<svg viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
+  <!-- One note propagating: center dot + concentric rings fading outward -->
+  <circle cx="400" cy="400" r="4" fill="#3d3d3d"/>
+  <circle cx="400" cy="400" r="60"  fill="none" stroke="#3d3d3d" stroke-width="1"   opacity="0.90"/>
+  <circle cx="400" cy="400" r="130" fill="none" stroke="#3d3d3d" stroke-width="1"   opacity="0.70"/>
+  <circle cx="400" cy="400" r="210" fill="none" stroke="#3d3d3d" stroke-width="0.9" opacity="0.50"/>
+  <circle cx="400" cy="400" r="295" fill="none" stroke="#3d3d3d" stroke-width="0.8" opacity="0.30"/>
+  <circle cx="400" cy="400" r="370" fill="none" stroke="#3d3d3d" stroke-width="0.7" opacity="0.15"/>
+</svg>

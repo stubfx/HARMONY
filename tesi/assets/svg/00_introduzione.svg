@@ -1,0 +1,13 @@
+<svg viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
+  <!-- Conway glider: 5 cells, classic travel pattern -->
+  <!-- Cell (1,0) -->
+  <rect x="380" y="340" width="44" height="44" fill="none" stroke="#3d3d3d" stroke-width="1"/>
+  <!-- Cell (2,1) -->
+  <rect x="424" y="384" width="44" height="44" fill="none" stroke="#3d3d3d" stroke-width="1"/>
+  <!-- Cell (0,2) -->
+  <rect x="336" y="428" width="44" height="44" fill="none" stroke="#3d3d3d" stroke-width="1"/>
+  <!-- Cell (1,2) -->
+  <rect x="380" y="428" width="44" height="44" fill="none" stroke="#3d3d3d" stroke-width="1"/>
+  <!-- Cell (2,2) -->
+  <rect x="424" y="428" width="44" height="44" fill="none" stroke="#3d3d3d" stroke-width="1"/>
+</svg>
