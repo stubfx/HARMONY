@@ -75,7 +75,9 @@ function generateDots(modes, W, H, threshold, step, scatter, noise) {
   // ── Chladni nodal dots ───────────────────────────────────────────────────
   for (let px = 0; px < W; px += step) {
     for (let py = 0; py < H; py += step) {
-      const val = chladniValue(px / W, py / H, modes);
+      // Both axes normalised by W so the pattern has uniform spatial scale.
+      // On rectangular canvases the wave continues naturally rather than stretching.
+      const val = chladniValue(px / W, py / W, modes);
       if (Math.abs(val) < threshold) {
         const bx    = px + (Math.random() - 0.5) * step * 0.4;
         const by    = py + (Math.random() - 0.5) * step * 0.4;
@@ -149,7 +151,7 @@ function marchingSquares(modes, W, H, gridW, gridH) {
   const Z        = new Float32Array(stride * (gridH + 1));
   for (let j = 0; j <= gridH; j++) {
     for (let i = 0; i <= gridW; i++) {
-      Z[j * stride + i] = chladniValue(i / gridW, j / gridH, modes);
+      Z[j * stride + i] = chladniValue(i / gridW, j / gridW, modes);
     }
   }
   const cw = W / gridW;
