@@ -15,6 +15,8 @@ const sliderScatter = document.getElementById('s-scatter');
 const vScatter      = document.getElementById('v-scatter');
 const sliderJitter  = document.getElementById('s-jitter');
 const vJitter       = document.getElementById('v-jitter');
+const sliderNoise   = document.getElementById('s-noise');
+const vNoise        = document.getElementById('v-noise');
 const inWidth     = document.getElementById('s-width');
 const inHeight    = document.getElementById('s-height');
 const selUnit     = document.getElementById('s-unit');
@@ -63,20 +65,20 @@ function chladniValue(x, y, modes) {
 
 // ── Dot generation ───────────────────────────────────────────────────────────
 
-// Each dot is placed on the nodal line first, then scatter is applied radially —
-// pushing it outward in a random direction by up to scatter × (W/30) pixels.
-// This mimics stars distributed around constellation lines, not locked to a grid.
-function generateDots(modes, W, H, threshold, step, scatter) {
+// scatter: radial post-filter displacement, scaled to domain width (not step).
+// noise:   fraction 0–1 driving N random dots added after Chladni filtering.
+//          They share the same size/jitter field but are not subject to the formula.
+function generateDots(modes, W, H, threshold, step, scatter, noise) {
   const dots     = [];
-  const maxDrift = scatter * (W / 30); // scale with domain size, not step
+  const maxDrift = scatter * (W / 30);
+
+  // ── Chladni nodal dots ───────────────────────────────────────────────────
   for (let px = 0; px < W; px += step) {
     for (let py = 0; py < H; py += step) {
       const val = chladniValue(px / W, py / H, modes);
       if (Math.abs(val) < threshold) {
-        // Tiny base jitter so dots don't sit on a visible grid
         const bx    = px + (Math.random() - 0.5) * step * 0.4;
         const by    = py + (Math.random() - 0.5) * step * 0.4;
-        // Radial scatter applied after filtering: direction + distance are independent
         const angle = Math.random() * 6.2832;
         const dist  = Math.random() * maxDrift;
         dots.push({
@@ -88,6 +90,19 @@ function generateDots(modes, W, H, threshold, step, scatter) {
       }
     }
   }
+
+  // ── Pure entropy dots ────────────────────────────────────────────────────
+  // Count scales with canvas area so density is consistent across export sizes.
+  const noiseCount = Math.round(noise * W * H / 1200);
+  for (let i = 0; i < noiseCount; i++) {
+    dots.push({
+      x:         Math.random() * W,
+      y:         Math.random() * H,
+      intensity: Math.pow(Math.random(), 1.5), // bias toward faint — more like real stars
+      size:      Math.random(),
+    });
+  }
+
   return dots;
 }
 
@@ -238,8 +253,9 @@ function exportSVG(modes, threshold) {
     const step    = parseInt(selDensity.value);
     const scatter = parseFloat(sliderScatter.value);
     const jitter  = parseFloat(sliderJitter.value);
+    const noise   = parseFloat(sliderNoise.value);
     const baseR   = Math.max(0.4, Math.min(4, 160 / widthMm));
-    const dots    = generateDots(modes, viewW, viewH, threshold, step, scatter);
+    const dots    = generateDots(modes, viewW, viewH, threshold, step, scatter, noise);
     elements      = dots.map(({ x, y, size }) => {
       const r = Math.max(0.1, baseR * (1 + jitter * (size * 2 - 1))).toFixed(2);
       return `  <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="#3d3d3d"/>`;
@@ -298,7 +314,8 @@ function update() {
   if (mode === 'dots') {
     const scatter = parseFloat(sliderScatter.value);
     const jitter  = parseFloat(sliderJitter.value);
-    renderDots(generateDots(modes, size, size, threshold, 3, scatter), jitter);
+    const noise   = parseFloat(sliderNoise.value);
+    renderDots(generateDots(modes, size, size, threshold, 3, scatter, noise), jitter);
   } else {
     // Canvas preview: 200-cell grid keeps updates snappy.
     renderLines(marchingSquares(modes, size, size, 200, 200));
@@ -333,6 +350,11 @@ sliderScatter.addEventListener('input', () => {
 
 sliderJitter.addEventListener('input', () => {
   vJitter.textContent = parseFloat(sliderJitter.value).toFixed(2);
+  scheduleUpdate();
+});
+
+sliderNoise.addEventListener('input', () => {
+  vNoise.textContent = parseFloat(sliderNoise.value).toFixed(2);
   scheduleUpdate();
 });
 
