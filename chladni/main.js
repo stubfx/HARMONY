@@ -17,6 +17,10 @@ const sliderJitter  = document.getElementById('s-jitter');
 const vJitter       = document.getElementById('v-jitter');
 const sliderNoise   = document.getElementById('s-noise');
 const vNoise        = document.getElementById('v-noise');
+const inputImage    = document.getElementById('s-image');
+const lblImage      = document.getElementById('lbl-image');
+
+let imagePixels = null; // { data, width, height } — raw pixel data from uploaded image
 const inWidth     = document.getElementById('s-width');
 const inHeight    = document.getElementById('s-height');
 const selUnit     = document.getElementById('s-unit');
@@ -65,6 +69,19 @@ function chladniValue(x, y, modes) {
 
 // ── Dot generation ───────────────────────────────────────────────────────────
 
+// ── Image overlay ─────────────────────────────────────────────────────────────
+
+// Returns brightness [0,1] at normalised image coordinates (nx, ny) ∈ [0,1]².
+function sampleImage(nx, ny) {
+  const { data, width: iW, height: iH } = imagePixels;
+  const ix  = Math.min(iW - 1, Math.floor(nx * iW));
+  const iy  = Math.min(iH - 1, Math.floor(ny * iH));
+  const off = (iy * iW + ix) * 4;
+  return (data[off] + data[off + 1] + data[off + 2]) / 765;
+}
+
+// ── Dot generation ─────────────────────────────────────────────────────────────
+
 // scatter: radial post-filter displacement, scaled to domain width (not step).
 // noise:   fraction 0–1 driving N random dots added after Chladni filtering.
 //          They share the same size/jitter field but are not subject to the formula.
@@ -100,9 +117,33 @@ function generateDots(modes, W, H, threshold, step, scatter, noise) {
     dots.push({
       x:         Math.random() * W,
       y:         Math.random() * H,
-      intensity: Math.pow(Math.random(), 1.5), // bias toward faint — more like real stars
+      intensity: Math.pow(Math.random(), 1.5),
       size:      Math.random(),
     });
+  }
+
+  // ── Image overlay dots ───────────────────────────────────────────────────
+  // The image is sampled stochastically: brightness = probability of placing a dot.
+  // Coordinates use (px/W, py/H) so the image fills the canvas regardless of aspect ratio.
+  // Scatter and jitter are the same as Chladni dots.
+  if (imagePixels) {
+    for (let px = 0; px < W; px += step) {
+      for (let py = 0; py < H; py += step) {
+        const brightness = sampleImage(px / W, py / H);
+        if (brightness > 0.01 && Math.random() < brightness) {
+          const bx    = px + (Math.random() - 0.5) * step * 0.4;
+          const by    = py + (Math.random() - 0.5) * step * 0.4;
+          const angle = Math.random() * 6.2832;
+          const dist  = Math.random() * maxDrift;
+          dots.push({
+            x:         bx + Math.cos(angle) * dist,
+            y:         by + Math.sin(angle) * dist,
+            intensity: 0.4 + brightness * 0.6,
+            size:      Math.random(),
+          });
+        }
+      }
+    }
   }
 
   return dots;
@@ -358,6 +399,26 @@ sliderJitter.addEventListener('input', () => {
 sliderNoise.addEventListener('input', () => {
   vNoise.textContent = parseFloat(sliderNoise.value).toFixed(2);
   scheduleUpdate();
+});
+
+inputImage.addEventListener('change', () => {
+  const file = inputImage.files[0];
+  if (!file) return;
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    const off  = document.createElement('canvas');
+    off.width  = img.naturalWidth;
+    off.height = img.naturalHeight;
+    off.getContext('2d').drawImage(img, 0, 0);
+    imagePixels = off.getContext('2d').getImageData(0, 0, off.width, off.height);
+    URL.revokeObjectURL(url);
+    const name = file.name.replace(/\.[^.]+$/, '');
+    lblImage.textContent = name.length > 12 ? name.slice(0, 12) + '…' : name;
+    lblImage.classList.add('active');
+    scheduleUpdate();
+  };
+  img.src = url;
 });
 
 btnPlay.addEventListener('click', () => {
