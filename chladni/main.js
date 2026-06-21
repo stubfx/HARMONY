@@ -10,19 +10,16 @@ const btnExport   = document.getElementById('btn-export');
 const sliderThr   = document.getElementById('s-threshold');
 const vThr        = document.getElementById('v-threshold');
 const selDensity  = document.getElementById('s-density');
+const selMode     = document.getElementById('s-mode');
 const inWidth     = document.getElementById('s-width');
 const inHeight    = document.getElementById('s-height');
 const selUnit     = document.getElementById('s-unit');
 
 let audioCtx    = null;
-let currentDots = [];
 let updateTimer = null;
 
 // ── Chladni mathematics ──────────────────────────────────────────────────────
 
-// Map a character to a resonant mode (m, n, sym).
-// m, n ∈ [1,7] — standing-wave harmonics.
-// sym ∈ {+1,−1} — symmetric vs antisymmetric superposition.
 function charToMode(c) {
   const code = c.charCodeAt(0);
   const m    = (code % 7) + 1;
@@ -47,10 +44,7 @@ function textToModes(text) {
   return [...map.values()].map(v => ({ ...v, amp: v.amp / total }));
 }
 
-// Chladni plate function for mode (m, n) at normalised coords (x, y) ∈ [0,1].
-// Symmetric:     cos(mπx)·cos(nπy) + cos(nπx)·cos(mπy)
-// Antisymmetric: cos(mπx)·cos(nπy) − cos(nπx)·cos(mπy)
-// Max absolute value ≈ 2 regardless of text length (amplitudes sum to 1).
+// Chladni plate function at normalised coords (x, y) ∈ [0,1].
 function chladniValue(x, y, modes) {
   const π = Math.PI;
   let v = 0;
@@ -65,19 +59,16 @@ function chladniValue(x, y, modes) {
 
 // ── Dot generation ───────────────────────────────────────────────────────────
 
-// Sample a grid; keep points near the nodal surface (|Z| < threshold).
-// Slight jitter gives the organic, sand-like quality.
-function generateDots(modes, size, threshold, step = 3) {
+function generateDots(modes, W, H, threshold, step) {
   const dots = [];
-  for (let px = 0; px < size; px += step) {
-    for (let py = 0; py < size; py += step) {
-      const val = chladniValue(px / size, py / size, modes);
-      const abs = Math.abs(val);
-      if (abs < threshold) {
+  for (let px = 0; px < W; px += step) {
+    for (let py = 0; py < H; py += step) {
+      const val = chladniValue(px / W, py / H, modes);
+      if (Math.abs(val) < threshold) {
         dots.push({
           x:         px + (Math.random() - 0.5) * step * 0.75,
           y:         py + (Math.random() - 0.5) * step * 0.75,
-          intensity: 1 - abs / threshold,
+          intensity: 1 - Math.abs(val) / threshold,
         });
       }
     }
@@ -85,9 +76,78 @@ function generateDots(modes, size, threshold, step = 3) {
   return dots;
 }
 
+// ── Marching squares ─────────────────────────────────────────────────────────
+// Trace nodal lines (Z=0 isocontours) as exact vector segments.
+// No regular dot grid → no moiré or registration artifacts in print.
+
+// For each 4-corner cell, which pairs of edges does the Z=0 contour cross?
+// Corners: TL=bit0, TR=bit1, BR=bit2, BL=bit3.
+// Edges: 0=top(TL↔TR), 1=right(TR↔BR), 2=bottom(BR↔BL), 3=left(BL↔TL).
+const EDGE_PAIRS = [
+  [],              // 0  all same sign
+  [[0,3]],         // 1  TL
+  [[0,1]],         // 2  TR
+  [[1,3]],         // 3  TL+TR
+  [[1,2]],         // 4  BR
+  [[0,3],[1,2]],   // 5  TL+BR saddle
+  [[0,2]],         // 6  TR+BR
+  [[2,3]],         // 7  TL+TR+BR
+  [[2,3]],         // 8  BL
+  [[0,2]],         // 9  TL+BL
+  [[0,1],[2,3]],   // 10 TR+BL saddle
+  [[1,2]],         // 11 TL+TR+BL
+  [[1,3]],         // 12 BR+BL
+  [[0,1]],         // 13 TL+BR+BL
+  [[0,3]],         // 14 TR+BR+BL
+  [],              // 15 all same sign
+];
+
+const EDGE_CORNERS = [[0,1],[1,2],[2,3],[3,0]];
+
+function edgePoint(edge, px, py, v) {
+  const [a, b] = EDGE_CORNERS[edge];
+  const t = Math.abs(v[a] - v[b]) < 1e-10 ? 0.5 : v[a] / (v[a] - v[b]);
+  return [px[a] + (px[b] - px[a]) * t, py[a] + (py[b] - py[a]) * t];
+}
+
+// Returns [[x0,y0],[x1,y1]] segments in pixel coords [0..W]×[0..H].
+// The Chladni domain normalises both axes to [0,1], so a rectangular W×H
+// reveals a larger slice of the plate without stretching individual elements.
+function marchingSquares(modes, W, H, gridW, gridH) {
+  const segments = [];
+  const stride   = gridW + 1;
+  const Z        = new Float32Array(stride * (gridH + 1));
+  for (let j = 0; j <= gridH; j++) {
+    for (let i = 0; i <= gridW; i++) {
+      Z[j * stride + i] = chladniValue(i / gridW, j / gridH, modes);
+    }
+  }
+  const cw = W / gridW;
+  const ch = H / gridH;
+  for (let j = 0; j < gridH; j++) {
+    for (let i = 0; i < gridW; i++) {
+      const v = [
+        Z[ j      * stride + i    ],  // TL
+        Z[ j      * stride + i + 1],  // TR
+        Z[(j + 1) * stride + i + 1],  // BR
+        Z[(j + 1) * stride + i    ],  // BL
+      ];
+      const caseIdx = (v[0]>0?1:0)|(v[1]>0?2:0)|(v[2]>0?4:0)|(v[3]>0?8:0);
+      const edges = EDGE_PAIRS[caseIdx];
+      if (!edges.length) continue;
+      const px = [i*cw, (i+1)*cw, (i+1)*cw, i*cw    ];
+      const py = [j*ch,  j*ch,    (j+1)*ch,  (j+1)*ch];
+      for (const [e0, e1] of edges) {
+        segments.push([edgePoint(e0, px, py, v), edgePoint(e1, px, py, v)]);
+      }
+    }
+  }
+  return segments;
+}
+
 // ── Canvas rendering ─────────────────────────────────────────────────────────
 
-function render(dots) {
+function renderDots(dots) {
   const { width: W, height: H } = canvas;
   ctx.fillStyle = '#0a0a0a';
   ctx.fillRect(0, 0, W, H);
@@ -99,26 +159,36 @@ function render(dots) {
   }
 }
 
+function renderLines(segments) {
+  const { width: W, height: H } = canvas;
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(208,208,208,0.85)';
+  ctx.lineWidth = 0.65;
+  ctx.beginPath();
+  for (const [[x0, y0], [x1, y1]] of segments) {
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+  }
+  ctx.stroke();
+}
+
 // ── Audio ────────────────────────────────────────────────────────────────────
 
-// Resonant frequency of mode (m,n) on a square plate: f ∝ √(m²+n²).
-// Base tuned to 82 Hz so the chord sits in a low, ambient register.
 function playAudio(modes) {
   if (!audioCtx) audioCtx = new AudioContext();
   if (audioCtx.state === 'suspended') audioCtx.resume();
   const now = audioCtx.currentTime;
-
   const master = audioCtx.createGain();
   master.gain.value = 0.32;
   master.connect(audioCtx.destination);
-
   for (const { m, n, amp } of modes) {
     const freq = 82 * Math.sqrt(m * m + n * n);
     const osc  = audioCtx.createOscillator();
     const env  = audioCtx.createGain();
-    osc.type           = 'sine';
+    osc.type            = 'sine';
     osc.frequency.value = freq;
-    env.gain.setValueAtTime(0,              now);
+    env.gain.setValueAtTime(0,                now);
     env.gain.linearRampToValueAtTime(amp * 0.45, now + 0.10);
     env.gain.exponentialRampToValueAtTime(0.0001, now + 5.0);
     osc.connect(env);
@@ -130,30 +200,53 @@ function playAudio(modes) {
 
 // ── SVG export ───────────────────────────────────────────────────────────────
 
-// mm equivalent of each unit — used to compute an adaptive dot radius so
-// points appear at a consistent physical size regardless of canvas dimensions.
 const TO_MM = { mm: 1, cm: 10, pt: 0.3528, in: 25.4 };
 
 function exportSVG(modes, threshold) {
-  const step     = parseInt(selDensity.value);
-  const width    = parseFloat(inWidth.value)  || 80;
-  const height   = parseFloat(inHeight.value) || 80;
-  const unit     = selUnit.value;
-  const viewSize = 800; // internal viewBox resolution
+  const width   = parseFloat(inWidth.value)  || 14.8;
+  const height  = parseFloat(inHeight.value) || 21;
+  const unit    = selUnit.value;
+  const mode    = selMode.value;
+  const BASE    = 800;
 
-  // Dot radius scaled so each dot is ≈ 0.2 mm on the printed page.
-  const sizeMm = Math.max(width, height) * (TO_MM[unit] ?? 1);
-  const r      = Math.max(0.4, Math.min(4, 160 / sizeMm)).toFixed(2);
+  // viewBox aspect ratio matches physical dimensions — no stretching.
+  const widthMm  = width  * (TO_MM[unit] ?? 1);
+  const heightMm = height * (TO_MM[unit] ?? 1);
+  const viewW    = BASE;
+  const viewH    = Math.round(BASE * heightMm / widthMm);
 
-  // Regenerate at export density (independent from canvas preview density).
-  const dots  = generateDots(modes, viewSize, threshold, step);
-  const lines = dots.map(({ x, y }) =>
-    `  <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="#3d3d3d"/>`
-  );
+  let elements;
+
+  if (mode === 'dots') {
+    const step = parseInt(selDensity.value);
+    const r    = Math.max(0.4, Math.min(4, 160 / widthMm)).toFixed(2);
+    const dots = generateDots(modes, viewW, viewH, threshold, step);
+    elements   = dots.map(({ x, y }) =>
+      `  <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="#3d3d3d"/>`
+    );
+  } else {
+    // Marching squares: true vector contours, print-safe.
+    const GRID  = { '5': 150, '3': 300, '2': 500 }[selDensity.value] ?? 300;
+    const gridW = GRID;
+    const gridH = Math.round(GRID * viewH / viewW);
+    // Target ≈ 0.12mm physical stroke width.
+    const sw    = Math.max(0.3, 0.12 / (widthMm / viewW)).toFixed(2);
+    const segs  = marchingSquares(modes, viewW, viewH, gridW, gridH);
+    if (!segs.length) {
+      elements = [];
+    } else {
+      const d = segs.map(([[x0,y0],[x1,y1]]) =>
+        `M${x0.toFixed(1)},${y0.toFixed(1)} L${x1.toFixed(1)},${y1.toFixed(1)}`
+      ).join(' ');
+      elements = [
+        `  <path d="${d}" stroke="#3d3d3d" stroke-width="${sw}" stroke-linecap="round" fill="none"/>`,
+      ];
+    }
+  }
 
   const svg = [
-    `<svg width="${width}${unit}" height="${height}${unit}" viewBox="0 0 ${viewSize} ${viewSize}" xmlns="http://www.w3.org/2000/svg">`,
-    ...lines,
+    `<svg width="${width}${unit}" height="${height}${unit}" viewBox="0 0 ${viewW} ${viewH}" xmlns="http://www.w3.org/2000/svg">`,
+    ...elements,
     '</svg>',
   ].join('\n');
 
@@ -172,17 +265,22 @@ function update() {
   const text      = input.value.trim();
   const size      = canvas.width;
   const threshold = parseFloat(sliderThr.value);
+  const mode      = selMode.value;
 
   if (!text) {
     ctx.fillStyle = '#0a0a0a';
     ctx.fillRect(0, 0, size, size);
-    currentDots = [];
     return;
   }
 
   const modes = textToModes(text);
-  currentDots = generateDots(modes, size, threshold);
-  render(currentDots);
+
+  if (mode === 'dots') {
+    renderDots(generateDots(modes, size, size, threshold, 3));
+  } else {
+    // Canvas preview: 200-cell grid keeps updates snappy.
+    renderLines(marchingSquares(modes, size, size, 200, 200));
+  }
 }
 
 function scheduleUpdate() {
@@ -191,7 +289,6 @@ function scheduleUpdate() {
 }
 
 function resize() {
-  // Leave ~160px for the bottom UI bar.
   const s = Math.min(window.innerWidth, window.innerHeight - 160, 680);
   canvas.width = canvas.height = Math.max(s, 280);
   update();
@@ -200,6 +297,7 @@ function resize() {
 // ── Events ───────────────────────────────────────────────────────────────────
 
 input.addEventListener('input', scheduleUpdate);
+selMode.addEventListener('change', scheduleUpdate);
 
 sliderThr.addEventListener('input', () => {
   vThr.textContent = parseFloat(sliderThr.value).toFixed(2);
@@ -214,9 +312,7 @@ btnPlay.addEventListener('click', () => {
 btnExport.addEventListener('click', () => {
   const text = input.value.trim();
   if (!text) return;
-  const modes     = textToModes(text);
-  const threshold = parseFloat(sliderThr.value);
-  exportSVG(modes, threshold);
+  exportSVG(textToModes(text), parseFloat(sliderThr.value));
 });
 
 window.addEventListener('resize', resize);
