@@ -19,8 +19,10 @@ const sliderNoise   = document.getElementById('s-noise');
 const vNoise        = document.getElementById('v-noise');
 const inputImage    = document.getElementById('s-image');
 const lblImage      = document.getElementById('lbl-image');
+const btnInvert     = document.getElementById('btn-invert');
 
-let imagePixels = null; // { data, width, height } — raw pixel data from uploaded image
+let imagePixels  = null; // { data, width, height } — raw pixel data from uploaded image
+let imageInverted = false;
 const inWidth     = document.getElementById('s-width');
 const inHeight    = document.getElementById('s-height');
 const selUnit     = document.getElementById('s-unit');
@@ -77,7 +79,8 @@ function sampleImage(nx, ny) {
   const ix  = Math.min(iW - 1, Math.floor(nx * iW));
   const iy  = Math.min(iH - 1, Math.floor(ny * iH));
   const off = (iy * iW + ix) * 4;
-  return (data[off] + data[off + 1] + data[off + 2]) / 765;
+  const b   = (data[off] + data[off + 1] + data[off + 2]) / 765;
+  return imageInverted ? 1 - b : b;
 }
 
 // ── Dot generation ─────────────────────────────────────────────────────────────
@@ -416,9 +419,16 @@ inputImage.addEventListener('change', () => {
     const name = file.name.replace(/\.[^.]+$/, '');
     lblImage.textContent = name.length > 12 ? name.slice(0, 12) + '…' : name;
     lblImage.classList.add('active');
+    btnInvert.style.display = '';
     scheduleUpdate();
   };
   img.src = url;
+});
+
+btnInvert.addEventListener('click', () => {
+  imageInverted = !imageInverted;
+  btnInvert.classList.toggle('active', imageInverted);
+  scheduleUpdate();
 });
 
 btnPlay.addEventListener('click', () => {
