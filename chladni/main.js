@@ -11,6 +11,18 @@ const sliderThr   = document.getElementById('s-threshold');
 const vThr        = document.getElementById('v-threshold');
 const selDensity  = document.getElementById('s-density');
 const selMode     = document.getElementById('s-mode');
+const sliderScatter = document.getElementById('s-scatter');
+const vScatter      = document.getElementById('v-scatter');
+const sliderJitter  = document.getElementById('s-jitter');
+const vJitter       = document.getElementById('v-jitter');
+const sliderNoise   = document.getElementById('s-noise');
+const vNoise        = document.getElementById('v-noise');
+const inputImage    = document.getElementById('s-image');
+const lblImage      = document.getElementById('lbl-image');
+const btnInvert     = document.getElementById('btn-invert');
+
+let imagePixels  = null; // { data, width, height } — raw pixel data from uploaded image
+let imageInverted = false;
 const inWidth     = document.getElementById('s-width');
 const inHeight    = document.getElementById('s-height');
 const selUnit     = document.getElementById('s-unit');
@@ -59,20 +71,84 @@ function chladniValue(x, y, modes) {
 
 // ── Dot generation ───────────────────────────────────────────────────────────
 
-function generateDots(modes, W, H, threshold, step) {
-  const dots = [];
+// ── Image overlay ─────────────────────────────────────────────────────────────
+
+// Returns brightness [0,1] at normalised image coordinates (nx, ny) ∈ [0,1]².
+function sampleImage(nx, ny) {
+  const { data, width: iW, height: iH } = imagePixels;
+  const ix  = Math.min(iW - 1, Math.floor(nx * iW));
+  const iy  = Math.min(iH - 1, Math.floor(ny * iH));
+  const off = (iy * iW + ix) * 4;
+  const b   = (data[off] + data[off + 1] + data[off + 2]) / 765;
+  return imageInverted ? 1 - b : b;
+}
+
+// ── Dot generation ─────────────────────────────────────────────────────────────
+
+// scatter: radial post-filter displacement, scaled to domain width (not step).
+// noise:   fraction 0–1 driving N random dots added after Chladni filtering.
+//          They share the same size/jitter field but are not subject to the formula.
+function generateDots(modes, W, H, threshold, step, scatter, noise) {
+  const dots     = [];
+  const maxDrift = scatter * (W / 30);
+
+  // ── Chladni nodal dots ───────────────────────────────────────────────────
   for (let px = 0; px < W; px += step) {
     for (let py = 0; py < H; py += step) {
-      const val = chladniValue(px / W, py / H, modes);
+      // Both axes normalised by W so the pattern has uniform spatial scale.
+      // On rectangular canvases the wave continues naturally rather than stretching.
+      const val = chladniValue(px / W, py / W, modes);
       if (Math.abs(val) < threshold) {
+        const bx    = px + (Math.random() - 0.5) * step * 0.4;
+        const by    = py + (Math.random() - 0.5) * step * 0.4;
+        const angle = Math.random() * 6.2832;
+        const dist  = Math.random() * maxDrift;
         dots.push({
-          x:         px + (Math.random() - 0.5) * step * 0.75,
-          y:         py + (Math.random() - 0.5) * step * 0.75,
+          x:         bx + Math.cos(angle) * dist,
+          y:         by + Math.sin(angle) * dist,
           intensity: 1 - Math.abs(val) / threshold,
+          size:      Math.random(),
         });
       }
     }
   }
+
+  // ── Pure entropy dots ────────────────────────────────────────────────────
+  // Count scales with canvas area so density is consistent across export sizes.
+  const noiseCount = Math.round(noise * W * H / 1200);
+  for (let i = 0; i < noiseCount; i++) {
+    dots.push({
+      x:         Math.random() * W,
+      y:         Math.random() * H,
+      intensity: Math.pow(Math.random(), 1.5),
+      size:      Math.random(),
+    });
+  }
+
+  // ── Image overlay dots ───────────────────────────────────────────────────
+  // The image is sampled stochastically: brightness = probability of placing a dot.
+  // Coordinates use (px/W, py/H) so the image fills the canvas regardless of aspect ratio.
+  // Scatter and jitter are the same as Chladni dots.
+  if (imagePixels) {
+    for (let px = 0; px < W; px += step) {
+      for (let py = 0; py < H; py += step) {
+        const brightness = sampleImage(px / W, py / H);
+        if (brightness > 0.01 && Math.random() < brightness) {
+          const bx    = px + (Math.random() - 0.5) * step * 0.4;
+          const by    = py + (Math.random() - 0.5) * step * 0.4;
+          const angle = Math.random() * 6.2832;
+          const dist  = Math.random() * maxDrift;
+          dots.push({
+            x:         bx + Math.cos(angle) * dist,
+            y:         by + Math.sin(angle) * dist,
+            intensity: 0.4 + brightness * 0.6,
+            size:      Math.random(),
+          });
+        }
+      }
+    }
+  }
+
   return dots;
 }
 
@@ -119,7 +195,7 @@ function marchingSquares(modes, W, H, gridW, gridH) {
   const Z        = new Float32Array(stride * (gridH + 1));
   for (let j = 0; j <= gridH; j++) {
     for (let i = 0; i <= gridW; i++) {
-      Z[j * stride + i] = chladniValue(i / gridW, j / gridH, modes);
+      Z[j * stride + i] = chladniValue(i / gridW, j / gridW, modes);
     }
   }
   const cw = W / gridW;
@@ -147,14 +223,16 @@ function marchingSquares(modes, W, H, gridW, gridH) {
 
 // ── Canvas rendering ─────────────────────────────────────────────────────────
 
-function renderDots(dots) {
+// jitter: radius variation factor (0=uniform, 1=max spread like star magnitudes)
+function renderDots(dots, jitter) {
   const { width: W, height: H } = canvas;
   ctx.fillStyle = '#0a0a0a';
   ctx.fillRect(0, 0, W, H);
-  for (const { x, y, intensity } of dots) {
+  for (const { x, y, intensity, size } of dots) {
+    const r = Math.max(0.15, 1.1 * (1 + jitter * (size * 2 - 1)));
     ctx.fillStyle = `rgba(208,208,208,${(0.30 + intensity * 0.70).toFixed(2)})`;
     ctx.beginPath();
-    ctx.arc(x, y, 1.1, 0, 6.2832);
+    ctx.arc(x, y, r, 0, 6.2832);
     ctx.fill();
   }
 }
@@ -218,12 +296,16 @@ function exportSVG(modes, threshold) {
   let elements;
 
   if (mode === 'dots') {
-    const step = parseInt(selDensity.value);
-    const r    = Math.max(0.4, Math.min(4, 160 / widthMm)).toFixed(2);
-    const dots = generateDots(modes, viewW, viewH, threshold, step);
-    elements   = dots.map(({ x, y }) =>
-      `  <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="#3d3d3d"/>`
-    );
+    const step    = parseInt(selDensity.value);
+    const scatter = parseFloat(sliderScatter.value);
+    const jitter  = parseFloat(sliderJitter.value);
+    const noise   = parseFloat(sliderNoise.value);
+    const baseR   = Math.max(0.4, Math.min(4, 160 / widthMm));
+    const dots    = generateDots(modes, viewW, viewH, threshold, step, scatter, noise);
+    elements      = dots.map(({ x, y, size }) => {
+      const r = Math.max(0.1, baseR * (1 + jitter * (size * 2 - 1))).toFixed(2);
+      return `  <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="#3d3d3d"/>`;
+    });
   } else {
     // Marching squares: true vector contours, print-safe.
     const GRID  = { '5': 150, '3': 300, '2': 500 }[selDensity.value] ?? 300;
@@ -276,7 +358,10 @@ function update() {
   const modes = textToModes(text);
 
   if (mode === 'dots') {
-    renderDots(generateDots(modes, size, size, threshold, 3));
+    const scatter = parseFloat(sliderScatter.value);
+    const jitter  = parseFloat(sliderJitter.value);
+    const noise   = parseFloat(sliderNoise.value);
+    renderDots(generateDots(modes, size, size, threshold, 3, scatter, noise), jitter);
   } else {
     // Canvas preview: 200-cell grid keeps updates snappy.
     renderLines(marchingSquares(modes, size, size, 200, 200));
@@ -301,6 +386,48 @@ selMode.addEventListener('change', scheduleUpdate);
 
 sliderThr.addEventListener('input', () => {
   vThr.textContent = parseFloat(sliderThr.value).toFixed(2);
+  scheduleUpdate();
+});
+
+sliderScatter.addEventListener('input', () => {
+  vScatter.textContent = parseFloat(sliderScatter.value).toFixed(2);
+  scheduleUpdate();
+});
+
+sliderJitter.addEventListener('input', () => {
+  vJitter.textContent = parseFloat(sliderJitter.value).toFixed(2);
+  scheduleUpdate();
+});
+
+sliderNoise.addEventListener('input', () => {
+  vNoise.textContent = parseFloat(sliderNoise.value).toFixed(2);
+  scheduleUpdate();
+});
+
+inputImage.addEventListener('change', () => {
+  const file = inputImage.files[0];
+  if (!file) return;
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    const off  = document.createElement('canvas');
+    off.width  = img.naturalWidth;
+    off.height = img.naturalHeight;
+    off.getContext('2d').drawImage(img, 0, 0);
+    imagePixels = off.getContext('2d').getImageData(0, 0, off.width, off.height);
+    URL.revokeObjectURL(url);
+    const name = file.name.replace(/\.[^.]+$/, '');
+    lblImage.textContent = name.length > 12 ? name.slice(0, 12) + '…' : name;
+    lblImage.classList.add('active');
+    btnInvert.style.display = '';
+    scheduleUpdate();
+  };
+  img.src = url;
+});
+
+btnInvert.addEventListener('click', () => {
+  imageInverted = !imageInverted;
+  btnInvert.classList.toggle('active', imageInverted);
   scheduleUpdate();
 });
 

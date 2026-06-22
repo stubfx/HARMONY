@@ -1,0 +1,11 @@
+ABSTRACT
+
+---
+
+Cosa succederebbe se un sistema intelligente non aspettasse di essere interrogato? Se fosse già presente, già in movimento, già impegnato a vivere per conto suo — prima che qualcuno entri nella stanza, e dopo che se ne è andato.
+
+La domanda da cui nasce questa tesi è semplice: cosa può rivelare un sistema semplice quando gli si lascia abbastanza spazio? Non cosa riesce a produrre un sistema complesso, ma cosa emerge quando le regole sono poche, il sistema è autonomo, e qualcuno ci entra dentro.
+
+Per rispondere, la tesi ripercorre un percorso che va dalla musica generativa di Brian Eno al Flow di Csikszentmihalyi, dai sistemi emergenti di Conway e Reynolds alla calm technology di Weiser — fino a un oggetto progettuale che prova a rispondere a quella domanda con un'esperienza.
+
+E se un sistema semplice, senza memoria e senza dataset, potesse produrre qualcosa di complesso nel momento in cui viene attraversato da presenze umane reali? Se non fosse la complessità tecnica del dispositivo a generare significato, ma la relazione che il dispositivo rende possibile?

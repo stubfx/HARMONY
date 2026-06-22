@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GoL Pattern Editor</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <canvas id="grid"></canvas>
+
+  <div id="toolbar">
+    <div class="row controls">
+      <div class="ctrl">
+        <label>density</label>
+        <input type="range" id="s-density" min="8" max="64" value="24" step="2" />
+        <span id="v-density">24px</span>
+      </div>
+    </div>
+    <div class="row">
+      <button id="btn-clear">clear</button>
+      <button id="btn-center" class="active">center</button>
+      <button id="btn-export">export svg</button>
+    </div>
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

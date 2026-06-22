@@ -20,6 +20,7 @@ export default defineConfig({
                 life:    path.resolve(__dirname, 'life/index.html'),
                 img2cmyk: path.resolve(__dirname, 'img2cmyk/index.html'),
                 chladni: path.resolve(__dirname, 'chladni/index.html'),
+                golpatterns: path.resolve(__dirname, 'golpatterns/index.html'),
             },
         },
     },

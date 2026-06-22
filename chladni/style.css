@@ -122,7 +122,8 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 .ctrl.dim { gap: 6px; }
 .ctrl.dim .sep { color: rgba(255,255,255,0.2); }
 
-button {
+button,
+label.btn {
   background: transparent;
   border: 1px solid rgba(255,255,255,0.18);
   color: rgba(255,255,255,0.38);
@@ -133,7 +134,12 @@ button {
   padding: 5px 16px;
   transition: border-color 0.15s, color 0.15s;
 }
-button:hover {
+button:hover,
+label.btn:hover {
   border-color: rgba(255,255,255,0.45);
   color: rgba(255,255,255,0.75);
+}
+label.btn.active {
+  border-color: rgba(255,255,255,0.35);
+  color: rgba(255,255,255,0.6);
 }
