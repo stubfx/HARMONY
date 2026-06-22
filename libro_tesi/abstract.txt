@@ -1,0 +1,9 @@
+ABSTRACT
+
+---
+
+HARMONY è un sistema generativo: sfondo nero, particelle in movimento, un suono già nell'aria prima che qualcuno entri nella stanza. Non chiede di essere usato. Chiede, se si vuole, di essere ascoltato.
+
+La domanda da cui nasce questa tesi è semplice: cosa può rivelare un sistema semplice quando gli si lascia abbastanza spazio? Non cosa riesce a produrre un sistema complesso, ma cosa emerge quando le regole sono poche, il sistema è autonomo, e qualcuno ci entra dentro.
+
+Per rispondere, la tesi ripercorre un percorso che va dalla musica generativa di Brian Eno al Flow di Csikszentmihalyi, dai sistemi emergenti di Conway e Reynolds alla calm technology di Weiser — fino a HARMONY come oggetto progettuale e come esperienza. L'ipotesi è che un sistema semplice, senza memoria e senza dataset, possa produrre qualcosa di complesso nel momento in cui viene attraversato da presenze umane reali. Non è la complessità tecnica del dispositivo a generare significato, ma la relazione che il dispositivo rende possibile.
