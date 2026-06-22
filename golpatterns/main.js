@@ -165,6 +165,7 @@ function exportSVG() {
 
   const svg =
 `<svg xmlns="http://www.w3.org/2000/svg" width="${wCm}cm" height="${hCm}cm" viewBox="0 0 ${cols} ${rows}">
+  <rect width="${cols}" height="${rows}" fill="none"/>
   <g fill="#111">
 ${rects}  </g>
 </svg>`;
