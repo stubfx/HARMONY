@@ -1,4 +1,6 @@
 // GoL Pattern Editor — draw cells, export to SVG (each cell = 0.5×0.5 cm)
+// The center cell (floor(W/2), floor(H/2)) is the origin of the exported SVG.
+// The SVG is always expanded symmetrically around it so the center stays centered.
 
 let CELL = 24;
 
@@ -6,6 +8,10 @@ const canvas = document.getElementById('grid');
 const ctx    = canvas.getContext('2d');
 let W = 0, H = 0;
 let grid = null;
+
+function centerCell() {
+  return { cX: Math.floor(W / 2), cY: Math.floor(H / 2) };
+}
 
 function setSize() {
   const prevW = W, prevH = H;
@@ -29,6 +35,8 @@ function setSize() {
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+  const { cX, cY } = centerCell();
+
   // grid lines
   ctx.strokeStyle = '#ddd';
   ctx.lineWidth = 0.5;
@@ -44,6 +52,18 @@ function render() {
     ctx.lineTo(W * CELL, r * CELL);
     ctx.stroke();
   }
+
+  // center cell indicator
+  ctx.strokeStyle = '#f00';
+  ctx.lineWidth = 1;
+  const cx = cX * CELL, cy = cY * CELL;
+  const m = CELL * 0.25;
+  ctx.beginPath();
+  ctx.moveTo(cx + CELL / 2 - m, cy + CELL / 2);
+  ctx.lineTo(cx + CELL / 2 + m, cy + CELL / 2);
+  ctx.moveTo(cx + CELL / 2, cy + CELL / 2 - m);
+  ctx.lineTo(cx + CELL / 2, cy + CELL / 2 + m);
+  ctx.stroke();
 
   // live cells
   ctx.fillStyle = '#111';
@@ -115,13 +135,22 @@ function exportSVG() {
 
   if (live.length === 0) return;
 
-  const minC = Math.min(...live.map(p => p.c));
-  const maxC = Math.max(...live.map(p => p.c));
-  const minR = Math.min(...live.map(p => p.r));
-  const maxR = Math.max(...live.map(p => p.r));
+  const { cX, cY } = centerCell();
 
-  const cols = maxC - minC + 1;
-  const rows = maxR - minR + 1;
+  // Compute max distance from center in each direction
+  let maxLeft = 0, maxRight = 0, maxTop = 0, maxBottom = 0;
+  for (const { c, r } of live) {
+    maxLeft   = Math.max(maxLeft,   cX - c);
+    maxRight  = Math.max(maxRight,  c - cX);
+    maxTop    = Math.max(maxTop,    cY - r);
+    maxBottom = Math.max(maxBottom, r - cY);
+  }
+
+  // Expand symmetrically so center stays centered
+  const halfW = Math.max(maxLeft,  maxRight);
+  const halfH = Math.max(maxTop,   maxBottom);
+  const cols  = halfW * 2 + 1;
+  const rows  = halfH * 2 + 1;
 
   // viewBox uses integer cell units; width/height in cm (each unit = 0.5cm)
   const wCm = (cols * 0.5).toFixed(2);
@@ -129,8 +158,8 @@ function exportSVG() {
 
   let rects = '';
   for (const { c, r } of live) {
-    const x = c - minC;
-    const y = r - minR;
+    const x = c - cX + halfW;
+    const y = r - cY + halfH;
     rects += `  <rect x="${x}" y="${y}" width="1" height="1"/>\n`;
   }
 
