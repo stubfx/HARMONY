@@ -1,0 +1,85 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  background: #fff;
+  overflow: hidden;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  color: #111;
+}
+
+#grid {
+  display: block;
+  position: fixed;
+  inset: 0;
+  width: 100%; height: 100%;
+  cursor: crosshair;
+}
+
+#toolbar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(255,255,255,0.93);
+  border: 1px solid #111;
+  padding: 10px 16px;
+  z-index: 10;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.controls { gap: 18px; }
+
+.ctrl {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.ctrl label {
+  opacity: 0.5;
+  min-width: 38px;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 72px;
+  height: 2px;
+  background: #111;
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 9px; height: 9px;
+  background: #111;
+  border-radius: 50%;
+}
+.ctrl span {
+  opacity: 0.4;
+  min-width: 30px;
+  font-size: 11px;
+}
+
+button {
+  background: #111;
+  color: #fff;
+  border: none;
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  letter-spacing: 0.08em;
+}
+button:hover { background: #444; }
