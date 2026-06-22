@@ -3,6 +3,7 @@
 // The SVG is always expanded symmetrically around it so the center stays centered.
 
 let CELL = 24;
+let centerEnabled = true;
 
 const canvas = document.getElementById('grid');
 const ctx    = canvas.getContext('2d');
@@ -54,16 +55,18 @@ function render() {
   }
 
   // center cell indicator
-  ctx.strokeStyle = '#f00';
-  ctx.lineWidth = 1;
-  const cx = cX * CELL, cy = cY * CELL;
-  const m = CELL * 0.25;
-  ctx.beginPath();
-  ctx.moveTo(cx + CELL / 2 - m, cy + CELL / 2);
-  ctx.lineTo(cx + CELL / 2 + m, cy + CELL / 2);
-  ctx.moveTo(cx + CELL / 2, cy + CELL / 2 - m);
-  ctx.lineTo(cx + CELL / 2, cy + CELL / 2 + m);
-  ctx.stroke();
+  if (centerEnabled) {
+    ctx.strokeStyle = '#f00';
+    ctx.lineWidth = 1;
+    const cx = cX * CELL, cy = cY * CELL;
+    const m = CELL * 0.25;
+    ctx.beginPath();
+    ctx.moveTo(cx + CELL / 2 - m, cy + CELL / 2);
+    ctx.lineTo(cx + CELL / 2 + m, cy + CELL / 2);
+    ctx.moveTo(cx + CELL / 2, cy + CELL / 2 - m);
+    ctx.lineTo(cx + CELL / 2, cy + CELL / 2 + m);
+    ctx.stroke();
+  }
 
   // live cells
   ctx.fillStyle = '#111';
@@ -135,6 +138,31 @@ function exportSVG() {
 
   if (live.length === 0) return;
 
+  if (!centerEnabled) {
+    const minC = Math.min(...live.map(p => p.c));
+    const maxC = Math.max(...live.map(p => p.c));
+    const minR = Math.min(...live.map(p => p.r));
+    const maxR = Math.max(...live.map(p => p.r));
+    const cols = maxC - minC + 1;
+    const rows = maxR - minR + 1;
+    const wCm = (cols * 0.5).toFixed(2);
+    const hCm = (rows * 0.5).toFixed(2);
+    let rects = '';
+    for (const { c, r } of live)
+      rects += `  <rect x="${c - minC}" y="${r - minR}" width="1" height="1"/>\n`;
+    const svg =
+`<svg xmlns="http://www.w3.org/2000/svg" width="${wCm}cm" height="${hCm}cm" viewBox="0 0 ${cols} ${rows}">
+  <g fill="#111">
+${rects}  </g>
+</svg>`;
+    const blob = new Blob([svg], { type: 'image/svg+xml' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'pattern.svg'; a.click();
+    URL.revokeObjectURL(url);
+    return;
+  }
+
   const { cX, cY } = centerCell();
 
   // Compute max distance from center in each direction
@@ -182,6 +210,12 @@ ${rects}  </g>
 // ── Toolbar ───────────────────────────────────────────────────────────────────
 document.getElementById('btn-clear').addEventListener('click', () => grid.fill(0));
 document.getElementById('btn-export').addEventListener('click', exportSVG);
+
+const btnCenter = document.getElementById('btn-center');
+btnCenter.addEventListener('click', () => {
+  centerEnabled = !centerEnabled;
+  btnCenter.classList.toggle('active', centerEnabled);
+});
 
 const sl = document.getElementById('s-density');
 const vl = document.getElementById('v-density');
