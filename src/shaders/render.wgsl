@@ -117,8 +117,6 @@ struct SpectatorSlot {
     touchY:     f32,
     isTouching: u32,
     _p0:        u32,
-    windX:      f32,
-    windY:      f32,
     _p1:        u32,
     _p2:        u32,
 }
