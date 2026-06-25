@@ -48,7 +48,6 @@ html, body {
 }
 
 #join-btn {
-    font-family: ui-monospace, monospace;
     font-size: 0.85rem;
     letter-spacing: 0.18em;
     text-transform: lowercase;

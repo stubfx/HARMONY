@@ -23,7 +23,7 @@ const socketUrl = import.meta.env.DEV
     ? `http://localhost:${import.meta.env.VITE_SERVER_PORT ?? 3000}`
     : (import.meta.env.VITE_SOCKET_URL || '/');
 
-const socket = ioConnect(socketUrl, { reconnectionDelay: 2000 });
+const socket = ioConnect(socketUrl, { reconnectionDelay: 2000, transports: ['websocket'] });
 
 socket.on('connect', () => {
     socket.emit('join-session', { room, spectatorId });
@@ -178,7 +178,10 @@ let _motionChaos = 0;
 const MOTION_DECAY_RATE = 0.5; // full chaos → zero in ~2 s of stillness
 
 function _applyChaosVisuals() {
-    if (chaosVignetteEl) chaosVignetteEl.style.opacity = _motionChaos.toFixed(3);
+    if (!chaosVignetteEl) return;
+    const v = _motionChaos.toFixed(3);
+    if (chaosVignetteEl.style.opacity === v) return;
+    chaosVignetteEl.style.opacity = v;
 }
 
 // ── Smoke ─────────────────────────────────────────────────────────────────────
@@ -203,6 +206,7 @@ function _spawnSmoke(x, y, cf) {
 }
 
 function _tickSmoke(ctx2d, w, h) {
+    if (_smoke.length === 0) return;
     ctx2d.clearRect(0, 0, w, h);
     for (let i = _smoke.length - 1; i >= 0; i--) {
         const p = _smoke[i];
