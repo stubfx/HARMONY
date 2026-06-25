@@ -108,6 +108,11 @@ struct SoloParams {
     releaseBurstSpeed:    f32,   // fireworks scatter speed on joystick release (0 = disabled)
     chaos:                f32,   // 0 = armonia (no noise), 1 = max random noise (from collective rotation)
     randomTeleportChance: f32,   // per-frame probability that any agent jumps to a random canvas position
+    chladniActive:        u32,   // 1 = override evalDirFormula with Chladni gradient
+    chladniM:             f32,   // Chladni mode M
+    chladniN:             f32,   // Chladni mode N
+    chladniSym:           f32,   // Chladni symmetry factor (±1)
+    _chPad:               f32,   // alignment padding
 }
 
 // Per-spectator partition data — color, joystick spawner position, personal wind.
@@ -121,8 +126,6 @@ struct SpectatorSlot {
     spawnerY:             f32,
     spawnerLocationActive: u32,
     _p0:                  u32,
-    windX:                f32,   // tilt-derived wind X — portrait = 0, scaled to ±1 at ±90° roll
-    windY:                f32,   // tilt-derived wind Y — portrait = 0, scaled to ±1 at ±90° pitch
     burst:                u32,   // 1 for the single frame after the joystick is released — scatter this slot's agents
     burstSeed:            u32,   // per-release random seed so each burst differs
 }
@@ -164,6 +167,14 @@ struct ContamParams {
 
 const PI:     f32 = 3.14159265358979;
 const TWO_PI: f32 = 6.28318530717959;
+
+fn chladniDirAngle(x: f32, y: f32, cx: f32, cy: f32, m: f32, n: f32, sym: f32) -> f32 {
+    let xn = x / (2.0 * cx);
+    let yn = y / (2.0 * cy);
+    let fx = -m * PI * sin(m * PI * xn) * cos(n * PI * yn) - sym * n * PI * sin(n * PI * xn) * cos(m * PI * yn);
+    let fy = -n * PI * cos(m * PI * xn) * sin(n * PI * yn) - sym * m * PI * cos(n * PI * xn) * sin(m * PI * yn);
+    return atan2(fx, -fy);
+}
 
 // Integer hash → uniform float in [0, 1). Used for pseudo-random edge respawn.
 // Based on the Murmur3 finalizer — cheap, no texture lookup required.
@@ -284,7 +295,11 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let cx  = params.canvasW * 0.5;
     let cy  = params.canvasH * 0.5;
 
-    let dirAngle = evalDirFormula(x, y, t, idx, cx, cy);
+    let dirAngle = select(
+        evalDirFormula(x, y, t, idx, cx, cy),
+        chladniDirAngle(x, y, cx, cy, params.chladniM, params.chladniN, params.chladniSym),
+        params.chladniActive != 0u
+    );
     let desired  = vec2<f32>(cos(dirAngle), sin(dirAngle));
 
     let windAngle = evalWindFormula(x, y, t, idx, cx, cy);

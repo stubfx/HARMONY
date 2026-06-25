@@ -395,7 +395,7 @@ const agentBuf = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 const soloUB = device.createBuffer({
-    size: 208, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 224, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
     size: 192, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -423,9 +423,9 @@ const golUB = device.createBuffer({
 const contamUB = device.createBuffer({
     size: 176, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
-// SpectatorSlots: 16 slots × 48 bytes (12 × f32/u32 per slot) = 768 bytes
+// SpectatorSlots: 16 slots × 40 bytes (10 × f32/u32 per slot) = 640 bytes
 const spectatorSlotsBuf = device.createBuffer({
-    size: 768, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    size: 640, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 
 function seedAgents() {
@@ -1386,18 +1386,9 @@ function rebuildSimBG() {
 }
 
 async function buildSimPipeline(dir, wind) {
-    const chladniHelper = [
-        `fn chladniDirAngle(x:f32,y:f32,cx:f32,cy:f32,m:f32,n:f32,sym:f32)->f32{`,
-        `  let xn=x/(2.0*cx); let yn=y/(2.0*cy);`,
-        `  let fx=-m*PI*sin(m*PI*xn)*cos(n*PI*yn)-sym*n*PI*sin(n*PI*xn)*cos(m*PI*yn);`,
-        `  let fy=-n*PI*cos(m*PI*xn)*sin(n*PI*yn)-sym*m*PI*cos(n*PI*xn)*sin(m*PI*yn);`,
-        `  return atan2(fx,-fy);`,
-        `}`,
-    ].join('\n');
     const fnDefs = [
         `fn evalDirFormula(x:f32,y:f32,t:f32,idx:f32,cx:f32,cy:f32)->f32{ return ${dir}; }`,
         `fn evalWindFormula(x:f32,y:f32,t:f32,idx:f32,cx:f32,cy:f32)->f32{ return ${wind}; }`,
-        chladniHelper,
         ``,
     ].join('\n');
     const mod  = device.createShaderModule({ code: fnDefs + soloSimTemplate });
@@ -1652,7 +1643,7 @@ const SPECTATOR_PALETTE = [
     '#4466ff','#bb55ff','#ff6699','#ffff55',
 ];
 // { spectatorId, colorR, colorG, colorB, spawnerX, spawnerY, spawnerLocationActive,
-//   windX, windY, dx, dy, magnitude, lastInputTime }
+//   dx, dy, magnitude, lastInputTime }
 const activeSlots = [];
 
 // Note-driven formula selection: sum of active note indices → modulo on formula arrays.
@@ -1674,6 +1665,7 @@ let _currentHarmonyKey = -1;        // active sum value, -1 = no harmony
 const _harmonyFetching = new Set(); // sums currently being fetched
 let _harmonySnapshot   = null;      // params+formulas snapshot taken just before a config is applied
 let _preConnectionFormulas = null;  // { dir, wind } saved when the first spectator connects
+let _chladniSum = 0;                // current harmony sum driving Chladni mode params
 
 // ── IndexedDB helpers ─────────────────────────────────────────────────────────
 const _HARMONY_DB_NAME   = 'thesis-sim-harmony';
@@ -1815,13 +1807,6 @@ function _exitHarmony() {
     }
 }
 
-function _buildChladniFormula(sum) {
-    const m   = (sum % 7) + 1;
-    const n   = ((sum >>> 3) % 7) + 1;
-    const sym = (sum % 2 === 0) ? '1.0' : '-1.0';
-    return `chladniDirAngle(x,y,cx,cy,${m}.0,${n}.0,${sym})`;
-}
-
 function _recalcNoteFormulas() {
     let sum = 0;
     for (const idx of _activeNotesBySpectator.values()) sum += idx;
@@ -1833,19 +1818,27 @@ function _recalcNoteFormulas() {
     else if (!wantHarmony && _harmonyActive) _exitHarmony();
 
     if (_activeNotesBySpectator.size === 0) {
-        if (activeSlots.length > 0) {
-            // Users connected but no active notes: hold Chladni at sum=0
-            clearTimeout(_noteFormulaTimer);
-            _noteFormulaTimer = setTimeout(() =>
-                applyFormulas(_buildChladniFormula(0), windInput?.value || DEFAULT_WIND),
-                _FORMULA_DEBOUNCE_MIN);
-        }
+        if (activeSlots.length > 0) _chladniSum = 0; // back to base mode, no recompile needed
         return;
     }
 
-    const newDir  = activeSlots.length > 0
-        ? _buildChladniFormula(sum)
-        : DIR_FORMULAS[sum % DIR_FORMULAS.length];
+    // Chladni mode updates via uniform — no shader recompile needed.
+    if (activeSlots.length > 0) {
+        _chladniSum = sum;
+        // Still recompile for the wind formula change (wind is not uniform-driven).
+        const newWind = WIND_FORMULAS[sum % WIND_FORMULAS.length];
+        if (windInput) windInput.value = newWind;
+        const now = Date.now();
+        const dt  = (now - _formulaHeatLastT) / 1000;
+        _formulaHeatLastT = now;
+        _formulaHeat = Math.min(1, Math.max(0, _formulaHeat - _HEAT_DECAY_RATE * dt) + _HEAT_PER_CHANGE);
+        const debounceMs = _FORMULA_DEBOUNCE_MIN + _formulaHeat * (_FORMULA_DEBOUNCE_MAX - _FORMULA_DEBOUNCE_MIN);
+        clearTimeout(_noteFormulaTimer);
+        _noteFormulaTimer = setTimeout(() => applyFormulas(dirInput?.value || DEFAULT_DIR, newWind), debounceMs);
+        return;
+    }
+
+    const newDir  = DIR_FORMULAS[sum % DIR_FORMULAS.length];
     const newWind = WIND_FORMULAS[sum % WIND_FORMULAS.length];
     if (dirInput)  dirInput.value  = newDir;
     if (windInput) windInput.value = newWind;
@@ -1861,11 +1854,11 @@ function _recalcNoteFormulas() {
 }
 
 function uploadSpectatorSlots() {
-    const ab = new ArrayBuffer(768);
+    const ab = new ArrayBuffer(640);
     const f  = new Float32Array(ab);
     const u  = new Uint32Array(ab);
     for (let i = 0; i < activeSlots.length; i++) {
-        const b = i * 12;
+        const b = i * 10;
         const s = activeSlots[i];
         f[b + 0] = s.colorR;
         f[b + 1] = s.colorG;
@@ -1875,10 +1868,8 @@ function uploadSpectatorSlots() {
         f[b + 5] = s.spawnerY;
         u[b + 6] = s.spawnerLocationActive;
         u[b + 7] = 0;
-        f[b + 8] = s.windX;
-        f[b + 9] = s.windY;
-        u[b + 10] = s.burst ? 1 : 0;
-        u[b + 11] = s.burstSeed >>> 0;
+        u[b + 8] = s.burst ? 1 : 0;
+        u[b + 9] = s.burstSeed >>> 0;
     }
     device.queue.writeBuffer(spectatorSlotsBuf, 0, ab);
 }
@@ -1984,14 +1975,14 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
             const isFirst = activeSlots.length === 0;
             // Start with a neutral white — the phone sends a 'color-pick' immediately
             // after joining with its locally generated palette color, which overwrites this.
-            activeSlots.push({ spectatorId, colorR: 1, colorG: 1, colorB: 1, spawnerX: 0.5, spawnerY: 0.5, spawnerLocationActive: 0, windX: 0, windY: 0, dx: 0, dy: 0, magnitude: 0, velocity: 0, _smoothDx: 0, _smoothDy: 0, lastInputTime: 0, burst: 0, burstSeed: 0 });
+            activeSlots.push({ spectatorId, colorR: 1, colorG: 1, colorB: 1, spawnerX: 0.5, spawnerY: 0.5, spawnerLocationActive: 0, dx: 0, dy: 0, magnitude: 0, velocity: 0, _smoothDx: 0, _smoothDy: 0, lastInputTime: 0, burst: 0, burstSeed: 0 });
             uploadSpectatorSlots();
             if (isFirst) {
                 _preConnectionFormulas = {
                     dir:  dirInput?.value  || DEFAULT_DIR,
                     wind: windInput?.value || DEFAULT_WIND,
                 };
-                applyFormulas(_buildChladniFormula(0), _preConnectionFormulas.wind);
+                _chladniSum = 0;
             }
         }
         // Push current UI state so the new spectator shows the right screen immediately.
@@ -2005,6 +1996,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
             if (_preConnectionFormulas !== null) {
                 const saved = _preConnectionFormulas;
                 _preConnectionFormulas = null;
+                _chladniSum = 0;
                 applyFormulas(saved.dir, saved.wind);
             }
             collectiveChaos     = 1;
@@ -2032,7 +2024,6 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
     // sendToN8n: whether this event type is forwarded to n8n via callN8n().
     const REMOTE_EVENTS = {
         spawner:    { sendToN8n: false },
-        tilt:       { sendToN8n: false },
         'color-pick': { sendToN8n: false },
         rotation:   { sendToN8n: false },
         text:       { sendToN8n: true  },
@@ -2062,16 +2053,6 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
                     slot.velocity  = velocity;
                     slot.lastInputTime = Date.now();
                 }
-                uploadSpectatorSlots();
-            }
-        }
-        if (event.type === 'tilt') {
-            const slot = activeSlots.find(s => s.spectatorId === event.spectatorId);
-            if (slot) {
-                const roll  = event.data?.roll  ?? 0.5;
-                const pitch = event.data?.pitch ?? 0.75;
-                // Portrait upright = (roll≈0.5, pitch≈0.75) → windX/Y = 0.
-                // Tilt maps to ±1 at ±90° from portrait, then scaled by windStr in shader.
                 uploadSpectatorSlots();
             }
         }
@@ -2635,6 +2616,10 @@ function writeSoloUB(dt, time) {
     f[49] = chaosGPU;
     const teleportActive = !params.randomTeleportOnAvoidMap || hasAvoidMap;
     f[50] = teleportActive ? params.randomTeleportChance : 0;
+    u[51] = _preConnectionFormulas !== null ? 1 : 0;
+    f[52] = (_chladniSum % 7) + 1;
+    f[53] = ((_chladniSum >>> 3) % 7) + 1;
+    f[54] = (_chladniSum % 2 === 0) ? 1.0 : -1.0;
     setChaos(chaosGPU);
     const _synthNow = performance.now();
     if (_synthNow - _lastSynthTick >= 200) {
@@ -2821,7 +2806,7 @@ function writeContamUB() {
 }
 
 // ── Pre-allocated uniform buffers (reused every frame to avoid GC pressure) ──
-const _soloAB  = new ArrayBuffer(208); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
+const _soloAB  = new ArrayBuffer(224); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
 const _renderAB= new ArrayBuffer(192); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
 const _fadeAB  = new ArrayBuffer(16);  const _fadeF  = new Float32Array(_fadeAB);
 const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB); const _blitU  = new Uint32Array(_blitAB);
