@@ -2,83 +2,18 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
-        <meta http-equiv="Permissions-Policy" content="accelerometer=*, gyroscope=*, magnetometer=*">
         <title>—</title>
     </head>
     <body>
         <script type="module" src="./main.js"></script>
-
-        <!-- Atmospheric colour glow — shifts with temperature and tilt -->
         <div id="aura"></div>
-
-        <!-- Slow idle breathing pulse — always on, subtle -->
         <div id="breath"></div>
-
-
-        <!-- Star field — parallax space motion tied to joystick, DRAW mode only -->
-        <canvas id="star-field"></canvas>
-
-        <!-- Virtual joystick — centered, controls spawner direction -->
-        <div id="joystick-base"><div id="joystick-stick"></div></div>
-
-        <!-- Push message from n8n — shown large and centered -->
-        <div id="device-message" aria-live="polite"></div>
-
-        <!-- Minimal status bar -->
-        <div id="session-info"></div>
-
-        <!-- Full-screen join gate — dismissed after first interaction -->
         <div id="join-overlay">
             <button id="join-btn">swarm</button>
         </div>
-
-        <!-- Harmony panel — default screen; continuous note canvas -->
         <div id="harmony-panel">
             <canvas id="note-canvas"></canvas>
             <div id="chaos-vignette"></div>
-        </div>
-
-        <!-- Pulse panel — full-screen tap surface, visible only in PULSE step status -->
-        <div id="pulse-panel">
-            <div id="pulse-ring"></div>
-        </div>
-
-        <!-- Raise panel — lift arm upward; visible only in RAISE step status -->
-        <div id="raise-panel">
-            <div class="panel-body">
-                <div id="raise-ring"></div>
-                <div class="panel-instruction">↑ scorri verso l'alto</div>
-            </div>
-            <div class="panel-note" id="raise-note"></div>
-        </div>
-
-        <!-- Wave panel — swing phone side to side; visible only in WAVE step status -->
-        <div id="wave-panel">
-            <div class="panel-body">
-                <div id="wave-ring"></div>
-                <div class="panel-instruction">agita il telefono</div>
-            </div>
-            <div class="panel-note" id="wave-note"></div>
-        </div>
-
-<!-- Story vote panel — two full-screen buttons, visible only in VOTE step status -->
-        <div id="vote-panel">
-            <div id="vote-timer"></div>
-            <button id="vote-btn-a" class="vote-btn"></button>
-            <div class="vote-divider"></div>
-            <button id="vote-btn-b" class="vote-btn"></button>
-        </div>
-
-        <!-- Color picker — always visible at top -->
-        <div id="top-bar">
-            <div id="color-picker"></div>
-        </div>
-
-        <!-- Text input panel — centered overlay, visible only on stepStatus TEXT -->
-        <div id="text-panel">
-            <form id="input-form" autocomplete="off">
-                <input name="text1" type="text" placeholder="write to the swarm…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-            </form>
         </div>
     </body>
 </html>
