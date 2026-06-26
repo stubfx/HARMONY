@@ -171,16 +171,7 @@ function buildUI() {
     // ── Mode ──────────────────────────────────────────────────────────────────
     controlsEl.appendChild(mkLabel('Mode'));
     controlsEl.appendChild(mkBtnGroup([
-        { label: 'STORY',    action: () => send({ mode: 'STORY' }) },
         { label: 'SHOWCASE', action: () => send({ mode: 'SHOWCASE' }) },
-    ]));
-
-    // ── Step status ───────────────────────────────────────────────────────────
-    controlsEl.appendChild(mkLabel('Step status'));
-    controlsEl.appendChild(mkBtnGroup([
-        { label: 'IDLE', action: () => send({ stepStatus: 'IDLE' }) },
-        { label: 'DRAW', action: () => send({ stepStatus: 'DRAW' }) },
-        { label: 'VOTE', action: () => send({ stepStatus: 'VOTE' }) },
     ]));
 
     // ── QR code ───────────────────────────────────────────────────────────────
@@ -238,16 +229,6 @@ function buildUI() {
     clearBtn.textContent = '✕  clear trace';
     clearBtn.addEventListener('click', () => send({ clearTrace: true, caption: '' }));
     controlsEl.appendChild(clearBtn);
-
-    // ── Heartbeat ─────────────────────────────────────────────────────────────
-    controlsEl.appendChild(mkLabel('n8n'));
-    const heartbeatBtn = document.createElement('button');
-    heartbeatBtn.className   = 'btn-big btn-heartbeat';
-    heartbeatBtn.textContent = '↑  trigger heartbeat';
-    heartbeatBtn.addEventListener('click', () => {
-        if (window.confirm('Trigger n8n heartbeat now?')) send({ triggerHeartbeat: true });
-    });
-    controlsEl.appendChild(heartbeatBtn);
 
     // ── Speed ─────────────────────────────────────────────────────────────────
     controlsEl.appendChild(mkLabel('Motion'));

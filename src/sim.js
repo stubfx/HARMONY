@@ -153,10 +153,6 @@ const params = {
     maxSpectators:  1,    // sim QR hides when connected count reaches this threshold
     respawnOnQR:      true,  // respawn free agents inside the QR rect to a random edge
     qrRespawnChance:  0.01,  // per-frame probability [0–1] for the respawn
-    n8nEnabled:        false, // false = silence all n8n traffic (heartbeat + sim-event) without unsetting VITE_N8N_BASE_URL
-    n8nTestMode:       false, // true = /webhook-test/sim-event, false = /webhook/sim-event
-    heartbeatInterval: 10,   // seconds between periodic param snapshots sent to n8n (0 = off)
-    heartbeatTimeout:  60,   // seconds before a heartbeat fetch is aborted
     voteDuration:      30,   // seconds the vote panel stays open before the sim fires the result
     // Weight
     weightSpread: 0.8,    // 0 = all equal; 1 = weights span [0.05 … 1.95]
@@ -171,18 +167,11 @@ const params = {
 };
 
 // ── URL param overrides ───────────────────────────────────────────────────────
-// ?s=<uuid>      — pin the sim to a specific session room (survives reloads via URL)
-// ?amount=<n>    — override the starting agent count (still adjustable in the GUI)
-// ?test=1        — start with n8n test mode enabled (mirrors GUI toggle, survives reloads)
-// ?password=<x>  — forwarded as-is in every heartbeat payload; survives reloads via URL
-// ?n8n=off       — start with n8n traffic disabled (heartbeat + sim-event); mirrors GUI toggle, survives reloads
+// ?s=<uuid>       — pin the sim to a specific session room (survives reloads via URL)
+// ?amount=<n>     — override the starting agent count (still adjustable in the GUI)
 // ?pixelGrid=true — start with the chunky low-res pixel-grid mode enabled
 const _urlParams     = new URLSearchParams(location.search);
 const _forcedSession = _urlParams.get('s') || null;
-const _n8nPassword   = _urlParams.get('password') || null;
-if (['off', 'false', '0', 'disabled'].includes(_urlParams.get('n8n') ?? '')) {
-    params.n8nEnabled = false;
-}
 {
     const v = _urlParams.get('pixelGrid');
     if (v === 'true' || v === '1') params.pixelGrid = true;
@@ -191,10 +180,6 @@ if (['off', 'false', '0', 'disabled'].includes(_urlParams.get('n8n') ?? '')) {
     const n = parseInt(_urlParams.get('amount') ?? '', 10);
     if (Number.isFinite(n) && n > 0)
         params.agentCount = Math.max(1_000, Math.min(MAX_AGENTS, n));
-}
-{
-    const t = _urlParams.get('test');
-    if (t === '1' || t === 'true') params.n8nTestMode = true;
 }
 {
     // resolution: initial render scale, 0–1 (clamped to the slider's 0.1–1.0 range).
@@ -1435,8 +1420,7 @@ const rndPick   = arr => arr[Math.floor(Math.random() * arr.length)];
 /// qrStatus: 'SHOW' — QR is drawn as the topmost layer on the trace canvas.
 //                    Independent of user content — both can be visible simultaneously.
 //           'HIDE' — QR layer is skipped; only user content (image/text) is drawn.
-// mode:     'STORY'    — narrative-driven session; n8n sequences steps, votes, and content
-//           'SHOWCASE' — ambient / exhibition mode; no story sequencing
+// mode:     'SHOWCASE' — ambient / exhibition mode
 // status:   'NORMAL' — formula steering + wind active, auto-cycling runs
 //           'FREEROAM' — no formula, no wind; particles drift freely on momentum
 //           'DOT'    — fixed inward-spiral formulas; wind + formula forced on regardless of params
@@ -1445,7 +1429,7 @@ const simState = {
     colorMode:         'NORMAL',
     qrStatus:          'HIDE',
     status:            'DOT',
-    storyStep:         null,   // echoed from n8n step ID; null = not in story mode
+    storyStep:         null,
     storyVoteResult:   null,
     votesA:            0,      // raw vote count for optionA — dirty, never auto-reset
     votesB:            0,      // raw vote count for optionB — dirty, never auto-reset
@@ -1488,7 +1472,7 @@ function armFreeroamLock() {
     }
 }
 
-// Single entry point for status changes (GUI dropdown and n8n API both route here),
+// Single entry point for status changes (GUI dropdown and server both route here),
 // so the freeroam lock timer is armed/reset wherever FREEROAM is (re)entered.
 function setStatus(newStatus) {
     simState.status = newStatus;
@@ -1498,7 +1482,7 @@ function setStatus(newStatus) {
 }
 
 let qrBitmap           = null;  // permanent reference to the session QR bitmap
-let sessionRoom        = null;  // UUID assigned by server — needed for n8n payload
+let sessionRoom        = null;
 let sessionUrl         = null;  // full remote URL — kept so QR can be regenerated on param change
 
 async function generateQR() {
@@ -1513,122 +1497,6 @@ async function generateQR() {
     qrBitmap = await createImageBitmap(qrOffscreen);
 }
 let lastRemoteActivity = Date.now(); // timestamp of last remote-event (touch or text)
-
-// ── n8n direct integration ────────────────────────────────────────────────────
-// VITE_N8N_BASE_URL is the bare n8n origin (e.g. http://localhost:5678).
-// Two separate fetch paths, each with its own in-flight guard:
-//   /webhook/sim-event   — real-time events (vote-result, text input, etc.)
-//   /webhook/heartbeat   — periodic full state snapshot; n8n uses this to drive story
-// In test mode all paths switch to /webhook-test/*.
-
-// ── Server echo ───────────────────────────────────────────────────────────────
-// Whatever the server sends back in a heartbeat response is stored here and
-// echoed verbatim in the next heartbeat. Session-only: cleared on page reload.
-// The server can compare the echoed values against its current state and decide
-// whether the client is up to date or needs a re-push.
-let _serverEcho = {};
-
-// Runtime toggle is `params.n8nEnabled`; URL `?n8n=off` flips that flag at boot.
-// Every fetch / scheduler / fallback path that referenced N8N_BASE also checks
-// the runtime flag, so disabling at runtime stops traffic without needing a reload.
-const N8N_BASE            = (import.meta.env.VITE_N8N_BASE_URL ?? '').replace(/\/$/, '');
-const N8N_USER_TIMEOUT_MS = 15_000;
-let   n8nInFlight          = false;
-let   n8nHeartbeatInFlight = false;
-
-async function callN8n(event) {
-    if (!N8N_BASE || !params.n8nEnabled || n8nInFlight) return;
-    n8nInFlight = true;
-    const path = params.n8nTestMode ? '/webhook-test/sim-event' : '/webhook/sim-event';
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), N8N_USER_TIMEOUT_MS);
-    try {
-        const res = await fetch(N8N_BASE + path, {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ ...event, room: sessionRoom }),
-            signal:  controller.signal,
-        });
-        clearTimeout(timer);
-        if (res.ok) {
-            const raw  = await res.json();
-            const data = Array.isArray(raw) ? raw[0] : raw;
-            if (data && typeof data === 'object') applySimParams(data);
-        }
-    } catch (err) {
-        clearTimeout(timer);
-        if (err.name !== 'AbortError') console.warn('[n8n]', err.message);
-    } finally {
-        n8nInFlight = false;
-    }
-}
-
-// Periodic heartbeat — sends the full params snapshot to n8n every
-// params.heartbeatInterval seconds. Response is handled identically to sim-event.
-// In-flight guard: any heartbeat requested while one is running is dropped (no queue).
-async function callN8nHeartbeat() {
-    if (!N8N_BASE || !params.n8nEnabled) return;
-    if (n8nHeartbeatInFlight) { console.log('[n8n heartbeat] skipped — previous call still in flight'); return; }
-    n8nHeartbeatInFlight = true;
-    const path = params.n8nTestMode ? '/webhook-test/heartbeat' : '/webhook/heartbeat';
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), params.heartbeatTimeout * 1000);
-    try {
-        const res = await fetch(N8N_BASE + path, {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({
-                type:              'heartbeat',
-                room:              sessionRoom,
-                mode:              simState.mode,
-                colorMode:         simState.colorMode,
-                status:            simState.status,
-                qrStatus:          simState.qrStatus,
-                step:              simState.storyStep,
-                stepStatus:        simState.stepStatus,
-                optionA:           simState.optionA,
-                optionB:           simState.optionB,
-                votesA:            simState.votesA,
-                votesB:            simState.votesB,
-                storyVoteResult:   simState.storyVoteResult,
-                userCount:         simState.userCount,
-                avgChaos:          smoothChaos,
-                ...(_n8nPassword !== null && { password: _n8nPassword }),
-                ..._serverEcho,
-                params:            { ...params },
-            }),
-            signal:  controller.signal,
-        });
-        clearTimeout(timer);
-        if (res.ok) {
-            const raw  = await res.json();
-            const data = Array.isArray(raw) ? raw[0] : raw;
-            if (data && typeof data === 'object') {
-                const { audio, audioFormat, audiobg, audiobgFormat, audiobgLoop,
-                        traceImage, avoidMap, traceText, clearText, clearTrace,
-                        restart, dir, wind, ...echoable } = data;
-                _serverEcho = echoable;
-                applySimParams(data);
-            }
-        }
-    } catch (err) {
-        clearTimeout(timer);
-        if (err.name !== 'AbortError') console.warn('[n8n heartbeat]', err.message);
-    } finally {
-        n8nHeartbeatInFlight = false;
-    }
-}
-
-
-let heartbeatTimer = null;
-function restartHeartbeat() {
-    clearInterval(heartbeatTimer);
-    heartbeatTimer = null;
-    if (N8N_BASE && params.n8nEnabled && params.heartbeatInterval > 0) {
-        heartbeatTimer = setInterval(callN8nHeartbeat, params.heartbeatInterval * 1000);
-    }
-}
-restartHeartbeat();
 
 await applyFormulas(DOT_DIR, DOT_WIND, { reseed: true });
 
@@ -1886,8 +1754,6 @@ function triggerReleaseBurst(slot) {
 // The server assigns a session UUID on socket connect and emits it back as
 // 'session-id'. The sim renders a QR code pointing to $VITE_USER_URL/?s=<id> as both
 // a small scannable overlay and a large trace image in the canvas centre.
-// If VITE_N8N_BASE_URL is set, the sim calls n8n directly on each remote-event.
-// socket is declared here so the GUI's n8nTestMode onChange can reach it.
 let socket;
 // Base URL for server API calls — VITE_USER_URL in production, own origin as fallback.
 const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
@@ -1908,7 +1774,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
     // Identify this socket as the host simulation so the server can distinguish
     // it from remote spectator sockets and assign a UUID session room.
     // Pass _forcedSession if ?s= is in the URL — server will use it as the room ID.
-    socket.emit('register-host', { testMode: params.n8nTestMode, sessionId: _forcedSession || undefined });
+    socket.emit('register-host', { sessionId: _forcedSession || undefined });
 
     socket.on('session-id', async (sessionId) => {
         sessionRoom = sessionId;
@@ -1939,7 +1805,6 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
         }
 
         // ── Large QR bitmap — pre-rendered via generateQR(), stored for later activation.
-        // Activation is driven by n8n via heartbeat response { showQR: true }.
         await generateQR();
         socket.emit('audio-state', { locked: isAudioLocked() });
     });
@@ -2020,17 +1885,6 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
         }
     });
 
-    // ── Remote event registry ─────────────────────────────────────────────────
-    // Single source of truth for all event types emitted by spectator devices.
-    // sendToN8n: whether this event type is forwarded to n8n via callN8n().
-    const REMOTE_EVENTS = {
-        spawner:    { sendToN8n: false },
-        'color-pick': { sendToN8n: false },
-        rotation:   { sendToN8n: false },
-        text:       { sendToN8n: true  },
-        note:       { sendToN8n: false },
-    };
-
     socket.on('remote-event', (event) => {
         lastRemoteActivity = Date.now();
         if (event.type === 'spawner') {
@@ -2086,22 +1940,12 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
         if (event.type === 'raise' || event.type === 'wave') {
             burstBrightness = BURST_BRIGHTNESS;
         }
-        if (event.type === 'text' && event.data?.text && (!N8N_BASE || !params.n8nEnabled)) {
+        if (event.type === 'text' && event.data?.text) {
             const input = document.querySelector('#trace-text-input');
             if (input) input.value = event.data.text;
             renderTraceCanvas();
             scheduleAutoClear();
         }
-        if (REMOTE_EVENTS[event.type]?.sendToN8n) callN8n(event);
-    });
-
-    // Running vote tally from server — update storyVoteResult to current leader.
-    socket.on('story-vote-update', ({ optionA, votesA, optionB, votesB }) => {
-        simState.votesA = votesA ?? 0;
-        simState.votesB = votesB ?? 0;
-        if      (votesA > votesB) simState.storyVoteResult = optionA;
-        else if (votesB > votesA) simState.storyVoteResult = optionB;
-        else                      simState.storyVoteResult = null;
     });
 
     socket.on('connect_error', () => console.warn('[socket] connection failed, will retry…'));
@@ -2136,7 +1980,7 @@ function _startVoteTimer(status) {
     }
 }
 
-// Merge n8n-provided params into the live simulation.
+// Merge server-provided params into the live simulation.
 // Only numeric/boolean keys present in the payload are applied;
 // if formulas are included they re-trigger pipeline compilation.
 function applySimParams(data) {
@@ -2168,7 +2012,7 @@ function applySimParams(data) {
         _startVoteTimer(simState.stepStatus);
         socket.emit('remote-ui', _remoteUiPayload());
     }
-    if (mode === 'SHOWCASE' || mode === 'STORY') {
+    if (mode === 'SHOWCASE') {
         simState.mode = mode;
         updateStateDisplay();
     }
@@ -2223,10 +2067,7 @@ function applySimParams(data) {
     Object.entries(rest).forEach(([k, v]) => {
         if (k in params) params[k] = v;
     });
-    if ('heartbeatInterval' in rest) restartHeartbeat();
-    if (rest.triggerHeartbeat)       callN8nHeartbeat();
     if ('duckLevel'  in rest) setDuckLevel(params.duckLevel);
-    if ('n8nTestMode' in rest) socket.emit('set-n8n-test-mode', params.n8nTestMode);
     if (needsReseed)  seedAgents();
     if (needsRebuild) applyResize();
     if (needsRetrace) renderTraceCanvas();
@@ -2254,7 +2095,6 @@ function applySimParams(data) {
     seedAgents, seedGoL, setSize, rebuildOffscreen, rebuildGridTex, applyResize,
     renderTraceCanvas, generateQR, loadFontSpec,
     clearMagnetImage, clearTraceText, clearAvoidMap,
-    restartHeartbeat,
 }));
 
 stateCtrl.onChange(v => setStatus(v));
@@ -2324,36 +2164,6 @@ setInterval(() => {
 function apply() { applyFormulas(dirInput.value, windInput.value); }
 applyBtn.addEventListener('click', apply);
 
-// ── Save config ───────────────────────────────────────────────────────────────
-const saveConfigRow = document.querySelector('#save-config-row');
-const saveConfigBtn = document.querySelector('#save-config-btn');
-
-if (_n8nPassword && saveConfigRow) saveConfigRow.style.display = '';
-
-saveConfigBtn?.addEventListener('click', async () => {
-    const name = window.prompt('Nome della config (verrà salvata in simAss/config/):');
-    if (!name?.trim()) return;
-    const config = {
-        dir:       dirInput.value,
-        wind:      windInput.value,
-        colorMode: simState.colorMode,
-        mode:      simState.mode,
-        status:    simState.status,
-        ...params,
-    };
-    try {
-        const res = await fetch(`${_apiBase}/simAss-config?password=${encodeURIComponent(_n8nPassword)}`, {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ name: name.trim(), config }),
-        });
-        const data = await res.json();
-        if (res.ok) alert(`Salvato: ${data.filename}`);
-        else        alert(`Errore: ${data.error}`);
-    } catch (e) {
-        alert(`Errore di rete: ${e.message}`);
-    }
-});
 [dirInput, windInput].forEach(el => {
     el.addEventListener('keydown', e => { if (e.key === 'Enter') apply(); });
 });
@@ -3029,7 +2839,6 @@ function frame(ts) {
             const winner         = simState.storyVoteResult === simState.optionA ? 'A'
                                  : simState.storyVoteResult === simState.optionB ? 'B'
                                  : null;
-            callN8n({ type: 'vote-result', winner, winning_option: simState.storyVoteResult ?? null });
         }
     } else if (voteCountdownEl) {
         voteCountdownEl.classList.remove('visible');

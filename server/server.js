@@ -5,22 +5,12 @@
 //        host  : the simulation display; gets a UUID session room on 'register-host'
 //        remote: spectator devices; join with a room ID and emit user events
 //        admin : authenticated controller; sends sim-params to the host
-//   3. Event routing — server always forwards 'user-event' straight to the sim as
-//        'remote-event'. The sim calls n8n directly if VITE_N8N_WEBHOOK_URL is set.
+//   3. Event routing — forwards 'user-event' straight to the sim as 'remote-event'
 //   4. Collective state — aggregates all spectators' tilt + temperature per room
 //        and emits 'collective-state' to the host simulation every 300 ms
-//   5. Spectator presence — calls n8n /webhook/spectator on every join and leave,
-//        forwarding the response as 'sim-params' to the host. The server is the
-//        authoritative source for connection counts; the sim never tracks them.
-//   6. Device push — POST /spectator-push lets n8n send a 'device-message' event
-//        to a specific spectator (by spectatorId) or broadcast to all in a room.
+//   5. Device push — POST /spectator-push lets external callers send a 'device-message'
+//        event to a specific spectator (by spectatorId) or broadcast to all in a room.
 //        Authenticated via Bearer token (N8N_SECRET env var).
-//
-// Signal path:
-//   remote → socket → server → socket → simulation [→ n8n → simulation]
-//   server (ticker) → 'collective-state' → simulation
-//   server (join/leave) → n8n /spectator → 'sim-params' → simulation
-//   n8n → POST /spectator-push → server → socket → remote device
 
 import express           from 'express';
 import { createServer }  from 'node:http';
@@ -46,11 +36,9 @@ const VITE_PORT   = process.env.VITE_PORT ?? 5173;
 
 const ADMIN_PASS  = (process.env.ADMIN_PASSWORD ?? '').trim();
 const CONFIG_PASS = (process.env.PASSWORD ?? '').trim();
-const N8N_BASE    = (process.env.VITE_N8N_BASE_URL ?? '').replace(/\/$/, '');
 const N8N_SECRET  = process.env.N8N_SECRET ?? '';
 
 if (!ADMIN_PASS)  console.warn('[server] ADMIN_PASSWORD not set — /admin will be inaccessible');
-if (!N8N_BASE)    console.warn('[server] N8N_BASE_URL not set — spectator presence will not call n8n');
 if (!N8N_SECRET)  console.warn('[server] N8N_SECRET not set — /spectator-push is unauthenticated');
 
 const ORIGINS = [
@@ -80,7 +68,6 @@ setInterval(() => {
 //              never pruned; entries removed only on socket disconnect.
 // spectators:  Map<spectatorId, socketId> — reverse index for O(1) push by spectatorId.
 // users:       Map<socketId, UserState>   — tilt/touch aggregation; pruned on inactivity.
-// n8nTestMode: mirrors the host sim's n8nTestMode param so server calls the right endpoint.
 const rooms = new Map();
 
 const USER_TIMEOUT_MS = 15_000;
@@ -92,9 +79,7 @@ function getOrCreateRoom(roomId) {
             connections:  new Map(), // socketId  → spectatorId
             spectators:   new Map(), // spectatorId → socketId  (reverse index for push)
             users:        new Map(), // socketId  → UserState
-            n8nTestMode:  false,
             votes:        new Map(), // socketId  → choice string (one vote per spectator)
-            storyOptions: { a: null, b: null }, // current VOTE step options
             audioLocked:  null,      // null = unknown; true/false reported by sim
         });
     }
@@ -116,37 +101,6 @@ function updateUserState(roomId, socketId, type, data) {
     if (type === 'touch') {
         user.temperature = data.temp ?? 0.5;
         user.coherence   = data.x   ?? 0.5;
-    }
-}
-
-// ── n8n spectator presence ────────────────────────────────────────────────────
-// Called on every join and leave. Response is forwarded as 'sim-params' to the
-// host so n8n can react (show/hide QR, adjust params, etc.) with full context.
-const N8N_TIMEOUT_MS = 5_000;
-
-async function callN8nSpectator(roomId, type, spectatorId, userCount, testMode) {
-    if (!N8N_BASE) return;
-    const endpoint = testMode ? '/webhook-test/spectator' : '/webhook/spectator';
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), N8N_TIMEOUT_MS);
-    try {
-        const res = await fetch(N8N_BASE + endpoint, {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ type, room: roomId, spectatorId, userCount, avgChaos: rooms.get(roomId)?.lastAvgChaos ?? 1 }),
-            signal:  controller.signal,
-        });
-        clearTimeout(timer);
-        if (res.ok) {
-            const data = await res.json();
-            if (data && typeof data === 'object') {
-                const room = rooms.get(roomId);
-                if (room?.hostSockets.size) io.to(`${roomId}:hosts`).emit('sim-params', data);
-            }
-        }
-    } catch (err) {
-        clearTimeout(timer);
-        if (err.name !== 'AbortError') console.warn('[n8n spectator]', err.message);
     }
 }
 
@@ -203,7 +157,7 @@ io.on('connection', (socket) => {
     let assignedRoom = null;
 
     // ── Host (simulation display) ─────────────────────────────────────────────
-    socket.on('register-host', ({ testMode, sessionId: preferredId } = {}) => {
+    socket.on('register-host', ({ sessionId: preferredId } = {}) => {
         const sessionId = preferredId || randomUUID();
         assignedRoom    = sessionId;
         socket.join(sessionId);
@@ -211,20 +165,12 @@ io.on('connection', (socket) => {
         socket.emit('session-id', sessionId);
         const room = getOrCreateRoom(sessionId);
         room.hostSockets.add(socket.id);
-        room.n8nTestMode  = !!testMode;
-        console.log('[socket] host registered   room:', sessionId, '| hosts:', room.hostSockets.size, '| testMode:', !!testMode);
+        console.log('[socket] host registered   room:', sessionId, '| hosts:', room.hostSockets.size);
         // Tell existing spectators the host is live so they can re-handshake.
         if (room.connections.size) io.to(`${sessionId}:spectators`).emit('host-reconnected');
     });
 
-    // Syncs the host sim's n8nTestMode toggle so the server calls the right endpoint.
-    socket.on('set-n8n-test-mode', (testMode) => {
-        const room = assignedRoom ? rooms.get(assignedRoom) : null;
-        if (room && room.hostSockets.has(socket.id)) {
-            room.n8nTestMode = !!testMode;
-            console.log('[socket] n8nTestMode →', !!testMode, '  room:', assignedRoom);
-        }
-    });
+
 
     // Sim reports its AudioContext lock state so the admin panel can show a warning.
     socket.on('audio-state', ({ locked }) => {
@@ -293,7 +239,6 @@ io.on('connection', (socket) => {
         socket.to(`${room}:spectators`).emit('peer-joined', { userCount });
         io.to(`${room}:admin`).emit('spectator-count', { count: userCount });
 
-        callN8nSpectator(room, 'spectator-joined', sid, userCount, roomData.n8nTestMode);
     });
 
     // ── User event from remote ────────────────────────────────────────────────
@@ -313,31 +258,8 @@ io.on('connection', (socket) => {
         const room = rooms.get(assignedRoom);
         if (!room?.hostSockets.has(socket.id)) return;
         room.votes.clear();
-        room.storyOptions.a = data?.optionA ?? null;
-        room.storyOptions.b = data?.optionB ?? null;
         io.to(`${assignedRoom}:spectators`).emit('remote-ui', data);
         console.log('[socket] remote-ui         room:', assignedRoom, '| status:', data?.stepStatus);
-    });
-
-    // ── Story vote — spectator casts one vote; host gets running tally ───────────
-    socket.on('story-vote', ({ choice } = {}) => {
-        const room = rooms.get(assignedRoom);
-        if (!room || !choice) return;
-        room.votes.set(socket.id, choice);
-        const { a, b } = room.storyOptions;
-        let votesA = 0, votesB = 0;
-        for (const v of room.votes.values()) {
-            if (v === a) votesA++;
-            else if (v === b) votesB++;
-        }
-        if (room.hostSockets.size) {
-            io.to(`${assignedRoom}:hosts`).emit('story-vote-update', {
-                optionA: a, votesA,
-                optionB: b, votesB,
-                total:   room.votes.size,
-            });
-        }
-        console.log('[socket] story-vote        room:', assignedRoom, '|', a, votesA, 'vs', b, votesB);
     });
 
     // ── Host push to a specific spectator ────────────────────────────────────────
@@ -403,9 +325,6 @@ io.on('connection', (socket) => {
                 io.to(`${assignedRoom}:admin`).emit('spectator-count', { count: remaining });
                 console.log('[socket] spectator left    room:', assignedRoom, '| remaining:', remaining);
 
-                if (spectatorId !== undefined) {
-                    callN8nSpectator(assignedRoom, 'spectator-left', spectatorId, remaining, room.n8nTestMode);
-                }
             }
 
             if (!room.hostSockets.size && !room.connections.size) rooms.delete(assignedRoom);
@@ -414,7 +333,7 @@ io.on('connection', (socket) => {
 });
 
 // ── Device push endpoint ──────────────────────────────────────────────────────
-// Called by n8n to push a 'device-message' event to one spectator or all
+// POST /spectator-push — push a 'device-message' event to one spectator or all
 // spectators in a room. Authenticated with Bearer token (N8N_SECRET env var).
 //
 // POST /spectator-push
