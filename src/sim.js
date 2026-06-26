@@ -1182,8 +1182,8 @@ function renderTextAvoidMap() {
     if (!device) return;
     const text = document.querySelector('#trace-text-input')?.value.trim() ?? '';
 
-    // No text — clear only if we own the current avoidmap
-    if (!text) {
+    // No text, or an image is loaded — clear if we own the avoidmap, then bail
+    if (!text || imageBitmap) {
         if (_textOwnedAvoidMap) {
             _textOwnedAvoidMap = false;
             clearAvoidMap();
@@ -1307,6 +1307,7 @@ async function loadMagnetImage(file) {
     } else {
         imageBitmap = await createImageBitmap(file, { colorSpaceConversion: 'none' });
     }
+    renderTextAvoidMap(); // suppress text avoidmap while image is shown
     renderTraceCanvas();
     scheduleAutoClear();
 }
@@ -1325,6 +1326,7 @@ async function loadTraceImageFromUrl(url, fetchOptions = {}) {
         } else {
             imageBitmap = await createImageBitmap(blob, { colorSpaceConversion: 'none' });
         }
+        renderTextAvoidMap(); // suppress text avoidmap while image is shown
         renderTraceCanvas();
         scheduleAutoClear();
     } catch (err) {
@@ -1337,6 +1339,7 @@ function clearMagnetImage() {
     imageBitmap = null;
     clearTimeout(autoClearTimer);
     autoClearTimer = null;
+    renderTextAvoidMap(); // reapply text avoidmap now that image is gone
     renderTraceCanvas();
 }
 
@@ -2070,6 +2073,7 @@ function applySimParams(data) {
         if (clearInput) clearInput.value = '';
         simState.qrStatus = 'HIDE';
         updateStateDisplay();
+        renderTextAvoidMap();
         renderTraceCanvas();
     }
     if (caption !== undefined) { captionText = caption || ''; renderTraceCanvas(); }
