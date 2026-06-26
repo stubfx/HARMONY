@@ -53,7 +53,7 @@ const params = {
     chaosColor:         '#ff2244',  // colour taken by chaosColorFraction of all agents at full chaos
     chaosColorFraction: 0.5,        // max fraction of agents that use chaosColor (at chaos=1)
     idleColor:          '#ffffff',  // colour shown when no spectators connected
-    idleColorFraction:  0.7,        // fraction of agents that take idleColor when idle
+    idleColorFraction:  0,          // fraction of agents that take idleColor when idle
     brightness:  0.06,        // per-particle alpha; prevents additive saturation to white
     additiveBlend: true,      // true = additive (glow, accumulates); false = max blend (no over-brightness)
     blendAmount:   1.0,       // 0–1 multiplier on per-particle fragment output; lowers contribution in both blend modes
@@ -1311,7 +1311,7 @@ function renderTextAvoidMap() {
     // Multi-line word-wrap (same layout as the old trace text layer)
     const fontSize = Math.round(minDim * 0.10);
     ctx.font = `bold ${fontSize}px ${fontStack}`;
-    const maxW  = w * 0.88;
+    const maxW  = w * 0.50;
     const words = text.split(/\s+/);
     const lines = [];
     let cur = '';
@@ -2012,6 +2012,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
                 applyFormulas(saved.dir, saved.wind);
             }
             collectiveChaos     = 0;
+            smoothChaos         = 0;
             collectiveCoherence = 0.5;
             collectiveTemp      = 0.5;
             setSynthState(0.0, 0.5, 0, 0, 0.5);
