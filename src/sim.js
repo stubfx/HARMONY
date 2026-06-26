@@ -922,6 +922,7 @@ function seedGoL() {
 // White QR modules (r=1) repel agents; blur merges them into a solid repulsion zone.
 let _inQROverlayUpdate = false;
 let _qrOwnedAvoidMap   = false; // true when the current avoid map was set by updateQROverlay
+let _textOwnedAvoidMap = false; // true when the current avoid map was rendered from the text input
 function updateQROverlay() {
     const visible = params.qrOverlay && simState.qrStatus === 'SHOW' && !!qrBitmap;
     qrOverlayEl.style.opacity = visible ? '1' : '0';
@@ -1053,16 +1054,15 @@ async function loadFontSpec(raw) {
         console.warn(`Could not load Google Font "${family}" — using sans-serif fallback.`, e);
     }
     params.fontFamily = family;
+    renderTextAvoidMap();
     renderTraceCanvas();
 }
 
 function renderTraceCanvas() {
     if (!device) return;
 
-    const text       = document.querySelector('#trace-text-input')?.value.trim() ?? '';
-    const hasText    = text.length > 0;
     const hasCaption = captionText.length > 0;
-    const hasUserContent = !!imageBitmap || hasText || hasCaption;
+    const hasUserContent = !!imageBitmap || hasCaption;
     // When qrOverlay is on the QR lives on the 2D overlay canvas, not the trace.
     const showQR = !params.qrOverlay && simState.qrStatus === 'SHOW' && !!qrBitmap;
 
@@ -1115,45 +1115,6 @@ function renderTraceCanvas() {
             sy = (imageBitmap.height - sh) / 2;
         }
         ctx.drawImage(imageBitmap, sx, sy, sw, sh, 0, 0, tcW, tcH);
-    }
-
-    // Layer 2: text — at (imageX, imageY), multi-line when no image is present
-    if (hasText) {
-        ctx.fillStyle    = 'white';
-        ctx.textAlign    = 'center';
-        ctx.textBaseline = 'middle';
-        const cx = params.imageX * tcW;
-        const cy = params.imageY * tcH;
-
-        if (!imageBitmap) {
-            // Multi-line word-wrap centered on (cx, cy)
-            const fontSize = Math.round(minDim * 0.10);
-            ctx.font = `bold ${fontSize}px ${fontStack}`;
-            const maxW  = tcW * 0.88;
-            const words = text.split(/\s+/);
-            const lines = [];
-            let cur = '';
-            for (const w of words) {
-                const test = cur ? `${cur} ${w}` : w;
-                if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = w; }
-                else cur = test;
-            }
-            if (cur) lines.push(cur);
-            const lineH  = Math.round(fontSize * 1.35);
-            const startY = cy - ((lines.length - 1) * lineH) / 2;
-            lines.forEach((ln, i) => ctx.fillText(ln, cx, startY + i * lineH));
-        } else {
-            // Single line over an image — shrink font to fit width
-            let fontSize = minDim * 0.72;
-            ctx.font = `bold ${Math.round(fontSize)}px ${fontStack}`;
-            const measured = ctx.measureText(text).width;
-            const maxW     = tcW * 0.92;
-            if (measured > maxW) {
-                fontSize *= maxW / measured;
-                ctx.font  = `bold ${Math.round(fontSize)}px ${fontStack}`;
-            }
-            ctx.fillText(text, cx, cy);
-        }
     }
 
     // Caption layer: word-wrapped text anchored to the bottom center, subtitle-sized
@@ -1212,6 +1173,76 @@ function renderTraceCanvas() {
     updateQROverlay();
 }
 
+// ── Text avoid map ────────────────────────────────────────────────────────────
+// Renders the trace text input as white glyphs on black directly into avoidMapTex
+// so agents are repelled by the text shape. No homing involved.
+let _textAvoidCanvas = null;
+
+function renderTextAvoidMap() {
+    if (!device) return;
+    const text = document.querySelector('#trace-text-input')?.value.trim() ?? '';
+
+    // No text — clear only if we own the current avoidmap
+    if (!text) {
+        if (_textOwnedAvoidMap) {
+            _textOwnedAvoidMap = false;
+            clearAvoidMap();
+        }
+        return;
+    }
+
+    const MAX_DIM = device.limits.maxTextureDimension2D;
+    const w = Math.min(Math.max(1, Math.round(canvas.width  * params.traceScale)), MAX_DIM);
+    const h = Math.min(Math.max(1, Math.round(canvas.height * params.traceScale)), MAX_DIM);
+    const minDim = Math.min(w, h);
+    const fontStack = params.fontFamily ? `"${params.fontFamily}", sans-serif` : 'sans-serif';
+
+    if (!_textAvoidCanvas) _textAvoidCanvas = document.createElement('canvas');
+    _textAvoidCanvas.width  = w;
+    _textAvoidCanvas.height = h;
+    const ctx = _textAvoidCanvas.getContext('2d');
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle    = 'white';
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    const cx = params.imageX * w;
+    const cy = params.imageY * h;
+
+    // Multi-line word-wrap (same layout as the old trace text layer)
+    const fontSize = Math.round(minDim * 0.10);
+    ctx.font = `bold ${fontSize}px ${fontStack}`;
+    const maxW  = w * 0.88;
+    const words = text.split(/\s+/);
+    const lines = [];
+    let cur = '';
+    for (const word of words) {
+        const test = cur ? `${cur} ${word}` : word;
+        if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = word; }
+        else cur = test;
+    }
+    if (cur) lines.push(cur);
+    const lineH  = Math.round(fontSize * 1.35);
+    const startY = cy - ((lines.length - 1) * lineH) / 2;
+    lines.forEach((ln, i) => ctx.fillText(ln, cx, startY + i * lineH));
+
+    // Upload to avoidMapTex
+    clearAvoidGif();
+    if (avoidMapTex) avoidMapTex.destroy();
+    avoidMapTex = device.createTexture({
+        size:   [w, h],
+        format: 'rgba8unorm',
+        usage:  GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    device.queue.copyExternalImageToTexture({ source: _textAvoidCanvas }, { texture: avoidMapTex }, [w, h]);
+    avoidMapTexView    = avoidMapTex.createView();
+    hasAvoidMap        = true;
+    _qrOwnedAvoidMap   = false;
+    _textOwnedAvoidMap = true;
+    rebuildSimBG();
+    rebuildRenderBG();
+}
+
 // ── Auto-clear timer ──────────────────────────────────────────────────────────
 // Started whenever user-added content (image or text) appears in the trace layer.
 // Fires after params.clearDelay seconds and wipes user text + any non-QR image.
@@ -1227,6 +1258,7 @@ function scheduleAutoClear() {
         const input = document.querySelector('#trace-text-input');
         if (input) input.value = '';
         imageBitmap = null;
+        renderTextAvoidMap();
         renderTraceCanvas();
         console.log('[trace] auto-cleared after', params.clearDelay, 's');
     }, params.clearDelay * 1000);
@@ -1314,6 +1346,7 @@ function clearTraceText() {
     captionText = '';
     clearTimeout(autoClearTimer);
     autoClearTimer = null;
+    renderTextAvoidMap();
     renderTraceCanvas();
 }
 
@@ -1326,6 +1359,7 @@ function restoreQR() {
     if (input) input.value = '';
     clearTimeout(autoClearTimer);
     autoClearTimer = null;
+    renderTextAvoidMap(); // clears text-owned avoidmap since input is now empty
     simState.qrStatus = 'SHOW';
     updateStateDisplay();
     renderTraceCanvas();
@@ -2052,6 +2086,7 @@ function applySimParams(data) {
         if (input) input.value = traceText || '';
         clearTimeout(autoClearTimer);
         autoClearTimer = null;
+        renderTextAvoidMap();
         renderTraceCanvas();
         if (traceText) scheduleAutoClear();
     }
@@ -2205,7 +2240,8 @@ document.querySelector('#image-input').addEventListener('change', e => {
 
 // ── Avoidance map upload ──────────────────────────────────────────────────────
 async function loadAvoidMap(source) {
-    _qrOwnedAvoidMap = false; // user-loaded map; QR must not clear it
+    _qrOwnedAvoidMap   = false; // user-loaded map; neither QR nor text should clear it
+    _textOwnedAvoidMap = false;
     const blob = typeof source === 'string'
         ? await fetch(source).then(r => r.blob())
         : source; // File is a Blob
@@ -2236,8 +2272,9 @@ async function loadAvoidMap(source) {
 function clearAvoidMap() {
     clearAvoidGif();
     if (avoidMapTex) { avoidMapTex.destroy(); avoidMapTex = null; }
-    avoidMapTexView = null;
-    hasAvoidMap     = false;
+    avoidMapTexView    = null;
+    hasAvoidMap        = false;
+    _textOwnedAvoidMap = false;
     rebuildSimBG();
     rebuildRenderBG();
     if (!_inQROverlayUpdate && params.qrOverlay && simState.qrStatus === 'SHOW' && qrBitmap) updateQROverlay();
@@ -2256,7 +2293,7 @@ let traceTextTimer = null;
 document.querySelector('#trace-text-input').addEventListener('input', () => {
     clearTimeout(traceTextTimer);
     traceTextTimer = setTimeout(() => {
-        renderTraceCanvas();
+        renderTextAvoidMap();
         scheduleAutoClear();
     }, 300);
 });
