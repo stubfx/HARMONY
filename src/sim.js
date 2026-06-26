@@ -48,11 +48,11 @@ const params = {
     trailDecay:     0.04,
     bgBlackCutoff:  0.05, // luminance below which trail pixels are clamped to 0 at display time
     pointSize:      1.3,
-    color1:      '#00ff00',   // first palette colour
-    color2:      '#0000ff',   // second palette colour (assigned by agent index % 2)
+    color1:      '#ffffff',   // first palette colour
+    color2:      '#ffffff',   // second palette colour (assigned by agent index % 2)
     chaosColor:         '#ff2244',  // colour taken by chaosColorFraction of all agents at full chaos
     chaosColorFraction: 0.5,        // max fraction of agents that use chaosColor (at chaos=1)
-    idleColor:          '#0057B8',  // colour shown when no spectators connected (Greek marine blue)
+    idleColor:          '#ffffff',  // colour shown when no spectators connected
     idleColorFraction:  0.7,        // fraction of agents that take idleColor when idle
     brightness:  0.06,        // per-particle alpha; prevents additive saturation to white
     additiveBlend: true,      // true = additive (glow, accumulates); false = max blend (no over-brightness)
@@ -1956,7 +1956,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
     socket.on('collective-state', ({ avgTemp, avgCoherence, avgChaos, userCount }) => {
         collectiveTemp      = avgTemp      ?? 0.5;
         collectiveCoherence = avgCoherence ?? 0.5;
-        collectiveChaos     = avgChaos     ?? 1;
+        collectiveChaos     = avgChaos     ?? 0;
         console.log('[chaos] raw avgChaos:', avgChaos?.toFixed(4), '| users:', userCount);
         swarmDebug.users     = userCount ?? 0;
         swarmDebug.temp      = +(avgTemp      ?? 0.5).toFixed(3);
@@ -2007,10 +2007,10 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
                 _chladniSum = 0;
                 applyFormulas(saved.dir, saved.wind);
             }
-            collectiveChaos     = 1;
+            collectiveChaos     = 0;
             collectiveCoherence = 0.5;
             collectiveTemp      = 0.5;
-            setSynthState(1.0, 0.5, 0, 0, 0.5);
+            setSynthState(0.0, 0.5, 0, 0, 0.5);
             // last user left — fade out music, only synth remains
             const _fadeGen = ++_idleAudioGen;
             fadeOutIdleTrack(smoothChaos, () => {
@@ -2456,11 +2456,11 @@ canvas.addEventListener('mouseleave', () => { mouseCanvasX = -1; mouseCanvasY = 
 // Smoothed each frame via exponential moving average to avoid jarring jumps.
 let collectiveTemp      = 0.5; // target temperature [0=cold … 1=warm] (from touch Y)
 let collectiveCoherence = 0.5; // target coherence [0=chaos … 1=order] (from touch X)
-let collectiveChaos     = 1;   // target chaos [0=armonia … 1=max noise] (from note activity)
+let collectiveChaos     = 0;   // target chaos [0=armonia … 1=max noise] (from note activity)
 
 let smoothTemp        = 0.5;
 let smoothCoherence   = 0.5;
-let smoothChaos       = 1;
+let smoothChaos       = 0;
 let _lastSynthTick    = 0;    // throttle: call setSynthState at most every 200ms
 
 // ── Join burst state ──────────────────────────────────────────────────────────
