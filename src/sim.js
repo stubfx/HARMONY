@@ -452,6 +452,85 @@ function seedAgents() {
 }
 seedAgents();
 
+function enterPreshow() {
+    _preshowActive   = true;
+    _preshowLitCount = 0;
+
+    const count  = params.agentCount;
+    const data   = new Float32Array(count * 8);
+    const TAU    = Math.PI * 2;
+    const aspect = canvas.width / canvas.height;
+    const gridW  = Math.ceil(Math.sqrt(count * aspect));
+    const gridH  = Math.ceil(count / gridW);
+    const cellW  = canvas.width  / gridW;
+    const cellH  = canvas.height / gridH;
+
+    _preshowWeights = new Float32Array(count);
+
+    for (let i = 0; i < count; i++) {
+        const b  = i * 8;
+        const sx = Math.random() * canvas.width;
+        const sy = Math.random() * canvas.height;
+        const a  = Math.random() * TAU;
+        const s  = 0.5 + Math.random() * 1.5;
+        data[b]     = sx;
+        data[b + 1] = sy;
+        data[b + 2] = Math.cos(a) * s;
+        data[b + 3] = Math.sin(a) * s;
+        const col   = i % gridW;
+        const row   = Math.floor(i / gridW);
+        data[b + 4] = (col + Math.random()) * cellW;
+        data[b + 5] = (row + Math.random()) * cellH;
+        const w     = Math.max(0.05, 1.0 + (Math.random() * 2 - 1) * params.weightSpread);
+        _preshowWeights[i] = w;
+        data[b + 6] = 0.0; // weight = 0 → dormant
+        data[b + 7] = 0.0; // primed
+    }
+    device.queue.writeBuffer(agentBuf, 0, data);
+}
+
+function preshowActivateChunk() {
+    if (!_preshowActive || !_preshowWeights) return;
+    const total     = params.agentCount;
+    const chunkSize = Math.ceil(total * 0.10);
+    const start     = _preshowLitCount;
+    const end       = Math.min(start + chunkSize, total);
+    if (start >= total) return;
+
+    const cx  = canvas.width  / 2;
+    const cy  = canvas.height / 2;
+    const TAU = Math.PI * 2;
+    const count = end - start;
+    const data  = new Float32Array(count * 8);
+
+    for (let i = 0; i < count; i++) {
+        const agentIdx = start + i;
+        const b = i * 8;
+        const angle  = Math.random() * TAU;
+        const radius = Math.random() * 8;
+        data[b]     = cx + Math.cos(angle) * radius; // pos.x — spawn at center
+        data[b + 1] = cy + Math.sin(angle) * radius; // pos.y
+        const va = Math.random() * TAU;
+        const vs = 0.5 + Math.random() * 1.5;
+        data[b + 2] = Math.cos(va) * vs; // vel.x
+        data[b + 3] = Math.sin(va) * vs; // vel.y
+        data[b + 4] = cx; // home.x
+        data[b + 5] = cy; // home.y
+        data[b + 6] = _preshowWeights[agentIdx]; // restore weight → visible
+        data[b + 7] = 0.0; // primed
+    }
+
+    device.queue.writeBuffer(agentBuf, start * 32, data);
+    _preshowLitCount = end;
+}
+
+function exitPreshow() {
+    _preshowActive   = false;
+    _preshowLitCount = 0;
+    _preshowWeights  = null;
+    seedAgents(); // full reseed with proper positions
+}
+
 // ── Static pipelines & resources ──────────────────────────────────────────────
 const screenSmp = device.createSampler({
     magFilter: 'linear', minFilter: 'linear',
@@ -1484,6 +1563,11 @@ const simState = {
     voteResultSent:    false,  // guard: prevents firing the vote-result call more than once
 };
 
+// ── Preshow state ──────────────────────────────────────────────────────────────
+let _preshowActive    = false;
+let _preshowLitCount  = 0;
+let _preshowWeights   = null; // Float32Array(agentCount) of original weights
+
 // GUI handles — assigned by initGUI() at the bottom of this file.
 let stateCtrl     = null;
 let qrStateCtrl   = null;
@@ -1877,9 +1961,13 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
     socket.on('spectator-joined', ({ spectatorId, userCount } = {}) => {
         if (userCount !== undefined) simState.userCount = userCount;
         if (userCount === 1) { loadIdleAudio(true); } // first user — start music with fade in
-        if (simState.status === 'DOT' && userCount >= 1) setStatus('NORMAL');
-        lastRemoteActivity = Date.now();
-        burstBrightness    = BURST_BRIGHTNESS;
+        if (_preshowActive) {
+            preshowActivateChunk();
+        } else {
+            if (simState.status === 'DOT' && userCount >= 1) setStatus('NORMAL');
+            lastRemoteActivity = Date.now();
+            burstBrightness    = BURST_BRIGHTNESS;
+        }
         if (spectatorId && activeSlots.length < MAX_SPECTATOR_SLOTS) {
             const isFirst = activeSlots.length === 0;
             // Start with a neutral white — the phone sends a 'color-pick' immediately
@@ -2028,7 +2116,7 @@ function _startVoteTimer(status) {
 // if formulas are included they re-trigger pipeline compilation.
 function applySimParams(data) {
     const { dir, wind, restart, clearTrace, showQR, traceText, clearText, traceImage, status, avoidMap,
-            step, stepStatus, optionA, optionB, caption,
+            step, stepStatus, optionA, optionB, caption, preshow,
             audio, audioFormat, audiobg, audiobgFormat, audiobgLoop, mode, colorMode, ...rest } = data;
 
     if (audio    !== undefined) playAudio(audio    || null, audioFormat)                              .catch(e => console.warn('[audio]',    e));
@@ -2066,6 +2154,8 @@ function applySimParams(data) {
     if (status === 'NORMAL' || status === 'FREEROAM' || status === 'DOT') {
         setStatus(status);
     }
+    if (preshow === true)  enterPreshow();
+    if (preshow === false) exitPreshow();
     if (restart)              seedAgents();
     if (avoidMap === null)    clearAvoidMap();
     else if (typeof avoidMap === 'string') loadAvoidMap(avoidMap);
@@ -2137,7 +2227,8 @@ function applySimParams(data) {
     applyGUIVisibility, toggleGUI, updateGizmo,
 } = initGUI({
     params, socket, simState, MAX_AGENTS,
-    seedAgents, seedGoL, setSize, rebuildOffscreen, rebuildGridTex, applyResize,
+    seedAgents, enterPreshow, exitPreshow, preshowActivateChunk,
+    seedGoL, setSize, rebuildOffscreen, rebuildGridTex, applyResize,
     renderTraceCanvas, generateQR, loadFontSpec,
     clearMagnetImage, clearTraceText, clearAvoidMap,
 }));

@@ -189,6 +189,12 @@ fn avoidMapColorAt(canvasPx: vec2<f32>) -> vec4<f32> {
     );
 
     let agent    = agents[agentId];
+
+    // Dormant agents (preshow weight = 0) are clipped off-screen.
+    if (agent.weight < 0.001) {
+        return VsOut(vec4<f32>(10.0, 10.0, 0.0, 1.0), vec3<f32>(0.0), vec2<f32>(0.0), 0.0, vec2<f32>(0.0), 0.0, 0.0);
+    }
+
     var ndc:  vec2<f32>;
     var half: vec2<f32>;
     if (params.pixelMode != 0u) {
