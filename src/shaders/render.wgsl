@@ -1,5 +1,5 @@
 // ─── Solo Particle Render Shader ──────────────────────────────────────────────
-// SoloRenderParams layout (116 bytes, padded to 128 in uniform block):
+// SoloRenderParams layout (208 bytes):
 //   [0]   agentCount           u32
 //   [4]   canvasW              f32
 //   [8]   canvasH              f32
@@ -48,6 +48,10 @@
 //   [180] idleColorG           f32
 //   [184] idleColorB           f32
 //   [188] idleColorFraction    f32   (fraction of agents that take idleColor; set to 0 by JS when active)
+//   [192] debugHoming          u32   (1 = homing agents render bright white — proof-of-presence debug)
+//   [196] _pad0                u32
+//   [200] _pad1                u32
+//   [204] _pad2                u32
 
 struct SoloRenderParams {
     agentCount:           u32,
@@ -98,6 +102,10 @@ struct SoloRenderParams {
     idleColorG:           f32,
     idleColorB:           f32,
     idleColorFraction:    f32,
+    debugHoming:          u32,
+    _pad0:                u32,
+    _pad1:                u32,
+    _pad2:                u32,
 }
 
 struct Agent {
@@ -273,6 +281,12 @@ fn avoidMapColorAt(canvasPx: vec2<f32>) -> vec4<f32> {
 }
 
 @fragment fn fs(in: VsOut) -> @location(0) vec4<f32> {
+    // Debug mode: homing agents (primed=1) render bright white regardless of image/chaos state.
+    if (params.debugHoming != 0u && in.primed > 0.5) {
+        let b = params.blendAmount;
+        return vec4<f32>(b, b, b, b);
+    }
+
     // agent.primed is written by the compute shader each frame (1.0 = homing, 0.0 = free).
     // Using it as the sole gate guarantees render, shadow, and compute always agree —
     // no independent texture re-sampling means no bilinear/nearest-neighbour mismatch.

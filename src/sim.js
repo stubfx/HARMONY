@@ -63,6 +63,7 @@ const params = {
     pixelGridCells: 700,      // cell count along the X axis; Y count is derived from canvas aspect ratio
     // Magnet
     traceEnabled:   false, // master on/off for trace image homing (image stays loaded)
+    debugHoming:    false, // render homing agents bright white regardless of image/chaos
     magnetStr:      30.0, // homing speed: px/frame agents move toward their home position
     alphaThreshold: 0.1,  // min image alpha to trigger homing (0–1)
     blackThreshold: 0.05, // luminance below which pixels are treated as transparent
@@ -398,7 +399,7 @@ const soloUB = device.createBuffer({
     size: 224, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
-    size: 192, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 208, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const fadeUB = device.createBuffer({
     size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -2717,6 +2718,7 @@ function writeRenderUB() {
     f[45] = ic[1];
     f[46] = ic[2];
     f[47] = activeSlots.length === 0 ? params.idleColorFraction : 0.0;
+    u[48] = params.debugHoming ? 1 : 0;
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 
@@ -2807,7 +2809,7 @@ function writeContamUB() {
 
 // ── Pre-allocated uniform buffers (reused every frame to avoid GC pressure) ──
 const _soloAB  = new ArrayBuffer(224); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
-const _renderAB= new ArrayBuffer(192); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
+const _renderAB= new ArrayBuffer(208); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
 const _fadeAB  = new ArrayBuffer(16);  const _fadeF  = new Float32Array(_fadeAB);
 const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB); const _blitU  = new Uint32Array(_blitAB);
 const _downsampleAB = new ArrayBuffer(16); const _downsampleF = new Float32Array(_downsampleAB);
