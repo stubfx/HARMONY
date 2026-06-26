@@ -21,6 +21,8 @@ import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
 import champLinesWGSL   from './shaders/champLines.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
 import { startSynth, setSynthState, playIdleTrack, stopIdleTrack, fadeOutIdleTrack, setIdleChaos, addArpInfluence } from './synth.js';
+import { StoryEngine } from './storyEngine.js';
+import { STORY }       from './story.js';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const MAX_AGENTS = 5_000_000;
@@ -530,6 +532,15 @@ function exitPreshow() {
     _preshowWeights  = null;
     seedAgents(); // full reseed with proper positions
 }
+
+// ── Story facade & engine ────────────────────────────────────────────────────
+const simFacade = {
+    enterPreshow:         () => enterPreshow(),
+    exitPreshow:          () => exitPreshow(),
+    preshowActivateChunk: () => preshowActivateChunk(),
+    next:                 () => storyEngine.next(),
+};
+const storyEngine = new StoryEngine(STORY, simFacade);
 
 // ── Static pipelines & resources ──────────────────────────────────────────────
 const screenSmp = device.createSampler({
@@ -1962,7 +1973,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
         if (userCount !== undefined) simState.userCount = userCount;
         if (userCount === 1) { loadIdleAudio(true); } // first user — start music with fade in
         if (_preshowActive) {
-            preshowActivateChunk();
+            storyEngine.onSpectatorJoined(userCount);
         } else {
             if (simState.status === 'DOT' && userCount >= 1) setStatus('NORMAL');
             lastRemoteActivity = Date.now();
@@ -3268,4 +3279,5 @@ async function loadIdleAudio(fadeIn = false) {
     }
 }
 
+storyEngine.start();
 requestAnimationFrame(frame);
