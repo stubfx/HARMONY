@@ -23,6 +23,9 @@ export const STORY = [
         },
         onSpectatorJoined(sim, userCount) {
             sim.activateChunk(0.10);
+            if (userCount === 1) {
+                setTimeout(() => sim.setParam('dotRespawnChance', 0.002), 10_000);
+            }
         },
         exit(sim) {
             sim.thawParams();

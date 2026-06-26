@@ -542,6 +542,8 @@ const simFacade = {
     },
 
     next: () => storyEngine.next(),
+
+    setParam(key, val) { params[key] = val; },
 };
 const storyEngine = new StoryEngine(STORY, simFacade);
 
