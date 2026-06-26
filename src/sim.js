@@ -458,6 +458,15 @@ function enterPreshow() {
     _preshowActive   = true;
     _preshowLitCount = 0;
 
+    _preshowSavedParams = {
+        spectatorSpawnChance: params.spectatorSpawnChance,
+        randomTeleportChance: params.randomTeleportChance,
+        dotRespawnChance:     params.dotRespawnChance,
+    };
+    params.spectatorSpawnChance = 0;
+    params.randomTeleportChance = 0;
+    params.dotRespawnChance     = 0;
+
     const count  = params.agentCount;
     const data   = new Float32Array(count * 8);
     const TAU    = Math.PI * 2;
@@ -530,6 +539,12 @@ function exitPreshow() {
     _preshowActive   = false;
     _preshowLitCount = 0;
     _preshowWeights  = null;
+    if (_preshowSavedParams) {
+        params.spectatorSpawnChance = _preshowSavedParams.spectatorSpawnChance;
+        params.randomTeleportChance = _preshowSavedParams.randomTeleportChance;
+        params.dotRespawnChance     = _preshowSavedParams.dotRespawnChance;
+        _preshowSavedParams = null;
+    }
     seedAgents(); // full reseed with proper positions
 }
 
@@ -1575,9 +1590,10 @@ const simState = {
 };
 
 // ── Preshow state ──────────────────────────────────────────────────────────────
-let _preshowActive    = false;
-let _preshowLitCount  = 0;
-let _preshowWeights   = null; // Float32Array(agentCount) of original weights
+let _preshowActive      = false;
+let _preshowLitCount    = 0;
+let _preshowWeights     = null; // Float32Array(agentCount) of original weights
+let _preshowSavedParams = null; // spawn params saved on enter, restored on exit
 
 // GUI handles — assigned by initGUI() at the bottom of this file.
 let stateCtrl     = null;
