@@ -1311,7 +1311,7 @@ function renderTextAvoidMap() {
     // Multi-line word-wrap (same layout as the old trace text layer)
     const fontSize = Math.round(minDim * 0.10);
     ctx.font = `bold ${fontSize}px ${fontStack}`;
-    const maxW  = w * 0.50;
+    const maxW  = w * 0.75;
     const words = text.split(/\s+/);
     const lines = [];
     let cur = '';
