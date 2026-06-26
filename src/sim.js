@@ -1182,11 +1182,16 @@ function renderTextAvoidMap() {
     if (!device) return;
     const text = document.querySelector('#trace-text-input')?.value.trim() ?? '';
 
-    // No text, or an image is loaded — clear if we own the avoidmap, then bail
+    // No text, or an image is loaded — teardown inline (no clearAvoidMap call to avoid cycles)
     if (!text || imageBitmap) {
         if (_textOwnedAvoidMap) {
             _textOwnedAvoidMap = false;
-            clearAvoidMap();
+            clearAvoidGif();
+            if (avoidMapTex) { avoidMapTex.destroy(); avoidMapTex = null; }
+            avoidMapTexView = null;
+            hasAvoidMap     = false;
+            rebuildSimBG();
+            rebuildRenderBG();
         }
         return;
     }
@@ -2282,6 +2287,8 @@ function clearAvoidMap() {
     rebuildSimBG();
     rebuildRenderBG();
     if (!_inQROverlayUpdate && params.qrOverlay && simState.qrStatus === 'SHOW' && qrBitmap) updateQROverlay();
+    // Reapply text avoidmap if text is still present and no image is showing
+    renderTextAvoidMap();
 }
 
 document.querySelector('#avoid-map-input').addEventListener('change', e => {
@@ -2474,8 +2481,9 @@ function writeSoloUB(dt, time) {
     const teleportActive = !params.randomTeleportOnAvoidMap || hasAvoidMap;
     f[50] = teleportActive ? params.randomTeleportChance : 0;
     u[51] = _preConnectionFormulas !== null ? 1 : 0;
-    f[52] = (_chladniSum % 7) + 1;
-    f[53] = ((_chladniSum >>> 3) % 7) + 1;
+    const _cs = _chladniSum * 0.05;
+    f[52] = (_cs % 7) + 1;
+    f[53] = ((_chladniSum >>> 3) * 0.05 % 7) + 1;
     f[54] = (_chladniSum % 2 === 0) ? 1.0 : -1.0;
     setChaos(chaosGPU);
     const _synthNow = performance.now();
