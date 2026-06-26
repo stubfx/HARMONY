@@ -2312,6 +2312,11 @@ if (fontInput) {
     fontInput.addEventListener('change', applyFontInput);
     fontInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyFontInput(); });
 }
+// Set default text and render it as the avoidmap before font loads,
+// then again once the font is ready (loadFontSpec calls renderTextAvoidMap).
+const _defaultTextInput = document.querySelector('#trace-text-input');
+if (_defaultTextInput) _defaultTextInput.value = 'HARMONY';
+renderTextAvoidMap();
 loadFontSpec(params.fontFamily); // load the default Google Font on boot
 
 // ── Hex color → float RGB ─────────────────────────────────────────────────────
