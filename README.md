@@ -87,12 +87,6 @@ Host browser — simulation display (WebGPU)
     │                            → turnRate scale, speed-color tint, chaos level
     │
     │  'remote-event'  ←──── server (always direct — chaos aggregated only)
-    │
-    │  HTTPS POST /webhook/sim-event  ──→  n8n  (on every remote-event, if VITE_N8N_BASE_URL set)
-    │  ←── JSON response ─────────────────────  applySimParams()
-    │
-    │  HTTPS POST /webhook/heartbeat  ──→  n8n  (every heartbeatInterval seconds)
-    │  ←── JSON response ─────────────────────  applySimParams()
     ▼
 Display / projection
 
@@ -128,7 +122,7 @@ Node.js server  (:3000)
 
 ### Multi-host sessions
 
-If two browser windows open with the **same session UUID** (set manually in the URL as `?s=<uuid>`), both register as hosts for that room. The server tracks all host sockets in a `Set` and uses a `${sessionId}:hosts` Socket.IO room for all host-directed emits — both windows receive every event (spectator joins, collective state, n8n responses) identically. This is intended for multi-display installations where the same simulation runs on several screens simultaneously.
+If two browser windows open with the **same session UUID** (set manually in the URL as `?s=<uuid>`), both register as hosts for that room. The server tracks all host sockets in a `Set` and uses a `${sessionId}:hosts` Socket.IO room for all host-directed emits — both windows receive every event (spectator joins, collective state) identically. This is intended for multi-display installations where the same simulation runs on several screens simultaneously.
 
 ### Collective state aggregation
 
@@ -179,7 +173,7 @@ The coherence multiplier is applied to `turnRate` in JavaScript before writing t
 
 ## Story System
 
-A client-side story engine (`src/story.js` + `src/storyEngine.js`) runs autonomously inside the browser — no admin trigger or n8n response needed.
+A client-side story engine (`src/story.js` + `src/storyEngine.js`) runs autonomously inside the browser.
 
 `story.js` exports an array of step objects. Each step can define:
 
@@ -202,7 +196,7 @@ A client-side story engine (`src/story.js` + `src/storyEngine.js`) runs autonomo
 | `reseed()` | Clears dormant state and performs a full normal reseed |
 | `next()` | Advances to the next story step |
 
-This story system is separate from the n8n-driven story mode (step IDs, vote steps, captions). The two systems coexist: the client story runs on its own schedule while n8n continues to drive heartbeat-based content delivery.
+This story system coexists with the step-based story mode (step IDs, vote steps, captions) driven by `applySimParams` — the client story runs on its own schedule while the admin panel or `applySimParams` handles content delivery.
 
 ---
 
@@ -406,7 +400,7 @@ A **⛶ toggle fullscreen** button sits at the very top of the lil-gui panel, ab
 
 ### Top-level state controls
 
-Four dropdowns sit below the fullscreen button, above all folders. They mirror the set the n8n heartbeat exchanges:
+Four dropdowns sit below the fullscreen button, above all folders. They mirror the fields exchanged via `applySimParams`:
 
 | Control | Values | Description |
 |---------|--------|-------------|
@@ -536,8 +530,6 @@ The map is refreshed every 30 seconds — if the hash changes, the old map is cl
 | release burst (fireworks) | Scatter speed for a spectator's agents the moment they stop controlling (joystick released or timed out); 0 = off |
 | idle restore QR (s) | Seconds of silence from all remotes before QR trace is restored; 0 = disabled |
 | QR hides at N users | Remote page QR fades when `userCount` reaches this threshold |
-| n8n test mode | When on, calls `/webhook-test/` paths instead of `/webhook/`; no rebuild needed |
-| heartbeat (s) | Seconds between periodic full-params snapshots sent to n8n `/webhook/heartbeat`; 0 = disabled |
 
 ---
 
@@ -604,7 +596,7 @@ VITE_USER_URL=https://api.stubfx.io
 VITE_SOCKET_URL=https://api.stubfx.io
 
 npm run build          # bakes VITE_* into dist/
-npm run start          # starts Express (no n8n unless you need it)
+npm run start          # starts Express
 ```
 
 Verify the socket URL was baked in:
@@ -679,65 +671,9 @@ Independent volume control: **ch2: music vol** slider in the GUI Audio folder (�
 
 ---
 
-## n8n Integration
+## `applySimParams` — sim-params response format
 
-The simulation calls n8n directly from the browser via HTTPS fetch. No server relay is involved. Set `VITE_N8N_BASE_URL` in `.env` to your n8n origin (baked into the bundle at build time).
-
-### Endpoints
-
-| Event | Path | Trigger |
-|-------|------|---------|
-| User event | `/webhook/sim-event` (or `/webhook-test/sim-event` in test mode) | Every `remote-event` received from a spectator |
-| Heartbeat | `/webhook/heartbeat` (or `/webhook-test/heartbeat` in test mode) | Every `heartbeatInterval` seconds (default 20 s) |
-
-The **n8n test mode** toggle in the GUI switches between production and test paths without requiring a rebuild.
-
-### sim-event payload
-
-```json
-{
-  "type": "text",
-  "room": "session-UUID",
-  "spectatorId": "socket-id",
-  "data": { "text": "user prompt" },
-  "timestamp": 1234567890
-}
-```
-
-### heartbeat payload
-
-```json
-{
-  "type":            "heartbeat",
-  "room":            "session-UUID",
-  "mode":            "STORY",
-  "colorMode":       "NORMAL",
-  "status":          "NORMAL",
-  "qrStatus":        "HIDE",
-  "step":            2,
-  "stepStatus":      "IDLE",
-  "optionA":         null,
-  "optionB":         null,
-  "votesA":          0,
-  "votesB":          0,
-  "storyVoteResult": null,
-  "userCount":       3,
-  "params": {
-    "agentCount": 1200000,
-    "stepLen": 2.0,
-    "turnRate": 0.04,
-    "windStr": 0.2,
-    "...": "all current simulation params"
-  },
-  "...serverEchoFields": "any fields the server returned in its last heartbeat response are spread here at the root"
-}
-```
-
-When a story step completes (`storyStepComplete` flips to `true`), an **out-of-cycle heartbeat** fires immediately so n8n does not have to wait for the next scheduled tick.
-
-### Response format (`applySimParams`)
-
-Both endpoints consume the same response format. Return a JSON object with any combination of the following keys — unrecognised keys are ignored:
+The admin panel (and any other controller) drives the simulation by sending a `sim-params` Socket.IO event (or the server can push one directly). The payload is processed by `applySimParams()`. Pass a JSON object with any combination of the following keys — unrecognised keys are ignored:
 
 | Key | Type | Effect |
 |-----|------|--------|
@@ -752,7 +688,7 @@ Both endpoints consume the same response format. Return a JSON object with any c
 | `dir` | `string` | New direction formula (WGSL expression returning radians) |
 | `wind` | `string` | New wind formula (WGSL expression returning radians) |
 | `step` | any | Story step ID — resets `storyStepComplete`, `storyVoteResult`, and `stepStatus` for a new step |
-| `stepDuration` | number | Seconds until the step auto-completes and an out-of-cycle heartbeat fires |
+| `stepDuration` | number | Seconds until the step auto-completes |
 | `stepStatus` | `"IDLE" \| "DRAW" \| "VOTE" \| "TEXT" \| "RAISE" \| "PULSE" \| "WAVE"` | Spectator interaction mode — relayed to all remote devices via Socket.IO |
 | `optionA` | string | First vote option label (required with `VOTE` steps) |
 | `optionB` | string | Second vote option label (required with `VOTE` steps) |
@@ -785,7 +721,6 @@ Example story step response:
 | `ADMIN_PASSWORD` | — | Password for the `/admin` panel; leave blank to disable |
 | `VITE_PORT` | `5173` | Vite dev server port — Express redirects HTML requests here in dev |
 | `VITE_SERVER_PORT` | `3000` | Express port exposed to browser clients for direct Socket.IO connection in dev |
-| `VITE_N8N_BASE_URL` | — | Base URL of your n8n instance (no trailing slash). The sim appends `/webhook/sim-event` or `/webhook/heartbeat`. Leave blank to disable n8n. Baked at build time — requires rebuild to change. |
 | `VITE_USER_URL` | `http://localhost:3000` | Origin used to build the QR code URL (`$VITE_USER_URL/remote/?s=<uuid>`) |
 | `VITE_SOCKET_URL` | — | Socket.IO server origin used by browser clients **in production**. Set to your public API domain (e.g. `https://api.stubfx.io`). In dev this is ignored — clients always connect directly to Express. Falls back to `'/'` (page origin) if unset. |
 | `OPENAI_API_KEY` | — | OpenAI key — used for image generation (`gpt-image-1-mini`) and narration (`gpt-4o-mini`) |
@@ -875,12 +810,12 @@ thesis-sim/
 │   ├── main.js              Show operator panel: live spectator count, restart + full reset,
 │   │                        mute audio, mode (STORY/SHOWCASE), step status (IDLE/DRAW/VOTE),
 │   │                        QR show/hide (two independent buttons), QR location 3×3 grid,
-│   │                        clear trace, n8n heartbeat trigger, speed slider, formula presets
+│   │                        clear trace, speed slider, formula presets
 │   └── style.css
 │
 ├── server/
 │   ├── server.js            Socket.IO host/remote/admin routing; room state aggregation;
-│   │                        collective-state ticker (300 ms); always-direct remote-event relay (no n8n relay);
+│   │                        collective-state ticker (300 ms); always-direct remote-event relay;
 │   │                        spectator-joined/left to host; peer-joined/peer-left to spectators
 │   └── server-utils.js      File I/O for cached images
 │
@@ -889,7 +824,6 @@ thesis-sim/
 ├── README.md                Project overview and architecture
 ├── PARAMETERS.md            Full parameter reference with detailed explanations
 ├── behavior.md              Art-direction intent — the experience from the inside
-├── n8n-workflow.json        Importable n8n workflow template
 ├── package.json
 ├── vite.config.js
 └── .env.example

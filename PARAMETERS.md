@@ -20,7 +20,7 @@ The texture is rebuilt 300 ms after the last keystroke (debounced). There is no 
 
 ### Sizing and font
 
-- **Text only** (no image loaded): the canvas width is fixed to the screen width (capped at the GPU's `maxTextureDimension2D` limit). Text is word-wrapped across multiple lines; font size is approximately 6% of the canvas width. Canvas height grows with the number of lines. This prevents arbitrarily wide textures when long strings are received (e.g. from n8n).
+- **Text only** (no image loaded): the canvas width is fixed to the screen width (capped at the GPU's `maxTextureDimension2D` limit). Text is word-wrapped across multiple lines; font size is approximately 6% of the canvas width. Canvas height grows with the number of lines. This prevents arbitrarily wide textures when long strings are received remotely.
 - **Text + image**: the canvas is the same pixel dimensions as the loaded image. The text is drawn on top at auto-fitted size (starting at 72% of the image height, scaled down if the text would overflow 92% of the image width).
 
 The glyphs are always drawn **bold**, in the active font (see **Font** below; default **Bellefair**, with a `sans-serif` fallback). The fill is always **white** (RGB 1,1,1), so agents homing to text glyphs are rendered bright white — unless a loaded image provides color underneath, in which case the image RGB shows through.
@@ -190,7 +190,7 @@ A Conway cellular automaton runs on a coarse grid. When `golEnabled` is on (it i
 
 ### Freeroam lock
 
-When `freeroamLock` is on, entering FREEROAM starts a timer, and after `freeroamLockDelay` seconds (default 30) the status reverts automatically to NORMAL. Re-entering FREEROAM, whether from the GUI or the n8n API, resets the timer. On by default.
+When `freeroamLock` is on, entering FREEROAM starts a timer, and after `freeroamLockDelay` seconds (default 30) the status reverts automatically to NORMAL. Re-entering FREEROAM, whether from the GUI or `applySimParams`, resets the timer. On by default.
 
 ### brightness
 **Range:** 0.01 – 0.5 | **Default:** 0.08
@@ -266,7 +266,7 @@ A dropdown at the top of the GUI (between `mode` and `status`, above all folders
 
 **Why the blit pass and not the particle render?** The offscreen accumulation target is `rgba16float` and accumulates HDR contributions through additive blend. Inverting per particle in `render.wgsl` would map bright particles to near-zero, and additive blending of zeros produces nothing — the inverted image would collapse to background. Running the inversion in the blit pass, after the HDR has been compressed into `[0, 1]`, keeps `1 − v` well-defined regardless of how many particles overlapped.
 
-The mode is carried over the existing `blitUB` (32-byte buffer was already only 20 bytes used; adding a `u32 colorMode` at byte offset 20 doesn't require a resize) and is mirrored to n8n via the `colorMode` field in the heartbeat. It's also accepted as a top-level `applySimParams` key, so n8n workflows can switch palettes alongside story steps.
+The mode is carried over the existing `blitUB` (32-byte buffer was already only 20 bytes used; adding a `u32 colorMode` at byte offset 20 doesn't require a resize). It is accepted as a top-level `applySimParams` key, so palettes can be switched alongside story steps.
 
 ---
 
@@ -462,7 +462,7 @@ This multiplier applies to both the rendered particle alpha and the shadow alpha
 ### auto clear (s) (`clearDelay`)
 **Range:** 0 – 120 | **Default:** 0 (disabled)
 
-Seconds after which user-added trace content (text or loaded image) is automatically removed. The timer starts whenever new content appears and resets whenever new content arrives. Set to 0 to disable. All content lifecycle — show, hide, QR, trace — is intended to be driven by the n8n backend via heartbeat responses. The session QR code is considered system content and is never auto-cleared.
+Seconds after which user-added trace content (text or loaded image) is automatically removed. The timer starts whenever new content appears and resets whenever new content arrives. Set to 0 to disable. The session QR code is considered system content and is never auto-cleared.
 
 ---
 
@@ -493,7 +493,7 @@ Radius of the cursor eraser circle in canvas pixels. The erase zone matches this
 
 ## Avoidance map
 
-An invisible grayscale mask uploaded from the GUI (Avoidance map → Load map…) or delivered via n8n. White areas repel free agents; black areas are transparent. Homing agents (those whose home is on an opaque trace pixel) are unaffected.
+An invisible grayscale mask uploaded from the GUI (Avoidance map → Load map…) or delivered via `applySimParams`. White areas repel free agents; black areas are transparent. Homing agents (those whose home is on an opaque trace pixel) are unaffected.
 
 ### How it works
 
@@ -535,9 +535,9 @@ When on, **non-homing** particles take their base color from the avoid-map pixel
 
 Modifier on top of `sample color`. When off, the sampled RGB is used as the *base* and is then mixed with the speed colour (just like the global base colour normally would be), so faster particles still drift toward the speed colour. When on, the sampled pixel becomes the particle's final colour with no speed blend — the swarm reads as a direct, frozen copy of the avoid map's colours wherever it overlaps with the map.
 
-### Delivering via n8n
+### Delivering via `applySimParams`
 
-The `applySimParams` response accepts an `avoidMap` key:
+The `applySimParams` payload accepts an `avoidMap` key:
 
 ```json
 { "avoidMap": "data:image/png;base64,iVBORw0KGgo..." }
@@ -616,7 +616,7 @@ The server maintains a per-room state table (one entry per connected spectator, 
 **Routing:** forwarded to the sim as `remote-event`; the server aggregates all spectators' chaos values into `avgChaos` in the `collective-state` broadcast.
 **Effect:** two simultaneous effects.
 1. **Aura feedback** — chaos level modulates the vignette intensity of the atmospheric gradient on the spectator's own phone screen. More motion = darker, more intense aura edge.
-2. **Collective chaos** — the server averages all active spectators' chaos and emits `avgChaos`. This value is **received but not applied automatically**: `collectiveChaos` is not driven by `avgChaos` so motion alone no longer triggers the chaos system. Chaos can be activated manually (via the GUI or n8n params). To re-enable automatic motion-driven chaos, uncomment `collectiveChaos = avgChaos ?? 0` in the `collective-state` handler. The chaos system itself — noise magnitude, avoidMap suppression, chaos color fraction, all synth parameters — is fully intact and responds correctly once chaos is non-zero.
+2. **Collective chaos** — the server averages all active spectators' chaos and emits `avgChaos`. This value is **received but not applied automatically**: `collectiveChaos` is not driven by `avgChaos` so motion alone no longer triggers the chaos system. Chaos can be activated manually (via the GUI or `applySimParams`). To re-enable automatic motion-driven chaos, uncomment `collectiveChaos = avgChaos ?? 0` in the `collective-state` handler. The chaos system itself — noise magnitude, avoidMap suppression, chaos color fraction, all synth parameters — is fully intact and responds correctly once chaos is non-zero.
 
 **Shake detection** (used only for color reset): acceleration magnitude above 22 m/s² with a 1.2 s cooldown. Triggers `color-pick` + `shake` events — resets the spectator's color to the simulation base palette.
 
@@ -634,8 +634,8 @@ The server maintains a per-room state table (one entry per connected spectator, 
 ### Text — story input
 
 **Phone gesture:** a centered text input panel appears on the phone screen.
-**When shown:** only when `stepStatus` is `"TEXT"` (sent by n8n via the `remote-ui` socket event). Hidden at all other times — spectators cannot open it manually.
-**Data sent:** `text` string via `story-text` socket event. Forwarded to n8n as a `sim-event` of type `"text-input"`.
+**When shown:** only when `stepStatus` is `"TEXT"` (sent via the `remote-ui` socket event). Hidden at all other times — spectators cannot open it manually.
+**Data sent:** `text` string via `story-text` socket event.
 **After submit:** the panel collapses automatically and the phone returns to its rest state.
 
 ### Shake — color reset
@@ -727,7 +727,7 @@ The atmospheric glow behind the phone screen reflects the spectator's color sele
 
 | Axis | Visual effect |
 |------|--------------|
-| Color (swatch or n8n push) | Center hue of the radial gradient |
+| Color (swatch) | Center hue of the radial gradient |
 | Tilt | Anchor point of the gradient follows the phone's physical lean |
 
 This gives each spectator private, immediate feedback on what they are sending — without showing them what the collective result looks like.
@@ -795,8 +795,6 @@ When all spectators leave or `idle restore QR (s)` seconds pass with no remote a
 
 ### Signal routing
 Spectators connect via Socket.IO and emit `user-event` messages. The server always forwards joystick/text events directly to the simulation as `'remote-event'`. Tilt events are consumed server-side for aggregation and never forwarded individually.
-
-If `VITE_N8N_BASE_URL` is set, the simulation calls n8n directly (browser HTTPS fetch) on every `remote-event`. The server is not involved in the n8n round-trip. Text events are only applied locally (without n8n) when `VITE_N8N_BASE_URL` is blank.
 
 Each new spectator connection fires a `spectator-joined` event to the host, producing a brief visible gust in the particle field. See *Remote / Swarm Inputs — Join burst* above.
 
@@ -905,92 +903,31 @@ Per-frame probability that a free agent inside the QR bounding box is respawned.
 ### vote duration (s) (`voteDuration`)
 **Range:** 5 – 120 | **Default:** 30
 
-Seconds the vote panel stays open on spectator phones. Both the remote devices and the simulation's main display show a live countdown. When the timer expires the sim fires a `vote-result` event to n8n (`/webhook/sim-event`) containing the winning option label and whether it was A or B, then the remote devices automatically revert to their rest state (joystick).
+Seconds the vote panel stays open on spectator phones. Both the remote devices and the simulation's main display show a live countdown. When the timer expires the sim emits a `vote-result` event containing the winning option label and whether it was A or B, then the remote devices automatically revert to their rest state (joystick).
 
 ### idle restore QR (s) (`remoteTimeout`)
 **Range:** 0 – 180 | **Default:** 0 (disabled)
 
-Seconds of silence from all remote devices before the QR trace is automatically restored. Resets whenever any `remote-event` is received. Set to 0 to disable. QR show/hide is intended to be orchestrated by n8n via heartbeat responses (`showQR: true/false`).
+Seconds of silence from all remote devices before the QR trace is automatically restored. Resets whenever any `remote-event` is received. Set to 0 to disable. QR show/hide can also be controlled via `applySimParams` (`showQR: true/false`).
 
 ### QR hides at N users (`maxSpectators`)
 **Range:** 1 – 50 | **Default:** 1
 
 The remote page's persistent QR code fades when the connected spectator count reaches this threshold. This value is baked into the QR URL at generation time — changing it mid-session requires the QR to be regenerated (restart the simulation).
 
-### n8n enabled (`n8nEnabled`)
-**Default:** on
-
-Runtime kill-switch for all n8n traffic — the periodic heartbeat, the per-event `sim-event` fetches, and the text-event fallback path that uses n8n presence to decide whether to show submitted text locally. Toggling it off stops sending without unsetting `VITE_N8N_BASE_URL` or reloading; toggling it back on restarts the heartbeat timer (the GUI handler calls `restartHeartbeat()`).
-
-The `?n8n=off` URL parameter (and its aliases `false`, `0`, `disabled`) flips this flag to `false` at boot. Setting it via URL is equivalent to toggling it off in the GUI immediately after load.
-
-### n8n test mode (`n8nTestMode`)
-**Default:** off
-
-When on, all n8n calls use `/webhook-test/` paths instead of `/webhook/`. This lets you use the n8n test-trigger for a workflow without activating it in production. Does not require a rebuild — toggled live in the GUI.
-
-### heartbeat (s) (`heartbeatInterval`)
-**Range:** 0 – 120 | **Default:** 20
-
-Seconds between periodic snapshots sent to n8n at `/webhook/heartbeat` (or `/webhook-test/heartbeat` in test mode). Set to 0 to disable.
-
-The fetch timeout for each heartbeat request scales automatically with this value: **90% of the interval, minimum 5 s**. At the default interval of 5 s the timeout is 5 s (unchanged); at 20 s it becomes 18 s; at 60 s it becomes 54 s. This prevents heavy n8n responses (e.g. audio payloads loaded from disk) from being aborted when the interval is set longer than 5 s.
-
-**Payload:**
-```json
-{
-  "type":            "heartbeat",
-  "room":            "<session-uuid>",
-  "mode":            "STORY",
-  "colorMode":       "NORMAL",
-  "status":          "NORMAL",
-  "qrStatus":        "HIDE",
-  "step":            2,
-  "stepStatus":      "VOTE",
-  "optionA":         "Casa",
-  "optionB":         "Giardino",
-  "votesA":          3,
-  "votesB":          1,
-  "storyVoteResult": "Casa",
-  "userCount":       4,
-  "params":          { "...": "all current tunable params" },
-  "...serverEchoFields": "any lightweight fields from the last heartbeat response are spread here"
-}
-```
-
-| Field | Description |
-|-------|-------------|
-| `room` | Session UUID assigned at socket connect — stable for the page lifetime |
-| `mode` | Top-level session mode: `"STORY"` or `"SHOWCASE"` |
-| `colorMode` | Final-stage color treatment: `"NORMAL"`, `"GRAYSCALE"`, or `"GRAYSCALE_INVERTED"` (applied in the blit pass) |
-| `status` | Simulation state: `"NORMAL"`, `"FREEROAM"`, or `"DOT"` |
-| `qrStatus` | QR visibility: `"SHOW"` or `"HIDE"` |
-| `step` | Current story step ID as sent by n8n; `null` when not in story mode |
-| `stepStatus` | Current spectator interaction mode: `"IDLE"`, `"DRAW"`, `"VOTE"`, `"TEXT"`, `"RAISE"`, `"PULSE"`, or `"WAVE"` |
-| `optionA` / `optionB` | Vote option labels; dirty — hold last known value even outside a vote |
-| `votesA` / `votesB` | Raw vote counts; dirty, never auto-reset |
-| `storyVoteResult` | Winning option label while a vote is running; `null` if tied or no vote active |
-| `userCount` | Live connected spectator count |
-| `params` | Full snapshot of every tunable parameter in the GUI |
-| *(echo fields)* | Lightweight fields from the server's last heartbeat response spread at root. Media fields excluded. Cleared on page reload. |
-
-The response is handled identically to `sim-event` — any recognised keys are applied via `applySimParams`. This is the primary channel through which n8n drives all content lifecycle: QR show/hide, trace images, formula changes, parameter adjustments, and story step delivery.
-
 ---
 
 ## Story Mode
 
-Story mode layers a scripted, sequential narrative on top of the simulation. The sim has no built-in story state machine — n8n owns sequencing and branching; the sim just plays the current step and reports back when interactions complete.
+Story mode layers a scripted, sequential narrative on top of the simulation. The sim has no built-in story state machine — the admin panel or `applySimParams` drives story progression; the sim plays the current step and reports back when interactions complete.
 
-> **Embedded story system:** separate from this n8n-driven story mode, the simulation also runs a client-side story defined in `src/story.js` and driven by `src/storyEngine.js`. This story starts automatically before the first frame and uses `simFacade` primitives (`dormantSeed`, `activateChunk`, `freezeParams`, etc.) to stage physical transitions. The two systems are independent: the client story handles the opening experience (preshow), while n8n handles narrative sequencing, votes, and captions during the performance.
+> **Embedded story system:** separate from this step-based story mode, the simulation also runs a client-side story defined in `src/story.js` and driven by `src/storyEngine.js`. This story starts automatically before the first frame and uses `simFacade` primitives (`dormantSeed`, `activateChunk`, `freezeParams`, etc.) to stage physical transitions. The two systems are independent: the client story handles the opening experience (preshow), while the step system handles narrative sequencing, votes, and captions during the performance.
 
-n8n drives story progression entirely through heartbeat responses and `sim-event` reactions. The heartbeat payload includes `mode` and `step`, so n8n can detect when the sim is in story mode and when a step has or hasn't started, and respond accordingly. Event-driven moments (vote results) arrive via `/webhook/sim-event` and n8n responds with the next step.
-
-### Step fields (sent by n8n in any `applySimParams` response)
+### Step fields (sent in any `applySimParams` payload)
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `step` | any | Step identifier — echoed back in every heartbeat so n8n can correlate. Receiving a new `step` resets vote state and sets `stepStatus` to `"IDLE"` unless overridden. When no step is active (`null`), the remote always shows the joystick regardless of `stepStatus` |
+| `step` | any | Step identifier — echoed back in every heartbeat. Receiving a new `step` resets vote state and sets `stepStatus` to `"IDLE"` unless overridden. When no step is active (`null`), the remote always shows the joystick regardless of `stepStatus` |
 | `stepStatus` | `"IDLE"` \| `"DRAW"` \| `"VOTE"` \| `"TEXT"` | Spectator interaction mode for this step. Only meaningful while a step is active — if no step is set, the remote keeps the joystick visible. Defaults to `"IDLE"` when a new step arrives without an explicit value |
 | `optionA` | string | Label for the first vote option — required when `stepStatus` is `"VOTE"` |
 | `optionB` | string | Label for the second vote option — required when `stepStatus` is `"VOTE"` |
@@ -1031,7 +968,7 @@ When `stepStatus` changes, the sim broadcasts a `remote-ui` Socket.IO event to a
 - Server counts A vs B votes and emits a running `story-vote-update` tally to the host sim after every change
 - The sim tracks the current leader in `storyVoteResult`
 - Both the simulation display and each remote phone show a live countdown (`voteDuration` seconds)
-- When the timer expires, the sim POSTs `{ "type": "vote-result", "winner": "A"|"B"|null, "winning_option": "..." }` to `/webhook/sim-event`. n8n uses this to advance the story to the next step
+- When the timer expires, the sim emits a `vote-result` event `{ "type": "vote-result", "winner": "A"|"B"|null, "winning_option": "..." }` — the story system uses this to advance to the next step
 - Remote phones revert to rest state automatically when the timer ends
 - Votes are cleared when a new `step` is received
 
@@ -1120,7 +1057,7 @@ Browser autoplay policy prevents `AudioContext` from starting without a prior us
 
 ### Voiceover track (`audio`)
 
-Delivered via n8n as a base64-encoded audio blob. Plays once and stops. A new `audio` payload stops any currently playing voiceover before starting the new one. Sending `null` or `""` stops the track without starting another. If the `audio` key is absent from the response, no change is made. Default format: `audio/webm;codecs=opus`.
+Delivered via `applySimParams` as a base64-encoded audio blob. Plays once and stops. A new `audio` payload stops any currently playing voiceover before starting the new one. Sending `null` or `""` stops the track without starting another. If the `audio` key is absent from the payload, no change is made. Default format: `audio/webm;codecs=opus`.
 
 ### Background music track (`audiobg`)
 
@@ -1128,7 +1065,7 @@ Same delivery mechanism as `audio`, but loops continuously until stopped. Sendin
 
 ### Microphone
 
-Enabled via `startMic()` (not controllable from the GUI or n8n). When active, the microphone signal drives the same color2-lean pipeline as the audio tracks. The mic source is connected only to the analyser (not to `destination`) — no feedback loop.
+Enabled via `startMic()` (not controllable from the GUI). When active, the microphone signal drives the same color2-lean pipeline as the audio tracks. The mic source is connected only to the analyser (not to `destination`) — no feedback loop.
 
 ---
 
