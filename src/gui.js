@@ -214,7 +214,7 @@ export function initGUI({
     fSession.add(params, 'releaseBurstSpeed',        0, 100,  1   ).name('release burst (fireworks)');
     fSession.add(params, 'remoteTimeout',            0, 180,  5   ).name('idle restore QR (s)');
     fSession.add(params, 'maxSpectators',            1,  50,  1   ).name('QR hides at N users');
-
+    fSession.add(params, 'chladniBlend',             0,   1, 0.01).name('note field blend');
 
     // ── Audio ─────────────────────────────────────────────────────────────────
     const fAudio = gui.addFolder('Audio');

@@ -154,6 +154,7 @@ const params = {
     respawnOnQR:      true,  // respawn free agents inside the QR rect to a random edge
     qrRespawnChance:  0.01,  // per-frame probability [0–1] for the respawn
     voteDuration:      30,   // seconds the vote panel stays open before the sim fires the result
+    chladniBlend:      0.15, // 0–1 blend weight of the note-driven Chladni perturbation
     // Weight
     weightSpread: 0.8,    // 0 = all equal; 1 = weights span [0.05 … 1.95]
     // Motion behaviour
@@ -2481,10 +2482,12 @@ function writeSoloUB(dt, time) {
     const teleportActive = !params.randomTeleportOnAvoidMap || hasAvoidMap;
     f[50] = teleportActive ? params.randomTeleportChance : 0;
     u[51] = _preConnectionFormulas !== null ? 1 : 0;
-    const _cs = _chladniSum * 0.05;
-    f[52] = (_cs % 7) + 1;
-    f[53] = ((_chladniSum >>> 3) * 0.05 % 7) + 1;
+    // M and N stay in [1.0, 3.0) — low enough for smooth gentle patterns.
+    // Different prime multipliers decorrelate M from N so same sum → unique field.
+    f[52] = 1.0 + (_chladniSum * 0.07) % 2.0;
+    f[53] = 1.0 + (_chladniSum * 0.11) % 2.0;
     f[54] = (_chladniSum % 2 === 0) ? 1.0 : -1.0;
+    f[55] = params.chladniBlend;
     setChaos(chaosGPU);
     const _synthNow = performance.now();
     if (_synthNow - _lastSynthTick >= 200) {

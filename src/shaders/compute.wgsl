@@ -108,11 +108,11 @@ struct SoloParams {
     releaseBurstSpeed:    f32,   // fireworks scatter speed on joystick release (0 = disabled)
     chaos:                f32,   // 0 = armonia (no noise), 1 = max random noise (from collective rotation)
     randomTeleportChance: f32,   // per-frame probability that any agent jumps to a random canvas position
-    chladniActive:        u32,   // 1 = override evalDirFormula with Chladni gradient
+    chladniActive:        u32,   // 1 = blend a Chladni perturbation into the direction formula
     chladniM:             f32,   // Chladni mode M
     chladniN:             f32,   // Chladni mode N
     chladniSym:           f32,   // Chladni symmetry factor (±1)
-    _chPad:               f32,   // alignment padding
+    chladniBlend:         f32,   // 0–1 blend weight; 0 = formula only, 1 = full Chladni
 }
 
 // Per-spectator partition data — color, joystick spawner position, personal wind.
@@ -295,11 +295,15 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let cx  = params.canvasW * 0.5;
     let cy  = params.canvasH * 0.5;
 
-    let dirAngle = select(
-        evalDirFormula(x, y, t, idx, cx, cy),
-        chladniDirAngle(x, y, cx, cy, params.chladniM, params.chladniN, params.chladniSym),
-        params.chladniActive != 0u
-    );
+    let freeAngle = evalDirFormula(x, y, t, idx, cx, cy);
+    var dirAngle  = freeAngle;
+    if (params.chladniActive != 0u && params.chladniBlend > 0.0) {
+        let chAngle  = chladniDirAngle(x, y, cx, cy, params.chladniM, params.chladniN, params.chladniSym);
+        let freeVec  = vec2f(cos(freeAngle), sin(freeAngle));
+        let chVec    = vec2f(cos(chAngle),   sin(chAngle));
+        let blended  = normalize(mix(freeVec, chVec, params.chladniBlend));
+        dirAngle     = atan2(blended.y, blended.x);
+    }
     let desired  = vec2<f32>(cos(dirAngle), sin(dirAngle));
 
     let windAngle = evalWindFormula(x, y, t, idx, cx, cy);
