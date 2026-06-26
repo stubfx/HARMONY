@@ -1,5 +1,12 @@
 # Wind Particles
 
+> This project was built entirely through vibe coding, deliberately. The subject is visual AI and the experience of collaborating with it — coding by feel, without always knowing why something works, *is* the research.
+>
+> That said: vibe coding can be genuinely useful for experimentation, but it demands that you stay sharp about what you are actually doing at every step. Knowing your tools, your domain, and your intentions is what separates productive exploration from drift. Delivering a good product requires that rigour — which is not necessarily what this experiment was optimising for.
+
+---
+
+
 A real-time GPU particle simulation for an art-direction thesis. Up to 5 million
 independent agents move through two invisible mathematical fields — a *direction
 field* and a *wind field* — both defined live by typed formulas compiled directly
