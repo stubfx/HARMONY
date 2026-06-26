@@ -1960,12 +1960,12 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
     socket.on('collective-state', ({ avgTemp, avgCoherence, avgChaos, userCount }) => {
         collectiveTemp      = avgTemp      ?? 0.5;
         collectiveCoherence = avgCoherence ?? 0.5;
-        collectiveChaos     = avgChaos     ?? 0;
-        console.log('[chaos] raw avgChaos:', avgChaos?.toFixed(4), '| users:', userCount);
+        // collectiveChaos is intentionally NOT driven by avgChaos — chaos is manual only.
+        // To re-enable: collectiveChaos = avgChaos ?? 0;
         swarmDebug.users     = userCount ?? 0;
         swarmDebug.temp      = +(avgTemp      ?? 0.5).toFixed(3);
         swarmDebug.coherence = +(avgCoherence ?? 0.5).toFixed(3);
-        swarmDebug.chaos     = +(avgChaos     ?? 1).toFixed(3);
+        swarmDebug.chaos     = 0;
         dbgUsers.updateDisplay();
         dbgTemp.updateDisplay();
         dbgCoherence.updateDisplay();

@@ -170,12 +170,12 @@ At the default of 0.012 the residual is invisible in practice while the fix is i
 The side length of each agent's rendered quad, in canvas pixels. Larger agents overlap more, producing a denser, painterly look. Smaller agents are sharp and precise.
 
 ### color 1 (`color1`)
-**Default:** `#00ff00`
+**Default:** `#ffffff`
 
 The first palette colour. Each particle is assigned a colour by its index (`agentId % N`, currently two colours), with no velocity interpolation.
 
 ### color 2 (`color2`)
-**Default:** `#0000ff`
+**Default:** `#ffffff`
 
 The second palette colour. Odd-index particles take this colour, even-index particles take `color1`.
 
@@ -616,7 +616,7 @@ The server maintains a per-room state table (one entry per connected spectator, 
 **Routing:** forwarded to the sim as `remote-event`; the server aggregates all spectators' chaos values into `avgChaos` in the `collective-state` broadcast.
 **Effect:** two simultaneous effects.
 1. **Aura feedback** — chaos level modulates the vignette intensity of the atmospheric gradient on the spectator's own phone screen. More motion = darker, more intense aura edge.
-2. **Collective chaos** — the server averages all active spectators' chaos and emits `avgChaos`. The simulation smooths this and uses it to drive noise magnitude, avoidMap suppression (above `chaosAvoidMapThreshold`), chaos color fraction, and all synth parameters.
+2. **Collective chaos** — the server averages all active spectators' chaos and emits `avgChaos`. This value is **received but not applied automatically**: `collectiveChaos` is not driven by `avgChaos` so motion alone no longer triggers the chaos system. Chaos can be activated manually (via the GUI or n8n params). To re-enable automatic motion-driven chaos, uncomment `collectiveChaos = avgChaos ?? 0` in the `collective-state` handler. The chaos system itself — noise magnitude, avoidMap suppression, chaos color fraction, all synth parameters — is fully intact and responds correctly once chaos is non-zero.
 
 **Shake detection** (used only for color reset): acceleration magnitude above 22 m/s² with a 1.2 s cooldown. Triggers `color-pick` + `shake` events — resets the spectator's color to the simulation base palette.
 
@@ -834,6 +834,8 @@ effectiveSpawnChance = spectatorSpawnChance × activeUsers × spectatorSpawnMult
 
 Raise to 0.05–0.1 for a more explosive, immediately-visible effect; lower to 0.005 for a slow, cumulative drift.
 
+> **Preshow:** during the `'preshow'` story step, `spectatorSpawnChance` is frozen to `0` by `freezeParams`. Joystick-driven spawning is suppressed for the duration of preshow; it is restored automatically when preshow exits via `thawParams()`.
+
 ---
 
 ### spawn multiplier (`spectatorSpawnMultiplier`)
@@ -882,6 +884,8 @@ Implementation: the release transition (both the explicit "joystick up" event an
 **Range:** 0 – 0.02 | **Default:** 0.003
 
 Per-frame probability that any free agent jumps to a completely random canvas position, independent of the spectator spawner system. Creates a slow, background redistribution that prevents dead zones accumulating during long steady-state periods. Has no effect on homing agents.
+
+> **Preshow:** during the `'preshow'` story step, `randomTeleportChance` is frozen to `0` by `freezeParams`. Random redistribution is suppressed for the duration of preshow so that dormant agents stay invisible until explicitly activated by `activateChunk`. It is restored when preshow exits.
 
 ### random teleport on avoidMap only (`randomTeleportOnAvoidMap`)
 **Default:** on
@@ -977,6 +981,8 @@ The response is handled identically to `sim-event` — any recognised keys are a
 ## Story Mode
 
 Story mode layers a scripted, sequential narrative on top of the simulation. The sim has no built-in story state machine — n8n owns sequencing and branching; the sim just plays the current step and reports back when interactions complete.
+
+> **Embedded story system:** separate from this n8n-driven story mode, the simulation also runs a client-side story defined in `src/story.js` and driven by `src/storyEngine.js`. This story starts automatically before the first frame and uses `simFacade` primitives (`dormantSeed`, `activateChunk`, `freezeParams`, etc.) to stage physical transitions. The two systems are independent: the client story handles the opening experience (preshow), while n8n handles narrative sequencing, votes, and captions during the performance.
 
 n8n drives story progression entirely through heartbeat responses and `sim-event` reactions. The heartbeat payload includes `mode` and `step`, so n8n can detect when the sim is in story mode and when a step has or hasn't started, and respond accordingly. Event-driven moments (vote results) arrive via `/webhook/sim-event` and n8n responds with the next step.
 

@@ -138,7 +138,7 @@ The server maintains a per-room user table. Every 300 ms it averages all active 
 |-------|--------|----------------------|-----------------|
 | `avgTemp` | touch Y position | speed-color hue: blue (top/cold) → amber (bottom/warm), 65% blend | arp BPM (80–140) |
 | `avgCoherence` | touch X position | turnRate multiplier: 0.08× (left/chaos) → 3.0× (right/order) | — |
-| `avgChaos` | device motion magnitude | noise magnitude in agent compute; chaos color fraction on all agents; avoidMap suppressed above threshold | all synth layers + radio chain; pad LFO frequency (0.05→2 Hz as chaos→0) |
+| `avgChaos` | device motion magnitude | **received but not applied automatically** — `collectiveChaos` is not driven by this value; chaos is manual only. To re-enable: `collectiveChaos = avgChaos ?? 0` | all synth layers + radio chain; pad LFO frequency (0.05→2 Hz as chaos→0) |
 | `userCount` | active connections | DOT→NORMAL at first join; chaos reset when all leave | synth at chaos=1 when empty; simAss music fades in on first join, out on last leave |
 
 All collective values are smoothed with an exponential moving average (~0.8 s time constant) in the simulation before being written to the GPU, preventing jarring jumps when spectators join or leave.
@@ -177,6 +177,35 @@ The coherence multiplier is applied to `turnRate` in JavaScript before writing t
 
 ---
 
+## Story System
+
+A client-side story engine (`src/story.js` + `src/storyEngine.js`) runs autonomously inside the browser — no admin trigger or n8n response needed.
+
+`story.js` exports an array of step objects. Each step can define:
+
+| Hook | Signature | When called |
+|------|-----------|-------------|
+| `enter` | `(sim)` | When this step becomes active |
+| `exit` | `(sim)` | Just before advancing to the next step |
+| `onSpectatorJoined` | `(sim, userCount)` | Every time a spectator connects while this step is active |
+
+`storyEngine.js` exports a `StoryEngine` class. `StoryEngine.start()` is called automatically before the first `requestAnimationFrame`. Steps advance by calling `sim.next()`.
+
+`sim.js` exports a `simFacade` object that story steps use to drive the simulation:
+
+| Primitive | Effect |
+|-----------|--------|
+| `dormantSeed()` | Seeds all agents invisible (weight=0); stores original weights |
+| `activateChunk(fraction)` | Activates the next N% of dormant agents, spawning from canvas center |
+| `freezeParams(overrides)` | Saves current param values and applies overrides |
+| `thawParams()` | Restores params saved by `freezeParams` |
+| `reseed()` | Clears dormant state and performs a full normal reseed |
+| `next()` | Advances to the next story step |
+
+This story system is separate from the n8n-driven story mode (step IDs, vote steps, captions). The two systems coexist: the client story runs on its own schedule while n8n continues to drive heartbeat-based content delivery.
+
+---
+
 ## Intro Sequence
 
 On load, agents are split evenly across the four canvas corners, all pointing inward
@@ -189,6 +218,8 @@ The QR trace image is also held back until the intro ends — loading it immedia
 would trap agents in the QR pattern during the radial spread-out phase.
 
 The intro delay is tunable via the GUI (Motion → intro delay).
+
+> **Note:** In the current story configuration, the intro sequence is preceded by the **preshow step** (defined in `story.js`). During preshow, all agents start invisible (weight=0) and spectators connect into a dark screen. Each joining user activates 10% of agents from the canvas centre. When preshow exits, params are thawed and the simulation reseeds normally into the standard intro.
 
 ---
 
@@ -804,7 +835,13 @@ thesis-sim/
 │   ├── sim.js               Main entry point: GPU setup, frame loop, GUI, formula system,
 │   │                        Socket.IO host, collective-state handler, QR screensaver,
 │   │                        QR overlay canvas, join burst, contamination tracking,
-│   │                        avoid map, auto-clear timer
+│   │                        avoid map, auto-clear timer; exports simFacade for story steps
+│   ├── story.js             Story definition: array of step objects with enter(sim),
+│   │                        exit(sim), and onSpectatorJoined(sim, userCount) hooks;
+│   │                        includes the 'preshow' step that wakes agents as users arrive
+│   ├── storyEngine.js       StoryEngine class: drives story.js steps in sequence;
+│   │                        calls exit() before advancing; started automatically before
+│   │                        the first requestAnimationFrame — no admin trigger needed
 │   └── shaders/
 │       ├── compute.wgsl     Agent physics (soloUB 144 bytes): formula steering,
 │       │                    wind + collective tilt bias, image-trace avoidance (gradient

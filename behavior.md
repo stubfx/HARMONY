@@ -79,3 +79,17 @@ We are not making a tool. Tools have a clear purpose and a correct use. This has
 The piece works when someone in the room with the projection notices the swarm drifting and looks around at the people with phones, wondering — who did that? And the answer is: all of us, and none of us, in proportions nobody will ever know.
 
 That wonder is the work.
+
+---
+
+## The Preshow
+
+Before the piece begins, the screen is black. Not dormant — running, waiting. Every particle already exists; none of them are visible.
+
+Then the first person scans the code and connects. Something stirs at the centre of the screen — a small cluster of particles, emerging from the middle of the dark. They drift outward. You can count them if you look. Ten percent of everything that will become the swarm.
+
+The next person joins. Another ten percent appears — from the same place, the same centre, spreading into the field the first arrivals have already begun to explore. The screen accumulates.
+
+This continues for as long as people keep arriving. Each connection wakes a fraction of what was already there but couldn't be seen. The swarm doesn't grow — it reveals itself. The dark between the particles is not absence. It is potential that hasn't been claimed yet.
+
+By the time enough people have joined, the screen holds something moving and full. Nobody assembled it deliberately. It assembled in response to people walking into a room and deciding to be part of something.
