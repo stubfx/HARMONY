@@ -90,11 +90,11 @@ const params = {
     // Champions — every Nth agent (agentId % champions == 0) drops a constant shadow
     // splat under itself even when free. 1 = every agent, 2 = one in two…
     championsEnabled:  true, // master on/off for the whole champions feature
-    champions:         700,
+    champions:         1000,
     // Champion point size — applied ONLY while a champion is free (not homing);
     // homing champions render at the normal agent size like everyone else.
     championSize:      15,
-    champLinesAlpha:   0.01,
+    champLinesAlpha:   0.02,
     // Game of Life mode — toggle
     golEnabled:      false,
     golStrength:     0.5,  // attraction of particles toward live cells
