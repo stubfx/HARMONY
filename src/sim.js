@@ -454,106 +454,94 @@ function seedAgents() {
 }
 seedAgents();
 
-function enterPreshow() {
-    _preshowActive   = true;
-    _preshowLitCount = 0;
-
-    _preshowSavedParams = {
-        spectatorSpawnChance: params.spectatorSpawnChance,
-        randomTeleportChance: params.randomTeleportChance,
-        dotRespawnChance:     params.dotRespawnChance,
-    };
-    params.spectatorSpawnChance = 0;
-    params.randomTeleportChance = 0;
-    params.dotRespawnChance     = 0;
-
-    const count  = params.agentCount;
-    const data   = new Float32Array(count * 8);
-    const TAU    = Math.PI * 2;
-    const aspect = canvas.width / canvas.height;
-    const gridW  = Math.ceil(Math.sqrt(count * aspect));
-    const gridH  = Math.ceil(count / gridW);
-    const cellW  = canvas.width  / gridW;
-    const cellH  = canvas.height / gridH;
-
-    _preshowWeights = new Float32Array(count);
-
-    for (let i = 0; i < count; i++) {
-        const b  = i * 8;
-        const sx = Math.random() * canvas.width;
-        const sy = Math.random() * canvas.height;
-        const a  = Math.random() * TAU;
-        const s  = 0.5 + Math.random() * 1.5;
-        data[b]     = sx;
-        data[b + 1] = sy;
-        data[b + 2] = Math.cos(a) * s;
-        data[b + 3] = Math.sin(a) * s;
-        const col   = i % gridW;
-        const row   = Math.floor(i / gridW);
-        data[b + 4] = (col + Math.random()) * cellW;
-        data[b + 5] = (row + Math.random()) * cellH;
-        const w     = Math.max(0.05, 1.0 + (Math.random() * 2 - 1) * params.weightSpread);
-        _preshowWeights[i] = w;
-        data[b + 6] = 0.0; // weight = 0 → dormant
-        data[b + 7] = 0.0; // primed
-    }
-    device.queue.writeBuffer(agentBuf, 0, data);
-}
-
-function preshowActivateChunk() {
-    if (!_preshowActive || !_preshowWeights) return;
-    const total     = params.agentCount;
-    const chunkSize = Math.ceil(total * 0.10);
-    const start     = _preshowLitCount;
-    const end       = Math.min(start + chunkSize, total);
-    if (start >= total) return;
-
-    const cx  = canvas.width  / 2;
-    const cy  = canvas.height / 2;
-    const TAU = Math.PI * 2;
-    const count = end - start;
-    const data  = new Float32Array(count * 8);
-
-    for (let i = 0; i < count; i++) {
-        const agentIdx = start + i;
-        const b = i * 8;
-        const angle  = Math.random() * TAU;
-        const radius = Math.random() * 8;
-        data[b]     = cx + Math.cos(angle) * radius; // pos.x — spawn at center
-        data[b + 1] = cy + Math.sin(angle) * radius; // pos.y
-        const va = Math.random() * TAU;
-        const vs = 0.5 + Math.random() * 1.5;
-        data[b + 2] = Math.cos(va) * vs; // vel.x
-        data[b + 3] = Math.sin(va) * vs; // vel.y
-        data[b + 4] = cx; // home.x
-        data[b + 5] = cy; // home.y
-        data[b + 6] = _preshowWeights[agentIdx]; // restore weight → visible
-        data[b + 7] = 0.0; // primed
-    }
-
-    device.queue.writeBuffer(agentBuf, start * 32, data);
-    _preshowLitCount = end;
-}
-
-function exitPreshow() {
-    _preshowActive   = false;
-    _preshowLitCount = 0;
-    _preshowWeights  = null;
-    if (_preshowSavedParams) {
-        params.spectatorSpawnChance = _preshowSavedParams.spectatorSpawnChance;
-        params.randomTeleportChance = _preshowSavedParams.randomTeleportChance;
-        params.dotRespawnChance     = _preshowSavedParams.dotRespawnChance;
-        _preshowSavedParams = null;
-    }
-    seedAgents(); // full reseed with proper positions
-}
-
 // ── Story facade & engine ────────────────────────────────────────────────────
+// sim.js exposes low-level primitives. Story steps (story.js) compose them.
+
 const simFacade = {
-    enterPreshow:         () => enterPreshow(),
-    exitPreshow:          () => exitPreshow(),
-    preshowActivateChunk: () => preshowActivateChunk(),
-    next:                 () => storyEngine.next(),
+    // Seed all agents dormant (weight=0), storing original weights for later restore.
+    dormantSeed() {
+        _preshowActive   = true;
+        _preshowLitCount = 0;
+        const count  = params.agentCount;
+        const data   = new Float32Array(count * 8);
+        const TAU    = Math.PI * 2;
+        const aspect = canvas.width / canvas.height;
+        const gridW  = Math.ceil(Math.sqrt(count * aspect));
+        const gridH  = Math.ceil(count / gridW);
+        const cellW  = canvas.width  / gridW;
+        const cellH  = canvas.height / gridH;
+        _preshowWeights = new Float32Array(count);
+        for (let i = 0; i < count; i++) {
+            const b = i * 8;
+            const a = Math.random() * TAU;
+            const s = 0.5 + Math.random() * 1.5;
+            data[b]     = Math.random() * canvas.width;
+            data[b + 1] = Math.random() * canvas.height;
+            data[b + 2] = Math.cos(a) * s;
+            data[b + 3] = Math.sin(a) * s;
+            data[b + 4] = (i % gridW + Math.random()) * cellW;
+            data[b + 5] = (Math.floor(i / gridW) + Math.random()) * cellH;
+            _preshowWeights[i] = Math.max(0.05, 1.0 + (Math.random() * 2 - 1) * params.weightSpread);
+            data[b + 6] = 0.0; // weight = 0 → invisible
+            data[b + 7] = 0.0;
+        }
+        device.queue.writeBuffer(agentBuf, 0, data);
+    },
+
+    // Activate the next `fraction` of dormant agents, spawning from canvas center.
+    activateChunk(fraction = 0.10) {
+        if (!_preshowActive || !_preshowWeights) return;
+        const total     = params.agentCount;
+        const start     = _preshowLitCount;
+        const end       = Math.min(start + Math.ceil(total * fraction), total);
+        if (start >= total) return;
+        const cx  = canvas.width  / 2;
+        const cy  = canvas.height / 2;
+        const TAU = Math.PI * 2;
+        const data = new Float32Array((end - start) * 8);
+        for (let i = 0; i < end - start; i++) {
+            const b = i * 8;
+            const angle = Math.random() * TAU;
+            const va    = Math.random() * TAU;
+            const vs    = 0.5 + Math.random() * 1.5;
+            data[b]     = cx + Math.cos(angle) * (Math.random() * 8);
+            data[b + 1] = cy + Math.sin(angle) * (Math.random() * 8);
+            data[b + 2] = Math.cos(va) * vs;
+            data[b + 3] = Math.sin(va) * vs;
+            data[b + 4] = cx;
+            data[b + 5] = cy;
+            data[b + 6] = _preshowWeights[start + i];
+            data[b + 7] = 0.0;
+        }
+        device.queue.writeBuffer(agentBuf, start * 32, data);
+        _preshowLitCount = end;
+    },
+
+    // Save current values of the given params and apply overrides immediately.
+    freezeParams(overrides) {
+        _preshowSavedParams = {};
+        for (const [key, val] of Object.entries(overrides)) {
+            _preshowSavedParams[key] = params[key];
+            params[key] = val;
+        }
+    },
+
+    // Restore params saved by freezeParams().
+    thawParams() {
+        if (!_preshowSavedParams) return;
+        for (const [key, val] of Object.entries(_preshowSavedParams)) params[key] = val;
+        _preshowSavedParams = null;
+    },
+
+    // Clear preshow state and do a full normal reseed.
+    reseed() {
+        _preshowActive   = false;
+        _preshowLitCount = 0;
+        _preshowWeights  = null;
+        seedAgents();
+    },
+
+    next: () => storyEngine.next(),
 };
 const storyEngine = new StoryEngine(STORY, simFacade);
 
@@ -2181,8 +2169,8 @@ function applySimParams(data) {
     if (status === 'NORMAL' || status === 'FREEROAM' || status === 'DOT') {
         setStatus(status);
     }
-    if (preshow === true)  enterPreshow();
-    if (preshow === false) exitPreshow();
+    if (preshow === true)  storyEngine.start();
+    if (preshow === false) simFacade.reseed();
     if (restart)              seedAgents();
     if (avoidMap === null)    clearAvoidMap();
     else if (typeof avoidMap === 'string') loadAvoidMap(avoidMap);
@@ -2254,7 +2242,7 @@ function applySimParams(data) {
     applyGUIVisibility, toggleGUI, updateGizmo,
 } = initGUI({
     params, socket, simState, MAX_AGENTS,
-    seedAgents, enterPreshow, exitPreshow, preshowActivateChunk,
+    seedAgents,
     seedGoL, setSize, rebuildOffscreen, rebuildGridTex, applyResize,
     renderTraceCanvas, generateQR, loadFontSpec,
     clearMagnetImage, clearTraceText, clearAvoidMap,

@@ -1,6 +1,6 @@
 // ─── Story Engine ────────────────────────────────────────────────────────────
-// Drives the story defined in story.js. Receives a sim facade so steps can
-// call sim functions without importing sim.js directly.
+// Drives the story defined in story.js. Each step receives a sim facade and
+// can react to sim events. Call start() to begin from step 0.
 
 export class StoryEngine {
     constructor(steps, sim) {
@@ -17,6 +17,7 @@ export class StoryEngine {
 
     _goto(i) {
         if (i < 0 || i >= this._steps.length) return;
+        this.current?.exit?.(this._sim);
         this._index = i;
         this.current?.enter?.(this._sim);
     }
