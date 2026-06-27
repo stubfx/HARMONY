@@ -7,7 +7,7 @@ import { PHASE, RESEED } from './constants.js';
 //   audio2.mp3    →  preshow           (PHASE 1 — parte alla prima connessione; 10s dopo → PHASE 2)
 //   audio3_2.mp3  →  nota              (PHASE 2 — parte 20s dopo la prima nota suonata)
 //   audio3.mp3    →  nota              (PHASE 2 — parte subito all'entrata)
-//   audio4.mp3    →  immagini-cuore    (PHASE 4 — "Il primo suono che hai sentito...")
+//   audio4.mp3    →  rosso             (PHASE 3 — date un colore alla nota)
 //   audio5.mp3    →  immagini-tempesta (PHASE 5 — "Il rombo prima del lampo...")
 //   audio6.mp3    →  testo             (PHASE 7 — una parola a testa)
 //   audio7.mp3    →  chiusura          (PHASE 8 — l'armonia non e' la stessa nota)
@@ -134,12 +134,12 @@ export const STORY = [
 
     // ── PHASE 3 — IL ROSSO ────────────────────────────────────────────────────
     // Narrator speaks; advances automatically when audio ends.
-    // File: simAss/narrator/audio3.mp3
+    // File: simAss/narrator/audio4.mp3
     {
         id: PHASE.ROSSO,
         enter(sim) {
-            log('PHASE 3 — rosso. audio3 in partenza.');
-            this._audio = sim.playNarratorAudio('audio3.mp3', { autoNext: true });
+            log('PHASE 3 — rosso. audio4 in partenza.');
+            this._audio = sim.playNarratorAudio('audio4.mp3', { autoNext: true });
         },
         exit(sim) {
             log('uscita PHASE 3.');
