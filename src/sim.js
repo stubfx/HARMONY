@@ -1301,7 +1301,6 @@ function renderTextAvoidMap() {
     const MAX_DIM = device.limits.maxTextureDimension2D;
     const w = Math.min(Math.max(1, Math.round(canvas.width  * params.traceScale)), MAX_DIM);
     const h = Math.min(Math.max(1, Math.round(canvas.height * params.traceScale)), MAX_DIM);
-    const minDim = Math.min(w, h);
     const fontStack = params.fontFamily ? `"${params.fontFamily}", sans-serif` : 'sans-serif';
 
     if (!_textAvoidCanvas) _textAvoidCanvas = document.createElement('canvas');
@@ -1316,10 +1315,13 @@ function renderTextAvoidMap() {
     const cx = params.imageX * w;
     const cy = params.imageY * h;
 
-    // Multi-line word-wrap (same layout as the old trace text layer)
-    const fontSize = Math.round(minDim * 0.10);
-    ctx.font = `bold ${fontSize}px ${fontStack}`;
-    const maxW  = w * 0.75;
+    // Layout is computed in full-canvas space, then scaled to the avoidmap canvas.
+    const scale   = w / canvas.width;
+    const maxW    = canvas.width * 0.75 * scale; // 75% of full screen, scaled to avoidmap px
+
+    // Pass 1: word-wrap at an initial font size to determine line breaks
+    const initFontSize = Math.round(Math.min(canvas.width, canvas.height) * 0.10 * scale);
+    ctx.font = `bold ${initFontSize}px ${fontStack}`;
     const words = text.split(/\s+/);
     const lines = [];
     let cur = '';
@@ -1329,9 +1331,27 @@ function renderTextAvoidMap() {
         else cur = test;
     }
     if (cur) lines.push(cur);
+
+    // Pass 2: fit font so the longest line fills exactly maxW
+    const longestMeasured = Math.max(...lines.map(l => ctx.measureText(l).width));
+    const fontSize = longestMeasured > 0
+        ? Math.floor(initFontSize * maxW / longestMeasured)
+        : initFontSize;
+    ctx.font = `bold ${fontSize}px ${fontStack}`;
+
+    // Pass 3: re-wrap at fitted font size (longer font → fewer words per line)
+    const lines2 = [];
+    let cur2 = '';
+    for (const word of words) {
+        const test = cur2 ? `${cur2} ${word}` : word;
+        if (ctx.measureText(test).width > maxW && cur2) { lines2.push(cur2); cur2 = word; }
+        else cur2 = test;
+    }
+    if (cur2) lines2.push(cur2);
+
     const lineH  = Math.round(fontSize * 1.35);
-    const startY = cy - ((lines.length - 1) * lineH) / 2;
-    lines.forEach((ln, i) => ctx.fillText(ln, cx, startY + i * lineH));
+    const startY = cy - ((lines2.length - 1) * lineH) / 2;
+    lines2.forEach((ln, i) => ctx.fillText(ln, cx, startY + i * lineH));
 
     // Upload to avoidMapTex
     clearAvoidGif();
