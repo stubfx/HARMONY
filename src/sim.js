@@ -897,7 +897,13 @@ function applyResize() {
     renderTraceCanvas();
     rebuildAgentShadowBG();
     rebuildAgentShadowDensityBG();
-    seedAgents();
+    if (_preshowActive) {
+        const prevLit = _preshowLitCount;
+        simFacade.dormantSeed();
+        if (prevLit > 0) simFacade.activateChunk(prevLit / params.agentCount);
+    } else {
+        seedAgents();
+    }
 }
 window.addEventListener('resize', applyResize);
 
