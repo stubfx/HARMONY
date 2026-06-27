@@ -683,13 +683,14 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
 
     // Random global teleport: any agent has a per-frame chance to jump to a random position.
-    // Velocity and homing state are preserved — matches the joystick spawner behaviour.
+    // Agent appears at weight=0 and fades in via spawnFadeRate to avoid a visible flash.
     if (params.randomTeleportChance > 0.0) {
         let tRng = hash(i ^ (u32(params.time * 1013.0) + 29u));
         if (tRng < params.randomTeleportChance) {
             let rx = hash(i ^ (u32(params.time * 997.0)  + 3u));
             let ry = hash(i ^ (u32(params.time * 971.0)  + 11u));
-            np = vec2f(rx * params.canvasW, ry * params.canvasH);
+            np     = vec2f(rx * params.canvasW, ry * params.canvasH);
+            weight = 0.0;
         }
     }
 
