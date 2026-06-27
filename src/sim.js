@@ -89,7 +89,7 @@ const params = {
     contamPush:    false, // push free agents outward from the eraser circle
     contamRadius:  150,   // radius of each contamination circle, in canvas pixels
     // Agent shadow
-    agentShadowStr:    0.20, // peak opacity of each homing-agent shadow splat (0–1)
+    agentShadowStr:    0.10, // peak opacity of each homing-agent shadow splat (0–1)
     agentShadowRadius: 10,   // splat half-radius in canvas pixels
     // Champions — every Nth agent (agentId % champions == 0) drops a constant shadow
     // splat under itself even when free. 1 = every agent, 2 = one in two…
