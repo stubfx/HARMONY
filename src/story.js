@@ -1,3 +1,16 @@
+// ─── Narrator Audio Map ──────────────────────────────────────────────────────
+// All files live in simAss/narrator/. Replace any file to swap the narration.
+//
+//   audio1.mp3  →  preshow         (FASE 2 — connessione, suona a fine fase)
+//   audio2.mp3  →  nota            (FASE 3 — trovate la vostra nota)
+//   audio3.mp3  →  rosso           (FASE 4 — date un colore alla nota)
+//   audio4.mp3  →  immagini-cuore  (FASE 5a — "Il primo suono che hai sentito…")
+//   audio5.mp3  →  immagini-tempesta (FASE 5b — "Il rombo prima del lampo…")
+//   audio6.mp3  →  testo           (FASE 6 — una parola a testa)
+//   audio7.mp3  →  chiusura        (FASE 7 — l'armonia non è la stessa nota)
+//
+// immagini-bigbang non ha audio (note di regia: "non si commenta").
+
 // ─── Story Steps ────────────────────────────────────────────────────────────
 // Each object is one step. Order matters — the engine runs them in sequence.
 //
@@ -16,6 +29,7 @@
 //   sim.setParam(key, val)         — override a single param
 //   sim.suppressImages()           — block loadAvoidMap (images from admin)
 //   sim.restoreImages()            — re-enable loadAvoidMap
+//   sim.playNarratorAudio(file)    — play simAss/narrator/<file>; auto-next on ended
 
 export const STORY = [
 
@@ -43,12 +57,17 @@ export const STORY = [
     },
 
     // ── FASE 3 — LA NOTA ─────────────────────────────────────────────────────
-    // Users explore the touch surface and find their note.
-    // Advance manually via sim.next() when ready to move on.
+    // Narrator speaks; advances automatically when audio ends.
+    // File: simAss/narrator/audio2.mp3
     {
         id: 'nota',
-        enter(sim) {},
-        exit(sim)  {},
+        enter(sim) {
+            this._audio = sim.playNarratorAudio('audio2.mp3');
+        },
+        exit(sim) {
+            this._audio?.pause();
+            this._audio = null;
+        },
     },
 
     // ── FASE 4 — IL ROSSO ────────────────────────────────────────────────────

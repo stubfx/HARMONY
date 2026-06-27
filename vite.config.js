@@ -34,8 +34,9 @@ export default defineConfig({
             '/rndImage':   'http://localhost:3000',
             '/admin-auth': 'http://localhost:3000',
             '/simAss-image':  'http://localhost:3000',
-            '/simAss-audio':  'http://localhost:3000',
-            '/simAss-config': 'http://localhost:3000',
+            '/simAss-audio':    'http://localhost:3000',
+            '/simAss-narrator': 'http://localhost:3000',
+            '/simAss-config':   'http://localhost:3000',
         },
     },
 });

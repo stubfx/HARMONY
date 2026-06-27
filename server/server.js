@@ -522,6 +522,22 @@ app.get('/simAss-audio', async (_req, res) => {
     }
 });
 
+// ── Narrator audio — serves a specific file by name from simAss/narrator/ ────
+app.get('/simAss-narrator/:filename', async (req, res) => {
+    const filename = path.basename(req.params.filename); // prevent path traversal
+    const file     = path.join(_SIM_ASS_DIR, 'narrator', filename);
+    try {
+        const buf  = await readFile(file);
+        const ext  = path.extname(filename).toLowerCase();
+        const mime = ext === '.mp3' ? 'audio/mpeg' : ext === '.ogg' ? 'audio/ogg' : 'audio/wav';
+        console.log(`[simAss-narrator] serving ${filename}`);
+        res.type(mime).send(buf);
+    } catch (e) {
+        console.warn(`[simAss-narrator] not found: ${filename}`);
+        res.status(404).json({ error: `not found: ${filename}` });
+    }
+});
+
 // ── Page fallbacks ────────────────────────────────────────────────────────────
 function sendPage(distFile, req, res) {
     if (isDev) return res.redirect(`http://localhost:${VITE_PORT}${req.originalUrl}`);

@@ -547,6 +547,16 @@ const simFacade = {
 
     suppressImages()  { _avoidMapSuppressed = true;  },
     restoreImages()   { _avoidMapSuppressed = false; },
+
+    // Play a narrator audio file from simAss/narrator/ and advance to the
+    // next story step only when playback ends. Returns the Audio element so
+    // the caller can stop it early if needed (e.g. on exit).
+    playNarratorAudio(filename) {
+        const audio = new Audio(`/simAss-narrator/${filename}`);
+        audio.addEventListener('ended', () => storyEngine.next(), { once: true });
+        audio.play().catch(e => console.warn('[narrator]', e));
+        return audio;
+    },
 };
 const storyEngine = new StoryEngine(STORY, simFacade);
 
