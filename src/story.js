@@ -5,7 +5,7 @@ import { PHASE, RESEED } from './constants.js';
 //
 //   audio1.mp3    →  preshow           (PHASE 1 — parte subito; si ferma alla prima connessione)
 //   audio2.mp3    →  preshow           (PHASE 1 — parte alla prima connessione; 10s dopo → PHASE 2)
-//   audio3_1.mp3  →  nota              (PHASE 2 — parte 20s dopo la prima nota suonata)
+//   audio3_2.mp3  →  nota              (PHASE 2 — parte 20s dopo la prima nota suonata)
 //   audio3.mp3    →  nota              (PHASE 2 — parte subito all'entrata)
 //   audio4.mp3    →  immagini-cuore    (PHASE 4 — "Il primo suono che hai sentito...")
 //   audio5.mp3    →  immagini-tempesta (PHASE 5 — "Il rombo prima del lampo...")
@@ -96,7 +96,7 @@ export const STORY = [
 
     // ── PHASE 2 — LA NOTA ─────────────────────────────────────────────────────
     // audio3 parte subito all'entrata. wind disabilitato fino alla prima nota.
-    // Prima nota → wind on → timer 20s → audio3_1 → timer 10s → sim.next().
+    // Prima nota → wind on → timer 20s → audio3_2 → timer 10s → sim.next().
     // Il timer da 20s parte una sola volta.
     {
         id: PHASE.NOTA,
@@ -113,10 +113,10 @@ export const STORY = [
             sim.setParam('windEnabled', true);
             log('prima nota ricevuta (index ' + noteIndex + '). wind abilitato. timer 20s avviato.');
             setTimeout(() => {
-                log('20s scaduti — audio3_1 in partenza.');
-                this._audio = sim.playNarratorAudio('audio3_1.mp3');
+                log('20s scaduti — audio3_2 in partenza.');
+                this._audio = sim.playNarratorAudio('audio3_2.mp3');
                 this._audio.addEventListener('ended', () => {
-                    log('audio3_1 terminato. attesa 10s prima di avanzare a PHASE 3.');
+                    log('audio3_2 terminato. attesa 10s prima di avanzare a PHASE 3.');
                     setTimeout(() => {
                         log('10s scaduti — avanzamento a PHASE 3.');
                         sim.next();
