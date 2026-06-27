@@ -46,6 +46,7 @@ const params = {
     // Visual
     renderScale:    1.0,    // multiplied with DPR — reduce on high-res screens
     trailDecay:     0.04,
+    trailEnabled:   true,  // false = no trail; buffer cleared each frame
     bgBlackCutoff:  0.05, // luminance below which trail pixels are clamped to 0 at display time
     pointSize:      1.3,
     color1:      '#ffffff',   // first palette colour
@@ -2742,7 +2743,7 @@ function writeRenderUB() {
 
 
 function writeFadeUB() {
-    _fadeF[0] = params.trailDecay;
+    _fadeF[0] = params.trailEnabled ? params.trailDecay : 1.0;
     device.queue.writeBuffer(fadeUB, 0, _fadeAB);
 }
 
