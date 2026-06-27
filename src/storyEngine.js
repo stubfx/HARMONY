@@ -25,4 +25,8 @@ export class StoryEngine {
     onSpectatorJoined(userCount) {
         this.current?.onSpectatorJoined?.(this._sim, userCount);
     }
+
+    onNote(noteIndex) {
+        this.current?.onNote?.(this._sim, noteIndex);
+    }
 }

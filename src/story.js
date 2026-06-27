@@ -3,15 +3,22 @@ import { PHASE, RESEED } from './constants.js';
 // ─── Narrator Audio Map ──────────────────────────────────────────────────────
 // All files live in simAss/narrator/. Replace any file to swap the narration.
 //
-//   audio1.mp3  →  preshow         (FASE 2 — connessione, suona a fine fase)
-//   audio2.mp3  →  nota            (FASE 3 — trovate la vostra nota)
-//   audio3.mp3  →  rosso           (FASE 4 — date un colore alla nota)
-//   audio4.mp3  →  immagini-cuore  (FASE 5a — "Il primo suono che hai sentito…")
-//   audio5.mp3  →  immagini-tempesta (FASE 5b — "Il rombo prima del lampo…")
-//   audio6.mp3  →  testo           (FASE 6 — una parola a testa)
-//   audio7.mp3  →  chiusura        (FASE 7 — l'armonia non è la stessa nota)
+//   audio1.mp3    →  preshow           (FASE 2 — connessione, suona a fine fase)
+//   audio2.mp3    →  nota              (FASE 3 — parte subito all'entrata dello step)
+//   audio3_1.mp3  →  nota              (FASE 3 — parte 20s dopo la prima nota suonata)
+//   audio3.mp3    →  rosso             (FASE 4 — date un colore alla nota)
+//   audio4.mp3    →  immagini-cuore    (FASE 5a — "Il primo suono che hai sentito...")
+//   audio5.mp3    →  immagini-tempesta (FASE 5b — "Il rombo prima del lampo...")
+//   audio6.mp3    →  testo             (FASE 6 — una parola a testa)
+//   audio7.mp3    →  chiusura          (FASE 7 — l'armonia non e' la stessa nota)
 //
 // immagini-bigbang non ha audio (note di regia: "non si commenta").
+
+// ─── Nota sui parametri hardcodati ───────────────────────────────────────────
+// Tutti i timer, le soglie e i nomi dei file sono volutamente hardcodati in
+// questo file. E' intenzionale: ogni fase ha tempi precisi scelti in fase di
+// regia, e avere tutto qui rende facile modificare qualsiasi dettaglio senza
+// cercare tra i parametri del sim.
 
 // ─── Story Steps ────────────────────────────────────────────────────────────
 // Each object is one step. Order matters — the engine runs them in sequence.
@@ -20,6 +27,7 @@ import { PHASE, RESEED } from './constants.js';
 //   enter(sim)                — called when the step becomes active
 //   exit(sim)                 — called before moving to the next step
 //   onSpectatorJoined(sim, n) — called each time a spectator connects
+//   onNote(sim, noteIndex)    — called each time any spectator plays a note
 //
 // sim primitives:
 //   sim.dormantSeed()              — seed all agents invisible (weight=0)
@@ -74,12 +82,26 @@ export const STORY = [
     },
 
     // ── FASE 3 — LA NOTA ─────────────────────────────────────────────────────
-    // Narrator speaks; advances automatically when audio ends.
-    // File: simAss/narrator/audio2.mp3
+    // audio2 parte subito all'entrata.
+    // Al primo onNote → timer 20s → audio3_1 → timer 10s → sim.next().
+    // Il timer da 20s parte una sola volta (prima nota ricevuta).
     {
         id: PHASE.NOTA,
+        _noteTimerStarted: false,
         enter(sim) {
-            this._audio = sim.playNarratorAudio('audio2.mp3', { autoNext: true });
+            this._noteTimerStarted = false;
+            this._audio = sim.playNarratorAudio('audio2.mp3');
+        },
+        onNote(sim) {
+            if (this._noteTimerStarted) return;
+            this._noteTimerStarted = true;
+            setTimeout(() => {
+                this._audio?.pause();
+                this._audio = sim.playNarratorAudio('audio3_1.mp3');
+                this._audio.addEventListener('ended', () => {
+                    setTimeout(() => sim.next(), 10_000);
+                }, { once: true });
+            }, 20_000);
         },
         exit(sim) {
             this._audio?.pause();

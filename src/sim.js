@@ -2136,6 +2136,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
             if (event.type === 'note' && typeof event.data?.index === 'number') {
                 _activeNotesBySpectator.set(event.spectatorId, event.data.index);
                 _recalcNoteFormulas();
+                storyEngine.onNote(event.data.index);
             }
         }
         if (event.type === 'note-off') {
