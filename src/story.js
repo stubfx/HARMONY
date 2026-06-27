@@ -39,6 +39,8 @@ import { PHASE, RESEED } from './constants.js';
 //   sim.setParam(key, val)         — override a single param
 //   sim.suppressImages()           — block loadAvoidMap (images from admin)
 //   sim.restoreImages()            — re-enable loadAvoidMap
+//   sim.enableHarmonyImages()      — allow harmony to show its avoidmap image (off by default)
+//   sim.disableHarmonyImages()     — hide harmony image; blocks future ones until re-enabled
 //   sim.playNarratorAudio(file)    — play simAss/narrator/<file>; auto-next on ended
 //   sim.setTraceText(text)         — set the trace text input and re-render the avoidmap
 
@@ -142,11 +144,13 @@ export const STORY = [
         id: PHASE.ROSSO,
         enter(sim) {
             sim.freezeParams({ color1: '#ff0000', color2: '#ff0000' });
-            log('PHASE 3 — rosso. colori impostati a rosso. audio4 in partenza.');
+            sim.enableHarmonyImages();
+            log('PHASE 3 — rosso. colori impostati a rosso. immagini harmony abilitate. audio4 in partenza.');
             this._audio = sim.playNarratorAudio('audio4.mp3', { autoNext: true });
         },
         exit(sim) {
             log('uscita PHASE 3.');
+            sim.disableHarmonyImages();
             sim.thawParams();
             this._audio?.pause();
             this._audio = null;

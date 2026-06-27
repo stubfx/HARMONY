@@ -568,6 +568,15 @@ const simFacade = {
     suppressImages()  { _avoidMapSuppressed = true;  },
     restoreImages()   { _avoidMapSuppressed = false; },
 
+    enableHarmonyImages()  {
+        _harmonyImagesEnabled = true;
+        if (_harmonyActive) _loadCurrentHarmonyImage();
+    },
+    disableHarmonyImages() {
+        _harmonyImagesEnabled = false;
+        if (_harmonyActive) clearAvoidMap();
+    },
+
     setTraceText(text) {
         const input = document.querySelector('#trace-text-input');
         if (input) { input.value = text; renderTextAvoidMap(); }
@@ -1743,10 +1752,11 @@ const _HEAT_DECAY_RATE = 0.5;         // decade del 50% al secondo → freddo in
 // The cache key is the raw note sum — each unique note combination gets its own
 // persistent avoidMap image. Images are stored in IndexedDB (binary, no size limit)
 // and fetched on demand; no speculative prefetch.
-let _harmonyActive     = false;
-let _currentHarmonyKey = -1;        // active sum value, -1 = no harmony
-const _harmonyFetching = new Set(); // sums currently being fetched
-let _harmonySnapshot   = null;      // params+formulas snapshot taken just before a config is applied
+let _harmonyActive        = false;
+let _harmonyImagesEnabled = false;  // when false, harmony images are suppressed (enabled per-phase)
+let _currentHarmonyKey    = -1;     // active sum value, -1 = no harmony
+const _harmonyFetching    = new Set(); // sums currently being fetched
+let _harmonySnapshot      = null;   // params+formulas snapshot taken just before a config is applied
 let _preConnectionFormulas = null;  // { dir, wind } saved when the first spectator connects
 let _chladniSum = 0;                // current harmony sum driving Chladni mode params
 
@@ -1838,7 +1848,7 @@ async function _enterHarmony(sum) {
             _harmonyFetching.delete(sum);
         }
     }
-    if (_currentHarmonyKey === sum) { // guard: sum may have changed while awaiting
+    if (_harmonyImagesEnabled && _currentHarmonyKey === sum) { // guard: sum or flag may have changed while awaiting
         await loadAvoidMap(new Blob([bytes], { type: 'image/webp' }));
     }
 
@@ -1888,6 +1898,20 @@ function _exitHarmony() {
         if (wi) wi.value = s.wind;
         gui?.controllersRecursive().forEach(c => c.updateDisplay());
     }
+}
+
+// Load (or reload) the image for the currently-active harmony sum.
+// Called when _harmonyImagesEnabled flips to true while harmony is already active.
+async function _loadCurrentHarmonyImage() {
+    const sum = _currentHarmonyKey;
+    if (sum < 0) return;
+    let bytes = await _harmonyDbRead(sum);
+    if (!bytes) {
+        try { bytes = await _fetchIdleImageBytes(); }
+        catch (e) { console.warn('[harmony] image reload failed:', e.message); return; }
+    }
+    if (_harmonyActive && _harmonyImagesEnabled && _currentHarmonyKey === sum)
+        await loadAvoidMap(new Blob([bytes], { type: 'image/webp' }));
 }
 
 function _recalcNoteFormulas() {
