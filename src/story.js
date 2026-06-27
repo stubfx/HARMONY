@@ -50,25 +50,34 @@ export const STORY = [
 
     // ── PHASE 1 — CONNESSIONE ─────────────────────────────────────────────────
     // audio1 parte subito all'entrata.
-    // Prima connessione → se audio1 è già finito, audio2 parte subito;
-    //                     altrimenti audio2 parte alla fine di audio1.
+    // Durante audio1 i join degli spettatori vengono ignorati graficamente (accodati).
+    // audio1 finisce → se ci sono utenti accodati, attiva i loro chunk e avvia audio2;
+    //                  altrimenti aspetta il primo utente normalmente.
     // audio2 finisce → 10s → sim.next().
-    // dotRespawnChance abilitato 10s dopo la prima connessione.
+    // dotRespawnChance abilitato 10s dopo il primo join effettivo (al termine di audio1).
     {
         id: PHASE.PRESHOW,
         enter(sim) {
             this._audio2Started = false;
-            this._audio1Ended = false;
-            this._firstUserConnected = false;
+            this._audio1Playing = true;
+            this._pendingJoins = 0;
             log('PHASE 1 — connessione. audio1 in partenza.');
             sim.freezeParams({ spectatorSpawnChance: 0, randomTeleportChance: 0, dotRespawnChance: 0, spawnFadeRate: 0 });
             sim.suppressImages();
             sim.dormantSeed();
             this._audio = sim.playNarratorAudio('audio1.mp3');
             this._audio.addEventListener('ended', () => {
-                this._audio1Ended = true;
+                this._audio1Playing = false;
                 log('audio1 terminato.');
-                if (this._firstUserConnected) this._startAudio2(sim);
+                if (this._pendingJoins > 0) {
+                    log(this._pendingJoins + ' utenti in attesa — attivazione chunk e avvio audio2.');
+                    for (let i = 0; i < this._pendingJoins; i++) sim.activateChunk(1);
+                    setTimeout(() => {
+                        log('dotRespawnChance abilitato (0.002).');
+                        sim.setParam('dotRespawnChance', 0.002);
+                    }, 10_000);
+                    this._startAudio2(sim);
+                }
             }, { once: true });
         },
         _startAudio2(sim) {
@@ -86,16 +95,19 @@ export const STORY = [
         },
         onSpectatorJoined(sim, userCount) {
             log('utente connesso — totale: ' + userCount);
+            if (this._audio1Playing) {
+                this._pendingJoins++;
+                log('audio1 in corso — join ignorato graficamente (pending: ' + this._pendingJoins + ').');
+                return;
+            }
             sim.activateChunk(1);
             if (userCount === 1) {
-                this._firstUserConnected = true;
                 log('primo utente: dotRespawnChance attivo tra 10s.');
                 setTimeout(() => {
                     log('dotRespawnChance abilitato (0.002).');
                     sim.setParam('dotRespawnChance', 0.002);
                 }, 10_000);
-                if (this._audio1Ended) this._startAudio2(sim);
-                // se audio1 è ancora in corso, _startAudio2 viene chiamato dal listener 'ended'
+                this._startAudio2(sim);
             }
         },
         exit(sim) {
