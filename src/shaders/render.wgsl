@@ -283,7 +283,7 @@ fn avoidMapColorAt(canvasPx: vec2<f32>) -> vec4<f32> {
     let rawT       = 1.0 - clamp(distToHome / max(params.homingProximityRange, 1.0), 0.0, 1.0);
     let proximityT = mix(params.homingMinAlpha, 1.0, rawT);
 
-    return VsOut(vec4<f32>(finalNdc, 0.0, 1.0), color, agent.pos, 0.0, homeUV, agent.primed, proximityT);
+    return VsOut(vec4<f32>(finalNdc, 0.0, 1.0), color, agent.pos, agent.weight, homeUV, agent.primed, proximityT);
 }
 
 @fragment fn fs(in: VsOut) -> @location(0) vec4<f32> {
@@ -320,10 +320,10 @@ fn avoidMapColorAt(canvasPx: vec2<f32>) -> vec4<f32> {
         // max comparison sees distance-scaled colours instead of raw image values.
         // blendAmount scales the contribution in both modes: alpha for additive
         // (less accumulation), rgb for max (dimmer source in the per-channel max).
-        let b = params.blendAmount;
+        let b = params.blendAmount * in.bright;
         if (params.additiveBlend == 0u) { return vec4<f32>(imgSample.rgb * a * b, a * b); }
         return vec4<f32>(imgSample.rgb * b, a * b);
     }
-    let b = params.blendAmount;
+    let b = params.blendAmount * in.bright;
     return vec4<f32>(in.color * b, params.brightness * b);
 }
