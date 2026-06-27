@@ -1,3 +1,5 @@
+import { PHASE, RESEED } from './constants.js';
+
 // ─── Narrator Audio Map ──────────────────────────────────────────────────────
 // All files live in simAss/narrator/. Replace any file to swap the narration.
 //
@@ -24,7 +26,7 @@
 //   sim.activateChunk(fraction)    — light up next N% of agents from center
 //   sim.freezeParams(overrides)    — save + override named params
 //   sim.thawParams()               — restore params saved by freezeParams
-//   sim.reseed()                   — full normal reseed, exits dormant mode
+//   sim.reseed({ mode })             — full reseed; mode: RESEED.FADE_FROM_EDGES → perimeter spawn at weight=0
 //   sim.next()                     — advance to the next step
 //   sim.setParam(key, val)         — override a single param
 //   sim.suppressImages()           — block loadAvoidMap (images from admin)
@@ -40,7 +42,7 @@ export const STORY = [
     // Step advances when audio1 ends AND at least 1 user is connected.
     // If audio ends before anyone connects, it waits for the first join.
     {
-        id: 'preshow',
+        id: PHASE.PRESHOW,
         _MIN_USERS: 1,
         enter(sim) {
             this._userCount  = 0;
@@ -67,7 +69,7 @@ export const STORY = [
             this._audio = null;
             sim.restoreImages();
             sim.thawParams();
-            sim.reseed();
+            sim.reseed({ mode: RESEED.FADE_FROM_EDGES });
         },
     },
 
@@ -75,7 +77,7 @@ export const STORY = [
     // Narrator speaks; advances automatically when audio ends.
     // File: simAss/narrator/audio2.mp3
     {
-        id: 'nota',
+        id: PHASE.NOTA,
         enter(sim) {
             this._audio = sim.playNarratorAudio('audio2.mp3', { autoNext: true });
         },
@@ -89,7 +91,7 @@ export const STORY = [
     // Narrator speaks; advances automatically when audio ends.
     // File: simAss/narrator/audio3.mp3
     {
-        id: 'rosso',
+        id: PHASE.ROSSO,
         enter(sim) {
             this._audio = sim.playNarratorAudio('audio3.mp3', { autoNext: true });
         },
@@ -104,7 +106,7 @@ export const STORY = [
     // Narrator speaks after silence; advances when audio ends.
     // File: simAss/narrator/audio4.mp3
     {
-        id: 'immagini-cuore',
+        id: PHASE.IMMAGINI_CUORE,
         enter(sim) {
             // TODO: load cuore image into avoidmap
             this._audio = sim.playNarratorAudio('audio4.mp3', { autoNext: true });
@@ -120,7 +122,7 @@ export const STORY = [
     // Narrator speaks; advances when audio ends.
     // File: simAss/narrator/audio5.mp3
     {
-        id: 'immagini-tempesta',
+        id: PHASE.IMMAGINI_TEMPESTA,
         enter(sim) {
             // TODO: load tempesta image into avoidmap
             this._audio = sim.playNarratorAudio('audio5.mp3', { autoNext: true });
@@ -136,7 +138,7 @@ export const STORY = [
     // No narration (script note: "non si commenta").
     // Shown for 5 seconds, then cuts to black and auto-advances.
     {
-        id: 'immagini-bigbang',
+        id: PHASE.IMMAGINI_BIGBANG,
         enter(sim) {
             // TODO: load bigbang image into avoidmap
             this._timer = setTimeout(() => sim.next(), 5_000);
@@ -151,7 +153,7 @@ export const STORY = [
     // Narrator speaks; advances automatically when audio ends.
     // File: simAss/narrator/audio6.mp3
     {
-        id: 'testo',
+        id: PHASE.TESTO,
         enter(sim) {
             this._audio = sim.playNarratorAudio('audio6.mp3', { autoNext: true });
         },
@@ -165,7 +167,7 @@ export const STORY = [
     // Narrator speaks. Last step — no next().
     // File: simAss/narrator/audio7.mp3
     {
-        id: 'chiusura',
+        id: PHASE.CHIUSURA,
         enter(sim) {
             this._audio = sim.playNarratorAudio('audio7.mp3');
         },

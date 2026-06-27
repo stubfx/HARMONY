@@ -23,6 +23,7 @@ import golStepWGSL      from './shaders/gol-step.wgsl?raw';
 import { startSynth, setSynthState, playIdleTrack, stopIdleTrack, fadeOutIdleTrack, setIdleChaos, addArpInfluence } from './synth.js';
 import { StoryEngine } from './storyEngine.js';
 import { STORY }       from './story.js';
+import { RESEED }      from './constants.js';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const MAX_AGENTS = 5_000_000;
@@ -419,7 +420,8 @@ const spectatorSlotsBuf = device.createBuffer({
     size: 640, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 
-function seedAgents() {
+function seedAgents({ mode = RESEED.NORMAL } = {}) {
+    const fadeInPhase2 = mode === RESEED.FADE_FROM_EDGES;
     const count = params.agentCount;
     const data  = new Float32Array(count * 8);   // 8 floats × 4 bytes = 32 bytes/agent
     const TAU   = Math.PI * 2;
@@ -432,24 +434,37 @@ function seedAgents() {
     const cellW  = canvas.width  / gridW;
     const cellH  = canvas.height / gridH;
 
+    const perim = 2 * (canvas.width + canvas.height);
+
     for (let i = 0; i < count; i++) {
         const b  = i * 8;
-        const sx = Math.random() * canvas.width;
-        const sy = Math.random() * canvas.height;
-        const a  = Math.random() * TAU;              // fully random direction
+        const a  = Math.random() * TAU;
         const s  = 0.5 + Math.random() * 1.5;
-        data[b]     = sx;                             // pos.x
-        data[b + 1] = sy;                             // pos.y
+
+        // fadeInPhase2: place on canvas perimeter at weight=0 so spawnFadeRate fades them in.
+        // Normal: random interior position at full weight.
+        let sx, sy;
+        if (fadeInPhase2) {
+            const t = Math.random() * perim;
+            if      (t < canvas.width)                          { sx = t;                              sy = 0; }
+            else if (t < canvas.width + canvas.height)          { sx = canvas.width;                   sy = t - canvas.width; }
+            else if (t < 2 * canvas.width + canvas.height)      { sx = t - canvas.width - canvas.height; sy = canvas.height; }
+            else                                                 { sx = 0;                              sy = t - 2 * canvas.width - canvas.height; }
+        } else {
+            sx = Math.random() * canvas.width;
+            sy = Math.random() * canvas.height;
+        }
+
+        data[b]     = sx;
+        data[b + 1] = sy;
         data[b + 2] = Math.cos(a) * s;               // vel.x
         data[b + 3] = Math.sin(a) * s;               // vel.y
         // Home: jittered within this agent's assigned grid cell.
-        // Keeps uniform coverage but breaks the visible grid alignment when agents home.
         const col  = i % gridW;
         const row  = Math.floor(i / gridW);
-        data[b + 4] = (col + Math.random()) * cellW; // home.x
-        data[b + 5] = (row + Math.random()) * cellH; // home.y
-        // Weight
-        data[b + 6] = Math.max(0.05, 1.0 + (Math.random() * 2 - 1) * params.weightSpread);
+        data[b + 4] = (col + Math.random()) * cellW;
+        data[b + 5] = (row + Math.random()) * cellH;
+        data[b + 6] = fadeInPhase2 ? 0.0 : Math.max(0.05, 1.0 + (Math.random() * 2 - 1) * params.weightSpread);
         data[b + 7] = 0;                             // primed — compute writes this each frame
     }
     device.queue.writeBuffer(agentBuf, 0, data);
@@ -535,12 +550,14 @@ const simFacade = {
         _preshowSavedParams = null;
     },
 
-    // Clear preshow state and do a full normal reseed.
-    reseed() {
+    // Clear preshow state and do a full reseed.
+    // Pass { mode: RESEED.FADE_FROM_EDGES } to place all agents on the canvas perimeter
+    // at weight=0 so spawnFadeRate fades them in gradually instead of a snap to full.
+    reseed({ mode = RESEED.NORMAL } = {}) {
         _preshowActive   = false;
         _preshowLitCount = 0;
         _preshowWeights  = null;
-        seedAgents();
+        seedAgents({ mode });
     },
 
     next: () => storyEngine.next(),
