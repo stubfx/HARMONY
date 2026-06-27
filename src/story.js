@@ -40,6 +40,7 @@ import { PHASE, RESEED } from './constants.js';
 //   sim.suppressImages()           — block loadAvoidMap (images from admin)
 //   sim.restoreImages()            — re-enable loadAvoidMap
 //   sim.playNarratorAudio(file)    — play simAss/narrator/<file>; auto-next on ended
+//   sim.setTraceText(text)         — set the trace text input and re-render the avoidmap
 
 const log = (msg) => console.log(`[story] ${msg}`);
 
@@ -104,7 +105,8 @@ export const STORY = [
         enter(sim) {
             this._noteTimerStarted = false;
             sim.freezeParams({ windEnabled: false });
-            log('PHASE 2 — nota. wind disabilitato. audio3 in partenza.');
+            sim.setTraceText('HARMONY');
+            log('PHASE 2 — nota. wind disabilitato. testo HARMONY impostato. audio3 in partenza.');
             this._audio = sim.playNarratorAudio('audio3.mp3');
         },
         onNote(sim, noteIndex) {

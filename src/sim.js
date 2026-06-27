@@ -568,6 +568,11 @@ const simFacade = {
     suppressImages()  { _avoidMapSuppressed = true;  },
     restoreImages()   { _avoidMapSuppressed = false; },
 
+    setTraceText(text) {
+        const input = document.querySelector('#trace-text-input');
+        if (input) { input.value = text; renderTextAvoidMap(); }
+    },
+
     // Play a narrator audio file from simAss/narrator/.
     // Pass { autoNext: true } to advance to the next step when playback ends.
     // Returns the Audio element so the caller can pause it on exit if needed.
@@ -2495,10 +2500,8 @@ if (fontInput) {
     fontInput.addEventListener('change', applyFontInput);
     fontInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyFontInput(); });
 }
-// Set default text and render it as the avoidmap before font loads,
-// then again once the font is ready (loadFontSpec calls renderTextAvoidMap).
+// No default text on boot — story sets it at the appropriate phase.
 const _defaultTextInput = document.querySelector('#trace-text-input');
-if (_defaultTextInput) _defaultTextInput.value = 'HARMONY';
 renderTextAvoidMap();
 loadFontSpec(params.fontFamily); // load the default Google Font on boot
 
