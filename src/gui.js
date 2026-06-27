@@ -94,6 +94,7 @@ export function initGUI({
     const fVis = gui.addFolder('Visual');
     fVis.add(params, 'renderScale', 0.1, 1.0, 0.05).name('render scale').onChange(applyResize);
     fVis.add(params, 'traceScale', 0.1, 1.0, 0.05).name('trace res').onChange(renderTraceCanvas);
+    fVis.add(params, 'trailEnabled').name('trail on');
     fVis.add(params, 'trailDecay',    0.005, 0.4,  0.005).name('trail decay');
     fVis.add(params, 'bgBlackCutoff', 0,     0.05, 0.001).name('black cutoff');
     fVis.add(params, 'toneBlack',     0,     0.5,  0.005).name('tone black');
