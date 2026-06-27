@@ -19,6 +19,7 @@ export const STORY = [
         id: 'preshow',
         enter(sim) {
             sim.freezeParams({ spectatorSpawnChance: 0, randomTeleportChance: 0, dotRespawnChance: 0 });
+            sim.suppressImages();
             sim.dormantSeed();
         },
         onSpectatorJoined(sim, userCount) {
@@ -28,6 +29,7 @@ export const STORY = [
             }
         },
         exit(sim) {
+            sim.restoreImages();
             sim.thawParams();
             sim.reseed();
         },

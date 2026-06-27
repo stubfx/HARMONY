@@ -75,7 +75,7 @@ function hslToHex(h, s, l) {
 
 function updateAura() {
     if (!auraEl) return;
-    auraEl.style.background = `radial-gradient(circle at 50% 50%, ${pushedColor} 0%, #000 65%)`;
+    auraEl.style.background = pushedColor;
 }
 updateAura();
 

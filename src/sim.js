@@ -544,6 +544,9 @@ const simFacade = {
     next: () => storyEngine.next(),
 
     setParam(key, val) { params[key] = val; },
+
+    suppressImages()  { _avoidMapSuppressed = true;  },
+    restoreImages()   { _avoidMapSuppressed = false; },
 };
 const storyEngine = new StoryEngine(STORY, simFacade);
 
@@ -1610,6 +1613,7 @@ let _preshowActive      = false;
 let _preshowLitCount    = 0;
 let _preshowWeights     = null; // Float32Array(agentCount) of original weights
 let _preshowSavedParams = null; // spawn params saved on enter, restored on exit
+let _avoidMapSuppressed = false; // when true, loadAvoidMap is a no-op
 
 // GUI handles — assigned by initGUI() at the bottom of this file.
 let stateCtrl     = null;
@@ -2384,6 +2388,7 @@ document.querySelector('#image-input').addEventListener('change', e => {
 
 // ── Avoidance map upload ──────────────────────────────────────────────────────
 async function loadAvoidMap(source) {
+    if (_avoidMapSuppressed) return;
     _qrOwnedAvoidMap   = false; // user-loaded map; neither QR nor text should clear it
     _textOwnedAvoidMap = false;
     const blob = typeof source === 'string'
