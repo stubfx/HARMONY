@@ -94,7 +94,8 @@ const params = {
     agentShadowRadius: 10,   // splat half-radius in canvas pixels
     // Champions — every Nth agent (agentId % champions == 0) drops a constant shadow
     // splat under itself even when free. 1 = every agent, 2 = one in two…
-    championsEnabled:  true, // master on/off for the whole champions feature
+    championsEnabled:       true,  // master on/off for the whole champions feature
+    championShadowEnabled:  false, // shadow splat under free champions (separate from homing-agent shadows)
     champions:         1000,
     // Champion point size — applied ONLY while a champion is free (not homing);
     // homing champions render at the normal agent size like everyone else.
@@ -3196,7 +3197,7 @@ function frame(ts) {
     rp.draw(3);
     // Agent shadow is a soft splat — incoherent with chunky cells, skip in pixel mode.
     // Runs when an image is loaded (homing shadows) or champions are active (constant shadows).
-    if ((hasImage || (params.championsEnabled && params.champions > 0)) && agentShadowBG && !usingPixel) {
+    if ((hasImage || (params.championsEnabled && params.champions > 0 && params.championShadowEnabled)) && agentShadowBG && !usingPixel) {
         rp.setPipeline(agentShadowPipe);
         rp.setBindGroup(0, agentShadowBG);
         rp.draw(params.agentCount * 6);
