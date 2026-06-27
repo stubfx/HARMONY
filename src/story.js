@@ -93,21 +93,23 @@ export const STORY = [
     },
 
     // ── FASE 2 — LA NOTA ─────────────────────────────────────────────────────
-    // audio2 parte subito all'entrata.
-    // Al primo onNote → timer 20s → audio3_1 → timer 10s → sim.next().
+    // audio2 parte subito all'entrata. wind disabilitato fino alla prima nota.
+    // Al primo onNote → wind on → timer 20s → audio3_1 → timer 10s → sim.next().
     // Il timer da 20s parte una sola volta (prima nota ricevuta).
     {
         id: PHASE.NOTA,
         _noteTimerStarted: false,
         enter(sim) {
             this._noteTimerStarted = false;
-            log('FASE 2 — nota. audio2 in partenza.');
+            sim.freezeParams({ windEnabled: false });
+            log('FASE 2 — nota. wind disabilitato. audio2 in partenza.');
             this._audio = sim.playNarratorAudio('audio2.mp3');
         },
         onNote(sim, noteIndex) {
             if (this._noteTimerStarted) return;
             this._noteTimerStarted = true;
-            log('prima nota ricevuta (index ' + noteIndex + '). timer 20s avviato.');
+            sim.setParam('windEnabled', true);
+            log('prima nota ricevuta (index ' + noteIndex + '). wind abilitato. timer 20s avviato.');
             setTimeout(() => {
                 log('20s scaduti — audio3_1 in partenza.');
                 this._audio?.pause();
@@ -123,6 +125,7 @@ export const STORY = [
         },
         exit(sim) {
             log('uscita FASE 2.');
+            sim.thawParams();
             this._audio?.pause();
             this._audio = null;
         },
