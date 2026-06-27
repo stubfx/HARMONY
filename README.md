@@ -133,7 +133,7 @@ The server maintains a per-room user table. Every 300 ms it averages all active 
 | `avgTemp` | touch Y position | speed-color hue: blue (top/cold) → amber (bottom/warm), 65% blend | arp BPM (80–140) |
 | `avgCoherence` | touch X position | turnRate multiplier: 0.08× (left/chaos) → 3.0× (right/order) | — |
 | `avgChaos` | device motion magnitude | **received but not applied automatically** — `collectiveChaos` is not driven by this value; chaos is manual only. To re-enable: `collectiveChaos = avgChaos ?? 0` | all synth layers + radio chain; pad LFO frequency (0.05→2 Hz as chaos→0) |
-| `userCount` | active connections | DOT→NORMAL at first join; chaos reset when all leave | synth at chaos=1 when empty; simAss music fades in on first join, out on last leave |
+| `userCount` | active connections | chaos reset when all leave | synth at chaos=1 when empty; simAss music fades in on first join, out on last leave |
 
 All collective values are smoothed with an exponential moving average (~0.8 s time constant) in the simulation before being written to the GPU, preventing jarring jumps when spectators join or leave.
 
@@ -154,7 +154,7 @@ All computation runs on the GPU. No Three.js. No WebGL.
 | **Wind vis** *(debug)* | `wind-vis.wgsl` | Render | Arrow grid overlay — `evalWindFormula` prepended at pipeline build time, same pattern as `compute.wgsl` |
 | **Image debug** *(debug)* | `image-debug.wgsl` | Render | Grayscale overlay of the loaded image at its current size and position |
 
-Agents are stored as `array<Agent>` (pos.xy, vel.xy, home.xy, weight, primed — 32 bytes each)
+Agents are stored as `array<Agent>` (pos.xy, vel.xy, home.xy, weight, primed — 32 bytes each). `weight` is a [0, 1] brightness multiplier: agents with `weight < 0.001` are clipped off-screen (invisible); values between 0 and 1 smoothly scale the rendered brightness. Newly-respawned agents start at weight=0 and increment by `spawnFadeRate` per second until they reach 1.0 — this gives a smooth fade-in instead of a sudden flash. During the preshow, `spawnFadeRate` is frozen to 0 so respawned agents stay dark indefinitely.
 in a persistent GPU storage buffer. The buffer is always allocated at
 `MAX_AGENTS × 32` bytes; `params.agentCount` drives actual dispatch and draw counts
 without reallocation.
@@ -191,10 +191,32 @@ A client-side story engine (`src/story.js` + `src/storyEngine.js`) runs autonomo
 |-----------|--------|
 | `dormantSeed()` | Seeds all agents invisible (weight=0); stores original weights |
 | `activateChunk(fraction)` | Activates the next N% of dormant agents, spawning from canvas center |
-| `freezeParams(overrides)` | Saves current param values and applies overrides |
-| `thawParams()` | Restores params saved by `freezeParams` |
+| `freezeParams(overrides)` | Saves current param values and applies overrides immediately |
+| `thawParams()` | Restores all params saved by `freezeParams` |
 | `reseed()` | Clears dormant state and performs a full normal reseed |
 | `next()` | Advances to the next story step |
+| `setParam(key, val)` | Overrides a single param without affecting the freeze/thaw saved state |
+| `suppressImages()` | Blocks `loadAvoidMap` — external images from the admin are ignored |
+| `restoreImages()` | Re-enables `loadAvoidMap` |
+| `playNarratorAudio(file, { autoNext })` | Plays `simAss/narrator/<file>` via the `/simAss-narrator/` endpoint; if `autoNext: true`, calls `sim.next()` automatically when playback ends |
+
+### Narrator audio
+
+All narrator MP3s live in `simAss/narrator/`. The server exposes them at `GET /simAss-narrator/:filename` (served by name, not randomly). The facade method `playNarratorAudio` plays the file and optionally advances the story on `ended`. Call `this._audio?.pause()` in `exit()` to stop playback if the step is skipped.
+
+**Audio map for `story01`:**
+
+| File | Step | Phase |
+|------|------|-------|
+| `audio1.mp3` | `preshow` | FASE 2 — connessione |
+| `audio2.mp3` | `nota` | FASE 3 |
+| `audio3.mp3` | `rosso` | FASE 4 |
+| `audio4.mp3` | `immagini-cuore` | FASE 5a |
+| `audio5.mp3` | `immagini-tempesta` | FASE 5b |
+| `audio6.mp3` | `testo` | FASE 6 |
+| `audio7.mp3` | `chiusura` | FASE 7 |
+
+`immagini-bigbang` has no narration (script note: "non si commenta").
 
 This story system coexists with the step-based story mode (step IDs, vote steps, captions) driven by `applySimParams` — the client story runs on its own schedule while the admin panel or `applySimParams` handles content delivery.
 
@@ -213,7 +235,7 @@ would trap agents in the QR pattern during the radial spread-out phase.
 
 The intro delay is tunable via the GUI (Motion → intro delay).
 
-> **Note:** In the current story configuration, the intro sequence is preceded by the **preshow step** (defined in `story.js`). During preshow, all agents start invisible (weight=0) and spectators connect into a dark screen. Each joining user activates 10% of agents from the canvas centre. When preshow exits, params are thawed and the simulation reseeds normally into the standard intro.
+> **Note:** In the current story configuration, the intro sequence is preceded by the **preshow step** (defined in `story.js`). During preshow all agents start invisible (weight=0), images from the admin are suppressed, and narrator `audio1.mp3` plays immediately on enter. Each spectator that connects activates agents from the canvas centre. The step advances when audio ends **and** at least one user is connected — if audio ends before anyone joins, it waits for the first connection. After 10 s from the first join, `dotRespawnChance` is re-enabled (at a low value) so a trickle of agents respawn invisibly and fade in. On canvas resize or fullscreen while preshow is active, agents are re-seeded dormant and the previously-lit fraction is restored. When preshow exits, params are thawed and the simulation reseeds normally.
 
 ---
 

@@ -84,12 +84,12 @@ That wonder is the work.
 
 ## The Preshow
 
-Before the piece begins, the screen is black. Not dormant — running, waiting. Every particle already exists; none of them are visible.
+Before the piece begins, the screen is black. Not dormant — running, waiting. Every particle already exists; none of them are visible. A voice begins to speak.
 
-Then the first person scans the code and connects. Something stirs at the centre of the screen — a small cluster of particles, emerging from the middle of the dark. They drift outward. You can count them if you look. Ten percent of everything that will become the swarm.
+While the voice speaks, people scan the QR and connect. Each connection wakes a portion of the swarm from the canvas centre — particles drift outward, accumulating. The swarm doesn't grow; it reveals itself. The dark between the particles is not absence. It is potential that hasn't been claimed yet.
 
-The next person joins. Another ten percent appears — from the same place, the same centre, spreading into the field the first arrivals have already begun to explore. The screen accumulates.
+The preshow ends when the narrator finishes *and* at least one person has connected. If the voice finishes before anyone joins, the piece waits quietly. Once both conditions are met, the simulation reseeds and the story begins.
 
-This continues for as long as people keep arriving. Each connection wakes a fraction of what was already there but couldn't be seen. The swarm doesn't grow — it reveals itself. The dark between the particles is not absence. It is potential that hasn't been claimed yet.
+After ten seconds from the first connection, a slow trickle of new particles begins to respawn at the canvas edges — invisible at first, fading in gradually over about a second. This is intentional: the swarm breathes even before the piece begins.
 
-By the time enough people have joined, the screen holds something moving and full. Nobody assembled it deliberately. It assembled in response to people walking into a room and deciding to be part of something.
+Remote phones during preshow show a flat coloured background — no sphere, no animation. The colour changes as people touch the screen, giving each person a quiet signal that they are already part of something before the lights come on.

@@ -150,10 +150,15 @@ Canvas resolution multiplier applied on top of the device pixel ratio (DPR). At 
 
 Can be set at boot via the `?resolution=<0-1>` URL parameter (clamped to the 0.1–1.0 range), which initialises this slider before the first frame.
 
+### trail on (`trailEnabled`)
+**Default:** on
+
+Master switch for the trail. When off, the fade pass draws at alpha=1.0, clearing the offscreen buffer every frame — only the particles of the current frame are visible, with no persistence. Useful for debugging spawn artefacts or achieving a sharp, no-ghost look.
+
 ### trail decay
 **Range:** 0.005 – 0.4 | **Default:** 0.055
 
-Controls how quickly particle trails fade. Each frame a black fullscreen quad is blended over the offscreen texture at this alpha — higher values erase trails faster, lower values leave longer ghosts. At the minimum, trails persist for many seconds; at the maximum they vanish almost instantly.
+Controls how quickly particle trails fade. Each frame a black fullscreen quad is blended over the offscreen texture at this alpha — higher values erase trails faster, lower values leave longer ghosts. At the minimum, trails persist for many seconds; at the maximum they vanish almost instantly. Has no effect when `trailEnabled` is off.
 
 ### black cutoff (`bgBlackCutoff`)
 **Range:** 0 – 0.05 | **Default:** 0.012
@@ -883,7 +888,20 @@ Implementation: the release transition (both the explicit "joystick up" event an
 
 Per-frame probability that any free agent jumps to a completely random canvas position, independent of the spectator spawner system. Creates a slow, background redistribution that prevents dead zones accumulating during long steady-state periods. Has no effect on homing agents.
 
+Teleporting agents are set to `weight=0` on arrival and fade in via `spawnFadeRate` to avoid a visible flash at the destination.
+
 > **Preshow:** during the `'preshow'` story step, `randomTeleportChance` is frozen to `0` by `freezeParams`. Random redistribution is suppressed for the duration of preshow so that dormant agents stay invisible until explicitly activated by `activateChunk`. It is restored when preshow exits.
+
+### spawn fade rate (`spawnFadeRate`)
+**Range:** 0 – 5 | **Default:** 1.0 | **Unit:** per second
+
+Rate at which newly-spawned or teleported agents increase their brightness (weight) after arriving at their new position. A value of `1.0` means full brightness is reached in ~1 second, regardless of frame rate (the increment is multiplied by `dt` each frame). At `0`, respawned agents stay dark indefinitely — used by the `preshow` step via `freezeParams` to keep newly-activated agents invisible until the preshow exits.
+
+Applies to:
+- **Dot-centre respawn** — agents scattered from the canvas centre to the edges
+- **Random teleport** — agents jumping to random canvas positions
+
+The respawn uses a two-frame process: frame A sets `weight = -1` (invisible, no position change); frame B teleports to the edge and sets `weight = 0`; frame C+ increments weight each frame. This prevents a one-frame flash at the spawn edge.
 
 ### random teleport on avoidMap only (`randomTeleportOnAvoidMap`)
 **Default:** on
@@ -921,7 +939,9 @@ The remote page's persistent QR code fades when the connected spectator count re
 
 Story mode layers a scripted, sequential narrative on top of the simulation. The sim has no built-in story state machine — the admin panel or `applySimParams` drives story progression; the sim plays the current step and reports back when interactions complete.
 
-> **Embedded story system:** separate from this step-based story mode, the simulation also runs a client-side story defined in `src/story.js` and driven by `src/storyEngine.js`. This story starts automatically before the first frame and uses `simFacade` primitives (`dormantSeed`, `activateChunk`, `freezeParams`, etc.) to stage physical transitions. The two systems are independent: the client story handles the opening experience (preshow), while the step system handles narrative sequencing, votes, and captions during the performance.
+> **Embedded story system:** separate from this step-based story mode, the simulation also runs a client-side story defined in `src/story.js` and driven by `src/storyEngine.js`. This story starts automatically before the first frame and uses `simFacade` primitives to stage physical transitions:
+> `dormantSeed()`, `activateChunk(fraction)`, `freezeParams(overrides)`, `thawParams()`, `reseed()`, `next()`, `setParam(key, val)`, `suppressImages()`, `restoreImages()`, `playNarratorAudio(file, { autoNext })`.
+> Narrator audio files live in `simAss/narrator/` and are served by name via `GET /simAss-narrator/:filename`. The two systems are independent: the client story handles the opening experience (preshow, narration, image cascade), while the step system handles captions, votes, and `applySimParams`-driven content.
 
 ### Step fields (sent in any `applySimParams` payload)
 
