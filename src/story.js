@@ -23,7 +23,7 @@ export const STORY = [
             sim.dormantSeed();
         },
         onSpectatorJoined(sim, userCount) {
-            sim.activateChunk(0.10);
+            sim.activateChunk(1);
             if (userCount === 1) {
                 setTimeout(() => sim.setParam('dotRespawnChance', 0.002), 10_000);
             }
