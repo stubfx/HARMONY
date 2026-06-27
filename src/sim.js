@@ -1566,7 +1566,7 @@ const simState = {
     mode:              'STORY',
     colorMode:         'NORMAL',
     qrStatus:          'HIDE',
-    status:            'DOT',
+    status:            'NORMAL',
     storyStep:         null,
     storyVoteResult:   null,
     votesA:            0,      // raw vote count for optionA — dirty, never auto-reset
@@ -1981,7 +1981,6 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
         if (_preshowActive) {
             storyEngine.onSpectatorJoined(userCount);
         } else {
-            if (simState.status === 'DOT' && userCount >= 1) setStatus('NORMAL');
             lastRemoteActivity = Date.now();
             burstBrightness    = BURST_BRIGHTNESS;
         }
