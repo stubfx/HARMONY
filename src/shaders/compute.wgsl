@@ -595,30 +595,41 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         np.y = ((np.y % params.canvasH) + params.canvasH) % params.canvasH;
     }
 
-    // DOT mode centre-respawn: free agents inside the centre zone are stochastically scattered to edges.
+    // DOT mode centre-respawn — two-frame process to avoid edge-flash artefacts:
+    //   Frame A: agent selected → weight set to -1 (invisible, stays at current pos)
+    //   Frame B: weight < 0 detected → teleport to random edge, weight reset to 0
+    //   Frame C+: spawnFadeRate increments weight 0→1 (fade-in)
+
+    // Frame B: complete a pending respawn flagged last frame.
+    if (weight < 0.0) {
+        let posRng = hash(i ^ (u32(params.time * 97.0) + 71u));
+        let perim_ = 2.0 * (params.canvasW + params.canvasH);
+        let t_     = posRng * perim_;
+        var ep     = vec2<f32>(0.0, 0.0);
+        if (t_ < params.canvasW) {
+            ep = vec2<f32>(t_, 0.0);
+        } else if (t_ < params.canvasW + params.canvasH) {
+            ep = vec2<f32>(params.canvasW, t_ - params.canvasW);
+        } else if (t_ < 2.0 * params.canvasW + params.canvasH) {
+            ep = vec2<f32>(t_ - params.canvasW - params.canvasH, params.canvasH);
+        } else {
+            ep = vec2<f32>(0.0, t_ - 2.0 * params.canvasW - params.canvasH);
+        }
+        agents[i].pos    = ep;
+        agents[i].vel    = vec2<f32>(0.0, 0.0);
+        agents[i].primed = 0.0;
+        agents[i].weight = 0.0;
+        return;
+    }
+
+    // Frame A: select agent for respawn — flag it, stay invisible at current pos.
     if (params.dotMode != 0u && params.dotCenterRadius > 0.0 && !homeInImg) {
         let cx = params.canvasW * 0.5;
         let cy = params.canvasH * 0.5;
         if (length(np - vec2<f32>(cx, cy)) < params.dotCenterRadius) {
-            let rng_    = hash(i ^ (u32(params.time * 137.0) + 53u));
+            let rng_ = hash(i ^ (u32(params.time * 137.0) + 53u));
             if (rng_ < params.dotRespawnChance) {
-                let posRng = hash(i ^ (u32(params.time * 97.0)  + 71u));
-                let perim_ = 2.0 * (params.canvasW + params.canvasH);
-                let t_     = posRng * perim_;
-                var ep     = vec2<f32>(0.0, 0.0);
-                if (t_ < params.canvasW) {
-                    ep = vec2<f32>(t_, 0.0);
-                } else if (t_ < params.canvasW + params.canvasH) {
-                    ep = vec2<f32>(params.canvasW, t_ - params.canvasW);
-                } else if (t_ < 2.0 * params.canvasW + params.canvasH) {
-                    ep = vec2<f32>(t_ - params.canvasW - params.canvasH, params.canvasH);
-                } else {
-                    ep = vec2<f32>(0.0, t_ - 2.0 * params.canvasW - params.canvasH);
-                }
-                agents[i].pos    = ep;
-                agents[i].vel    = vec2<f32>(0.0, 0.0);
-                agents[i].primed = 0.0;
-                agents[i].weight = 0.0;
+                agents[i].weight = -1.0;
                 return;
             }
         }
@@ -682,8 +693,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         }
     }
 
-    // Fade-in: agents that spawned at weight=0 brighten up each frame.
-    if (params.spawnFadeRate > 0.0 && weight < 1.0) {
+    // Fade-in: agents at weight=0 (just teleported) brighten up each frame.
+    // weight < 0 means pending-respawn — skip, handled above on next invocation.
+    if (params.spawnFadeRate > 0.0 && weight >= 0.0 && weight < 1.0) {
         weight = min(weight + params.spawnFadeRate, 1.0);
     }
 
