@@ -34,12 +34,14 @@ import { PHASE, RESEED } from './constants.js';
 //   sim.activateChunk(fraction)    — light up next N% of agents from center
 //   sim.freezeParams(overrides)    — save + override named params
 //   sim.thawParams()               — restore params saved by freezeParams
-//   sim.reseed({ mode })             — full reseed; mode: RESEED.FADE_FROM_EDGES → perimeter spawn at weight=0
+//   sim.reseed({ mode })           — full reseed; mode: RESEED.FADE_FROM_EDGES → perimeter spawn at weight=0
 //   sim.next()                     — advance to the next step
 //   sim.setParam(key, val)         — override a single param
 //   sim.suppressImages()           — block loadAvoidMap (images from admin)
 //   sim.restoreImages()            — re-enable loadAvoidMap
 //   sim.playNarratorAudio(file)    — play simAss/narrator/<file>; auto-next on ended
+
+const log = (msg) => console.log(`[story] ${msg}`);
 
 export const STORY = [
 
@@ -55,24 +57,33 @@ export const STORY = [
         enter(sim) {
             this._userCount  = 0;
             this._audioEnded = false;
+            log('FASE 2 — connessione. audio1 in partenza.');
             sim.freezeParams({ spectatorSpawnChance: 0, randomTeleportChance: 0, dotRespawnChance: 0, spawnFadeRate: 0 });
             sim.suppressImages();
             sim.dormantSeed();
             this._audio = sim.playNarratorAudio('audio1.mp3');
             this._audio.addEventListener('ended', () => {
                 this._audioEnded = true;
+                log('audio1 terminato. utenti connessi: ' + this._userCount);
                 if (this._userCount >= this._MIN_USERS) sim.next();
+                else log('in attesa di almeno ' + this._MIN_USERS + ' utente/i prima di avanzare.');
             }, { once: true });
         },
         onSpectatorJoined(sim, userCount) {
             this._userCount = userCount;
+            log('utente connesso — totale: ' + userCount);
             sim.activateChunk(1);
             if (userCount === 1) {
-                setTimeout(() => sim.setParam('dotRespawnChance', 0.002), 10_000);
+                log('primo utente: dotRespawnChance attivo tra 10s.');
+                setTimeout(() => {
+                    log('dotRespawnChance abilitato (0.002).');
+                    sim.setParam('dotRespawnChance', 0.002);
+                }, 10_000);
             }
             if (this._audioEnded && userCount >= this._MIN_USERS) sim.next();
         },
         exit(sim) {
+            log('uscita FASE 2 — reseed con fade dai bordi.');
             this._audio?.pause();
             this._audio = null;
             sim.restoreImages();
@@ -90,20 +101,28 @@ export const STORY = [
         _noteTimerStarted: false,
         enter(sim) {
             this._noteTimerStarted = false;
+            log('FASE 3 — nota. audio2 in partenza.');
             this._audio = sim.playNarratorAudio('audio2.mp3');
         },
-        onNote(sim) {
+        onNote(sim, noteIndex) {
             if (this._noteTimerStarted) return;
             this._noteTimerStarted = true;
+            log('prima nota ricevuta (index ' + noteIndex + '). timer 20s avviato.');
             setTimeout(() => {
+                log('20s scaduti — audio3_1 in partenza.');
                 this._audio?.pause();
                 this._audio = sim.playNarratorAudio('audio3_1.mp3');
                 this._audio.addEventListener('ended', () => {
-                    setTimeout(() => sim.next(), 10_000);
+                    log('audio3_1 terminato. attesa 10s prima di avanzare a FASE 4.');
+                    setTimeout(() => {
+                        log('10s scaduti — avanzamento a FASE 4.');
+                        sim.next();
+                    }, 10_000);
                 }, { once: true });
             }, 20_000);
         },
         exit(sim) {
+            log('uscita FASE 3.');
             this._audio?.pause();
             this._audio = null;
         },
@@ -115,9 +134,11 @@ export const STORY = [
     {
         id: PHASE.ROSSO,
         enter(sim) {
+            log('FASE 4 — rosso. audio3 in partenza.');
             this._audio = sim.playNarratorAudio('audio3.mp3', { autoNext: true });
         },
         exit(sim) {
+            log('uscita FASE 4.');
             this._audio?.pause();
             this._audio = null;
         },
@@ -130,10 +151,12 @@ export const STORY = [
     {
         id: PHASE.IMMAGINI_CUORE,
         enter(sim) {
+            log('FASE 5a — cuore. audio4 in partenza.');
             // TODO: load cuore image into avoidmap
             this._audio = sim.playNarratorAudio('audio4.mp3', { autoNext: true });
         },
         exit(sim) {
+            log('uscita FASE 5a.');
             this._audio?.pause();
             this._audio = null;
         },
@@ -146,10 +169,12 @@ export const STORY = [
     {
         id: PHASE.IMMAGINI_TEMPESTA,
         enter(sim) {
+            log('FASE 5b — tempesta. audio5 in partenza.');
             // TODO: load tempesta image into avoidmap
             this._audio = sim.playNarratorAudio('audio5.mp3', { autoNext: true });
         },
         exit(sim) {
+            log('uscita FASE 5b.');
             this._audio?.pause();
             this._audio = null;
         },
@@ -162,10 +187,15 @@ export const STORY = [
     {
         id: PHASE.IMMAGINI_BIGBANG,
         enter(sim) {
+            log('FASE 5c — bigbang. timer 5s avviato (no audio).');
             // TODO: load bigbang image into avoidmap
-            this._timer = setTimeout(() => sim.next(), 5_000);
+            this._timer = setTimeout(() => {
+                log('5s scaduti — avanzamento a FASE 6.');
+                sim.next();
+            }, 5_000);
         },
         exit(sim) {
+            log('uscita FASE 5c.');
             clearTimeout(this._timer);
             // TODO: cut to black before advancing
         },
@@ -177,9 +207,11 @@ export const STORY = [
     {
         id: PHASE.TESTO,
         enter(sim) {
+            log('FASE 6 — testo. audio6 in partenza.');
             this._audio = sim.playNarratorAudio('audio6.mp3', { autoNext: true });
         },
         exit(sim) {
+            log('uscita FASE 6.');
             this._audio?.pause();
             this._audio = null;
         },
@@ -191,6 +223,7 @@ export const STORY = [
     {
         id: PHASE.CHIUSURA,
         enter(sim) {
+            log('FASE 7 — chiusura. audio7 in partenza. fine storia.');
             this._audio = sim.playNarratorAudio('audio7.mp3');
         },
         exit(sim) {
