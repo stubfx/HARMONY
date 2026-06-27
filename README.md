@@ -182,6 +182,7 @@ A client-side story engine (`src/story.js` + `src/storyEngine.js`) runs autonomo
 | `enter` | `(sim)` | When this step becomes active |
 | `exit` | `(sim)` | Just before advancing to the next step |
 | `onSpectatorJoined` | `(sim, userCount)` | Every time a spectator connects while this step is active |
+| `onNote` | `(sim, noteIndex)` | Every time any spectator plays a note while this step is active |
 
 `storyEngine.js` exports a `StoryEngine` class. `StoryEngine.start()` is called automatically before the first `requestAnimationFrame`. Steps advance by calling `sim.next()`.
 
@@ -193,11 +194,14 @@ A client-side story engine (`src/story.js` + `src/storyEngine.js`) runs autonomo
 | `activateChunk(fraction)` | Activates the next N% of dormant agents, spawning from canvas center |
 | `freezeParams(overrides)` | Saves current param values and applies overrides immediately |
 | `thawParams()` | Restores all params saved by `freezeParams` |
-| `reseed()` | Clears dormant state and performs a full normal reseed |
+| `reseed({ mode })` | Full reseed; `mode: RESEED.FADE_FROM_EDGES` spawns from perimeter at weight=0 for a gradual fade-in |
 | `next()` | Advances to the next story step |
 | `setParam(key, val)` | Overrides a single param without affecting the freeze/thaw saved state |
+| `setTraceText(text)` | Sets the trace text input and re-renders the avoidmap texture |
 | `suppressImages()` | Blocks `loadAvoidMap` — external images from the admin are ignored |
 | `restoreImages()` | Re-enables `loadAvoidMap` |
+| `enableHarmonyImages()` | Allows harmony note-sum events to show their AI-generated avoidmap image (off by default) |
+| `disableHarmonyImages()` | Hides the harmony image and blocks future ones until re-enabled |
 | `playNarratorAudio(file, { autoNext })` | Plays `simAss/narrator/<file>` via the `/simAss-narrator/` endpoint; if `autoNext: true`, calls `sim.next()` automatically when playback ends |
 
 ### Narrator audio
@@ -206,17 +210,18 @@ All narrator MP3s live in `simAss/narrator/`. The server exposes them at `GET /s
 
 **Audio map for `story01`:**
 
-| File | Step | Phase |
-|------|------|-------|
-| `audio1.mp3` | `preshow` | FASE 2 — connessione |
-| `audio2.mp3` | `nota` | FASE 3 |
-| `audio3.mp3` | `rosso` | FASE 4 |
-| `audio4.mp3` | `immagini-cuore` | FASE 5a |
-| `audio5.mp3` | `immagini-tempesta` | FASE 5b |
-| `audio6.mp3` | `testo` | FASE 6 |
-| `audio7.mp3` | `chiusura` | FASE 7 |
+| File | Step | Phase | Trigger |
+|------|------|-------|---------|
+| `audio1.mp3` | `preshow` | PHASE 1 | Plays immediately on enter; stops when first spectator connects |
+| `audio2.mp3` | `preshow` | PHASE 1 | Plays on first spectator connect; 10 s after end → advance to PHASE 2 |
+| `audio3.mp3` | `nota` | PHASE 2 | Plays immediately on enter |
+| `audio3_2.mp3` | `nota` | PHASE 2 | Plays 20 s after first note; 10 s after end → advance to PHASE 3 |
+| `audio4.mp3` | `rosso` | PHASE 3 | Plays on enter; autoNext |
+| `audio5.mp3` | `immagini-tempesta` | PHASE 5 | Plays on enter; autoNext |
+| `audio6.mp3` | `testo` | PHASE 7 | Plays on enter; autoNext |
+| `audio7.mp3` | `chiusura` | PHASE 8 | Plays on enter; last step, no autoNext |
 
-`immagini-bigbang` has no narration (script note: "non si commenta").
+`immagini-cuore` (PHASE 4) and `immagini-bigbang` (PHASE 6) have no narration. `immagini-bigbang` auto-advances after 5 s.
 
 This story system coexists with the step-based story mode (step IDs, vote steps, captions) driven by `applySimParams` — the client story runs on its own schedule while the admin panel or `applySimParams` handles content delivery.
 
@@ -235,7 +240,7 @@ would trap agents in the QR pattern during the radial spread-out phase.
 
 The intro delay is tunable via the GUI (Motion → intro delay).
 
-> **Note:** In the current story configuration, the intro sequence is preceded by the **preshow step** (defined in `story.js`). During preshow all agents start invisible (weight=0), images from the admin are suppressed, and narrator `audio1.mp3` plays immediately on enter. Each spectator that connects activates agents from the canvas centre. The step advances when audio ends **and** at least one user is connected — if audio ends before anyone joins, it waits for the first connection. After 10 s from the first join, `dotRespawnChance` is re-enabled (at a low value) so a trickle of agents respawn invisibly and fade in. On canvas resize or fullscreen while preshow is active, agents are re-seeded dormant and the previously-lit fraction is restored. When preshow exits, params are thawed and the simulation reseeds normally.
+> **Note:** In the current story configuration, the intro sequence is preceded by the **preshow step** (PHASE 1, defined in `story.js`). During preshow all agents start invisible (weight=0), images from the admin are suppressed, and wind is disabled. `audio1.mp3` plays immediately on enter. When the **first spectator connects**: `audio1` stops, `audio2` starts, and 10 s after `audio2` ends the story advances to PHASE 2. Each spectator that connects activates a chunk of dormant agents from the canvas centre. 10 s after the first connection `dotRespawnChance` is re-enabled (at `0.002`) so a trickle of agents begin fading in from the edges. When preshow exits, params are thawed and the simulation reseeds with `RESEED.FADE_FROM_EDGES` (perimeter spawn, agents fade in gradually rather than popping).
 
 ---
 
@@ -793,9 +798,10 @@ thesis-sim/
 │   │                        Socket.IO host, collective-state handler, QR screensaver,
 │   │                        QR overlay canvas, join burst, contamination tracking,
 │   │                        avoid map, auto-clear timer; exports simFacade for story steps
+│   ├── constants.js         Shared enums: PHASE (step IDs) and RESEED (reseed modes)
 │   ├── story.js             Story definition: array of step objects with enter(sim),
-│   │                        exit(sim), and onSpectatorJoined(sim, userCount) hooks;
-│   │                        includes the 'preshow' step that wakes agents as users arrive
+│   │                        exit(sim), onSpectatorJoined(sim, userCount), and
+│   │                        onNote(sim, noteIndex) hooks; 8 phases from PRESHOW to CHIUSURA
 │   ├── storyEngine.js       StoryEngine class: drives story.js steps in sequence;
 │   │                        calls exit() before advancing; started automatically before
 │   │                        the first requestAnimationFrame — no admin trigger needed

@@ -1,5 +1,7 @@
 # n8n Control Reference
 
+> **DEPRECATED** — n8n integration (webhooks, heartbeat, sim-event) was removed entirely. The webhook endpoints no longer exist in `server.js` and `VITE_N8N_BASE_URL` is no longer used. The `applySimParams` format documented here is still valid and still used by the admin panel. The agentic story-flow architecture (Architect + Step Generator + Memory Extractor agents) is still documented at the bottom of this file for reference.
+
 Two webhook paths receive data from the simulation system (sim → n8n). Both return a JSON object that is applied directly as sim params via `applySimParams()`: `/webhook/heartbeat` for periodic snapshots and `/webhook/sim-event` for real-time interaction events.
 
 n8n can also push data **back to individual remote devices** using the server's `/spectator-push` endpoint (n8n → server → remote).
