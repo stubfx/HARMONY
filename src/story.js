@@ -6,7 +6,7 @@ import { PHASE, RESEED } from './constants.js';
 //   audio1.mp3    →  preshow           (PHASE 1 — parte subito; si ferma alla prima connessione)
 //   audio2.mp3    →  preshow           (PHASE 1 — parte alla prima connessione; 10s dopo → PHASE 2)
 //   audio3_1.mp3  →  nota              (PHASE 2 — parte 20s dopo la prima nota suonata)
-//   audio3.mp3    →  rosso             (PHASE 3 — date un colore alla nota)
+//   audio3.mp3    →  nota              (PHASE 2 — parte subito all'entrata)
 //   audio4.mp3    →  immagini-cuore    (PHASE 4 — "Il primo suono che hai sentito...")
 //   audio5.mp3    →  immagini-tempesta (PHASE 5 — "Il rombo prima del lampo...")
 //   audio6.mp3    →  testo             (PHASE 7 — una parola a testa)
@@ -95,7 +95,7 @@ export const STORY = [
     },
 
     // ── PHASE 2 — LA NOTA ─────────────────────────────────────────────────────
-    // Wind disabilitato fino alla prima nota.
+    // audio3 parte subito all'entrata. wind disabilitato fino alla prima nota.
     // Prima nota → wind on → timer 20s → audio3_1 → timer 10s → sim.next().
     // Il timer da 20s parte una sola volta.
     {
@@ -104,7 +104,8 @@ export const STORY = [
         enter(sim) {
             this._noteTimerStarted = false;
             sim.freezeParams({ windEnabled: false });
-            log('PHASE 2 — nota. wind disabilitato. in attesa della prima nota.');
+            log('PHASE 2 — nota. wind disabilitato. audio3 in partenza.');
+            this._audio = sim.playNarratorAudio('audio3.mp3');
         },
         onNote(sim, noteIndex) {
             if (this._noteTimerStarted) return;
