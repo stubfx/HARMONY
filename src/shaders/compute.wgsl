@@ -683,24 +683,23 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
 
     // Random global teleport: any agent has a per-frame chance to jump to a random position.
-    // Agent appears at weight=0 and fades in via spawnFadeRate to avoid a visible flash.
+    // Sets weight=0 so the agent is invisible this frame; fade-in starts next frame.
+    var justTeleported = false;
     if (params.randomTeleportChance > 0.0) {
         let tRng = hash(i ^ (u32(params.time * 1013.0) + 29u));
         if (tRng < params.randomTeleportChance) {
             let rx = hash(i ^ (u32(params.time * 997.0)  + 3u));
             let ry = hash(i ^ (u32(params.time * 971.0)  + 11u));
-            agents[i].pos    = vec2f(rx * params.canvasW, ry * params.canvasH);
-            agents[i].vel    = vel;
-            agents[i].weight = 0.0;
-            agents[i].primed = select(0.0, 1.0, homeInImg);
-            return;
+            np             = vec2f(rx * params.canvasW, ry * params.canvasH);
+            weight         = 0.0;
+            justTeleported = true;
         }
     }
 
-    // Fade-in: agents at weight=0 (just teleported) brighten up each frame.
-    // weight < 0 means pending-respawn — skip, handled above on next invocation.
-    if (params.spawnFadeRate > 0.0 && weight >= 0.0 && weight < 1.0) {
-        weight = min(weight + params.spawnFadeRate, 1.0);
+    // Fade-in: spawnFadeRate is per-second; scaled by dt for framerate independence.
+    // Skip if weight<0 (pending dot-respawn) or agent just teleported this frame.
+    if (params.spawnFadeRate > 0.0 && weight >= 0.0 && weight < 1.0 && !justTeleported) {
+        weight = min(weight + params.spawnFadeRate * params.dt, 1.0);
     }
 
     agents[i].pos    = np;

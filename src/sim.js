@@ -137,7 +137,7 @@ const params = {
     // DOT mode
     dotCenterRadius:     50,   // px — agents within this radius of centre are candidates for respawn (0 = disabled)
     dotRespawnChance:    0.01, // per-frame probability that a centre-zone agent is respawned to an edge
-    spawnFadeRate:       0.008, // per-frame weight increment after respawn (0 = stay dark, ~125 frames to full)
+    spawnFadeRate:       1.0,   // per-second weight increment after respawn (0 = stay dark, 1.0 = ~1s to full)
     // Freeroam lock — when on, FREEROAM auto-reverts to NORMAL after a delay
     freeroamLock:        true,
     freeroamLockDelay:   30,   // seconds in FREEROAM before reverting to NORMAL (timer resets each time FREEROAM is re-entered)
