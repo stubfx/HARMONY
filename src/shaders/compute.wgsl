@@ -689,8 +689,11 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         if (tRng < params.randomTeleportChance) {
             let rx = hash(i ^ (u32(params.time * 997.0)  + 3u));
             let ry = hash(i ^ (u32(params.time * 971.0)  + 11u));
-            np     = vec2f(rx * params.canvasW, ry * params.canvasH);
-            weight = 0.0;
+            agents[i].pos    = vec2f(rx * params.canvasW, ry * params.canvasH);
+            agents[i].vel    = vel;
+            agents[i].weight = 0.0;
+            agents[i].primed = select(0.0, 1.0, homeInImg);
+            return;
         }
     }
 
