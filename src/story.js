@@ -3,8 +3,8 @@ import { PHASE, RESEED } from './constants.js';
 // ─── Narrator Audio Map ──────────────────────────────────────────────────────
 // All files live in simAss/narrator/. Replace any file to swap the narration.
 //
-//   audio1.mp3    →  preshow           (FASE 1 — connessione, suona a fine fase)
-//   audio2.mp3    →  nota              (FASE 2 — parte subito all'entrata dello step)
+//   audio1.mp3    →  preshow           (FASE 1 — parte subito; si ferma alla prima connessione)
+//   audio2.mp3    →  preshow           (FASE 1 — parte alla prima connessione; 10s dopo → FASE 2)
 //   audio3_1.mp3  →  nota              (FASE 2 — parte 20s dopo la prima nota suonata)
 //   audio3.mp3    →  rosso             (FASE 3 — date un colore alla nota)
 //   audio4.mp3    →  immagini-cuore    (FASE 4 — "Il primo suono che hai sentito...")
@@ -46,31 +46,21 @@ const log = (msg) => console.log(`[story] ${msg}`);
 export const STORY = [
 
     // ── FASE 1 — CONNESSIONE ─────────────────────────────────────────────────
-    // audio1 starts immediately on enter (no users needed).
-    // Users connect while the audio plays; each one lights up a chunk of agents.
-    // After 10s from the first connection, dotRespawnChance is re-enabled.
-    // Step advances when audio1 ends AND at least 1 user is connected.
-    // If audio ends before anyone connects, it waits for the first join.
+    // audio1 parte subito all'entrata.
+    // Prima connessione → audio2 parte (audio1 si ferma se ancora in corso).
+    // audio2 finisce → 10s → sim.next().
+    // dotRespawnChance abilitato 10s dopo la prima connessione.
     {
         id: PHASE.PRESHOW,
-        _MIN_USERS: 1,
         enter(sim) {
-            this._userCount  = 0;
-            this._audioEnded = false;
+            this._audio2Started = false;
             log('FASE 1 — connessione. audio1 in partenza.');
             sim.freezeParams({ spectatorSpawnChance: 0, randomTeleportChance: 0, dotRespawnChance: 0, spawnFadeRate: 0 });
             sim.suppressImages();
             sim.dormantSeed();
             this._audio = sim.playNarratorAudio('audio1.mp3');
-            this._audio.addEventListener('ended', () => {
-                this._audioEnded = true;
-                log('audio1 terminato. utenti connessi: ' + this._userCount);
-                if (this._userCount >= this._MIN_USERS) sim.next();
-                else log('in attesa di almeno ' + this._MIN_USERS + ' utente/i prima di avanzare.');
-            }, { once: true });
         },
         onSpectatorJoined(sim, userCount) {
-            this._userCount = userCount;
             log('utente connesso — totale: ' + userCount);
             sim.activateChunk(1);
             if (userCount === 1) {
@@ -79,8 +69,20 @@ export const STORY = [
                     log('dotRespawnChance abilitato (0.002).');
                     sim.setParam('dotRespawnChance', 0.002);
                 }, 10_000);
+                if (!this._audio2Started) {
+                    this._audio2Started = true;
+                    this._audio?.pause();
+                    log('audio1 fermato. audio2 in partenza.');
+                    this._audio = sim.playNarratorAudio('audio2.mp3');
+                    this._audio.addEventListener('ended', () => {
+                        log('audio2 terminato. attesa 10s prima di avanzare a FASE 2.');
+                        setTimeout(() => {
+                            log('10s scaduti — avanzamento a FASE 2.');
+                            sim.next();
+                        }, 10_000);
+                    }, { once: true });
+                }
             }
-            if (this._audioEnded && userCount >= this._MIN_USERS) sim.next();
         },
         exit(sim) {
             log('uscita FASE 1 — reseed con fade dai bordi.');
@@ -93,17 +95,16 @@ export const STORY = [
     },
 
     // ── FASE 2 — LA NOTA ─────────────────────────────────────────────────────
-    // audio2 parte subito all'entrata. wind disabilitato fino alla prima nota.
-    // Al primo onNote → wind on → timer 20s → audio3_1 → timer 10s → sim.next().
-    // Il timer da 20s parte una sola volta (prima nota ricevuta).
+    // Wind disabilitato fino alla prima nota.
+    // Prima nota → wind on → timer 20s → audio3_1 → timer 10s → sim.next().
+    // Il timer da 20s parte una sola volta.
     {
         id: PHASE.NOTA,
         _noteTimerStarted: false,
         enter(sim) {
             this._noteTimerStarted = false;
             sim.freezeParams({ windEnabled: false });
-            log('FASE 2 — nota. wind disabilitato. audio2 in partenza.');
-            this._audio = sim.playNarratorAudio('audio2.mp3');
+            log('FASE 2 — nota. wind disabilitato. in attesa della prima nota.');
         },
         onNote(sim, noteIndex) {
             if (this._noteTimerStarted) return;
@@ -112,7 +113,6 @@ export const STORY = [
             log('prima nota ricevuta (index ' + noteIndex + '). wind abilitato. timer 20s avviato.');
             setTimeout(() => {
                 log('20s scaduti — audio3_1 in partenza.');
-                this._audio?.pause();
                 this._audio = sim.playNarratorAudio('audio3_1.mp3');
                 this._audio.addEventListener('ended', () => {
                     log('audio3_1 terminato. attesa 10s prima di avanzare a FASE 3.');
