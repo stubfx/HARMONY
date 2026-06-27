@@ -552,7 +552,7 @@ const simFacade = {
     // Pass { autoNext: true } to advance to the next step when playback ends.
     // Returns the Audio element so the caller can pause it on exit if needed.
     playNarratorAudio(filename, { autoNext = false } = {}) {
-        const audio = new Audio(`/simAss-narrator/${filename}`);
+        const audio = new Audio(`${_apiBase}/simAss-narrator/${filename}`);
         if (autoNext) audio.addEventListener('ended', () => storyEngine.next(), { once: true });
         audio.play().catch(e => console.warn('[narrator]', e));
         return audio;
