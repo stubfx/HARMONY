@@ -136,15 +136,18 @@ export const STORY = [
 
     // ── PHASE 3 — IL ROSSO ────────────────────────────────────────────────────
     // Narrator speaks; advances automatically when audio ends.
+    // color1 e color2 impostati a rosso puro per tutta la fase.
     // File: simAss/narrator/audio4.mp3
     {
         id: PHASE.ROSSO,
         enter(sim) {
-            log('PHASE 3 — rosso. audio4 in partenza.');
+            sim.freezeParams({ color1: '#ff0000', color2: '#ff0000' });
+            log('PHASE 3 — rosso. colori impostati a rosso. audio4 in partenza.');
             this._audio = sim.playNarratorAudio('audio4.mp3', { autoNext: true });
         },
         exit(sim) {
             log('uscita PHASE 3.');
+            sim.thawParams();
             this._audio?.pause();
             this._audio = null;
         },
