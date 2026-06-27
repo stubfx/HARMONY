@@ -50,41 +50,52 @@ export const STORY = [
 
     // ── PHASE 1 — CONNESSIONE ─────────────────────────────────────────────────
     // audio1 parte subito all'entrata.
-    // Prima connessione → audio2 parte (audio1 si ferma se ancora in corso).
+    // Prima connessione → se audio1 è già finito, audio2 parte subito;
+    //                     altrimenti audio2 parte alla fine di audio1.
     // audio2 finisce → 10s → sim.next().
     // dotRespawnChance abilitato 10s dopo la prima connessione.
     {
         id: PHASE.PRESHOW,
         enter(sim) {
             this._audio2Started = false;
+            this._audio1Ended = false;
+            this._firstUserConnected = false;
             log('PHASE 1 — connessione. audio1 in partenza.');
             sim.freezeParams({ spectatorSpawnChance: 0, randomTeleportChance: 0, dotRespawnChance: 0, spawnFadeRate: 0 });
             sim.suppressImages();
             sim.dormantSeed();
             this._audio = sim.playNarratorAudio('audio1.mp3');
+            this._audio.addEventListener('ended', () => {
+                this._audio1Ended = true;
+                log('audio1 terminato.');
+                if (this._firstUserConnected) this._startAudio2(sim);
+            }, { once: true });
+        },
+        _startAudio2(sim) {
+            if (this._audio2Started) return;
+            this._audio2Started = true;
+            log('audio2 in partenza.');
+            this._audio = sim.playNarratorAudio('audio2.mp3');
+            this._audio.addEventListener('ended', () => {
+                log('audio2 terminato. attesa 10s prima di avanzare a PHASE 2.');
+                setTimeout(() => {
+                    log('10s scaduti — avanzamento a PHASE 2.');
+                    sim.next();
+                }, 10_000);
+            }, { once: true });
         },
         onSpectatorJoined(sim, userCount) {
             log('utente connesso — totale: ' + userCount);
             sim.activateChunk(1);
             if (userCount === 1) {
+                this._firstUserConnected = true;
                 log('primo utente: dotRespawnChance attivo tra 10s.');
                 setTimeout(() => {
                     log('dotRespawnChance abilitato (0.002).');
                     sim.setParam('dotRespawnChance', 0.002);
                 }, 10_000);
-                if (!this._audio2Started) {
-                    this._audio2Started = true;
-                    this._audio?.pause();
-                    log('audio1 fermato. audio2 in partenza.');
-                    this._audio = sim.playNarratorAudio('audio2.mp3');
-                    this._audio.addEventListener('ended', () => {
-                        log('audio2 terminato. attesa 10s prima di avanzare a PHASE 2.');
-                        setTimeout(() => {
-                            log('10s scaduti — avanzamento a PHASE 2.');
-                            sim.next();
-                        }, 10_000);
-                    }, { once: true });
-                }
+                if (this._audio1Ended) this._startAudio2(sim);
+                // se audio1 è ancora in corso, _startAudio2 viene chiamato dal listener 'ended'
             }
         },
         exit(sim) {
