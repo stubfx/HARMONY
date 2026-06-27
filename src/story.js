@@ -3,16 +3,16 @@ import { PHASE, RESEED } from './constants.js';
 // ─── Narrator Audio Map ──────────────────────────────────────────────────────
 // All files live in simAss/narrator/. Replace any file to swap the narration.
 //
-//   audio1.mp3    →  preshow           (FASE 2 — connessione, suona a fine fase)
-//   audio2.mp3    →  nota              (FASE 3 — parte subito all'entrata dello step)
-//   audio3_1.mp3  →  nota              (FASE 3 — parte 20s dopo la prima nota suonata)
-//   audio3.mp3    →  rosso             (FASE 4 — date un colore alla nota)
-//   audio4.mp3    →  immagini-cuore    (FASE 5a — "Il primo suono che hai sentito...")
-//   audio5.mp3    →  immagini-tempesta (FASE 5b — "Il rombo prima del lampo...")
-//   audio6.mp3    →  testo             (FASE 6 — una parola a testa)
-//   audio7.mp3    →  chiusura          (FASE 7 — l'armonia non e' la stessa nota)
+//   audio1.mp3    →  preshow           (FASE 1 — connessione, suona a fine fase)
+//   audio2.mp3    →  nota              (FASE 2 — parte subito all'entrata dello step)
+//   audio3_1.mp3  →  nota              (FASE 2 — parte 20s dopo la prima nota suonata)
+//   audio3.mp3    →  rosso             (FASE 3 — date un colore alla nota)
+//   audio4.mp3    →  immagini-cuore    (FASE 4 — "Il primo suono che hai sentito...")
+//   audio5.mp3    →  immagini-tempesta (FASE 5 — "Il rombo prima del lampo...")
+//   audio6.mp3    →  testo             (FASE 7 — una parola a testa)
+//   audio7.mp3    →  chiusura          (FASE 8 — l'armonia non e' la stessa nota)
 //
-// immagini-bigbang non ha audio (note di regia: "non si commenta").
+// immagini-bigbang (FASE 6) non ha audio (note di regia: "non si commenta").
 
 // ─── Nota sui parametri hardcodati ───────────────────────────────────────────
 // Tutti i timer, le soglie e i nomi dei file sono volutamente hardcodati in
@@ -45,7 +45,7 @@ const log = (msg) => console.log(`[story] ${msg}`);
 
 export const STORY = [
 
-    // ── FASE 2 — CONNESSIONE ─────────────────────────────────────────────────
+    // ── FASE 1 — CONNESSIONE ─────────────────────────────────────────────────
     // audio1 starts immediately on enter (no users needed).
     // Users connect while the audio plays; each one lights up a chunk of agents.
     // After 10s from the first connection, dotRespawnChance is re-enabled.
@@ -57,7 +57,7 @@ export const STORY = [
         enter(sim) {
             this._userCount  = 0;
             this._audioEnded = false;
-            log('FASE 2 — connessione. audio1 in partenza.');
+            log('FASE 1 — connessione. audio1 in partenza.');
             sim.freezeParams({ spectatorSpawnChance: 0, randomTeleportChance: 0, dotRespawnChance: 0, spawnFadeRate: 0 });
             sim.suppressImages();
             sim.dormantSeed();
@@ -83,7 +83,7 @@ export const STORY = [
             if (this._audioEnded && userCount >= this._MIN_USERS) sim.next();
         },
         exit(sim) {
-            log('uscita FASE 2 — reseed con fade dai bordi.');
+            log('uscita FASE 1 — reseed con fade dai bordi.');
             this._audio?.pause();
             this._audio = null;
             sim.restoreImages();
@@ -92,7 +92,7 @@ export const STORY = [
         },
     },
 
-    // ── FASE 3 — LA NOTA ─────────────────────────────────────────────────────
+    // ── FASE 2 — LA NOTA ─────────────────────────────────────────────────────
     // audio2 parte subito all'entrata.
     // Al primo onNote → timer 20s → audio3_1 → timer 10s → sim.next().
     // Il timer da 20s parte una sola volta (prima nota ricevuta).
@@ -101,7 +101,7 @@ export const STORY = [
         _noteTimerStarted: false,
         enter(sim) {
             this._noteTimerStarted = false;
-            log('FASE 3 — nota. audio2 in partenza.');
+            log('FASE 2 — nota. audio2 in partenza.');
             this._audio = sim.playNarratorAudio('audio2.mp3');
         },
         onNote(sim, noteIndex) {
@@ -113,13 +113,29 @@ export const STORY = [
                 this._audio?.pause();
                 this._audio = sim.playNarratorAudio('audio3_1.mp3');
                 this._audio.addEventListener('ended', () => {
-                    log('audio3_1 terminato. attesa 10s prima di avanzare a FASE 4.');
+                    log('audio3_1 terminato. attesa 10s prima di avanzare a FASE 3.');
                     setTimeout(() => {
-                        log('10s scaduti — avanzamento a FASE 4.');
+                        log('10s scaduti — avanzamento a FASE 3.');
                         sim.next();
                     }, 10_000);
                 }, { once: true });
             }, 20_000);
+        },
+        exit(sim) {
+            log('uscita FASE 2.');
+            this._audio?.pause();
+            this._audio = null;
+        },
+    },
+
+    // ── FASE 3 — IL ROSSO ────────────────────────────────────────────────────
+    // Narrator speaks; advances automatically when audio ends.
+    // File: simAss/narrator/audio3.mp3
+    {
+        id: PHASE.ROSSO,
+        enter(sim) {
+            log('FASE 3 — rosso. audio3 in partenza.');
+            this._audio = sim.playNarratorAudio('audio3.mp3', { autoNext: true });
         },
         exit(sim) {
             log('uscita FASE 3.');
@@ -128,14 +144,16 @@ export const STORY = [
         },
     },
 
-    // ── FASE 4 — IL ROSSO ────────────────────────────────────────────────────
-    // Narrator speaks; advances automatically when audio ends.
-    // File: simAss/narrator/audio3.mp3
+    // ── FASE 4 — IMMAGINE: CUORE ─────────────────────────────────────────────
+    // TODO: implement image appearance logic (how the image fades/arrives on screen).
+    // Narrator speaks after silence; advances when audio ends.
+    // File: simAss/narrator/audio4.mp3
     {
-        id: PHASE.ROSSO,
+        id: PHASE.IMMAGINI_CUORE,
         enter(sim) {
-            log('FASE 4 — rosso. audio3 in partenza.');
-            this._audio = sim.playNarratorAudio('audio3.mp3', { autoNext: true });
+            log('FASE 4 — cuore. audio4 in partenza.');
+            // TODO: load cuore image into avoidmap
+            this._audio = sim.playNarratorAudio('audio4.mp3', { autoNext: true });
         },
         exit(sim) {
             log('uscita FASE 4.');
@@ -144,86 +162,68 @@ export const STORY = [
         },
     },
 
-    // ── FASE 5a — IMMAGINE: CUORE ────────────────────────────────────────────
-    // TODO: implement image appearance logic (how the image fades/arrives on screen).
-    // Narrator speaks after silence; advances when audio ends.
-    // File: simAss/narrator/audio4.mp3
-    {
-        id: PHASE.IMMAGINI_CUORE,
-        enter(sim) {
-            log('FASE 5a — cuore. audio4 in partenza.');
-            // TODO: load cuore image into avoidmap
-            this._audio = sim.playNarratorAudio('audio4.mp3', { autoNext: true });
-        },
-        exit(sim) {
-            log('uscita FASE 5a.');
-            this._audio?.pause();
-            this._audio = null;
-        },
-    },
-
-    // ── FASE 5b — IMMAGINE: TEMPESTA ─────────────────────────────────────────
+    // ── FASE 5 — IMMAGINE: TEMPESTA ──────────────────────────────────────────
     // TODO: implement image appearance logic.
     // Narrator speaks; advances when audio ends.
     // File: simAss/narrator/audio5.mp3
     {
         id: PHASE.IMMAGINI_TEMPESTA,
         enter(sim) {
-            log('FASE 5b — tempesta. audio5 in partenza.');
+            log('FASE 5 — tempesta. audio5 in partenza.');
             // TODO: load tempesta image into avoidmap
             this._audio = sim.playNarratorAudio('audio5.mp3', { autoNext: true });
         },
         exit(sim) {
-            log('uscita FASE 5b.');
+            log('uscita FASE 5.');
             this._audio?.pause();
             this._audio = null;
         },
     },
 
-    // ── FASE 5c — IMMAGINE: BIG BANG ─────────────────────────────────────────
+    // ── FASE 6 — IMMAGINE: BIG BANG ──────────────────────────────────────────
     // TODO: implement image appearance logic.
     // No narration (script note: "non si commenta").
     // Shown for 5 seconds, then cuts to black and auto-advances.
     {
         id: PHASE.IMMAGINI_BIGBANG,
         enter(sim) {
-            log('FASE 5c — bigbang. timer 5s avviato (no audio).');
+            log('FASE 6 — bigbang. timer 5s avviato (no audio).');
             // TODO: load bigbang image into avoidmap
             this._timer = setTimeout(() => {
-                log('5s scaduti — avanzamento a FASE 6.');
+                log('5s scaduti — avanzamento a FASE 7.');
                 sim.next();
             }, 5_000);
         },
         exit(sim) {
-            log('uscita FASE 5c.');
+            log('uscita FASE 6.');
             clearTimeout(this._timer);
             // TODO: cut to black before advancing
         },
     },
 
-    // ── FASE 6 — IL TESTO ────────────────────────────────────────────────────
+    // ── FASE 7 — IL TESTO ────────────────────────────────────────────────────
     // Narrator speaks; advances automatically when audio ends.
     // File: simAss/narrator/audio6.mp3
     {
         id: PHASE.TESTO,
         enter(sim) {
-            log('FASE 6 — testo. audio6 in partenza.');
+            log('FASE 7 — testo. audio6 in partenza.');
             this._audio = sim.playNarratorAudio('audio6.mp3', { autoNext: true });
         },
         exit(sim) {
-            log('uscita FASE 6.');
+            log('uscita FASE 7.');
             this._audio?.pause();
             this._audio = null;
         },
     },
 
-    // ── FASE 7 — CHIUSURA ────────────────────────────────────────────────────
+    // ── FASE 8 — CHIUSURA ────────────────────────────────────────────────────
     // Narrator speaks. Last step — no next().
     // File: simAss/narrator/audio7.mp3
     {
         id: PHASE.CHIUSURA,
         enter(sim) {
-            log('FASE 7 — chiusura. audio7 in partenza. fine storia.');
+            log('FASE 8 — chiusura. audio7 in partenza. fine storia.');
             this._audio = sim.playNarratorAudio('audio7.mp3');
         },
         exit(sim) {
