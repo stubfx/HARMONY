@@ -34,28 +34,22 @@
 export const STORY = [
 
     // ── FASE 2 — CONNESSIONE ─────────────────────────────────────────────────
-    // Users connect one by one; each one lights up a chunk of agents.
+    // audio1 starts immediately on enter (no users needed).
+    // Users connect while the audio plays; each one lights up a chunk of agents.
     // After 10s from the first connection, dotRespawnChance is re-enabled.
-    // Once at least MIN_USERS have joined, audio1.mp3 plays once; the step
-    // advances automatically when the audio ends.
+    // Step advances automatically when audio1 ends.
     {
         id: 'preshow',
-        _MIN_USERS: 1, // hardcoded threshold — raise when ready for full audience
-        _audioPlayed: false,
         enter(sim) {
-            this._audioPlayed = false;
             sim.freezeParams({ spectatorSpawnChance: 0, randomTeleportChance: 0, dotRespawnChance: 0 });
             sim.suppressImages();
             sim.dormantSeed();
+            this._audio = sim.playNarratorAudio('audio1.mp3', { autoNext: true });
         },
         onSpectatorJoined(sim, userCount) {
             sim.activateChunk(1);
             if (userCount === 1) {
                 setTimeout(() => sim.setParam('dotRespawnChance', 0.002), 10_000);
-            }
-            if (!this._audioPlayed && userCount >= this._MIN_USERS) {
-                this._audioPlayed = true;
-                this._audio = sim.playNarratorAudio('audio1.mp3', { autoNext: true });
             }
         },
         exit(sim) {
