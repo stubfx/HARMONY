@@ -36,9 +36,14 @@ export const STORY = [
     // ── FASE 2 — CONNESSIONE ─────────────────────────────────────────────────
     // Users connect one by one; each one lights up a chunk of agents.
     // After 10s from the first connection, dotRespawnChance is re-enabled.
+    // Once at least MIN_USERS have joined, audio1.mp3 plays once; the step
+    // advances automatically when the audio ends.
     {
         id: 'preshow',
+        _MIN_USERS: 1, // hardcoded threshold — raise when ready for full audience
+        _audioPlayed: false,
         enter(sim) {
+            this._audioPlayed = false;
             sim.freezeParams({ spectatorSpawnChance: 0, randomTeleportChance: 0, dotRespawnChance: 0 });
             sim.suppressImages();
             sim.dormantSeed();
@@ -48,8 +53,14 @@ export const STORY = [
             if (userCount === 1) {
                 setTimeout(() => sim.setParam('dotRespawnChance', 0.002), 10_000);
             }
+            if (!this._audioPlayed && userCount >= this._MIN_USERS) {
+                this._audioPlayed = true;
+                this._audio = sim.playNarratorAudio('audio1.mp3', { autoNext: true });
+            }
         },
         exit(sim) {
+            this._audio?.pause();
+            this._audio = null;
             sim.restoreImages();
             sim.thawParams();
             sim.reseed();
@@ -62,7 +73,7 @@ export const STORY = [
     {
         id: 'nota',
         enter(sim) {
-            this._audio = sim.playNarratorAudio('audio2.mp3');
+            this._audio = sim.playNarratorAudio('audio2.mp3', { autoNext: true });
         },
         exit(sim) {
             this._audio?.pause();
@@ -71,67 +82,92 @@ export const STORY = [
     },
 
     // ── FASE 4 — IL ROSSO ────────────────────────────────────────────────────
-    // Users assign a color (Y axis on remote → hue) to their note.
-    // Advance manually via sim.next().
+    // Narrator speaks; advances automatically when audio ends.
+    // File: simAss/narrator/audio3.mp3
     {
         id: 'rosso',
-        enter(sim) {},
-        exit(sim)  {},
+        enter(sim) {
+            this._audio = sim.playNarratorAudio('audio3.mp3', { autoNext: true });
+        },
+        exit(sim) {
+            this._audio?.pause();
+            this._audio = null;
+        },
     },
 
     // ── FASE 5a — IMMAGINE: CUORE ────────────────────────────────────────────
     // TODO: implement image appearance logic (how the image fades/arrives on screen).
-    // Shown for 10 seconds in total silence, then auto-advances.
+    // Narrator speaks after silence; advances when audio ends.
+    // File: simAss/narrator/audio4.mp3
     {
         id: 'immagini-cuore',
         enter(sim) {
             // TODO: load cuore image into avoidmap
-            setTimeout(() => sim.next(), 10_000);
+            this._audio = sim.playNarratorAudio('audio4.mp3', { autoNext: true });
         },
-        exit(sim) {},
+        exit(sim) {
+            this._audio?.pause();
+            this._audio = null;
+        },
     },
 
     // ── FASE 5b — IMMAGINE: TEMPESTA ─────────────────────────────────────────
     // TODO: implement image appearance logic.
-    // Shown for 7 seconds, then auto-advances.
+    // Narrator speaks; advances when audio ends.
+    // File: simAss/narrator/audio5.mp3
     {
         id: 'immagini-tempesta',
         enter(sim) {
             // TODO: load tempesta image into avoidmap
-            setTimeout(() => sim.next(), 7_000);
+            this._audio = sim.playNarratorAudio('audio5.mp3', { autoNext: true });
         },
-        exit(sim) {},
+        exit(sim) {
+            this._audio?.pause();
+            this._audio = null;
+        },
     },
 
     // ── FASE 5c — IMMAGINE: BIG BANG ─────────────────────────────────────────
     // TODO: implement image appearance logic.
+    // No narration (script note: "non si commenta").
     // Shown for 5 seconds, then cuts to black and auto-advances.
     {
         id: 'immagini-bigbang',
         enter(sim) {
             // TODO: load bigbang image into avoidmap
-            setTimeout(() => sim.next(), 5_000);
+            this._timer = setTimeout(() => sim.next(), 5_000);
         },
         exit(sim) {
+            clearTimeout(this._timer);
             // TODO: cut to black before advancing
         },
     },
 
     // ── FASE 6 — IL TESTO ────────────────────────────────────────────────────
-    // Users type one word each; the text forms on screen via avoidmap.
-    // Advance manually via sim.next() when the text has formed.
+    // Narrator speaks; advances automatically when audio ends.
+    // File: simAss/narrator/audio6.mp3
     {
         id: 'testo',
-        enter(sim) {},
-        exit(sim)  {},
+        enter(sim) {
+            this._audio = sim.playNarratorAudio('audio6.mp3', { autoNext: true });
+        },
+        exit(sim) {
+            this._audio?.pause();
+            this._audio = null;
+        },
     },
 
     // ── FASE 7 — CHIUSURA ────────────────────────────────────────────────────
-    // All notes play together; audio grows. Final monologue.
-    // Last step — no next().
+    // Narrator speaks. Last step — no next().
+    // File: simAss/narrator/audio7.mp3
     {
         id: 'chiusura',
-        enter(sim) {},
-        exit(sim)  {},
+        enter(sim) {
+            this._audio = sim.playNarratorAudio('audio7.mp3');
+        },
+        exit(sim) {
+            this._audio?.pause();
+            this._audio = null;
+        },
     },
 ];
