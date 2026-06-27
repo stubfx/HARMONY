@@ -55,6 +55,12 @@
 //   [192] releaseBurstSpeed    f32   (initial speed of the fireworks scatter when a joystick is released; 0 = off)
 //   [196] chaos                f32
 //   [200] randomTeleportChance f32   (per-frame probability [0–1] that any agent teleports to a random canvas position)
+//   [204] chladniActive        u32
+//   [208] chladniM             f32
+//   [212] chladniN             f32
+//   [216] chladniSym           f32
+//   [220] chladniBlend         f32
+//   [224] spawnFadeRate        f32   (per-frame weight increment for newly-respawned agents; 0 = stay dark)
 
 struct SoloParams {
     agentCount:     u32,
@@ -113,6 +119,10 @@ struct SoloParams {
     chladniN:             f32,   // Chladni mode N
     chladniSym:           f32,   // Chladni symmetry factor (±1)
     chladniBlend:         f32,   // 0–1 blend weight; 0 = formula only, 1 = full Chladni
+    spawnFadeRate:        f32,   // per-frame weight increment after respawn; 0 = stay dark
+    _pad0:                u32,
+    _pad1:                u32,
+    _pad2:                u32,
 }
 
 // Per-spectator partition data — color, joystick spawner position, personal wind.
@@ -286,7 +296,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     var pos    = agents[i].pos;
     var vel    = agents[i].vel;
     let home   = agents[i].home;
-    let weight = agents[i].weight;
+    var weight = agents[i].weight;
 
     let x   = pos.x;
     let y   = pos.y;
@@ -608,6 +618,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                 agents[i].pos    = ep;
                 agents[i].vel    = vec2<f32>(0.0, 0.0);
                 agents[i].primed = 0.0;
+                agents[i].weight = 0.0;
                 return;
             }
         }
@@ -671,7 +682,13 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         }
     }
 
+    // Fade-in: agents that spawned at weight=0 brighten up each frame.
+    if (params.spawnFadeRate > 0.0 && weight < 1.0) {
+        weight = min(weight + params.spawnFadeRate, 1.0);
+    }
+
     agents[i].pos    = np;
     agents[i].vel    = vel;
+    agents[i].weight = weight;
     agents[i].primed = select(0.0, 1.0, homeInImg);
 }

@@ -136,6 +136,7 @@ const params = {
     // DOT mode
     dotCenterRadius:     50,   // px — agents within this radius of centre are candidates for respawn (0 = disabled)
     dotRespawnChance:    0.01, // per-frame probability that a centre-zone agent is respawned to an edge
+    spawnFadeRate:       0.008, // per-frame weight increment after respawn (0 = stay dark, ~125 frames to full)
     // Freeroam lock — when on, FREEROAM auto-reverts to NORMAL after a delay
     freeroamLock:        true,
     freeroamLockDelay:   30,   // seconds in FREEROAM before reverting to NORMAL (timer resets each time FREEROAM is re-entered)
@@ -384,7 +385,7 @@ const agentBuf = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 const soloUB = device.createBuffer({
-    size: 224, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 240, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
     size: 208, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -2637,6 +2638,7 @@ function writeSoloUB(dt, time) {
     f[53] = 1.0 + (_chladniSum * 0.11) % 2.0;
     f[54] = (_chladniSum % 2 === 0) ? 1.0 : -1.0;
     f[55] = params.chladniBlend;
+    f[56] = params.spawnFadeRate;
     setChaos(chaosGPU);
     const _synthNow = performance.now();
     if (_synthNow - _lastSynthTick >= 200) {
@@ -2824,7 +2826,7 @@ function writeContamUB() {
 }
 
 // ── Pre-allocated uniform buffers (reused every frame to avoid GC pressure) ──
-const _soloAB  = new ArrayBuffer(224); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
+const _soloAB  = new ArrayBuffer(240); const _soloU  = new Uint32Array(_soloAB);  const _soloF  = new Float32Array(_soloAB);
 const _renderAB= new ArrayBuffer(208); const _renderU= new Uint32Array(_renderAB); const _renderF= new Float32Array(_renderAB);
 const _fadeAB  = new ArrayBuffer(16);  const _fadeF  = new Float32Array(_fadeAB);
 const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB); const _blitU  = new Uint32Array(_blitAB);

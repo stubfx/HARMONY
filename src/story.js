@@ -45,7 +45,7 @@ export const STORY = [
         enter(sim) {
             this._userCount  = 0;
             this._audioEnded = false;
-            sim.freezeParams({ spectatorSpawnChance: 0, randomTeleportChance: 0, dotRespawnChance: 0 });
+            sim.freezeParams({ spectatorSpawnChance: 0, randomTeleportChance: 0, dotRespawnChance: 0, spawnFadeRate: 0 });
             sim.suppressImages();
             sim.dormantSeed();
             this._audio = sim.playNarratorAudio('audio1.mp3');
