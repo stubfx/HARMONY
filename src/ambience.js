@@ -153,13 +153,17 @@ let _blinkersTimer = null;
 
 function _blinkersStep() {
     const delay = 200 + Math.random() * 7800;
+    console.log(`[blinkers] prossimo blinker tra ${(delay / 1000).toFixed(1)}s`);
     _blinkersTimer = setTimeout(() => {
-        blinker(BLINKER_TYPES[Math.floor(Math.random() * BLINKER_TYPES.length)]);
+        const type = BLINKER_TYPES[Math.floor(Math.random() * BLINKER_TYPES.length)];
+        console.log(`[blinkers] suono: ${type}`);
+        blinker(type);
         _blinkersStep();
     }, delay);
 }
 
 export function startBlinkersLoop() {
+    console.log('[blinkers] startBlinkersLoop chiamato, _blinkersTimer:', _blinkersTimer);
     if (_blinkersTimer !== null) return;
     _blinkersStep();
 }
