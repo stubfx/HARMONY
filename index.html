@@ -131,24 +131,23 @@
         /* ── Audio unlock nudge ─────────────────────────────────────────────── */
         #audio-unlock {
             position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
+            inset: 0;
             z-index: 20;
             background: rgba(0, 0, 0, 0.55);
             border: none;
-            border-top: 1px solid rgba(255, 255, 255, 0.07);
-            padding: 10px 24px;
             cursor: pointer;
-            color: rgba(255, 255, 255, 0.35);
+            color: rgba(255, 255, 255, 0.95);
             font-family: monospace;
-            font-size: 0.7rem;
-            letter-spacing: 0.1em;
+            font-size: 1.4rem;
+            letter-spacing: 0.2em;
             text-align: center;
-            transition: opacity 0.5s, color 0.2s;
-            backdrop-filter: blur(6px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s;
+            backdrop-filter: blur(12px);
         }
-        #audio-unlock:hover { color: rgba(255, 255, 255, 0.65); }
+        #audio-unlock:hover { color: #ffffff; }
         #audio-unlock.unlocked { opacity: 0; pointer-events: none; }
 
         /* ── Vote countdown — large number shown on the main display during VOTE ── */
