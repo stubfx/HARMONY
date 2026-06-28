@@ -3,6 +3,7 @@
 // Call init(apiBase) once at startup, then start() when the story is ready.
 
 import * as Tone from 'tone';
+import { blinker, BLINKER_TYPES } from './synth.js';
 
 const RAMP = 2.0; // seconds for smooth parameter transitions
 
@@ -143,4 +144,28 @@ export function setChaos(chaos) {
 // Independent bus volume (dB). Matches the GUI ch2 slider.
 export function setVolume(db) {
     if (_busVol) _busVol.volume.value = db;
+}
+
+// ── Blinkers loop ─────────────────────────────────────────────────────────────
+// Plays a random blinker every 0.2–8 s. Fully async, cancellable.
+
+let _blinkersTimer = null;
+
+function _blinkersStep() {
+    const delay = 200 + Math.random() * 7800;
+    _blinkersTimer = setTimeout(() => {
+        blinker(BLINKER_TYPES[Math.floor(Math.random() * BLINKER_TYPES.length)]);
+        _blinkersStep();
+    }, delay);
+}
+
+export function startBlinkersLoop() {
+    if (_blinkersTimer !== null) return;
+    _blinkersStep();
+}
+
+export function stopBlinkersLoop() {
+    if (_blinkersTimer === null) return;
+    clearTimeout(_blinkersTimer);
+    _blinkersTimer = null;
 }

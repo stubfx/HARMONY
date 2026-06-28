@@ -168,7 +168,8 @@ export const STORY = [
         id: PHASE.ROSSO,
         enter(sim) {
             sim.enableHarmonyImages();
-            log('PHASE 3 — rosso. immagini harmony abilitate. audio4 in partenza.');
+            sim.startBlinkersLoop();
+            log('PHASE 3 — rosso. immagini harmony abilitate. blinkers loop avviato. audio4 in partenza.');
             this._audio = sim.playNarratorAudio('audio4.mp3');
             this._audio.addEventListener('ended', () => {
                 log('audio4 terminato. attesa 5s → colori rosso → PHASE 4.');

@@ -211,18 +211,18 @@ async function _ensurePingReverb() {
     _pingReverb.toDestination();
 }
 
-const PING_PRESETS = {
+const BLINKER_PRESETS = {
     //          freq   slide  decay  vol    type
-    sonar:    [ 528,   0.82,  1.8,  -22,  'sine'     ],  // default join ping
+    sonar:    [ 528,   0.82,  1.8,  -22,  'sine'     ],
     sputnik:  [ 880,   0.97,  0.7,  -24,  'sine'     ],
     deep:     [ 264,   0.80,  3.0,  -18,  'sine'     ],
     blip:     [ 1320,  1.00,  0.18, -26,  'triangle' ],
     ghost:    [ 440,   0.75,  4.0,  -30,  'sine'     ],
 };
 
-export async function ping(type = 'sonar') {
+export async function blinker(type = 'sonar') {
     await _ensurePingReverb();
-    const [freq, slideRatio, decay, vol, oscType] = PING_PRESETS[type] ?? PING_PRESETS.sonar;
+    const [freq, slideRatio, decay, vol, oscType] = BLINKER_PRESETS[type] ?? BLINKER_PRESETS.sonar;
     const synth = new Tone.Synth({
         oscillator: { type: oscType },
         envelope:   { attack: 0.002, decay, sustain: 0, release: 0.1 },
@@ -236,5 +236,5 @@ export async function ping(type = 'sonar') {
     setTimeout(() => synth.dispose(), (decay + 1.5) * 1000);
 }
 
-export const PING_TYPES = Object.keys(PING_PRESETS);
+export const BLINKER_TYPES = Object.keys(BLINKER_PRESETS);
 

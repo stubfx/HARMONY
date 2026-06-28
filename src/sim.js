@@ -20,7 +20,7 @@ import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
 import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
 import champLinesWGSL   from './shaders/champLines.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
-import { startSynth, setSynthState, setSynthDroneOnly, addArpInfluence, ping, PING_TYPES } from './synth.js';
+import { startSynth, setSynthState, setSynthDroneOnly, addArpInfluence, blinker, BLINKER_TYPES } from './synth.js';
 import * as ambience from './ambience.js';
 import { StoryEngine } from './storyEngine.js';
 import { STORY }       from './story.js';
@@ -592,6 +592,9 @@ const simFacade = {
     // Start the ambience music. Routed through ambience.js (Tone.js radio chain).
     // Safe to call multiple times — no-op if already started.
     startBackgroundMusic() { ambience.start(); },
+
+    startBlinkersLoop() { ambience.startBlinkersLoop(); },
+    stopBlinkersLoop()  { ambience.stopBlinkersLoop();  },
 
     // Play a narrator audio file from simAss/narrator/.
     // Pass { autoNext: true } to advance to the next step when playback ends.
@@ -2083,7 +2086,7 @@ ambience.init(_apiBase);
     // A spectator joined — assign a slot, send them their color, brightness burst.
     socket.on('spectator-joined', ({ spectatorId, userCount } = {}) => {
         if (userCount !== undefined) simState.userCount = userCount;
-        ping(PING_TYPES[Math.floor(Math.random() * PING_TYPES.length)]);
+        blinker(BLINKER_TYPES[Math.floor(Math.random() * BLINKER_TYPES.length)]);
         if (_preshowActive) {
             storyEngine.onSpectatorJoined(userCount);
         } else {
