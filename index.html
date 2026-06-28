@@ -4,6 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>swarm</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bellefair&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { box-sizing: border-box; }
         body   { margin: 0; background: #000; overflow: hidden; font-family: monospace; }
@@ -136,18 +139,27 @@
             background: rgba(0, 0, 0, 0.55);
             border: none;
             cursor: pointer;
-            color: rgba(255, 255, 255, 0.95);
-            font-family: monospace;
-            font-size: 1.4rem;
-            letter-spacing: 0.2em;
+            color: #ffffff;
+            font-family: 'Bellefair', serif;
             text-align: center;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
+            gap: 1.2rem;
             transition: opacity 0.5s;
             backdrop-filter: blur(12px);
         }
-        #audio-unlock:hover { color: #ffffff; }
+        #audio-unlock .unlock-title {
+            font-size: clamp(4rem, 14vw, 11rem);
+            letter-spacing: 0.25em;
+            line-height: 1;
+        }
+        #audio-unlock .unlock-countdown {
+            font-size: clamp(0.9rem, 2.2vw, 1.4rem);
+            letter-spacing: 0.3em;
+            opacity: 0.75;
+        }
         #audio-unlock.unlocked { opacity: 0; pointer-events: none; }
 
         /* ── Vote countdown — large number shown on the main display during VOTE ── */
@@ -213,7 +225,28 @@
     </div>
 
     <div id="vote-countdown"></div>
-    <button id="audio-unlock">tap to start</button>
+    <button id="audio-unlock">
+        <span class="unlock-title">HARMONY</span>
+        <span class="unlock-countdown" id="unlock-countdown"></span>
+    </button>
+    <script>
+        (function () {
+            const TARGET = new Date('2026-07-25T00:00:00');
+            const el = document.getElementById('unlock-countdown');
+            function tick() {
+                const diff = TARGET - Date.now();
+                if (diff <= 0) { el.textContent = '25 · VII · MMXXVI'; return; }
+                const d  = Math.floor(diff / 86400000);
+                const h  = Math.floor((diff % 86400000) / 3600000);
+                const m  = Math.floor((diff % 3600000)  / 60000);
+                const s  = Math.floor((diff % 60000)    / 1000);
+                const pad = n => String(n).padStart(2, '0');
+                el.textContent = `${d}d  ${pad(h)}h  ${pad(m)}m  ${pad(s)}s`;
+            }
+            tick();
+            setInterval(tick, 1000);
+        })();
+    </script>
 
     <input id="image-input"     type="file" accept="image/*" style="display:none;">
     <input id="avoid-map-input" type="file" accept="image/*" style="display:none;">
