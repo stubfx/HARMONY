@@ -603,9 +603,8 @@ const simFacade = {
     },
 
     setTraceText(text) {
-        _rawTraceText = text;
         const input = document.querySelector('#trace-text-input');
-        if (input) { input.value = text.replace(/\n/g, ' '); renderTextAvoidMap(); }
+        if (input) { input.value = text; renderTextAvoidMap(); }
     },
 
     // Set direction and wind formulas (WGSL expressions). Fire-and-forget async.
@@ -1122,7 +1121,6 @@ function seedGoL() {
 let _inQROverlayUpdate = false;
 let _qrOwnedAvoidMap   = false; // true when the current avoid map was set by updateQROverlay
 let _textOwnedAvoidMap = false; // true when the current avoid map was rendered from the text input
-let _rawTraceText      = null;  // preserves \n — set by setTraceText(), cleared when user edits the input directly
 function updateQROverlay() {
     const visible = params.qrOverlay && simState.qrStatus === 'SHOW' && !!qrBitmap;
     qrOverlayEl.style.opacity = visible ? '1' : '0';
@@ -1380,8 +1378,7 @@ let _textAvoidCanvas = null;
 
 function renderTextAvoidMap() {
     if (!device) return;
-    const _rawInput = document.querySelector('#trace-text-input')?.value ?? '';
-    const text = (_rawTraceText !== null ? _rawTraceText : _rawInput).trim();
+    const text = document.querySelector('#trace-text-input')?.value.trim() ?? '';
 
     // No text, or an image is loaded — teardown inline (no clearAvoidMap call to avoid cycles)
     if (!text || imageBitmap) {
@@ -2578,7 +2575,6 @@ document.querySelector('#avoid-map-input').addEventListener('change', e => {
 // stops typing. The text is drawn as white glyphs on top of any loaded image.
 let traceTextTimer = null;
 document.querySelector('#trace-text-input').addEventListener('input', () => {
-    _rawTraceText = null; // user is typing directly — stop using the raw programmatic text
     clearTimeout(traceTextTimer);
     traceTextTimer = setTimeout(() => {
         renderTextAvoidMap();
