@@ -1415,35 +1415,34 @@ function renderTextAvoidMap() {
     const scale   = w / canvas.width;
     const maxW    = canvas.width * 0.75 * scale; // 75% of full screen, scaled to avoidmap px
 
+    // word-wrap a single segment (no \n) at the current ctx.font
+    const wrapSeg = seg => {
+        const words = seg.trim().split(/\s+/).filter(Boolean);
+        const out = []; let cur = '';
+        for (const w of words) {
+            const test = cur ? `${cur} ${w}` : w;
+            if (ctx.measureText(test).width > maxW && cur) { out.push(cur); cur = w; }
+            else cur = test;
+        }
+        if (cur) out.push(cur);
+        return out;
+    };
+    const segments = text.split('\n');
+
     // Pass 1: word-wrap at an initial font size to determine line breaks
     const initFontSize = Math.round(Math.min(canvas.width, canvas.height) * 0.10 * scale);
     ctx.font = `bold ${initFontSize}px ${fontStack}`;
-    const words = text.split(/\s+/);
-    const lines = [];
-    let cur = '';
-    for (const word of words) {
-        const test = cur ? `${cur} ${word}` : word;
-        if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = word; }
-        else cur = test;
-    }
-    if (cur) lines.push(cur);
+    const lines = segments.flatMap(wrapSeg);
 
     // Pass 2: fit font so the longest line fills exactly maxW
-    const longestMeasured = Math.max(...lines.map(l => ctx.measureText(l).width));
+    const longestMeasured = Math.max(...lines.map(l => ctx.measureText(l).width), 0);
     const fontSize = longestMeasured > 0
         ? Math.floor(initFontSize * maxW / longestMeasured)
         : initFontSize;
     ctx.font = `bold ${fontSize}px ${fontStack}`;
 
     // Pass 3: re-wrap at fitted font size (longer font → fewer words per line)
-    const lines2 = [];
-    let cur2 = '';
-    for (const word of words) {
-        const test = cur2 ? `${cur2} ${word}` : word;
-        if (ctx.measureText(test).width > maxW && cur2) { lines2.push(cur2); cur2 = word; }
-        else cur2 = test;
-    }
-    if (cur2) lines2.push(cur2);
+    const lines2 = segments.flatMap(wrapSeg);
 
     const lineH  = Math.round(fontSize * 1.35);
     const startY = cy - ((lines2.length - 1) * lineH) / 2;
@@ -2476,14 +2475,41 @@ function _syncAudioBanner() {
     _audioBanner?.classList.toggle('unlocked', isAudioReady());
 }
 
-document.addEventListener('pointerdown', async () => {
-    await unlockAudio();
-    if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
-    _syncAudioBanner();
-    setSynthDroneOnly(true);
-    startSynth().then(() => setSynthState(1.0, smoothCoherence, 0, 0, smoothTemp));
-    storyEngine.start();
-}, { once: true });
+// ── Pre-story splash — HARMONY + countdown in the sim trace text ──────────────
+{
+    const _splashTarget = new Date('2026-07-25T00:00:00');
+    let _splashInterval = null;
+
+    function _splashTick() {
+        const diff = _splashTarget - Date.now();
+        let countdown;
+        if (diff <= 0) {
+            countdown = '25 · VII · MMXXVI';
+        } else {
+            const d   = Math.floor(diff / 86400000);
+            const h   = Math.floor((diff % 86400000) / 3600000);
+            const m   = Math.floor((diff % 3600000)  / 60000);
+            const s   = Math.floor((diff % 60000)    / 1000);
+            const pad = n => String(n).padStart(2, '0');
+            countdown = `${d}d  ${pad(h)}h  ${pad(m)}m  ${pad(s)}s`;
+        }
+        simFacade.setTraceText(`HARMONY\n${countdown}`);
+    }
+
+    _splashTick();
+    _splashInterval = setInterval(_splashTick, 1000);
+
+    document.addEventListener('pointerdown', async () => {
+        clearInterval(_splashInterval);
+        simFacade.setTraceText('');
+        await unlockAudio();
+        if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
+        _syncAudioBanner();
+        setSynthDroneOnly(true);
+        startSynth().then(() => setSynthState(1.0, smoothCoherence, 0, 0, smoothTemp));
+        storyEngine.start();
+    }, { once: true });
+}
 
 // ── File input for trace image ────────────────────────────────────────────────
 
