@@ -124,6 +124,14 @@ export async function startSynth() {
 // coherence : 0 = scattered, 1 = converged
 // biasX/Y   : collective tilt (wind direction), nominally 0–1 centered at 0
 // temp      : collective temperature 0–1
+let _droneOnly = false;
+
+// When true, only the drone plays — noise/pad/arp are silenced.
+// Call setSynthDroneOnly(false) to restore all layers.
+export function setSynthDroneOnly(enabled) {
+    _droneOnly = enabled;
+}
+
 export function setSynthState(chaos, coherence = 0.5, biasX = 0, biasY = 0, temp = 0.5) {
     if (!_ready) return;
     const c   = Math.max(0, Math.min(1, chaos));
@@ -141,6 +149,8 @@ export function setSynthState(chaos, coherence = 0.5, biasX = 0, biasY = 0, temp
 
     // Drone — always audible, slightly quieter at peak chaos
     smoothTo(_droneVol.volume, -18 - c * 6);
+
+    if (_droneOnly) return; // PHASE 1: solo drone, gli altri layer restano silenziosi
 
     // Noise — fades out as harmony approaches
     smoothTo(_noiseGain.gain, Math.max(1e-4, c * 0.25));

@@ -20,7 +20,7 @@ import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
 import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
 import champLinesWGSL   from './shaders/champLines.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
-import { startSynth, setSynthState, addArpInfluence, ping, PING_TYPES } from './synth.js';
+import { startSynth, setSynthState, setSynthDroneOnly, addArpInfluence, ping, PING_TYPES } from './synth.js';
 import * as ambience from './ambience.js';
 import { StoryEngine } from './storyEngine.js';
 import { STORY }       from './story.js';
@@ -585,6 +585,9 @@ const simFacade = {
 
     // Set direction and wind formulas (WGSL expressions). Fire-and-forget async.
     setFormulas(dir, wind) { applyFormulas(dir, wind); },
+
+    // Unlock noise/pad/arp — call when the story is ready for the full synth.
+    enableFullSynth() { setSynthDroneOnly(false); },
 
     // Start the ambience music. Routed through ambience.js (Tone.js radio chain).
     // Safe to call multiple times — no-op if already started.
@@ -2444,6 +2447,7 @@ document.addEventListener('pointerdown', async () => {
     await unlockAudio();
     if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
     _syncAudioBanner();
+    setSynthDroneOnly(true);
     startSynth().then(() => setSynthState(1.0, smoothCoherence, 0, 0, smoothTemp));
     storyEngine.start();
 }, { once: true });

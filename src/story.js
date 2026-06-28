@@ -137,7 +137,8 @@ export const STORY = [
             sim.freezeParams({ windEnabled: false });
             sim.setTraceText('HARMONY');
             sim.startBackgroundMusic();
-            log('PHASE 2 — nota. wind disabilitato. testo HARMONY impostato. musica di fondo avviata. audio3 parte tra 10s.');
+            sim.enableFullSynth();
+            log('PHASE 2 — nota. wind disabilitato. synth completo abilitato. musica di fondo avviata. audio3 parte tra 10s.');
             setTimeout(() => {
                 log('10s scaduti — audio3 in partenza.');
                 this._audio = sim.playNarratorAudio('audio3.mp3');
