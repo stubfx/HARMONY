@@ -1,6 +1,6 @@
 import GUI from 'lil-gui';
 import { stopAudio, isActive, setDuckLevel } from './audio.js';
-import { setSynthBusVolume } from './synth.js';
+import { setSynthBusVolume, ping, PING_TYPES } from './synth.js';
 import { setVolume as setAmbienceVolume } from './ambience.js';
 
 // ── GUI initialisation ────────────────────────────────────────────────────────
@@ -226,6 +226,10 @@ export function initGUI({
     const _busState = { synthVol: 0, musicVol: 0 };
     fAudio.add(_busState, 'synthVol', -30, 6, 0.5).name('ch1: synth vol').onChange(v => setSynthBusVolume(v));
     fAudio.add(_busState, 'musicVol', -30, 6, 0.5).name('ch2: music vol').onChange(v => setAmbienceVolume(v));
+
+    const fPing = fAudio.addFolder('ping variants');
+    const _pingBtns = Object.fromEntries(PING_TYPES.map(t => [t, () => ping(t)]));
+    PING_TYPES.forEach(t => fPing.add(_pingBtns, t).name(`▶ ${t}`));
     fAudio.close();
 
     // ── Debug ─────────────────────────────────────────────────────────────────

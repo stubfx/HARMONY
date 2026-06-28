@@ -191,3 +191,40 @@ export function stopSynth() {
     }, 1600);
 }
 
+// ── Ping / blip — short tonal transient, fires on spectator join ──────────────
+// Shared reverb tail — built once, reused across all ping types.
+let _pingReverb = null;
+async function _ensurePingReverb() {
+    if (_pingReverb) return;
+    _pingReverb = new Tone.Reverb({ decay: 6, wet: 0.65 });
+    await _pingReverb.ready;
+    _pingReverb.toDestination();
+}
+
+const PING_PRESETS = {
+    //          freq   slide  decay  vol    type
+    sonar:    [ 528,   0.82,  1.8,  -22,  'sine'     ],  // default join ping
+    sputnik:  [ 880,   0.97,  0.7,  -24,  'sine'     ],
+    deep:     [ 264,   0.80,  3.0,  -18,  'sine'     ],
+    blip:     [ 1320,  1.00,  0.18, -26,  'triangle' ],
+    ghost:    [ 440,   0.75,  4.0,  -30,  'sine'     ],
+};
+
+export async function ping(type = 'sonar') {
+    await _ensurePingReverb();
+    const [freq, slideRatio, decay, vol, oscType] = PING_PRESETS[type] ?? PING_PRESETS.sonar;
+    const synth = new Tone.Synth({
+        oscillator: { type: oscType },
+        envelope:   { attack: 0.002, decay, sustain: 0, release: 0.1 },
+        volume:     vol,
+    }).connect(_pingReverb);
+
+    const t = Tone.now();
+    synth.frequency.setValueAtTime(freq, t);
+    if (slideRatio < 1) synth.frequency.exponentialRampToValueAtTime(freq * slideRatio, t + decay);
+    synth.triggerAttackRelease(freq, decay + 0.1, t);
+    setTimeout(() => synth.dispose(), (decay + 1.5) * 1000);
+}
+
+export const PING_TYPES = Object.keys(PING_PRESETS);
+
