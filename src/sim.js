@@ -582,6 +582,14 @@ const simFacade = {
         if (input) { input.value = text; renderTextAvoidMap(); }
     },
 
+    // Enable the simAss background music and start it immediately if users are connected.
+    // Safe to call multiple times — no-op if already started.
+    startBackgroundMusic() {
+        if (_backgroundMusicEnabled) return;
+        _backgroundMusicEnabled = true;
+        if (simState.userCount > 0) loadIdleAudio(true);
+    },
+
     // Play a narrator audio file from simAss/narrator/.
     // Pass { autoNext: true } to advance to the next step when playback ends.
     // Returns the Audio element so the caller can pause it on exit if needed.
@@ -2071,7 +2079,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
     // A spectator joined — assign a slot, send them their color, brightness burst.
     socket.on('spectator-joined', ({ spectatorId, userCount } = {}) => {
         if (userCount !== undefined) simState.userCount = userCount;
-        if (userCount === 1) { loadIdleAudio(true); } // first user — start music with fade in
+        if (userCount === 1 && _backgroundMusicEnabled) { loadIdleAudio(true); } // first user — start music with fade in
         if (_preshowActive) {
             storyEngine.onSpectatorJoined(userCount);
         } else {
@@ -2440,7 +2448,7 @@ document.addEventListener('pointerdown', async () => {
     if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
     _syncAudioBanner();
     startSynth().then(() => setSynthState(1.0, smoothCoherence, 0, 0, smoothTemp));
-    if (simState.userCount > 0) loadIdleAudio(true);
+    if (simState.userCount > 0 && _backgroundMusicEnabled) loadIdleAudio(true);
 }, { once: true });
 
 // ── File input for trace image ────────────────────────────────────────────────
@@ -3361,7 +3369,8 @@ async function _fetchIdleImageBytes() {
 // Harmony images are fetched on demand and cached in localStorage by note sum.
 
 // ── simAss audio loader — chains tracks via Tone.js radio chain ──────────────
-// Plays when users are connected. fadeIn=true on first track (user join).
+// Gated by _backgroundMusicEnabled — music only starts when the story enables it.
+let _backgroundMusicEnabled = false;
 let _idleAudioGen = 0;
 
 async function loadIdleAudio(fadeIn = false) {
