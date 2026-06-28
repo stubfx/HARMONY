@@ -5,7 +5,6 @@ import { PHASE, RESEED } from './constants.js';
 //
 //   audio1.mp3    →  preshow           (PHASE 1 — parte subito; si ferma alla prima connessione)
 //   audio2.mp3    →  preshow           (PHASE 1 — parte alla prima connessione; 10s dopo → PHASE 2)
-//   audio3_2.mp3  →  nota              (PHASE 2 — parte 20s dopo la prima nota suonata)
 //   audio3.mp3    →  nota              (PHASE 2 — parte subito all'entrata)
 //   audio4.mp3    →  rosso             (PHASE 3 — date un colore alla nota)
 //   audio5.mp3    →  immagini-tempesta (PHASE 5 — "Il rombo prima del lampo...")
@@ -120,7 +119,7 @@ export const STORY = [
     // ── PHASE 2 — LA NOTA ─────────────────────────────────────────────────────
     // Entra subito da PHASE 1. Imposta testo HARMONY e aspetta 10s (respawn già attivo).
     // Poi audio3 parte. wind disabilitato fino alla prima nota.
-    // Prima nota → wind on → timer 20s → audio3_2 → timer 10s → sim.next().
+    // Prima nota → wind on → timer 20s → sim.next().
     // Il timer da 20s parte una sola volta.
     {
         id: PHASE.NOTA,
@@ -140,17 +139,10 @@ export const STORY = [
             if (this._noteTimerStarted) return;
             this._noteTimerStarted = true;
             sim.setParam('windEnabled', true);
-            log('prima nota ricevuta (index ' + noteIndex + '). wind abilitato. timer 20s avviato.');
+            log('prima nota ricevuta (index ' + noteIndex + '). wind abilitato. timer 20s avviato → PHASE 3.');
             setTimeout(() => {
-                log('20s scaduti — audio3_2 in partenza.');
-                this._audio = sim.playNarratorAudio('audio3_2.mp3');
-                this._audio.addEventListener('ended', () => {
-                    log('audio3_2 terminato. attesa 10s prima di avanzare a PHASE 3.');
-                    setTimeout(() => {
-                        log('10s scaduti — avanzamento a PHASE 3.');
-                        sim.next();
-                    }, 10_000);
-                }, { once: true });
+                log('20s scaduti — avanzamento a PHASE 3.');
+                sim.next();
             }, 20_000);
         },
         exit(sim) {
