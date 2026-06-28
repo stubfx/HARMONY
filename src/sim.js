@@ -20,7 +20,8 @@ import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
 import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
 import champLinesWGSL   from './shaders/champLines.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
-import { startSynth, setSynthState, playIdleTrack, stopIdleTrack, fadeOutIdleTrack, setIdleChaos, addArpInfluence } from './synth.js';
+import { startSynth, setSynthState, addArpInfluence } from './synth.js';
+import * as ambience from './ambience.js';
 import { StoryEngine } from './storyEngine.js';
 import { STORY }       from './story.js';
 import { RESEED }      from './constants.js';
@@ -582,13 +583,9 @@ const simFacade = {
         if (input) { input.value = text; renderTextAvoidMap(); }
     },
 
-    // Enable the simAss background music and start it immediately if users are connected.
+    // Start the ambience music. Routed through ambience.js (Tone.js radio chain).
     // Safe to call multiple times — no-op if already started.
-    startBackgroundMusic() {
-        if (_backgroundMusicEnabled) return;
-        _backgroundMusicEnabled = true;
-        if (simState.userCount > 0) loadIdleAudio(true);
-    },
+    startBackgroundMusic() { ambience.start(); },
 
     // Play a narrator audio file from simAss/narrator/.
     // Pass { autoNext: true } to advance to the next step when playback ends.
@@ -2003,6 +2000,7 @@ function triggerReleaseBurst(slot) {
 let socket;
 // Base URL for server API calls — VITE_USER_URL in production, own origin as fallback.
 const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
+ambience.init(_apiBase);
 {
     // In dev, Vite runs on a different port from Express, so connect directly to Express.
     // In production, use VITE_SOCKET_URL (the Caddy-fronted public origin) so Socket.IO
@@ -2079,7 +2077,6 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
     // A spectator joined — assign a slot, send them their color, brightness burst.
     socket.on('spectator-joined', ({ spectatorId, userCount } = {}) => {
         if (userCount !== undefined) simState.userCount = userCount;
-        if (userCount === 1 && _backgroundMusicEnabled) { loadIdleAudio(true); } // first user — start music with fade in
         if (_preshowActive) {
             storyEngine.onSpectatorJoined(userCount);
         } else {
@@ -2119,11 +2116,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
             collectiveCoherence = 0.5;
             collectiveTemp      = 0.5;
             setSynthState(0.0, 0.5, 0, 0, 0.5);
-            // last user left — fade out music, only synth remains
-            const _fadeGen = ++_idleAudioGen;
-            fadeOutIdleTrack(smoothChaos, () => {
-                if (_fadeGen === _idleAudioGen) stopIdleTrack();
-            });
+            ambience.stop(smoothChaos); // last user left — fade out music
         }
         if (spectatorId) {
             const idx = activeSlots.findIndex(s => s.spectatorId === spectatorId);
@@ -2448,7 +2441,6 @@ document.addEventListener('pointerdown', async () => {
     if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
     _syncAudioBanner();
     startSynth().then(() => setSynthState(1.0, smoothCoherence, 0, 0, smoothTemp));
-    if (simState.userCount > 0 && _backgroundMusicEnabled) loadIdleAudio(true);
 }, { once: true });
 
 // ── File input for trace image ────────────────────────────────────────────────
@@ -2704,7 +2696,7 @@ function writeSoloUB(dt, time) {
     if (_synthNow - _lastSynthTick >= 200) {
         _lastSynthTick = _synthNow;
         setSynthState(smoothChaos, smoothCoherence, 0, 0, smoothTemp);
-        setIdleChaos(smoothChaos);
+        ambience.setChaos(smoothChaos);
     }
     if (Math.random() < 0.01) console.log('[chaos] smoothChaos→GPU:', smoothChaos.toFixed(4));
     device.queue.writeBuffer(soloUB, 0, ab);
@@ -3367,27 +3359,6 @@ async function _fetchIdleImageBytes() {
 }
 
 // Harmony images are fetched on demand and cached in localStorage by note sum.
-
-// ── simAss audio loader — chains tracks via Tone.js radio chain ──────────────
-// Gated by _backgroundMusicEnabled — music only starts when the story enables it.
-let _backgroundMusicEnabled = false;
-let _idleAudioGen = 0;
-
-async function loadIdleAudio(fadeIn = false) {
-    const gen = ++_idleAudioGen;
-    try {
-        const res = await fetch(`${_apiBase}/simAss-audio`);
-        if (!res.ok) { console.warn('[simAss-audio] HTTP', res.status); return; }
-        if (gen !== _idleAudioGen) return;
-        const buf = await res.arrayBuffer();
-        console.log(`[simAss-audio] loaded ${buf.byteLength}B — playing${fadeIn ? ' (fade in)' : ''}`);
-        await playIdleTrack(buf, () => {
-            if (gen === _idleAudioGen) loadIdleAudio(false);
-        }, fadeIn ? smoothChaos : null);
-    } catch (e) {
-        console.warn('[simAss-audio]', e);
-    }
-}
 
 storyEngine.start();
 requestAnimationFrame(frame);
