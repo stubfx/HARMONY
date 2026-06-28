@@ -174,8 +174,8 @@ export const STORY = [
             this._audio.addEventListener('ended', () => {
                 log('audio4 terminato. attesa 5s → colori rosso → PHASE 4.');
                 this._colorTimer = setTimeout(() => {
-                    log('5s scaduti — color1=#ff0000 color2=#ffffff. avanzamento a PHASE 4.');
-                    sim.freezeParams({ color1: '#ff0000', color2: '#ffffff' });
+                    log('5s scaduti — color1=#ff0000 color2=#ff0000. avanzamento a PHASE 4.');
+                    sim.freezeParams({ color1: '#ff0000', color2: '#ff0000' });
                     sim.next();
                 }, 5_000);
             }, { once: true });
