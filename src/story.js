@@ -111,7 +111,7 @@ export const STORY = [
             }
         },
         exit(sim) {
-            log('uscita PHASE 1 — reseed con fade dai bordi.');
+            log('uscita PHASE 1 — formule aggiornate, respawn random già attivo.');
             this._audio?.pause();
             this._audio = null;
             sim.restoreImages();
@@ -120,7 +120,6 @@ export const STORY = [
                 'atan2(cy - y, cx - x) + sin(t * 1.4 + length(vec2(x-cx,y-cy)) * 0.012) * PI * 0.38',
                 'atan2(cy - y, cx - x) + PI * 0.46 + sin(t * 0.65 + length(vec2(x-cx,y-cy)) * 0.007) * 0.6',
             );
-            sim.reseed({ mode: RESEED.FADE_FROM_EDGES });
         },
     },
 
