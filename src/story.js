@@ -53,7 +53,7 @@ export const STORY = [
     // Durante audio1 i join degli spettatori vengono ignorati graficamente (accodati).
     // audio1 finisce → se ci sono utenti accodati, attiva i loro chunk e avvia audio2;
     //                  altrimenti aspetta il primo utente normalmente.
-    // audio2 finisce → 10s → sim.next().
+    // audio2 finisce → testo HARMONY a schermo → 10s → sim.next().
     // dotRespawnChance abilitato 10s dopo il primo join effettivo (al termine di audio1).
     {
         id: PHASE.PRESHOW,
@@ -86,7 +86,8 @@ export const STORY = [
             log('audio2 in partenza.');
             this._audio = sim.playNarratorAudio('audio2.mp3');
             this._audio.addEventListener('ended', () => {
-                log('audio2 terminato. attesa 10s prima di avanzare a PHASE 2.');
+                log('audio2 terminato — testo HARMONY a schermo. attesa 10s prima di avanzare a PHASE 2.');
+                sim.setTraceText('HARMONY');
                 setTimeout(() => {
                     log('10s scaduti — avanzamento a PHASE 2.');
                     sim.next();
@@ -130,8 +131,7 @@ export const STORY = [
         enter(sim) {
             this._noteTimerStarted = false;
             sim.freezeParams({ windEnabled: false });
-            sim.setTraceText('HARMONY');
-            log('PHASE 2 — nota. wind disabilitato. testo HARMONY impostato. audio3 in partenza.');
+            log('PHASE 2 — nota. wind disabilitato. audio3 in partenza.');
             this._audio = sim.playNarratorAudio('audio3.mp3');
         },
         onNote(sim, noteIndex) {
