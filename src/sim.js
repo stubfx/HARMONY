@@ -2441,6 +2441,7 @@ document.addEventListener('pointerdown', async () => {
     if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
     _syncAudioBanner();
     startSynth().then(() => setSynthState(1.0, smoothCoherence, 0, 0, smoothTemp));
+    storyEngine.start();
 }, { once: true });
 
 // ── File input for trace image ────────────────────────────────────────────────
@@ -3360,5 +3361,4 @@ async function _fetchIdleImageBytes() {
 
 // Harmony images are fetched on demand and cached in localStorage by note sum.
 
-storyEngine.start();
 requestAnimationFrame(frame);
