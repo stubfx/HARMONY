@@ -53,7 +53,7 @@ export const STORY = [
     // Durante audio1 i join degli spettatori vengono ignorati graficamente (accodati).
     // audio1 finisce → se ci sono utenti accodati, attiva i loro chunk e avvia audio2;
     //                  altrimenti aspetta il primo utente normalmente.
-    // audio2 finisce → testo HARMONY a schermo → 10s → sim.next().
+    // audio2 finisce → sim.next() immediato (testo HARMONY e 10s di attesa in PHASE 2).
     // dotRespawnChance abilitato 10s dopo il primo join effettivo (al termine di audio1).
     {
         id: PHASE.PRESHOW,
@@ -86,12 +86,8 @@ export const STORY = [
             log('audio2 in partenza.');
             this._audio = sim.playNarratorAudio('audio2.mp3');
             this._audio.addEventListener('ended', () => {
-                log('audio2 terminato — testo HARMONY a schermo. attesa 10s prima di avanzare a PHASE 2.');
-                sim.setTraceText('HARMONY');
-                setTimeout(() => {
-                    log('10s scaduti — avanzamento a PHASE 2.');
-                    sim.next();
-                }, 10_000);
+                log('audio2 terminato — avanzamento immediato a PHASE 2.');
+                sim.next();
             }, { once: true });
         },
         onSpectatorJoined(sim, userCount) {
@@ -122,7 +118,8 @@ export const STORY = [
     },
 
     // ── PHASE 2 — LA NOTA ─────────────────────────────────────────────────────
-    // audio3 parte subito all'entrata. wind disabilitato fino alla prima nota.
+    // Entra subito da PHASE 1. Imposta testo HARMONY e aspetta 10s (respawn già attivo).
+    // Poi audio3 parte. wind disabilitato fino alla prima nota.
     // Prima nota → wind on → timer 20s → audio3_2 → timer 10s → sim.next().
     // Il timer da 20s parte una sola volta.
     {
@@ -131,8 +128,12 @@ export const STORY = [
         enter(sim) {
             this._noteTimerStarted = false;
             sim.freezeParams({ windEnabled: false });
-            log('PHASE 2 — nota. wind disabilitato. audio3 in partenza.');
-            this._audio = sim.playNarratorAudio('audio3.mp3');
+            sim.setTraceText('HARMONY');
+            log('PHASE 2 — nota. wind disabilitato. testo HARMONY impostato. audio3 parte tra 10s.');
+            setTimeout(() => {
+                log('10s scaduti — audio3 in partenza.');
+                this._audio = sim.playNarratorAudio('audio3.mp3');
+            }, 10_000);
         },
         onNote(sim, noteIndex) {
             if (this._noteTimerStarted) return;
