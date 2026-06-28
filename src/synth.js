@@ -221,6 +221,7 @@ const BLINKER_PRESETS = {
 };
 
 export async function blinker(type = 'sonar') {
+    await Tone.start();
     await _ensurePingReverb();
     const [freq, slideRatio, decay, vol, oscType] = BLINKER_PRESETS[type] ?? BLINKER_PRESETS.sonar;
     const synth = new Tone.Synth({
