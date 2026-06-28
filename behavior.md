@@ -90,7 +90,7 @@ The narration has two movements. The first (`audio1`) plays from the moment the 
 
 While the second voice speaks, more people scan the QR and connect. Each connection wakes a portion of the swarm from the canvas centre — particles drift outward, accumulating. The swarm doesn't grow; it reveals itself. The dark between the particles is not absence. It is potential that hasn't been claimed yet.
 
-The preshow ends ten seconds after the second voice finishes. At that point the simulation reseeds and the story begins — agents spawning from the canvas edges and fading in gradually rather than appearing all at once.
+The preshow ends ten seconds after the second voice finishes. At that point the story begins — agents stay where they are, and the slow respawn already active continues without interruption.
 
 After ten seconds from the first connection, a slow trickle of new particles begins to respawn at the canvas edges — invisible at first, fading in over about a second. This is intentional: the swarm breathes even before the piece begins.
 

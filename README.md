@@ -214,8 +214,7 @@ All narrator MP3s live in `simAss/narrator/`. The server exposes them at `GET /s
 |------|------|-------|---------|
 | `audio1.mp3` | `preshow` | PHASE 1 | Plays immediately on enter; stops when first spectator connects |
 | `audio2.mp3` | `preshow` | PHASE 1 | Plays on first spectator connect; 10 s after end → advance to PHASE 2 |
-| `audio3.mp3` | `nota` | PHASE 2 | Plays immediately on enter |
-| `audio3_2.mp3` | `nota` | PHASE 2 | Plays 20 s after first note; 10 s after end → advance to PHASE 3 |
+| `audio3.mp3` | `nota` | PHASE 2 | Plays 10 s after enter; 20 s after first note → advance to PHASE 3 |
 | `audio4.mp3` | `rosso` | PHASE 3 | Plays on enter; autoNext |
 | `audio5.mp3` | `immagini-tempesta` | PHASE 5 | Plays on enter; autoNext |
 | `audio6.mp3` | `testo` | PHASE 7 | Plays on enter; autoNext |
@@ -240,7 +239,7 @@ would trap agents in the QR pattern during the radial spread-out phase.
 
 The intro delay is tunable via the GUI (Motion → intro delay).
 
-> **Note:** In the current story configuration, the intro sequence is preceded by the **preshow step** (PHASE 1, defined in `story.js`). During preshow all agents start invisible (weight=0), images from the admin are suppressed, and wind is disabled. `audio1.mp3` plays immediately on enter. When the **first spectator connects**: `audio1` stops, `audio2` starts, and 10 s after `audio2` ends the story advances to PHASE 2. Each spectator that connects activates a chunk of dormant agents from the canvas centre. 10 s after the first connection `dotRespawnChance` is re-enabled (at `0.002`) so a trickle of agents begin fading in from the edges. When preshow exits, params are thawed and the simulation reseeds with `RESEED.FADE_FROM_EDGES` (perimeter spawn, agents fade in gradually rather than popping).
+> **Note:** In the current story configuration, the intro sequence is preceded by the **preshow step** (PHASE 1, defined in `story.js`). During preshow all agents start invisible (weight=0), images from the admin are suppressed, and wind is disabled. `audio1.mp3` plays immediately on enter. When the **first spectator connects**: `audio1` stops, `audio2` starts, and 10 s after `audio2` ends the story advances to PHASE 2. Each spectator that connects activates a chunk of dormant agents from the canvas centre. 10 s after the first connection `dotRespawnChance` is re-enabled (at `0.002`) so a trickle of agents begin fading in from the edges. When preshow exits, params are thawed — `dotRespawnChance` reverts to its default (0.01) so agents continue to respawn gradually in place, without any full reseed.
 
 ---
 
