@@ -163,19 +163,26 @@ export const STORY = [
     },
 
     // ── PHASE 3 — IL ROSSO ────────────────────────────────────────────────────
-    // Narrator speaks; advances automatically when audio ends.
-    // color1 rosso puro, color2 bianco puro per tutta la fase.
+    // audio4 parte subito. alla fine: 5s di silenzio → colori rosso → PHASE 4.
     // File: simAss/narrator/audio4.mp3
     {
         id: PHASE.ROSSO,
         enter(sim) {
-            sim.freezeParams({ color1: '#ff0000', color2: '#ffffff' });
             sim.enableHarmonyImages();
-            log('PHASE 3 — rosso. color1=#ff0000 color2=#ffffff. immagini harmony abilitate. audio4 in partenza.');
-            this._audio = sim.playNarratorAudio('audio4.mp3', { autoNext: true });
+            log('PHASE 3 — rosso. immagini harmony abilitate. audio4 in partenza.');
+            this._audio = sim.playNarratorAudio('audio4.mp3');
+            this._audio.addEventListener('ended', () => {
+                log('audio4 terminato. attesa 5s → colori rosso → PHASE 4.');
+                this._colorTimer = setTimeout(() => {
+                    log('5s scaduti — color1=#ff0000 color2=#ffffff. avanzamento a PHASE 4.');
+                    sim.freezeParams({ color1: '#ff0000', color2: '#ffffff' });
+                    sim.next();
+                }, 5_000);
+            }, { once: true });
         },
         exit(sim) {
             log('uscita PHASE 3.');
+            clearTimeout(this._colorTimer);
             sim.disableHarmonyImages();
             sim.thawParams();
             this._audio?.pause();
