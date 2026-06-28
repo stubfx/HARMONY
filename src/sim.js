@@ -20,7 +20,7 @@ import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
 import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
 import champLinesWGSL   from './shaders/champLines.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
-import { startSynth, setSynthState, addArpInfluence, ping } from './synth.js';
+import { startSynth, setSynthState, addArpInfluence, ping, PING_TYPES } from './synth.js';
 import * as ambience from './ambience.js';
 import { StoryEngine } from './storyEngine.js';
 import { STORY }       from './story.js';
@@ -2080,7 +2080,7 @@ ambience.init(_apiBase);
     // A spectator joined — assign a slot, send them their color, brightness burst.
     socket.on('spectator-joined', ({ spectatorId, userCount } = {}) => {
         if (userCount !== undefined) simState.userCount = userCount;
-        ping('sonar');
+        ping(PING_TYPES[Math.floor(Math.random() * PING_TYPES.length)]);
         if (_preshowActive) {
             storyEngine.onSpectatorJoined(userCount);
         } else {
