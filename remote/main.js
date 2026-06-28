@@ -107,6 +107,14 @@ function _ensureAudioCtx() {
     return _audioCtx;
 }
 
+// Safari iOS sospende l'AudioContext quando la pagina va in background o arriva
+// un'interruzione (chiamata, Siri). Ripristiniamo al ritorno senza richiedere un gesto.
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && _audioCtx?.state === 'suspended') {
+        _audioCtx.resume();
+    }
+});
+
 function _ensureReverb(ctx) {
     if (_reverbNode) return;
     const sr  = ctx.sampleRate;
@@ -266,6 +274,9 @@ function _initNoteCanvas() {
         noteCanvasEl.setPointerCapture(e.pointerId);
         _touching = true;
         _touchX = e.offsetX; _touchY = e.offsetY;
+        // Safari può ri-sospendere il context dopo un'interruzione; il gesto dell'utente
+        // è il momento giusto per ripristinarlo senza rischiare il blocco autoplay.
+        if (_audioCtx?.state === 'suspended') _audioCtx.resume();
         _setContNote(_noteIdx(_touchX));
         _applyColor(_touchY);
     });
