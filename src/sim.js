@@ -583,6 +583,9 @@ const simFacade = {
         if (input) { input.value = text; renderTextAvoidMap(); }
     },
 
+    // Set direction and wind formulas (WGSL expressions). Fire-and-forget async.
+    setFormulas(dir, wind) { applyFormulas(dir, wind); },
+
     // Start the ambience music. Routed through ambience.js (Tone.js radio chain).
     // Safe to call multiple times — no-op if already started.
     startBackgroundMusic() { ambience.start(); },

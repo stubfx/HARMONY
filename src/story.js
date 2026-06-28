@@ -60,7 +60,11 @@ export const STORY = [
             this._audio2Started = false;
             this._audio1Playing = true;
             this._pendingJoins = 0;
-            log('PHASE 1 — connessione. audio1 in partenza.');
+            log('PHASE 1 — connessione. spirale verso l\'esterno. audio1 in partenza.');
+            sim.setFormulas(
+                'atan2(y - cy, x - cx) + t * 0.3',
+                'sin(x * 0.004 - y * 0.003 + t * 0.4) * TWO_PI',
+            );
             sim.freezeParams({ spectatorSpawnChance: 0, randomTeleportChance: 0, dotRespawnChance: 0, spawnFadeRate: 0 });
             sim.suppressImages();
             sim.dormantSeed();
@@ -112,6 +116,10 @@ export const STORY = [
             this._audio = null;
             sim.restoreImages();
             sim.thawParams();
+            sim.setFormulas(
+                'atan2(cy - y, cx - x) + sin(t * 1.4 + length(vec2(x-cx,y-cy)) * 0.012) * PI * 0.38',
+                'atan2(cy - y, cx - x) + PI * 0.46 + sin(t * 0.65 + length(vec2(x-cx,y-cy)) * 0.007) * 0.6',
+            );
             sim.reseed({ mode: RESEED.FADE_FROM_EDGES });
         },
     },
