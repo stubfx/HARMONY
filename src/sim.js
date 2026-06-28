@@ -473,6 +473,30 @@ function seedAgents({ mode = RESEED.NORMAL } = {}) {
 }
 seedAgents();
 
+// Raw teleport: move `fraction` of agents to (x, y) with random velocities.
+// No fade — agents keep full weight and appear instantly at the target.
+function _rawTeleport(x, y, fraction = 0.1) {
+    const count     = params.agentCount;
+    const chunkSize = Math.max(1, Math.ceil(count * fraction));
+    const start     = Math.floor(Math.random() * (count - chunkSize));
+    const TAU       = Math.PI * 2;
+    const data      = new Float32Array(chunkSize * 8);
+    for (let i = 0; i < chunkSize; i++) {
+        const b = i * 8;
+        const a = Math.random() * TAU;
+        const s = 0.5 + Math.random() * 1.5;
+        data[b]     = x;
+        data[b + 1] = y;
+        data[b + 2] = Math.cos(a) * s;
+        data[b + 3] = Math.sin(a) * s;
+        data[b + 4] = x;    // home
+        data[b + 5] = y;
+        data[b + 6] = 1.0;  // weight — full, no fade
+        data[b + 7] = 0;
+    }
+    device.queue.writeBuffer(agentBuf, start * 32, data);
+}
+
 // ── Story facade & engine ────────────────────────────────────────────────────
 // sim.js exposes low-level primitives. Story steps (story.js) compose them.
 
@@ -593,7 +617,13 @@ const simFacade = {
     // Safe to call multiple times — no-op if already started.
     startBackgroundMusic() { ambience.start(); },
 
-    startBlinkersLoop() { ambience.startBlinkersLoop(); },
+    startBlinkersLoop() {
+        ambience.startBlinkersLoop(() => {
+            const x = Math.random() * canvas.width;
+            const y = Math.random() * canvas.height;
+            _rawTeleport(x, y, 0.1);
+        });
+    },
     stopBlinkersLoop()  { ambience.stopBlinkersLoop();  },
 
     // Play a narrator audio file from simAss/narrator/.

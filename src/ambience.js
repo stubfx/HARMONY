@@ -148,8 +148,10 @@ export function setVolume(db) {
 
 // ── Blinkers loop ─────────────────────────────────────────────────────────────
 // Plays a random blinker every 0.2–8 s. Fully async, cancellable.
+// onBlink() is called synchronously after each blinker fires.
 
 let _blinkersTimer = null;
+let _onBlink       = null;
 
 function _blinkersStep() {
     const delay = 200 + Math.random() * 7800;
@@ -158,13 +160,15 @@ function _blinkersStep() {
         const type = BLINKER_TYPES[Math.floor(Math.random() * BLINKER_TYPES.length)];
         console.log(`[blinkers] suono: ${type}`);
         blinker(type);
+        _onBlink?.();
         _blinkersStep();
     }, delay);
 }
 
-export function startBlinkersLoop() {
+export function startBlinkersLoop(onBlink) {
     console.log('[blinkers] startBlinkersLoop chiamato, _blinkersTimer:', _blinkersTimer);
     if (_blinkersTimer !== null) return;
+    _onBlink = onBlink ?? null;
     _blinkersStep();
 }
 
