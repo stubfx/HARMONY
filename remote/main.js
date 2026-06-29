@@ -76,10 +76,7 @@ function hslToHex(h, s, l) {
 
 function updateAura() {
     if (!auraEl) return;
-    // step 0: nero (nessuna interazione)
-    // step 1: colore pieno aura
-    // step 2+: nero — il colore va sulla sinusoide, non sullo sfondo
-    auraEl.style.background = _currentStep === 1 ? pushedColor : '#000000';
+    auraEl.style.background = '#000000';
 }
 updateAura();
 
@@ -162,27 +159,28 @@ let _noteDebounceMs    = 0;
 let _noteDebounceTimer = null;
 
 function _setContNote(noteIdx) {
-    if (!_contOscReady) return;
+    if (_currentStep <= 0 || !_contOscReady) return;
     const t = _audioCtx.currentTime;
     if (noteIdx !== _activeNoteIdx) {
         _contOsc.frequency.setTargetAtTime(KEYS[noteIdx].freq, t, 0.04);
         _activeNoteIdx = noteIdx;
         _motionChaos = Math.min(1, _motionChaos + 0.05);
+        _sinePulse = 1;
         clearTimeout(_noteDebounceTimer);
         _noteDebounceTimer = setTimeout(() => {
-            if (_currentStep > 0) sendEvent('note', { index: noteIdx, freq: KEYS[noteIdx].freq, color: KEYS[noteIdx].color });
+            sendEvent('note', { index: noteIdx, freq: KEYS[noteIdx].freq, color: KEYS[noteIdx].color });
         }, _noteDebounceMs);
     }
     _contGainNode.gain.setTargetAtTime(0.25, t, 0.05);
 }
 
 function _silenceContNote() {
-    if (!_contOscReady) return;
+    if (_currentStep <= 0 || !_contOscReady) return;
     clearTimeout(_noteDebounceTimer);
     _noteDebounceTimer = null;
     _contGainNode.gain.setTargetAtTime(0, _audioCtx.currentTime, 0.12);
     _activeNoteIdx = -1;
-    if (_currentStep > 0) sendEvent('note-off', {});
+    sendEvent('note-off', {});
 }
 
 // ── Chaos vignette ────────────────────────────────────────────────────────────
@@ -300,12 +298,14 @@ function _initNoteCanvas() {
     // ── Sine wave state ───────────────────────────────────────────────────────
     let _sineAmp   = 0;
     let _sinePhase = 0;
+    let _sinePulse = 0; // set to 1 on note change, decays quickly → mini burst
 
     function _drawSine(w, h, dt) {
         if (_currentStep < 1) return;
         _sineAmp = _touching
             ? Math.min(1, _sineAmp + 6 * dt)
             : Math.max(0, _sineAmp - 2 * dt);
+        _sinePulse = Math.max(0, _sinePulse - dt * 5); // decade in ~0.2s
         if (_sineAmp <= 0.01) return;
 
         const idx    = Math.max(0, _activeNoteIdx);
@@ -314,7 +314,7 @@ function _initNoteCanvas() {
         _sinePhase  += (freq / 220) * dt * 3;
 
         const color = _currentStep >= 2 ? pushedColor : '#ffffff';
-        const amp   = h * 0.32 * _sineAmp;
+        const amp   = h * 0.32 * _sineAmp * (1 + _sinePulse * 0.6);
         const cy    = h / 2;
 
         ctx2d.save();
@@ -341,7 +341,7 @@ function _initNoteCanvas() {
         ctx2d.clearRect(0, 0, noteCanvasEl.width, noteCanvasEl.height);
         _drawSine(noteCanvasEl.width, noteCanvasEl.height, dt);
 
-        if (_touching && ts - _lastSpawn > 25) {
+        if (_touching && _currentStep > 0 && ts - _lastSpawn > 25) {
             _spawnSmoke(_touchX, _touchY, _cf(_touchX, _touchY));
             _lastSpawn = ts;
         }
