@@ -341,7 +341,7 @@ function _initNoteCanvas() {
         ctx2d.clearRect(0, 0, noteCanvasEl.width, noteCanvasEl.height);
         _drawSine(noteCanvasEl.width, noteCanvasEl.height, dt);
 
-        if (_touching && _currentStep > 0 && ts - _lastSpawn > 25) {
+        if (_touching && ts - _lastSpawn > 25) {
             _spawnSmoke(_touchX, _touchY, _cf(_touchX, _touchY));
             _lastSpawn = ts;
         }
