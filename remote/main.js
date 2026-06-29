@@ -13,8 +13,6 @@ const spectatorId = sessionStorage.getItem('spectator-id') ?? (() => {
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const auraEl          = document.querySelector('#aura');
-const joinOverlayEl   = document.querySelector('#join-overlay');
-const joinBtnEl       = document.querySelector('#join-btn');
 const chaosVignetteEl = document.querySelector('#chaos-vignette');
 const noteCanvasEl    = document.getElementById('note-canvas');
 
@@ -311,18 +309,8 @@ function _initNoteCanvas() {
     })(0);
 }
 
-// ── Join ──────────────────────────────────────────────────────────────────────
-function dismissOverlay() {
-    if (!joinOverlayEl) return;
-    joinOverlayEl.style.opacity = '0';
-    joinOverlayEl.style.pointerEvents = 'none';
-    setTimeout(() => joinOverlayEl.remove(), 650);
-}
-
-joinBtnEl?.addEventListener('click', () => {
-    // AudioContext + reverb must be created inside a user gesture (iOS Safari).
-    // Doing it here pre-warms the reverb buffer so the first touch is stutter-free.
+// ── Init on first gesture (AudioContext requires user interaction on iOS) ─────
+document.addEventListener('pointerdown', () => {
     _startContOsc();
     _initNoteCanvas();
-    dismissOverlay();
-});
+}, { once: true });
