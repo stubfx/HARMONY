@@ -81,6 +81,7 @@ function getOrCreateRoom(roomId) {
             users:        new Map(), // socketId  → UserState
             votes:        new Map(), // socketId  → choice string (one vote per spectator)
             audioLocked:  null,      // null = unknown; true/false reported by sim
+            storyStep:    -1,        // current story step index; -1 = not started
         });
     }
     return rooms.get(roomId);
@@ -132,6 +133,14 @@ setInterval(() => {
     }
 }, 300);
 
+// ── Story step broadcast — 1 s tick ──────────────────────────────────────────
+setInterval(() => {
+    for (const [roomId, room] of rooms) {
+        if (!room.connections.size) continue;
+        io.to(`${roomId}:spectators`).emit('story-step', { step: room.storyStep });
+    }
+}, 1000);
+
 // ── Admin auth endpoint ───────────────────────────────────────────────────────
 app.post('/admin-auth', (req, res) => {
     const { password } = req.body ?? {};
@@ -163,6 +172,13 @@ io.on('connection', (socket) => {
     });
 
 
+
+    // Sim reports the current story step index.
+    socket.on('story-step', ({ step }) => {
+        const room = assignedRoom ? rooms.get(assignedRoom) : null;
+        if (!room?.hostSockets.has(socket.id)) return;
+        room.storyStep = typeof step === 'number' ? step : -1;
+    });
 
     // Sim reports its AudioContext lock state so the admin panel can show a warning.
     socket.on('audio-state', ({ locked }) => {

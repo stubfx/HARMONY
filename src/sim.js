@@ -2406,7 +2406,10 @@ function applySimParams(data) {
     updateAvoidMapOverlay: _updateAvoidMapOverlay,
 }));
 
-storyEngine.onGoto = () => storyPhaseCtrl.updateDisplay();
+storyEngine.onGoto = (i) => {
+    storyPhaseCtrl.updateDisplay();
+    socket?.emit('story-step', { step: i });
+};
 
 stateCtrl.onChange(v => setStatus(v));
 qrStateCtrl.onChange(() => { updateStateDisplay(); renderTraceCanvas(); });

@@ -309,6 +309,12 @@ function _initNoteCanvas() {
     })(0);
 }
 
+// ── Story step debug display ──────────────────────────────────────────────────
+const _stepDebug = document.querySelector('#step-debug');
+socket.on('story-step', ({ step } = {}) => {
+    if (_stepDebug) _stepDebug.textContent = step >= 0 ? step : '';
+});
+
 // ── Init on first gesture (AudioContext requires user interaction on iOS) ─────
 const _tapHint = document.querySelector('#tap-hint');
 document.addEventListener('pointerdown', () => {
