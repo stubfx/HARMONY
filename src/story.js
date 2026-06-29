@@ -61,10 +61,7 @@ export const STORY = [
             this._audio1Playing = true;
             this._pendingJoins = 0;
             log('PHASE 1 — connessione. spirale verso l\'esterno. audio1 in partenza.');
-            sim.setFormulas(
-                'atan2(y - cy, x - cx) + t * 0.3',
-                'sin(x * 0.004 - y * 0.003 + t * 0.4) * TWO_PI',
-            );
+            sim.setColorMode('GRAYSCALE');
             sim.freezeParams({ spectatorSpawnChance: 0, randomTeleportChance: 0, dotRespawnChance: 0, spawnFadeRate: 0 });
             sim.setParam('champLinesAlpha', 0);
             sim.setParam('limitAtCenter', true);
@@ -164,6 +161,7 @@ export const STORY = [
     {
         id: PHASE.ROSSO,
         enter(sim) {
+            sim.setColorMode('NORMAL');
             sim.setParam('champLinesAlpha', 0.02);
             sim.enableHarmonyImages();
             sim.startBlinkersLoop();
