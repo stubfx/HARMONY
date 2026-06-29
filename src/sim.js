@@ -709,8 +709,29 @@ const fadePipe = device.createRenderPipeline({
     },
     primitive: { topology: 'triangle-list' },
 });
+// Additive-mode fade: pure multiplicative scale — src zeroed out, dst scaled by (1-alpha).
+// Avoids injecting black into the HDR accumulation buffer.
+const fadePipeAdditive = device.createRenderPipeline({
+    layout: 'auto',
+    vertex:   { module: fadeMod, entryPoint: 'vs' },
+    fragment: {
+        module: fadeMod, entryPoint: 'fs',
+        targets: [{
+            format: 'rgba16float',
+            blend: {
+                color: { srcFactor: 'zero', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+                alpha: { srcFactor: 'zero', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+            },
+        }],
+    },
+    primitive: { topology: 'triangle-list' },
+});
 const fadeBG = device.createBindGroup({
     layout: fadePipe.getBindGroupLayout(0),
+    entries: [{ binding: 0, resource: { buffer: fadeUB } }],
+});
+const fadeBGAdditive = device.createBindGroup({
+    layout: fadePipeAdditive.getBindGroupLayout(0),
     entries: [{ binding: 0, resource: { buffer: fadeUB } }],
 });
 
@@ -3310,8 +3331,8 @@ function frame(ts) {
             view: renderTargetView, loadOp: 'load', storeOp: 'store',
         }],
     });
-    rp.setPipeline(fadePipe);
-    rp.setBindGroup(0, fadeBG);
+    rp.setPipeline(params.additiveBlend ? fadePipeAdditive : fadePipe);
+    rp.setBindGroup(0, params.additiveBlend ? fadeBGAdditive : fadeBG);
     rp.draw(3);
     // Agent shadow is a soft splat — incoherent with chunky cells, skip in pixel mode.
     // Runs when an image is loaded (homing shadows) or champions are active (constant shadows).
