@@ -22,6 +22,25 @@ html, body {
 }
 
 
+#tap-hint {
+    position: fixed;
+    bottom: 2.5rem;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: lowercase;
+    color: rgba(255, 255, 255, 0.25);
+    pointer-events: none;
+    z-index: 20;
+    transition: opacity 0.6s ease;
+}
+
+#tap-hint.hidden {
+    opacity: 0;
+}
+
 #harmony-panel {
     position: fixed;
     inset: 0;

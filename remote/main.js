@@ -310,7 +310,9 @@ function _initNoteCanvas() {
 }
 
 // ── Init on first gesture (AudioContext requires user interaction on iOS) ─────
+const _tapHint = document.querySelector('#tap-hint');
 document.addEventListener('pointerdown', () => {
     _startContOsc();
     _initNoteCanvas();
+    _tapHint?.classList.add('hidden');
 }, { once: true });
