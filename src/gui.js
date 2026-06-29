@@ -204,7 +204,6 @@ export function initGUI({
     fAvoid.add(params, 'avoidMapFixedColor').name('fixed color');
     fAvoid.add(params, 'avoidMapBlackCutoff', 0, 0.5, 0.005).name('color black cutoff');
     fAvoid.add(params, 'randomTeleportOnAvoidMap').name('random teleport');
-    fAvoid.add(params, 'autoAvoidMap').name('auto voronoi pattern');
     fAvoid.add(params, 'showAvoidMapImage').name('show image').onChange(() => updateAvoidMapOverlay());
     fAvoid.add({ load: () => document.querySelector('#avoid-map-input').click() }, 'load').name('Load map…');
     fAvoid.add({ clear: clearAvoidMap }, 'clear').name('Clear map');
@@ -341,7 +340,7 @@ export function initGUI({
     fStoria.add({ prev: () => storyEngine.goto(storyEngine.index - 1) }, 'prev').name('← indietro');
     fStoria.add({ next: () => storyEngine.goto(storyEngine.index + 1) }, 'next').name('avanti →');
 
-    const modeCtrl      = gui.add(simState, 'mode',      ['STORY', 'SHOWCASE', 'VORONOI']).name('mode');
+    const modeCtrl      = gui.add(simState, 'mode',      ['STORY', 'SHOWCASE']).name('mode');
     const colorModeCtrl = gui.add(simState, 'colorMode', ['NORMAL', 'GRAYSCALE', 'GRAYSCALE_INVERTED']).name('color mode');
     const stateCtrl     = gui.add(simState, 'status',    ['NORMAL', 'FREEROAM', 'DOT']).name('status');
     const qrStateCtrl = gui.add(simState, 'qrStatus', ['SHOW', 'HIDE']).name('qr');
