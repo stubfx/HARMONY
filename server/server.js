@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID }    from 'node:crypto';
 import * as Utils        from './server-utils.js';
 import { narrate, generateIdleImage, generateIdleAudio } from './openai-api.js';
-import { readdir, readFile, writeFile, stat, unlink } from 'node:fs/promises';
+import { readdir, readFile, writeFile } from 'node:fs/promises';
 
 dotenv.config();
 
@@ -399,29 +399,13 @@ app.post('/rndImage', async (_req, res) => {
 // ── simAss assets — ./simAss/{images,music}/, max 10, 1-day lifespan ─────────
 const _SIM_ASS_DIR   = path.join(__dirname, '..', 'simAss');
 const _IMAGE_MIME    = { '.webp': 'image/webp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml' };
-const SIM_ASS_MAX    = 10;
-const _FILE_LIFESPAN = 24 * 60 * 60 * 1000; // 1 day in ms
+const SIM_ASS_MAX = 10;
 
 const _generating = { image: false, audio: false };
 
-async function _simAssFiles(dir, { checkExpiry = true } = {}) {
-    const now   = Date.now();
+async function _simAssFiles(dir) {
     const names = await readdir(dir).catch(() => []);
-    const valid = [];
-    for (const name of names) {
-        if (name.startsWith('.')) continue;
-        const full = path.join(dir, name);
-        try {
-            const s = await stat(full);
-            if (checkExpiry && now - s.mtimeMs > _FILE_LIFESPAN) {
-                await unlink(full);
-                console.log(`[simAss] expired and deleted: ${name}`);
-            } else {
-                valid.push(name);
-            }
-        } catch { /* file disappeared between readdir and stat — ignore */ }
-    }
-    return valid;
+    return names.filter(n => !n.startsWith('.'));
 }
 
 async function _genAndSaveImage(dir) {
@@ -453,7 +437,7 @@ async function _genAndSaveAudio(dir) {
 
 app.get('/simAss-image', async (_req, res) => {
     const dir   = path.join(_SIM_ASS_DIR, 'images');
-    const files = await _simAssFiles(dir, { checkExpiry: false });
+    const files = await _simAssFiles(dir);
     console.log(`[simAss-image] request — ${files.length} file(s) available: [${files.join(', ')}]`);
     if (files.length === 0) {
         console.log('[simAss-image] no files in simAss/images — nothing to serve');
@@ -498,7 +482,7 @@ app.post('/simAss-config', express.json({ limit: '512kb' }), async (req, res) =>
 
 app.get('/simAss-audio', async (_req, res) => {
     const dir   = path.join(_SIM_ASS_DIR, 'music');
-    const files = await _simAssFiles(dir, { checkExpiry: false });
+    const files = await _simAssFiles(dir);
     console.log(`[simAss-audio] request — ${files.length} file(s) available: [${files.join(', ')}]`);
     if (files.length === 0) {
         console.log('[simAss-audio] no files — generating synchronously…');

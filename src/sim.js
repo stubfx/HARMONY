@@ -1505,24 +1505,6 @@ function renderTextAvoidMap() {
 
 // ── Auto-clear timer ──────────────────────────────────────────────────────────
 // Started whenever user-added content (image or text) appears in the trace layer.
-// Fires after params.clearDelay seconds and wipes user text + any non-QR image.
-// Cancelled when the user explicitly clears content; reset when new content arrives.
-// The session QR is considered system content and is never auto-cleared.
-let autoClearTimer = null;
-
-function scheduleAutoClear() {
-    clearTimeout(autoClearTimer);
-    if (params.clearDelay <= 0) return;
-    autoClearTimer = setTimeout(() => {
-        autoClearTimer = null;
-        const input = document.querySelector('#trace-text-input');
-        if (input) input.value = '';
-        imageBitmap = null;
-        renderTextAvoidMap();
-        renderTraceCanvas();
-        console.log('[trace] auto-cleared after', params.clearDelay, 's');
-    }, params.clearDelay * 1000);
-}
 
 // Decodes every frame of an animated image (GIF, animated WebP/AVIF) via the
 // ImageDecoder API. Returns { frames: ImageBitmap[], durations: number[] } or
@@ -1569,7 +1551,7 @@ async function loadMagnetImage(file) {
     }
     renderTextAvoidMap(); // suppress text avoidmap while image is shown
     renderTraceCanvas();
-    scheduleAutoClear();
+    
 }
 
 async function loadTraceImageFromUrl(url, fetchOptions = {}) {
@@ -1588,7 +1570,7 @@ async function loadTraceImageFromUrl(url, fetchOptions = {}) {
         }
         renderTextAvoidMap(); // suppress text avoidmap while image is shown
         renderTraceCanvas();
-        scheduleAutoClear();
+        
     } catch (err) {
         console.warn('[traceImage] failed to load:', url, err.message);
     }
@@ -2245,7 +2227,7 @@ _clearHarmonyImageCache();
             const input = document.querySelector('#trace-text-input');
             if (input) input.value = event.data.text;
             renderTraceCanvas();
-            scheduleAutoClear();
+            
         }
     });
 
@@ -2358,7 +2340,7 @@ function applySimParams(data) {
         autoClearTimer = null;
         renderTextAvoidMap();
         renderTraceCanvas();
-        if (traceText) scheduleAutoClear();
+        if (traceText) 
     }
     const changed = (k) => k in rest && rest[k] !== params[k];
     const needsRetrace = ['traceScale','qrSize','qrMargin','qrAlignX','qrAlignY',
@@ -2619,7 +2601,7 @@ document.querySelector('#trace-text-input').addEventListener('input', () => {
     clearTimeout(traceTextTimer);
     traceTextTimer = setTimeout(() => {
         renderTextAvoidMap();
-        scheduleAutoClear();
+        
     }, 300);
 });
 
