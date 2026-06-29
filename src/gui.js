@@ -75,6 +75,8 @@ export function initGUI({
     fMotion.add(params, 'freeroamLock').name('freeroam lock');
     fMotion.add(params, 'freeroamLockDelay', 1, 60, 1).name('freeroam lock (s)');
     fMotion.add(params, 'randomTeleportChance', 0, 0.05, 0.001).name('random teleport chance');
+    fMotion.add(params, 'limitAtCenter').name('limit at center');
+    fMotion.add(params, 'limitAtCenterRadius', 1, 2000, 1).name('limit radius (px)');
 
     // ── Game of Life ────────────────────────────────────────────────────────────
     // Conway automaton on a grid; particles are pulled toward the live cells.

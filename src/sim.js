@@ -142,6 +142,8 @@ const params = {
     dotCenterRadius:     50,   // px — agents within this radius of centre are candidates for respawn (0 = disabled)
     dotRespawnChance:    0.01, // per-frame probability that a centre-zone agent is respawned to an edge
     spawnFadeRate:       1.0,   // per-second weight increment after respawn (0 = stay dark, 1.0 = ~1s to full)
+    limitAtCenter:       false, // if true: agents outside limitAtCenterRadius are raw-teleported to canvas centre
+    limitAtCenterRadius: 300,   // radius in canvas pixels for limitAtCenter
     // Freeroam lock — when on, FREEROAM auto-reverts to NORMAL after a delay
     freeroamLock:        true,
     freeroamLockDelay:   30,   // seconds in FREEROAM before reverting to NORMAL (timer resets each time FREEROAM is re-entered)
@@ -2769,6 +2771,8 @@ function writeSoloUB(dt, time) {
     f[54] = (_chladniSum % 2 === 0) ? 1.0 : -1.0;
     f[55] = params.chladniBlend;
     f[56] = params.spawnFadeRate;
+    u[57] = params.limitAtCenter ? 1 : 0;
+    f[58] = params.limitAtCenterRadius;
     setChaos(chaosGPU);
     const _synthNow = performance.now();
     if (_synthNow - _lastSynthTick >= 200) {
