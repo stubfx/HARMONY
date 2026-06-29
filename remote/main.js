@@ -57,6 +57,9 @@ function sendEvent(type, data) {
     socket.emit('user-event', { type, data });
 }
 
+// ── Story step ────────────────────────────────────────────────────────────────
+let _currentStep = -1;
+
 // ── Aura ──────────────────────────────────────────────────────────────────────
 let pushedColor = '#2495FF';
 
@@ -346,9 +349,7 @@ function _initNoteCanvas() {
     })(0);
 }
 
-// ── Story step ────────────────────────────────────────────────────────────────
-let _currentStep = -1;
-
+// ── Story step socket handler ─────────────────────────────────────────────────
 const _stepDebug = document.querySelector('#step-debug');
 socket.on('story-step', ({ step } = {}) => {
     _currentStep = typeof step === 'number' ? step : -1;
