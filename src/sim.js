@@ -1831,17 +1831,20 @@ async function _harmonyDbRead(sum) {
         const db = await _openHarmonyDb();
         return new Promise((resolve) => {
             const req = db.transaction(_HARMONY_DB_IMAGES, 'readonly').objectStore(_HARMONY_DB_IMAGES).get(sum);
-            req.onsuccess = (e) => resolve(e.target.result?.bytes ?? null);
+            req.onsuccess = (e) => {
+                const r = e.target.result;
+                resolve(r ? { bytes: r.bytes, mime: r.mime ?? 'image/webp' } : null);
+            };
             req.onerror   = () => resolve(null);
         });
     } catch { return null; }
 }
 
-async function _harmonyDbWrite(sum, bytes) {
+async function _harmonyDbWrite(sum, bytes, mime) {
     try {
         const db = await _openHarmonyDb();
         return new Promise((resolve, reject) => {
-            const req = db.transaction(_HARMONY_DB_IMAGES, 'readwrite').objectStore(_HARMONY_DB_IMAGES).put({ sum, bytes, savedAt: Date.now() });
+            const req = db.transaction(_HARMONY_DB_IMAGES, 'readwrite').objectStore(_HARMONY_DB_IMAGES).put({ sum, bytes, mime, savedAt: Date.now() });
             req.onsuccess = () => resolve();
             req.onerror   = (e) => reject(e.target.error);
         });
@@ -1892,13 +1895,13 @@ async function _enterHarmony(sum) {
     if (_harmonyActive && _currentHarmonyKey === sum) return;
     _harmonyActive     = true;
     _currentHarmonyKey = sum;
-    let bytes = await _harmonyDbRead(sum);
-    if (!bytes) {
+    let cached = await _harmonyDbRead(sum);
+    if (!cached) {
         if (_harmonyFetching.has(sum)) return; // fetch already in flight for this sum
         _harmonyFetching.add(sum);
         try {
-            bytes = await _fetchIdleImageBytes();
-            await _harmonyDbWrite(sum, bytes);
+            cached = await _fetchIdleImageBytes();
+            await _harmonyDbWrite(sum, cached.bytes, cached.mime);
         } catch (e) {
             console.warn('[harmony] enter sum', sum, 'failed:', e.message);
             return;
@@ -1907,7 +1910,7 @@ async function _enterHarmony(sum) {
         }
     }
     if (_harmonyImagesEnabled && _currentHarmonyKey === sum) { // guard: sum or flag may have changed while awaiting
-        await loadAvoidMap(new Blob([bytes], { type: 'image/webp' }));
+        await loadAvoidMap(new Blob([cached.bytes], { type: cached.mime }));
     }
 
     // Load scene config — cache-first via IndexedDB, fallback to server fetch
@@ -1963,13 +1966,13 @@ function _exitHarmony() {
 async function _loadCurrentHarmonyImage() {
     const sum = _currentHarmonyKey;
     if (sum < 0) return;
-    let bytes = await _harmonyDbRead(sum);
-    if (!bytes) {
-        try { bytes = await _fetchIdleImageBytes(); }
+    let cached = await _harmonyDbRead(sum);
+    if (!cached) {
+        try { cached = await _fetchIdleImageBytes(); }
         catch (e) { console.warn('[harmony] image reload failed:', e.message); return; }
     }
     if (_harmonyActive && _harmonyImagesEnabled && _currentHarmonyKey === sum)
-        await loadAvoidMap(new Blob([bytes], { type: 'image/webp' }));
+        await loadAvoidMap(new Blob([cached.bytes], { type: cached.mime }));
 }
 
 function _recalcNoteFormulas() {
@@ -3425,7 +3428,8 @@ function frame(ts) {
 async function _fetchIdleImageBytes() {
     const res = await fetch(`${_apiBase}/simAss-image`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return new Uint8Array(await res.arrayBuffer());
+    const mime = res.headers.get('content-type')?.split(';')[0].trim() ?? 'image/webp';
+    return { bytes: new Uint8Array(await res.arrayBuffer()), mime };
 }
 
 // Harmony images are fetched on demand and cached in localStorage by note sum.
