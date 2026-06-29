@@ -1,6 +1,7 @@
 import GUI from 'lil-gui';
 import { stopAudio, isActive, setDuckLevel } from './audio.js';
-import { setSynthBusVolume, setMusicBusVolume } from './synth.js';
+import { setSynthBusVolume, blinker, BLINKER_TYPES } from './synth.js';
+import { setVolume as setAmbienceVolume } from './ambience.js';
 
 // ── GUI initialisation ────────────────────────────────────────────────────────
 // Call once after all sim functions are defined.
@@ -10,6 +11,7 @@ export function initGUI({
     socket,
     simState,
     MAX_AGENTS,
+    storyEngine,
     seedAgents,
     seedGoL,
     setSize,
@@ -22,6 +24,7 @@ export function initGUI({
     clearMagnetImage,
     clearTraceText,
     clearAvoidMap,
+    updateAvoidMapOverlay,
 }) {
     // ── HUD visibility ────────────────────────────────────────────────────────
     let guiVisible = new URLSearchParams(location.search).get('gui') === 'true';
@@ -72,6 +75,8 @@ export function initGUI({
     fMotion.add(params, 'freeroamLock').name('freeroam lock');
     fMotion.add(params, 'freeroamLockDelay', 1, 60, 1).name('freeroam lock (s)');
     fMotion.add(params, 'randomTeleportChance', 0, 0.05, 0.001).name('random teleport chance');
+    fMotion.add(params, 'limitAtCenter').name('limit at center');
+    fMotion.add(params, 'limitAtCenterRadius', 1, 2000, 1).name('limit radius (px)');
 
     // ── Game of Life ────────────────────────────────────────────────────────────
     // Conway automaton on a grid; particles are pulled toward the live cells.
@@ -158,9 +163,10 @@ export function initGUI({
     // ── Champions ───────────────────────────────────────────────────────────────
     const fChampions = gui.addFolder('Champions');
     fChampions.add(params, 'championsEnabled').name('enabled');
-    fChampions.add(params, 'champions',       1, 1500, 1   ).name('1 in N');
-    fChampions.add(params, 'championSize',    0.1, 40, 0.1 ).name('size (free)');
-    fChampions.add(params, 'champLinesAlpha', 0, 1,    0.01).name('lines alpha');
+    fChampions.add(params, 'champions',            1, 1500, 1   ).name('1 in N');
+    fChampions.add(params, 'championSize',         0.1, 40, 0.1 ).name('size (free)');
+    fChampions.add(params, 'champLinesAlpha',      0, 1,    0.01).name('lines alpha');
+    fChampions.add(params, 'championShadowEnabled').name('shadow');
     fChampions.close();
 
     // ── Probe ─────────────────────────────────────────────────────────────────
@@ -194,12 +200,13 @@ export function initGUI({
     // ── Avoidance map ─────────────────────────────────────────────────────────
     const fAvoid = gui.addFolder('Avoidance map');
     fAvoid.add(params, 'chaosAvoidMapThreshold', 0, 1, 0.01).name('chaos threshold (hide above)');
-    fAvoid.add(params, 'avoidMapScale', 0.05, 1.0, 0.01).name('scale');
+    fAvoid.add(params, 'avoidMapScale', 0.05, 1.0, 0.01).name('scale').onChange(() => updateAvoidMapOverlay());
     fAvoid.add(params, 'avoidMapInvert').name('invert colors');
     fAvoid.add(params, 'avoidMapSampleColor').name('sample color');
     fAvoid.add(params, 'avoidMapFixedColor').name('fixed color');
     fAvoid.add(params, 'avoidMapBlackCutoff', 0, 0.5, 0.005).name('color black cutoff');
     fAvoid.add(params, 'randomTeleportOnAvoidMap').name('random teleport');
+    fAvoid.add(params, 'showAvoidMapImage').name('show image').onChange(() => updateAvoidMapOverlay());
     fAvoid.add({ load: () => document.querySelector('#avoid-map-input').click() }, 'load').name('Load map…');
     fAvoid.add({ clear: clearAvoidMap }, 'clear').name('Clear map');
 
@@ -223,7 +230,11 @@ export function initGUI({
     fAudio.add(params, 'duckLevel',  0, 1, 0.01).name('duck level').onChange(v => setDuckLevel(v));
     const _busState = { synthVol: 0, musicVol: 0 };
     fAudio.add(_busState, 'synthVol', -30, 6, 0.5).name('ch1: synth vol').onChange(v => setSynthBusVolume(v));
-    fAudio.add(_busState, 'musicVol', -30, 6, 0.5).name('ch2: music vol').onChange(v => setMusicBusVolume(v));
+    fAudio.add(_busState, 'musicVol', -30, 6, 0.5).name('ch2: music vol').onChange(v => setAmbienceVolume(v));
+
+    const fPing = fAudio.addFolder('blinker variants');
+    const _pingBtns = Object.fromEntries(BLINKER_TYPES.map(t => [t, () => blinker(t)]));
+    BLINKER_TYPES.forEach(t => fPing.add(_pingBtns, t).name(`▶ ${t}`));
     fAudio.close();
 
     // ── Debug ─────────────────────────────────────────────────────────────────
@@ -317,6 +328,20 @@ export function initGUI({
 
     gui.add({ restart: () => seedAgents() }, 'restart').name('↺  Restart');
 
+    // ── Storia — phase navigation ─────────────────────────────────────────────
+    const fStoria = gui.addFolder('Storia');
+    const _phaseIds = storyEngine.steps.map(s => s.id);
+    const _storyState = { get phase() { return storyEngine.stepId ?? _phaseIds[0]; } };
+    const storyPhaseCtrl = fStoria
+        .add(_storyState, 'phase', _phaseIds)
+        .name('fase')
+        .onChange(v => {
+            const i = _phaseIds.indexOf(v);
+            if (i >= 0) storyEngine.goto(i);
+        });
+    fStoria.add({ prev: () => storyEngine.goto(storyEngine.index - 1) }, 'prev').name('← indietro');
+    fStoria.add({ next: () => storyEngine.goto(storyEngine.index + 1) }, 'next').name('avanti →');
+
     const modeCtrl      = gui.add(simState, 'mode',      ['STORY', 'SHOWCASE']).name('mode');
     const colorModeCtrl = gui.add(simState, 'colorMode', ['NORMAL', 'GRAYSCALE', 'GRAYSCALE_INVERTED']).name('color mode');
     const stateCtrl     = gui.add(simState, 'status',    ['NORMAL', 'FREEROAM', 'DOT']).name('status');
@@ -345,6 +370,7 @@ export function initGUI({
         golEnabledCtrl,
         applyGUIVisibility,
         toggleGUI,
+        storyPhaseCtrl,
         updateGizmo(pitch, roll) {
             gizmoPitch = pitch;
             gizmoRoll  = roll;

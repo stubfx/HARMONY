@@ -61,6 +61,8 @@
 //   [216] chladniSym           f32
 //   [220] chladniBlend         f32
 //   [224] spawnFadeRate        f32   (per-frame weight increment for newly-respawned agents; 0 = stay dark)
+//   [228] limitAtCenter        u32   (1 = agents outside limitAtCenterRadius are raw-teleported to canvas centre)
+//   [232] limitAtCenterRadius  f32   (radius in canvas pixels for the limitAtCenter constraint)
 
 struct SoloParams {
     agentCount:     u32,
@@ -119,9 +121,9 @@ struct SoloParams {
     chladniN:             f32,   // Chladni mode N
     chladniSym:           f32,   // Chladni symmetry factor (±1)
     chladniBlend:         f32,   // 0–1 blend weight; 0 = formula only, 1 = full Chladni
-    spawnFadeRate:        f32,   // per-frame weight increment after respawn; 0 = stay dark
-    _pad0:                u32,
-    _pad1:                u32,
+    spawnFadeRate:        f32,
+    limitAtCenter:        u32,
+    limitAtCenterRadius:  f32,
     _pad2:                u32,
 }
 
@@ -700,6 +702,19 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     // Skip if weight<0 (pending dot-respawn) or agent just teleported this frame.
     if (params.spawnFadeRate > 0.0 && weight >= 0.0 && weight < 1.0 && !justTeleported) {
         weight = min(weight + params.spawnFadeRate * params.dt, 1.0);
+    }
+
+    // Limit-at-center: override all previous movement — agents outside the radius
+    // are raw-teleported to the canvas centre with no fade.
+    if (params.limitAtCenter != 0u) {
+        let cx = params.canvasW * 0.5;
+        let cy = params.canvasH * 0.5;
+        let dx = np.x - cx;
+        let dy = np.y - cy;
+        if (dx * dx + dy * dy > params.limitAtCenterRadius * params.limitAtCenterRadius) {
+            np  = vec2f(cx, cy);
+            vel = vec2f(0.0, 0.0);
+        }
     }
 
     agents[i].pos    = np;

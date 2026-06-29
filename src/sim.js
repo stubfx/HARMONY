@@ -20,7 +20,8 @@ import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
 import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
 import champLinesWGSL   from './shaders/champLines.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
-import { startSynth, setSynthState, playIdleTrack, stopIdleTrack, fadeOutIdleTrack, setIdleChaos, addArpInfluence } from './synth.js';
+import { startSynth, setSynthState, setSynthDroneOnly, addArpInfluence, blinker, BLINKER_TYPES } from './synth.js';
+import * as ambience from './ambience.js';
 import { StoryEngine } from './storyEngine.js';
 import { STORY }       from './story.js';
 import { RESEED }      from './constants.js';
@@ -94,7 +95,8 @@ const params = {
     agentShadowRadius: 10,   // splat half-radius in canvas pixels
     // Champions — every Nth agent (agentId % champions == 0) drops a constant shadow
     // splat under itself even when free. 1 = every agent, 2 = one in two…
-    championsEnabled:  true, // master on/off for the whole champions feature
+    championsEnabled:       true,  // master on/off for the whole champions feature
+    championShadowEnabled:  false, // shadow splat under free champions (separate from homing-agent shadows)
     champions:         1000,
     // Champion point size — applied ONLY while a champion is free (not homing);
     // homing champions render at the normal agent size like everyone else.
@@ -119,6 +121,7 @@ const params = {
     avoidMapSampleColor: true,  // true = non-homing particles take their base color from the avoid map sample at their position
     avoidMapFixedColor:  true,  // true (paired with sampleColor) = use the sampled pixel exactly
     avoidMapBlackCutoff: 0.05,  // luminance floor for the color sample: pixels below this are skipped (particle keeps base color) — mirrors trace blackThreshold
+    showAvoidMapImage: false, // debug: overlay avoidmap image on canvas
     qrOverlay:       false, // true = QR on a 2D overlay canvas; agents freed from QR area
     // Primed-spot probe (free agents only)
     probeLen:          15.0, // probe cast distance in canvas pixels
@@ -139,6 +142,8 @@ const params = {
     dotCenterRadius:     50,   // px — agents within this radius of centre are candidates for respawn (0 = disabled)
     dotRespawnChance:    0.01, // per-frame probability that a centre-zone agent is respawned to an edge
     spawnFadeRate:       1.0,   // per-second weight increment after respawn (0 = stay dark, 1.0 = ~1s to full)
+    limitAtCenter:       false, // if true: agents outside limitAtCenterRadius are raw-teleported to canvas centre
+    limitAtCenterRadius: 300,   // radius in canvas pixels for limitAtCenter
     // Freeroam lock — when on, FREEROAM auto-reverts to NORMAL after a delay
     freeroamLock:        true,
     freeroamLockDelay:   30,   // seconds in FREEROAM before reverting to NORMAL (timer resets each time FREEROAM is re-entered)
@@ -318,6 +323,12 @@ const qrOverlayEl = document.createElement('canvas');
 qrOverlayEl.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:10;opacity:0;transition:opacity 0.6s ease;image-rendering:pixelated;';
 document.body.appendChild(qrOverlayEl);
 
+// Avoidmap debug overlay: semi-transparent 2D canvas showing the active avoidmap.
+const _avoidMapOverlayEl = document.createElement('canvas');
+_avoidMapOverlayEl.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:11;opacity:0;';
+document.body.appendChild(_avoidMapOverlayEl);
+let _avoidMapBitmap = null;
+
 function setSize() {
     const scale   = window.devicePixelRatio * params.renderScale;
     canvas.width  = Math.floor(window.innerWidth  * scale);
@@ -471,6 +482,30 @@ function seedAgents({ mode = RESEED.NORMAL } = {}) {
 }
 seedAgents();
 
+// Raw teleport: move `fraction` of agents to (x, y) with random velocities.
+// No fade — agents keep full weight and appear instantly at the target.
+function _rawTeleport(x, y, fraction = 0.1) {
+    const count     = params.agentCount;
+    const chunkSize = Math.max(1, Math.ceil(count * fraction));
+    const start     = Math.floor(Math.random() * (count - chunkSize));
+    const TAU       = Math.PI * 2;
+    const data      = new Float32Array(chunkSize * 8);
+    for (let i = 0; i < chunkSize; i++) {
+        const b = i * 8;
+        const a = Math.random() * TAU;
+        const s = 0.5 + Math.random() * 1.5;
+        data[b]     = x;
+        data[b + 1] = y;
+        data[b + 2] = Math.cos(a) * s;
+        data[b + 3] = Math.sin(a) * s;
+        data[b + 4] = x;    // home
+        data[b + 5] = y;
+        data[b + 6] = 1.0;  // weight — full, no fade
+        data[b + 7] = 0;
+    }
+    device.queue.writeBuffer(agentBuf, start * 32, data);
+}
+
 // ── Story facade & engine ────────────────────────────────────────────────────
 // sim.js exposes low-level primitives. Story steps (story.js) compose them.
 
@@ -567,13 +602,51 @@ const simFacade = {
     suppressImages()  { _avoidMapSuppressed = true;  },
     restoreImages()   { _avoidMapSuppressed = false; },
 
+    enableHarmonyImages()  {
+        _harmonyImagesEnabled = true;
+        if (_harmonyActive) _loadCurrentHarmonyImage();
+    },
+    disableHarmonyImages() {
+        _harmonyImagesEnabled = false;
+        if (_harmonyActive) clearAvoidMap();
+    },
+
+    setTraceText(text) {
+        const input = document.querySelector('#trace-text-input');
+        if (input) { input.value = text; renderTextAvoidMap(); }
+    },
+
+    // Set direction and wind formulas (WGSL expressions). Fire-and-forget async.
+    setFormulas(dir, wind) { applyFormulas(dir, wind); },
+
+    // Unlock noise/pad/arp — call when the story is ready for the full synth.
+    enableFullSynth() { setSynthDroneOnly(false); },
+
+    // Start the ambience music. Routed through ambience.js (Tone.js radio chain).
+    // Safe to call multiple times — no-op if already started.
+    startBackgroundMusic() { ambience.start(); },
+
+    startBlinkersLoop() {
+        ambience.startBlinkersLoop(() => {
+            const x = Math.random() * canvas.width;
+            const y = Math.random() * canvas.height;
+            _rawTeleport(x, y, 0.1);
+        });
+    },
+    stopBlinkersLoop()  { ambience.stopBlinkersLoop();  },
+
     // Play a narrator audio file from simAss/narrator/.
     // Pass { autoNext: true } to advance to the next step when playback ends.
     // Returns the Audio element so the caller can pause it on exit if needed.
     playNarratorAudio(filename, { autoNext = false } = {}) {
         const audio = new Audio(`${_apiBase}/simAss-narrator/${filename}`);
-        if (autoNext) audio.addEventListener('ended', () => storyEngine.next(), { once: true });
-        audio.play().catch(e => console.warn('[narrator]', e));
+        const onEnd = () => { if (autoNext) storyEngine.next(); };
+        audio.addEventListener('ended', onEnd, { once: true });
+        audio.addEventListener('error', (e) => {
+            console.warn(`[narrator] failed to load "${filename}" — skipping.`, e);
+            onEnd(); // treat missing file as instant end so story is never stuck
+        }, { once: true });
+        audio.play().catch(e => console.warn('[narrator] play() rejected:', e));
         return audio;
     },
 };
@@ -1651,7 +1724,8 @@ let modeCtrl      = null;
 let colorModeCtrl = null;
 let gui, swarmDebug, dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence, dbgChaos;
 let applyGUIVisibility, toggleGUI, updateGizmo;
-let golEnabledCtrl = null;
+let golEnabledCtrl  = null;
+let storyPhaseCtrl  = null;
 
 function updateStateDisplay() {
     modeCtrl?.updateDisplay();
@@ -1732,10 +1806,10 @@ const _HEAT_DECAY_RATE = 0.5;         // decade del 50% al secondo → freddo in
 // The cache key is the raw note sum — each unique note combination gets its own
 // persistent avoidMap image. Images are stored in IndexedDB (binary, no size limit)
 // and fetched on demand; no speculative prefetch.
-let _harmonyActive     = false;
-let _currentHarmonyKey = -1;        // active sum value, -1 = no harmony
-const _harmonyFetching = new Set(); // sums currently being fetched
-let _harmonySnapshot   = null;      // params+formulas snapshot taken just before a config is applied
+let _harmonyActive        = false;
+let _harmonyImagesEnabled = false;  // when false, harmony images are suppressed (enabled per-phase)
+let _currentHarmonyKey    = -1;     // active sum value, -1 = no harmony
+const _harmonyFetching    = new Set(); // sums currently being fetched
 let _preConnectionFormulas = null;  // { dir, wind } saved when the first spectator connects
 let _chladniSum = 0;                // current harmony sum driving Chladni mode params
 
@@ -1766,17 +1840,20 @@ async function _harmonyDbRead(sum) {
         const db = await _openHarmonyDb();
         return new Promise((resolve) => {
             const req = db.transaction(_HARMONY_DB_IMAGES, 'readonly').objectStore(_HARMONY_DB_IMAGES).get(sum);
-            req.onsuccess = (e) => resolve(e.target.result?.bytes ?? null);
+            req.onsuccess = (e) => {
+                const r = e.target.result;
+                resolve(r ? { bytes: r.bytes, mime: r.mime ?? 'image/webp' } : null);
+            };
             req.onerror   = () => resolve(null);
         });
     } catch { return null; }
 }
 
-async function _harmonyDbWrite(sum, bytes) {
+async function _harmonyDbWrite(sum, bytes, mime) {
     try {
         const db = await _openHarmonyDb();
         return new Promise((resolve, reject) => {
-            const req = db.transaction(_HARMONY_DB_IMAGES, 'readwrite').objectStore(_HARMONY_DB_IMAGES).put({ sum, bytes, savedAt: Date.now() });
+            const req = db.transaction(_HARMONY_DB_IMAGES, 'readwrite').objectStore(_HARMONY_DB_IMAGES).put({ sum, bytes, mime, savedAt: Date.now() });
             req.onsuccess = () => resolve();
             req.onerror   = (e) => reject(e.target.error);
         });
@@ -1809,17 +1886,31 @@ async function _harmonyConfigWrite(sum, config) {
     }
 }
 
+async function _clearHarmonyImageCache() {
+    try {
+        const db = await _openHarmonyDb();
+        await new Promise((resolve, reject) => {
+            const req = db.transaction(_HARMONY_DB_IMAGES, 'readwrite').objectStore(_HARMONY_DB_IMAGES).clear();
+            req.onsuccess = () => resolve();
+            req.onerror   = (e) => reject(e.target.error);
+        });
+        console.log('[harmony] image cache cleared');
+    } catch (e) {
+        console.warn('[harmony] image cache clear failed:', e.message);
+    }
+}
+
 async function _enterHarmony(sum) {
     if (_harmonyActive && _currentHarmonyKey === sum) return;
     _harmonyActive     = true;
     _currentHarmonyKey = sum;
-    let bytes = await _harmonyDbRead(sum);
-    if (!bytes) {
+    let cached = await _harmonyDbRead(sum);
+    if (!cached) {
         if (_harmonyFetching.has(sum)) return; // fetch already in flight for this sum
         _harmonyFetching.add(sum);
         try {
-            bytes = await _fetchIdleImageBytes();
-            await _harmonyDbWrite(sum, bytes);
+            cached = await _fetchIdleImageBytes();
+            await _harmonyDbWrite(sum, cached.bytes, cached.mime);
         } catch (e) {
             console.warn('[harmony] enter sum', sum, 'failed:', e.message);
             return;
@@ -1827,56 +1918,32 @@ async function _enterHarmony(sum) {
             _harmonyFetching.delete(sum);
         }
     }
-    if (_currentHarmonyKey === sum) { // guard: sum may have changed while awaiting
-        await loadAvoidMap(new Blob([bytes], { type: 'image/webp' }));
+    if (_harmonyImagesEnabled && _currentHarmonyKey === sum) { // guard: sum or flag may have changed while awaiting
+        await loadAvoidMap(new Blob([cached.bytes], { type: cached.mime }));
     }
 
-    // Load scene config — cache-first via IndexedDB, fallback to server fetch
-    if (_currentHarmonyKey === sum) {
-        let config = await _harmonyConfigRead(sum);
-        if (!config) {
-            try {
-                const res = await fetch(`${_apiBase}/simAss-config`);
-                if (res.ok) {
-                    config = await res.json();
-                    await _harmonyConfigWrite(sum, config);
-                }
-            } catch (e) {
-                console.warn('[harmony] config fetch failed:', e.message);
-            }
-        }
-        if (config && _currentHarmonyKey === sum) {
-            _harmonySnapshot = {
-                dir:       document.querySelector('#dir-input')?.value  ?? '',
-                wind:      document.querySelector('#wind-input')?.value ?? '',
-                colorMode: simState.colorMode,
-                mode:      simState.mode,
-                status:    simState.status,
-                params:    { ...params },
-            };
-            applySimParams(config);
-            gui?.controllersRecursive().forEach(c => c.updateDisplay());
-        }
-    }
 }
+
 
 function _exitHarmony() {
     if (!_harmonyActive) return;
     _harmonyActive     = false;
     _currentHarmonyKey = -1;
     clearAvoidMap();
-    if (_harmonySnapshot) {
-        const s = _harmonySnapshot;
-        _harmonySnapshot = null;
-        Object.assign(params, s.params);
-        applySimParams({ colorMode: s.colorMode, mode: s.mode, status: s.status });
-        applyFormulas(s.dir, s.wind);
-        const di = document.querySelector('#dir-input');
-        const wi = document.querySelector('#wind-input');
-        if (di) di.value = s.dir;
-        if (wi) wi.value = s.wind;
-        gui?.controllersRecursive().forEach(c => c.updateDisplay());
+}
+
+// Load (or reload) the image for the currently-active harmony sum.
+// Called when _harmonyImagesEnabled flips to true while harmony is already active.
+async function _loadCurrentHarmonyImage() {
+    const sum = _currentHarmonyKey;
+    if (sum < 0) return;
+    let cached = await _harmonyDbRead(sum);
+    if (!cached) {
+        try { cached = await _fetchIdleImageBytes(); }
+        catch (e) { console.warn('[harmony] image reload failed:', e.message); return; }
     }
+    if (_harmonyActive && _harmonyImagesEnabled && _currentHarmonyKey === sum)
+        await loadAvoidMap(new Blob([cached.bytes], { type: cached.mime }));
 }
 
 function _recalcNoteFormulas() {
@@ -1960,6 +2027,8 @@ function triggerReleaseBurst(slot) {
 let socket;
 // Base URL for server API calls — VITE_USER_URL in production, own origin as fallback.
 const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
+ambience.init(_apiBase);
+_clearHarmonyImageCache();
 {
     // In dev, Vite runs on a different port from Express, so connect directly to Express.
     // In production, use VITE_SOCKET_URL (the Caddy-fronted public origin) so Socket.IO
@@ -2036,7 +2105,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
     // A spectator joined — assign a slot, send them their color, brightness burst.
     socket.on('spectator-joined', ({ spectatorId, userCount } = {}) => {
         if (userCount !== undefined) simState.userCount = userCount;
-        if (userCount === 1) { loadIdleAudio(true); } // first user — start music with fade in
+        blinker(BLINKER_TYPES[Math.floor(Math.random() * BLINKER_TYPES.length)]);
         if (_preshowActive) {
             storyEngine.onSpectatorJoined(userCount);
         } else {
@@ -2076,11 +2145,7 @@ const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
             collectiveCoherence = 0.5;
             collectiveTemp      = 0.5;
             setSynthState(0.0, 0.5, 0, 0, 0.5);
-            // last user left — fade out music, only synth remains
-            const _fadeGen = ++_idleAudioGen;
-            fadeOutIdleTrack(smoothChaos, () => {
-                if (_fadeGen === _idleAudioGen) stopIdleTrack();
-            });
+            ambience.stop(smoothChaos); // last user left — fade out music
         }
         if (spectatorId) {
             const idx = activeSlots.findIndex(s => s.spectatorId === spectatorId);
@@ -2301,14 +2366,19 @@ function applySimParams(data) {
     modeCtrl, colorModeCtrl, stateCtrl, qrStateCtrl,
     dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence, dbgChaos,
     golEnabledCtrl,
+    storyPhaseCtrl,
     applyGUIVisibility, toggleGUI, updateGizmo,
 } = initGUI({
     params, socket, simState, MAX_AGENTS,
+    storyEngine,
     seedAgents,
     seedGoL, setSize, rebuildOffscreen, rebuildGridTex, applyResize,
     renderTraceCanvas, generateQR, loadFontSpec,
     clearMagnetImage, clearTraceText, clearAvoidMap,
+    updateAvoidMapOverlay: _updateAvoidMapOverlay,
 }));
+
+storyEngine.onGoto = () => storyPhaseCtrl.updateDisplay();
 
 stateCtrl.onChange(v => setStatus(v));
 qrStateCtrl.onChange(() => { updateStateDisplay(); renderTraceCanvas(); });
@@ -2404,8 +2474,9 @@ document.addEventListener('pointerdown', async () => {
     await unlockAudio();
     if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
     _syncAudioBanner();
+    setSynthDroneOnly(true);
     startSynth().then(() => setSynthState(1.0, smoothCoherence, 0, 0, smoothTemp));
-    if (simState.userCount > 0) loadIdleAudio(true);
+    storyEngine.start();
 }, { once: true });
 
 // ── File input for trace image ────────────────────────────────────────────────
@@ -2416,6 +2487,25 @@ document.querySelector('#image-input').addEventListener('change', e => {
     e.target.value = '';
 });
 
+// ── Avoidance map overlay ─────────────────────────────────────────────────────
+function _updateAvoidMapOverlay() {
+    if (!params.showAvoidMapImage || !_avoidMapBitmap || !hasAvoidMap) {
+        _avoidMapOverlayEl.style.opacity = '0';
+        return;
+    }
+    const W = canvas.width, H = canvas.height;
+    _avoidMapOverlayEl.width  = W;
+    _avoidMapOverlayEl.height = H;
+    const ctx2 = _avoidMapOverlayEl.getContext('2d');
+    ctx2.clearRect(0, 0, W, H);
+    const coverScale = Math.max(W / _avoidMapBitmap.width, H / _avoidMapBitmap.height) * params.avoidMapScale;
+    const dw = _avoidMapBitmap.width  * coverScale;
+    const dh = _avoidMapBitmap.height * coverScale;
+    ctx2.globalAlpha = 0.5;
+    ctx2.drawImage(_avoidMapBitmap, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    _avoidMapOverlayEl.style.opacity = '1';
+}
+
 // ── Avoidance map upload ──────────────────────────────────────────────────────
 async function loadAvoidMap(source) {
     if (_avoidMapSuppressed) return;
@@ -2425,14 +2515,35 @@ async function loadAvoidMap(source) {
         ? await fetch(source).then(r => r.blob())
         : source; // File is a Blob
     clearAvoidGif();
-    const anim = await decodeAnimatedImage(blob);
+    const isSvg = blob.type === 'image/svg+xml' || (typeof source === 'object' && source?.name?.toLowerCase().endsWith('.svg'));
     let bmp;
-    if (anim) {
-        avoidGifFrames = anim.frames; avoidGifDurations = anim.durations;
-        avoidGifFrameIdx = 0; avoidGifNextFrameAt = performance.now() + avoidGifDurations[0];
-        bmp = avoidGifFrames[0];
+    if (isSvg) {
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+        URL.revokeObjectURL(url);
+        const cw = canvas.width, ch = canvas.height;
+        const offscreen = new OffscreenCanvas(cw, ch);
+        const ctx2 = offscreen.getContext('2d');
+        ctx2.fillStyle = '#000000';
+        ctx2.fillRect(0, 0, cw, ch);
+        const imgW = img.naturalWidth  || cw;
+        const imgH = img.naturalHeight || ch;
+        const scale = Math.min(cw / imgW, ch / imgH);
+        const dw = imgW * scale, dh = imgH * scale;
+        ctx2.filter = 'invert(1)';
+        ctx2.drawImage(img, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
+        ctx2.filter = 'none';
+        bmp = await createImageBitmap(offscreen);
     } else {
-        bmp = await createImageBitmap(blob, { colorSpaceConversion: 'none' });
+        const anim = await decodeAnimatedImage(blob);
+        if (anim) {
+            avoidGifFrames = anim.frames; avoidGifDurations = anim.durations;
+            avoidGifFrameIdx = 0; avoidGifNextFrameAt = performance.now() + avoidGifDurations[0];
+            bmp = avoidGifFrames[0];
+        } else {
+            bmp = await createImageBitmap(blob, { colorSpaceConversion: 'none' });
+        }
     }
     if (avoidMapTex) avoidMapTex.destroy();
     avoidMapTex = device.createTexture({
@@ -2443,8 +2554,10 @@ async function loadAvoidMap(source) {
     device.queue.copyExternalImageToTexture({ source: bmp }, { texture: avoidMapTex }, [bmp.width, bmp.height]);
     avoidMapTexView = avoidMapTex.createView();
     hasAvoidMap     = true;
+    _avoidMapBitmap = bmp;
     rebuildSimBG();
     rebuildRenderBG();
+    _updateAvoidMapOverlay();
     if (!_inQROverlayUpdate && params.qrOverlay && simState.qrStatus === 'SHOW' && qrBitmap) updateQROverlay();
 }
 
@@ -2453,7 +2566,9 @@ function clearAvoidMap() {
     if (avoidMapTex) { avoidMapTex.destroy(); avoidMapTex = null; }
     avoidMapTexView    = null;
     hasAvoidMap        = false;
+    _avoidMapBitmap    = null;
     _textOwnedAvoidMap = false;
+    _updateAvoidMapOverlay();
     rebuildSimBG();
     rebuildRenderBG();
     if (!_inQROverlayUpdate && params.qrOverlay && simState.qrStatus === 'SHOW' && qrBitmap) updateQROverlay();
@@ -2489,10 +2604,8 @@ if (fontInput) {
     fontInput.addEventListener('change', applyFontInput);
     fontInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyFontInput(); });
 }
-// Set default text and render it as the avoidmap before font loads,
-// then again once the font is ready (loadFontSpec calls renderTextAvoidMap).
+// No default text on boot — story sets it at the appropriate phase.
 const _defaultTextInput = document.querySelector('#trace-text-input');
-if (_defaultTextInput) _defaultTextInput.value = 'HARMONY';
 renderTextAvoidMap();
 loadFontSpec(params.fontFamily); // load the default Google Font on boot
 
@@ -2658,12 +2771,14 @@ function writeSoloUB(dt, time) {
     f[54] = (_chladniSum % 2 === 0) ? 1.0 : -1.0;
     f[55] = params.chladniBlend;
     f[56] = params.spawnFadeRate;
+    u[57] = params.limitAtCenter ? 1 : 0;
+    f[58] = params.limitAtCenterRadius;
     setChaos(chaosGPU);
     const _synthNow = performance.now();
     if (_synthNow - _lastSynthTick >= 200) {
         _lastSynthTick = _synthNow;
         setSynthState(smoothChaos, smoothCoherence, 0, 0, smoothTemp);
-        setIdleChaos(smoothChaos);
+        ambience.setChaos(smoothChaos);
     }
     if (Math.random() < 0.01) console.log('[chaos] smoothChaos→GPU:', smoothChaos.toFixed(4));
     device.queue.writeBuffer(soloUB, 0, ab);
@@ -3196,7 +3311,7 @@ function frame(ts) {
     rp.draw(3);
     // Agent shadow is a soft splat — incoherent with chunky cells, skip in pixel mode.
     // Runs when an image is loaded (homing shadows) or champions are active (constant shadows).
-    if ((hasImage || (params.championsEnabled && params.champions > 0)) && agentShadowBG && !usingPixel) {
+    if ((hasImage || (params.championsEnabled && params.champions > 0 && params.championShadowEnabled)) && agentShadowBG && !usingPixel) {
         rp.setPipeline(agentShadowPipe);
         rp.setBindGroup(0, agentShadowBG);
         rp.draw(params.agentCount * 6);
@@ -3322,30 +3437,10 @@ function frame(ts) {
 async function _fetchIdleImageBytes() {
     const res = await fetch(`${_apiBase}/simAss-image`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return new Uint8Array(await res.arrayBuffer());
+    const mime = res.headers.get('content-type')?.split(';')[0].trim() ?? 'image/webp';
+    return { bytes: new Uint8Array(await res.arrayBuffer()), mime };
 }
 
 // Harmony images are fetched on demand and cached in localStorage by note sum.
 
-// ── simAss audio loader — chains tracks via Tone.js radio chain ──────────────
-// Plays when users are connected. fadeIn=true on first track (user join).
-let _idleAudioGen = 0;
-
-async function loadIdleAudio(fadeIn = false) {
-    const gen = ++_idleAudioGen;
-    try {
-        const res = await fetch(`${_apiBase}/simAss-audio`);
-        if (!res.ok) { console.warn('[simAss-audio] HTTP', res.status); return; }
-        if (gen !== _idleAudioGen) return;
-        const buf = await res.arrayBuffer();
-        console.log(`[simAss-audio] loaded ${buf.byteLength}B — playing${fadeIn ? ' (fade in)' : ''}`);
-        await playIdleTrack(buf, () => {
-            if (gen === _idleAudioGen) loadIdleAudio(false);
-        }, fadeIn ? smoothChaos : null);
-    } catch (e) {
-        console.warn('[simAss-audio]', e);
-    }
-}
-
-storyEngine.start();
 requestAnimationFrame(frame);

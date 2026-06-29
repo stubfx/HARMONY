@@ -124,6 +124,14 @@ export async function startSynth() {
 // coherence : 0 = scattered, 1 = converged
 // biasX/Y   : collective tilt (wind direction), nominally 0–1 centered at 0
 // temp      : collective temperature 0–1
+let _droneOnly = false;
+
+// When true, only the drone plays — noise/pad/arp are silenced.
+// Call setSynthDroneOnly(false) to restore all layers.
+export function setSynthDroneOnly(enabled) {
+    _droneOnly = enabled;
+}
+
 export function setSynthState(chaos, coherence = 0.5, biasX = 0, biasY = 0, temp = 0.5) {
     if (!_ready) return;
     const c   = Math.max(0, Math.min(1, chaos));
@@ -141,6 +149,8 @@ export function setSynthState(chaos, coherence = 0.5, biasX = 0, biasY = 0, temp
 
     // Drone — always audible, slightly quieter at peak chaos
     smoothTo(_droneVol.volume, -18 - c * 6);
+
+    if (_droneOnly) return; // PHASE 1: solo drone, gli altri layer restano silenziosi
 
     // Noise — fades out as harmony approaches
     smoothTo(_noiseGain.gain, Math.max(1e-4, c * 0.25));
@@ -191,113 +201,41 @@ export function stopSynth() {
     }, 1600);
 }
 
-// ── simAss radio chain — plays when users connected, off when room is empty ────
-// Music routed through chaos-driven degradation (radio with no signal at chaos=1).
-// _idleFadeGain controls presence (0 = silent, 1 = present) and is used for
-// fade in/out on user join/leave. Both music and static noise route through it.
-
-let _idleChainReady = false;
-let _idlePlayer     = null;
-let _idleFilter     = null;   // lowpass — chaos drives cutoff down
-let _idleDist       = null;   // distortion — chaos drives up
-let _idleTremolo    = null;   // dropout tremolo — chaos deepens
-let _idleReverb     = null;   // reverb wash — chaos drives wet up
-let _idleVol        = null;   // chaos-driven level
-let _idleFadeGain   = null;   // fade in/out on user join/leave (0 = off)
-let _idleNoiseGain  = null;   // static noise level — chaos drives up
-let _musicBusVol    = null;   // independent music channel master volume
-
-async function _buildIdleChain() {
-    if (_idleChainReady) return;
-    _idleFilter   = new Tone.Filter({ frequency: 4000, type: 'lowpass', rolloff: -24 });
-    _idleDist     = new Tone.Distortion(0);
-    _idleTremolo  = new Tone.Tremolo({ frequency: 3, depth: 0 }).start();
-    _idleReverb   = new Tone.Reverb({ decay: 4, wet: 0.15 });
-    _idleVol      = new Tone.Volume(-3);
-    _idleFadeGain = new Tone.Gain(0);   // starts silent
-    _musicBusVol  = new Tone.Volume(0); // independent channel fader
-    _idlePlayer   = new Tone.Player({ loop: false, fadeOut: 0.1 });
-
-    // Music: player → effects → chaos vol → fade gain → music bus → destination
-    _idlePlayer.chain(_idleFilter, _idleDist, _idleTremolo, _idleReverb, _idleVol, _idleFadeGain);
-    _idleFadeGain.connect(_musicBusVol);
-
-    // Static noise routed through fade gain (fades with music)
-    const noiseBP  = new Tone.Filter({ frequency: 2000, type: 'bandpass', Q: 1.0 });
-    _idleNoiseGain = new Tone.Gain(0);
-    const noise    = new Tone.Noise('white');
-    noise.connect(noiseBP);
-    noiseBP.connect(_idleNoiseGain);
-    _idleNoiseGain.connect(_idleFadeGain);
-
-    _musicBusVol.toDestination();
-    noise.start();
-
-    await _idleReverb.ready;
-    _idleChainReady = true;
+// ── Ping / blip — short tonal transient, fires on spectator join ──────────────
+// Shared reverb tail — built once, reused across all ping types.
+let _pingReverb = null;
+async function _ensurePingReverb() {
+    if (_pingReverb) return;
+    _pingReverb = new Tone.Reverb({ decay: 6, wet: 0.65 });
+    await _pingReverb.ready;
+    _pingReverb.toDestination();
 }
 
-export function setMusicBusVolume(db) {
-    if (_musicBusVol) _musicBusVol.volume.value = db;
-}
+const BLINKER_PRESETS = {
+    //          freq   slide  decay  vol    type
+    sonar:    [ 528,   0.82,  1.8,  -22,  'sine'     ],
+    sputnik:  [ 880,   0.97,  0.7,  -24,  'sine'     ],
+    deep:     [ 264,   0.80,  3.0,  -18,  'sine'     ],
+    blip:     [ 1320,  1.00,  0.18, -26,  'triangle' ],
+    ghost:    [ 440,   0.75,  4.0,  -30,  'sine'     ],
+};
 
-// chaos-driven radio degradation — call every frame alongside setSynthState
-export function setIdleChaos(chaos) {
-    if (!_idleChainReady) return;
-    const c  = Math.max(0, Math.min(1, chaos));
-    const t  = Tone.now();
-    const TC = RAMP / 3;
-
-    function smooth(signal, value) {
-        signal.cancelScheduledValues(t);
-        signal.setTargetAtTime(value, t, TC);
-    }
-
-    smooth(_idleFilter.frequency, 4000 - c * 3600);   // 4000 Hz → 400 Hz
-    smooth(_idleReverb.wet,       0.15 + c * 0.70);   // 0.15 → 0.85
-    smooth(_idleNoiseGain.gain,   c * 0.04);           // static noise 0 → 0.04 (subtle)
-    smooth(_idleVol.volume,       -3 - c * 12);        // -3 dB → -15 dB
-
-    _idleDist.distortion         = c * 0.65;
-    _idleTremolo.depth.value     = c * 0.85;
-    _idleTremolo.frequency.value = 2 + c * 6;         // 2 Hz → 8 Hz dropout
-}
-
-// TC = exponential time constant: 0.7s at chaos=1, 2.5s at chaos=0
-// Perceptible fade duration ≈ TC × 3.5
-function _fadeTC(chaos) {
-    return Math.max(0.7, 2.5 - Math.max(0, Math.min(1, chaos)) * 1.8);
-}
-
-export async function playIdleTrack(arrayBuffer, onEnded, fadeInChaos = null) {
+export async function blinker(type = 'sonar') {
     await Tone.start();
-    await _buildIdleChain();
-    if (_idlePlayer.state === 'started') _idlePlayer.stop();
-    const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
-    const url  = URL.createObjectURL(blob);
-    await _idlePlayer.load(url);
-    URL.revokeObjectURL(url);
-    _idlePlayer.onstop = onEnded ?? null;
-    if (fadeInChaos !== null) {
-        const t  = Tone.now();
-        const TC = _fadeTC(fadeInChaos);
-        _idleFadeGain.gain.cancelScheduledValues(t);
-        _idleFadeGain.gain.setValueAtTime(0, t);
-        _idleFadeGain.gain.setTargetAtTime(1, t, TC);
-    }
-    _idlePlayer.start();
+    await _ensurePingReverb();
+    const [freq, slideRatio, decay, vol, oscType] = BLINKER_PRESETS[type] ?? BLINKER_PRESETS.sonar;
+    const synth = new Tone.Synth({
+        oscillator: { type: oscType },
+        envelope:   { attack: 0.002, decay, sustain: 0, release: 0.1 },
+        volume:     vol,
+    }).connect(_pingReverb);
+
+    const t = Tone.now();
+    synth.frequency.setValueAtTime(freq, t);
+    if (slideRatio < 1) synth.frequency.exponentialRampToValueAtTime(freq * slideRatio, t + decay);
+    synth.triggerAttackRelease(freq, decay + 0.1, t);
+    setTimeout(() => synth.dispose(), (decay + 1.5) * 1000);
 }
 
-export function stopIdleTrack() {
-    if (_idlePlayer?.state === 'started') _idlePlayer.stop();
-}
+export const BLINKER_TYPES = Object.keys(BLINKER_PRESETS);
 
-// Smooth exponential fade out; calls onFaded when inaudible (~TC×3.5s)
-export function fadeOutIdleTrack(chaos, onFaded) {
-    if (!_idleChainReady) { onFaded?.(); return; }
-    const t  = Tone.now();
-    const TC = _fadeTC(chaos);
-    _idleFadeGain.gain.cancelScheduledValues(t);
-    _idleFadeGain.gain.setTargetAtTime(0, t, TC);
-    setTimeout(() => onFaded?.(), TC * 3.5 * 1000);
-}

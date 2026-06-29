@@ -2,7 +2,7 @@
 
 // Story phase IDs — must match the `id` fields in story.js.
 export const PHASE = Object.freeze({
-    PRESHOW:           'preshow',
+    BLACK:             'black',
     NOTA:              'nota',
     ROSSO:             'rosso',
     IMMAGINI_CUORE:    'immagini-cuore',
@@ -17,6 +17,6 @@ export const RESEED = Object.freeze({
     // Random interior positions, weight = full. Default behaviour.
     NORMAL:          'normal',
     // Perimeter spawn, weight = 0 → spawnFadeRate fades agents in from the edges.
-    // Used at the end of PHASE.PRESHOW so the transition is gradual, not a snap.
+    // Used at the end of PHASE.BLACK so the transition is gradual, not a snap.
     FADE_FROM_EDGES: 'fadeFromEdges',
 });

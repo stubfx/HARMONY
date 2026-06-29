@@ -390,7 +390,7 @@ app.post('/rndImage', async (_req, res) => {
 
 // ── simAss assets — ./simAss/{images,music}/, max 10, 1-day lifespan ─────────
 const _SIM_ASS_DIR   = path.join(__dirname, '..', 'simAss');
-const _IMAGE_MIME    = { '.webp': 'image/webp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png' };
+const _IMAGE_MIME    = { '.webp': 'image/webp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml' };
 const SIM_ASS_MAX    = 10;
 const _FILE_LIFESPAN = 24 * 60 * 60 * 1000; // 1 day in ms
 
@@ -445,27 +445,17 @@ async function _genAndSaveAudio(dir) {
 
 app.get('/simAss-image', async (_req, res) => {
     const dir   = path.join(_SIM_ASS_DIR, 'images');
-    const files = await _simAssFiles(dir);
+    const files = await _simAssFiles(dir, { checkExpiry: false });
     console.log(`[simAss-image] request — ${files.length} file(s) available: [${files.join(', ')}]`);
     if (files.length === 0) {
-        console.log('[simAss-image] no files — generating synchronously…');
-        try {
-            const { buf, mime } = await _genAndSaveImage(dir);
-            return res.type(mime).send(buf);
-        } catch (err) {
-            console.error('[simAss-image] generation failed:', err.message);
-            return res.status(500).json({ error: err.message });
-        }
+        console.log('[simAss-image] no files in simAss/images — nothing to serve');
+        return res.status(404).json({ error: 'no images available' });
     }
     const chosen = files[Math.floor(Math.random() * files.length)];
     const file   = path.join(dir, chosen);
     const mime   = _IMAGE_MIME[path.extname(file).toLowerCase()] ?? 'image/webp';
-    console.log(`[simAss-image] serving ${chosen}  (${files.length}/${SIM_ASS_MAX})`);
+    console.log(`[simAss-image] serving ${chosen}`);
     res.type(mime).send(await readFile(file));
-    if (files.length < SIM_ASS_MAX) {
-        console.log(`[simAss-image] below cap (${files.length}/${SIM_ASS_MAX}) — triggering background generation`);
-        _genAndSaveImage(dir).catch(e => console.error('[simAss-image] bg gen failed:', e.message));
-    }
 });
 
 app.get('/simAss-config', async (_req, res) => {

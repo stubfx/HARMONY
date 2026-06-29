@@ -86,10 +86,12 @@ That wonder is the work.
 
 Before the piece begins, the screen is black. Not dormant — running, waiting. Every particle already exists; none of them are visible. A voice begins to speak.
 
-While the voice speaks, people scan the QR and connect. Each connection wakes a portion of the swarm from the canvas centre — particles drift outward, accumulating. The swarm doesn't grow; it reveals itself. The dark between the particles is not absence. It is potential that hasn't been claimed yet.
+The narration has two movements. The first (`audio1`) plays from the moment the room opens — before anyone has connected. It speaks into the empty space. When the first person scans the QR and joins, that first voice stops and a second voice begins (`audio2`). The arrival of a listener changes what is said. This transition is not announced.
 
-The preshow ends when the narrator finishes *and* at least one person has connected. If the voice finishes before anyone joins, the piece waits quietly. Once both conditions are met, the simulation reseeds and the story begins.
+While the second voice speaks, more people scan the QR and connect. Each connection wakes a portion of the swarm from the canvas centre — particles drift outward, accumulating. The swarm doesn't grow; it reveals itself. The dark between the particles is not absence. It is potential that hasn't been claimed yet.
 
-After ten seconds from the first connection, a slow trickle of new particles begins to respawn at the canvas edges — invisible at first, fading in gradually over about a second. This is intentional: the swarm breathes even before the piece begins.
+The preshow ends ten seconds after the second voice finishes. At that point the story begins — agents stay where they are, and the slow respawn already active continues without interruption.
+
+After ten seconds from the first connection, a slow trickle of new particles begins to respawn at the canvas edges — invisible at first, fading in over about a second. This is intentional: the swarm breathes even before the piece begins.
 
 Remote phones during preshow show a flat coloured background — no sphere, no animation. The colour changes as people touch the screen, giving each person a quiet signal that they are already part of something before the lights come on.
