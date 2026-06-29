@@ -1957,7 +1957,7 @@ function _exitHarmony() {
     if (!_harmonyActive) return;
     _harmonyActive     = false;
     _currentHarmonyKey = -1;
-    clearAvoidMap();
+    if (_harmonyImagesEnabled) clearAvoidMap();
 }
 
 // Load (or reload) the image for the currently-active harmony sum.
