@@ -11,15 +11,22 @@ export class StoryEngine {
 
     get current() { return this._steps[this._index] ?? null; }
     get stepId()  { return this.current?.id ?? null; }
+    get index()   { return this._index; }
+    get length()  { return this._steps.length; }
+    get steps()   { return this._steps; }
 
-    start() { this._goto(0); }
-    next()  { this._goto(this._index + 1); }
+    set onGoto(fn) { this._onGoto = fn; }
+
+    start()    { this._goto(0); }
+    next()     { this._goto(this._index + 1); }
+    goto(i)    { this._goto(i); }
 
     _goto(i) {
         if (i < 0 || i >= this._steps.length) return;
         this.current?.exit?.(this._sim);
         this._index = i;
         this.current?.enter?.(this._sim);
+        this._onGoto?.(i);
     }
 
     onSpectatorJoined(userCount) {

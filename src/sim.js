@@ -2395,14 +2395,18 @@ function applySimParams(data) {
     modeCtrl, colorModeCtrl, stateCtrl, qrStateCtrl,
     dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence, dbgChaos,
     golEnabledCtrl,
+    storyPhaseCtrl,
     applyGUIVisibility, toggleGUI, updateGizmo,
 } = initGUI({
     params, socket, simState, MAX_AGENTS,
+    storyEngine,
     seedAgents,
     seedGoL, setSize, rebuildOffscreen, rebuildGridTex, applyResize,
     renderTraceCanvas, generateQR, loadFontSpec,
     clearMagnetImage, clearTraceText, clearAvoidMap,
 }));
+
+storyEngine.onGoto = () => storyPhaseCtrl.updateDisplay();
 
 stateCtrl.onChange(v => setStatus(v));
 qrStateCtrl.onChange(() => { updateStateDisplay(); renderTraceCanvas(); });

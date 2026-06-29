@@ -11,6 +11,7 @@ export function initGUI({
     socket,
     simState,
     MAX_AGENTS,
+    storyEngine,
     seedAgents,
     seedGoL,
     setSize,
@@ -323,6 +324,20 @@ export function initGUI({
 
     gui.add({ restart: () => seedAgents() }, 'restart').name('↺  Restart');
 
+    // ── Storia — phase navigation ─────────────────────────────────────────────
+    const fStoria = gui.addFolder('Storia');
+    const _phaseIds = storyEngine.steps.map(s => s.id);
+    const _storyState = { get phase() { return storyEngine.stepId ?? _phaseIds[0]; } };
+    const storyPhaseCtrl = fStoria
+        .add(_storyState, 'phase', _phaseIds)
+        .name('fase')
+        .onChange(v => {
+            const i = _phaseIds.indexOf(v);
+            if (i >= 0) storyEngine.goto(i);
+        });
+    fStoria.add({ prev: () => storyEngine.goto(storyEngine.index - 1) }, 'prev').name('← indietro');
+    fStoria.add({ next: () => storyEngine.goto(storyEngine.index + 1) }, 'next').name('avanti →');
+
     const modeCtrl      = gui.add(simState, 'mode',      ['STORY', 'SHOWCASE']).name('mode');
     const colorModeCtrl = gui.add(simState, 'colorMode', ['NORMAL', 'GRAYSCALE', 'GRAYSCALE_INVERTED']).name('color mode');
     const stateCtrl     = gui.add(simState, 'status',    ['NORMAL', 'FREEROAM', 'DOT']).name('status');
@@ -351,6 +366,7 @@ export function initGUI({
         golEnabledCtrl,
         applyGUIVisibility,
         toggleGUI,
+        storyPhaseCtrl,
         updateGizmo(pitch, roll) {
             gizmoPitch = pitch;
             gizmoRoll  = roll;
