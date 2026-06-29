@@ -136,6 +136,7 @@ export const STORY = [
         _noteTimerStarted: false,
         enter(sim) {
             this._noteTimerStarted = false;
+            sim.setParam('limitAtCenter', false);
             sim.freezeParams({ windEnabled: false });
             sim.setTraceText('HARMONY');
             sim.startBackgroundMusic();
@@ -171,7 +172,6 @@ export const STORY = [
         id: PHASE.ROSSO,
         enter(sim) {
             sim.setParam('champLinesAlpha', 0.02);
-            sim.setParam('limitAtCenter', false);
             sim.enableHarmonyImages();
             sim.startBlinkersLoop();
             log('PHASE 3 — rosso. immagini harmony abilitate. blinkers loop avviato. audio4 in partenza.');
