@@ -66,6 +66,7 @@ export const STORY = [
                 'sin(x * 0.004 - y * 0.003 + t * 0.4) * TWO_PI',
             );
             sim.freezeParams({ spectatorSpawnChance: 0, randomTeleportChance: 0, dotRespawnChance: 0, spawnFadeRate: 0 });
+            sim.setParam('champLinesAlpha', 0);
             sim.suppressImages();
             sim.dormantSeed();
             this._audio = sim.playNarratorAudio('audio1.mp3');
@@ -167,6 +168,7 @@ export const STORY = [
     {
         id: PHASE.ROSSO,
         enter(sim) {
+            sim.setParam('champLinesAlpha', 0.02);
             sim.enableHarmonyImages();
             sim.startBlinkersLoop();
             log('PHASE 3 — rosso. immagini harmony abilitate. blinkers loop avviato. audio4 in partenza.');
