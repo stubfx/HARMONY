@@ -162,7 +162,7 @@ export const STORY = [
     },
 
     // ── PHASE 3 — IL ROSSO ────────────────────────────────────────────────────
-    // 10s di attesa → dotRespawnChance abilitato → audio4.
+    // NORMAL color → HARMONY text subito → timer 10s → immagini harmony → audio4.
     // Alla fine di audio4: 5s di silenzio → colori rosso → PHASE 4.
     // File: simAss/narrator/audio4.mp3
     {
@@ -170,11 +170,11 @@ export const STORY = [
         enter(sim) {
             sim.setColorMode('NORMAL');
             sim.setParam('champLinesAlpha', 0.02);
-            sim.enableHarmonyImages();
             sim.setTraceText('HARMONY');
-            log('PHASE 3 — rosso.');
+            log('PHASE 3 — rosso. testo HARMONY attivo. immagini e audio tra 10s.');
             this._respawnTimer = setTimeout(() => {
-                log('10s scaduti — dotRespawnChance abilitato (0.002). audio4 in partenza.');
+                log('10s scaduti — immagini harmony abilitate. dotRespawnChance abilitato (0.002). audio4 in partenza.');
+                sim.enableHarmonyImages();
                 sim.setParam('dotRespawnChance', 0.002);
                 this._audio = sim.playNarratorAudio('audio4.mp3');
                 this._audio.addEventListener('ended', () => {
