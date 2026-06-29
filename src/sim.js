@@ -1715,7 +1715,8 @@ let modeCtrl      = null;
 let colorModeCtrl = null;
 let gui, swarmDebug, dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence, dbgChaos;
 let applyGUIVisibility, toggleGUI, updateGizmo;
-let golEnabledCtrl = null;
+let golEnabledCtrl  = null;
+let storyPhaseCtrl  = null;
 
 function updateStateDisplay() {
     modeCtrl?.updateDisplay();
