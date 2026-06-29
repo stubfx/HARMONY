@@ -713,7 +713,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         let dy = np.y - cy;
         if (dx * dx + dy * dy > params.limitAtCenterRadius * params.limitAtCenterRadius) {
             let lacRng = hash(i ^ (u32(params.time * 1031.0) + 17u));
-            if (lacRng < 0.05) {
+            if (lacRng < 0.003) {
                 np  = vec2f(cx, cy);
                 vel = vec2f(0.0, 0.0);
             }
