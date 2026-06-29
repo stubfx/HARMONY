@@ -116,29 +116,35 @@ export const STORY = [
     },
 
     // ── PHASE 2 — LA NOTA ─────────────────────────────────────────────────────
-    // Entra subito da PHASE 1. Imposta testo HARMONY e aspetta 10s (respawn già attivo).
-    // Poi audio3 parte. wind disabilitato fino alla prima nota.
-    // Prima nota → wind on → timer 20s → sim.next().
-    // Il timer da 20s parte una sola volta.
+    // Entra subito da PHASE 1. Aspetta 10s, poi audio3.
+    // Note ignorate finché audio3 non finisce (evita che note spedite durante
+    // audio2 o durante audio3 scattino il timer in anticipo).
+    // Prima nota dopo audio3 → wind on → timer 20s → sim.next().
     {
         id: PHASE.NOTA,
         _noteTimerStarted: false,
+        _notesEnabled: false,
         enter(sim) {
             this._noteTimerStarted = false;
+            this._notesEnabled = false;
             sim.setParam('limitAtCenter', false);
             sim.freezeParams({ windEnabled: false });
             sim.loadStaticAvoidMap('circle.png');
             sim.startBackgroundMusic();
             sim.startBlinkersLoop();
             sim.enableFullSynth();
-            log('PHASE 2 — nota. wind disabilitato. synth completo abilitato. musica di fondo avviata. audio3 parte tra 10s.');
+            log('PHASE 2 — nota. note disabilitate fino a fine audio3. audio3 parte tra 10s.');
             setTimeout(() => {
                 log('10s scaduti — audio3 in partenza.');
                 this._audio = sim.playNarratorAudio('audio3.mp3');
+                this._audio.addEventListener('ended', () => {
+                    log('audio3 terminato — note abilitate.');
+                    this._notesEnabled = true;
+                }, { once: true });
             }, 10_000);
         },
         onNote(sim, noteIndex) {
-            if (this._noteTimerStarted) return;
+            if (!this._notesEnabled || this._noteTimerStarted) return;
             this._noteTimerStarted = true;
             sim.setParam('windEnabled', true);
             log('prima nota ricevuta (index ' + noteIndex + '). wind abilitato. timer 20s avviato → PHASE 3.');
