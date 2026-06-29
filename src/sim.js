@@ -121,6 +121,7 @@ const params = {
     avoidMapSampleColor: true,  // true = non-homing particles take their base color from the avoid map sample at their position
     avoidMapFixedColor:  true,  // true (paired with sampleColor) = use the sampled pixel exactly
     avoidMapBlackCutoff: 0.05,  // luminance floor for the color sample: pixels below this are skipped (particle keeps base color) — mirrors trace blackThreshold
+    showAvoidMapImage: false, // debug: overlay avoidmap image on canvas
     qrOverlay:       false, // true = QR on a 2D overlay canvas; agents freed from QR area
     // Primed-spot probe (free agents only)
     probeLen:          15.0, // probe cast distance in canvas pixels
@@ -319,6 +320,12 @@ document.body.prepend(canvas);
 const qrOverlayEl = document.createElement('canvas');
 qrOverlayEl.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:10;opacity:0;transition:opacity 0.6s ease;image-rendering:pixelated;';
 document.body.appendChild(qrOverlayEl);
+
+// Avoidmap debug overlay: semi-transparent 2D canvas showing the active avoidmap.
+const _avoidMapOverlayEl = document.createElement('canvas');
+_avoidMapOverlayEl.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:11;opacity:0;';
+document.body.appendChild(_avoidMapOverlayEl);
+let _avoidMapBitmap = null;
 
 function setSize() {
     const scale   = window.devicePixelRatio * params.renderScale;
@@ -1801,7 +1808,6 @@ let _harmonyActive        = false;
 let _harmonyImagesEnabled = false;  // when false, harmony images are suppressed (enabled per-phase)
 let _currentHarmonyKey    = -1;     // active sum value, -1 = no harmony
 const _harmonyFetching    = new Set(); // sums currently being fetched
-let _harmonySnapshot      = null;   // params+formulas snapshot taken just before a config is applied
 let _preConnectionFormulas = null;  // { dir, wind } saved when the first spectator connects
 let _chladniSum = 0;                // current harmony sum driving Chladni mode params
 
@@ -1914,52 +1920,14 @@ async function _enterHarmony(sum) {
         await loadAvoidMap(new Blob([cached.bytes], { type: cached.mime }));
     }
 
-    // Load scene config — cache-first via IndexedDB, fallback to server fetch
-    if (_currentHarmonyKey === sum) {
-        let config = await _harmonyConfigRead(sum);
-        if (!config) {
-            try {
-                const res = await fetch(`${_apiBase}/simAss-config`);
-                if (res.ok) {
-                    config = await res.json();
-                    await _harmonyConfigWrite(sum, config);
-                }
-            } catch (e) {
-                console.warn('[harmony] config fetch failed:', e.message);
-            }
-        }
-        if (config && _currentHarmonyKey === sum) {
-            _harmonySnapshot = {
-                dir:       document.querySelector('#dir-input')?.value  ?? '',
-                wind:      document.querySelector('#wind-input')?.value ?? '',
-                colorMode: simState.colorMode,
-                mode:      simState.mode,
-                status:    simState.status,
-                params:    { ...params },
-            };
-            applySimParams(config);
-            gui?.controllersRecursive().forEach(c => c.updateDisplay());
-        }
-    }
 }
+
 
 function _exitHarmony() {
     if (!_harmonyActive) return;
     _harmonyActive     = false;
     _currentHarmonyKey = -1;
     clearAvoidMap();
-    if (_harmonySnapshot) {
-        const s = _harmonySnapshot;
-        _harmonySnapshot = null;
-        Object.assign(params, s.params);
-        applySimParams({ colorMode: s.colorMode, mode: s.mode, status: s.status });
-        applyFormulas(s.dir, s.wind);
-        const di = document.querySelector('#dir-input');
-        const wi = document.querySelector('#wind-input');
-        if (di) di.value = s.dir;
-        if (wi) wi.value = s.wind;
-        gui?.controllersRecursive().forEach(c => c.updateDisplay());
-    }
 }
 
 // Load (or reload) the image for the currently-active harmony sum.
@@ -2405,6 +2373,7 @@ function applySimParams(data) {
     seedGoL, setSize, rebuildOffscreen, rebuildGridTex, applyResize,
     renderTraceCanvas, generateQR, loadFontSpec,
     clearMagnetImage, clearTraceText, clearAvoidMap,
+    updateAvoidMapOverlay: _updateAvoidMapOverlay,
 }));
 
 storyEngine.onGoto = () => storyPhaseCtrl.updateDisplay();
@@ -2516,6 +2485,25 @@ document.querySelector('#image-input').addEventListener('change', e => {
     e.target.value = '';
 });
 
+// ── Avoidance map overlay ─────────────────────────────────────────────────────
+function _updateAvoidMapOverlay() {
+    if (!params.showAvoidMapImage || !_avoidMapBitmap || !hasAvoidMap) {
+        _avoidMapOverlayEl.style.opacity = '0';
+        return;
+    }
+    const W = canvas.width, H = canvas.height;
+    _avoidMapOverlayEl.width  = W;
+    _avoidMapOverlayEl.height = H;
+    const ctx2 = _avoidMapOverlayEl.getContext('2d');
+    ctx2.clearRect(0, 0, W, H);
+    const coverScale = Math.max(W / _avoidMapBitmap.width, H / _avoidMapBitmap.height) * params.avoidMapScale;
+    const dw = _avoidMapBitmap.width  * coverScale;
+    const dh = _avoidMapBitmap.height * coverScale;
+    ctx2.globalAlpha = 0.5;
+    ctx2.drawImage(_avoidMapBitmap, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    _avoidMapOverlayEl.style.opacity = '1';
+}
+
 // ── Avoidance map upload ──────────────────────────────────────────────────────
 async function loadAvoidMap(source) {
     if (_avoidMapSuppressed) return;
@@ -2532,10 +2520,16 @@ async function loadAvoidMap(source) {
         const img = new Image();
         await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
         URL.revokeObjectURL(url);
-        const w = img.naturalWidth  || 1024;
-        const h = img.naturalHeight || 1024;
-        const offscreen = new OffscreenCanvas(w, h);
-        offscreen.getContext('2d').drawImage(img, 0, 0, w, h);
+        const cw = canvas.width, ch = canvas.height;
+        const offscreen = new OffscreenCanvas(cw, ch);
+        const ctx2 = offscreen.getContext('2d');
+        ctx2.fillStyle = '#ffffff';
+        ctx2.fillRect(0, 0, cw, ch);
+        const imgW = img.naturalWidth  || cw;
+        const imgH = img.naturalHeight || ch;
+        const scale = Math.min(cw / imgW, ch / imgH);
+        const dw = imgW * scale, dh = imgH * scale;
+        ctx2.drawImage(img, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
         bmp = await createImageBitmap(offscreen);
     } else {
         const anim = await decodeAnimatedImage(blob);
@@ -2556,8 +2550,10 @@ async function loadAvoidMap(source) {
     device.queue.copyExternalImageToTexture({ source: bmp }, { texture: avoidMapTex }, [bmp.width, bmp.height]);
     avoidMapTexView = avoidMapTex.createView();
     hasAvoidMap     = true;
+    _avoidMapBitmap = bmp;
     rebuildSimBG();
     rebuildRenderBG();
+    _updateAvoidMapOverlay();
     if (!_inQROverlayUpdate && params.qrOverlay && simState.qrStatus === 'SHOW' && qrBitmap) updateQROverlay();
 }
 
@@ -2566,7 +2562,9 @@ function clearAvoidMap() {
     if (avoidMapTex) { avoidMapTex.destroy(); avoidMapTex = null; }
     avoidMapTexView    = null;
     hasAvoidMap        = false;
+    _avoidMapBitmap    = null;
     _textOwnedAvoidMap = false;
+    _updateAvoidMapOverlay();
     rebuildSimBG();
     rebuildRenderBG();
     if (!_inQROverlayUpdate && params.qrOverlay && simState.qrStatus === 'SHOW' && qrBitmap) updateQROverlay();

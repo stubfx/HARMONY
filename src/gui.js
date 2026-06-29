@@ -24,6 +24,7 @@ export function initGUI({
     clearMagnetImage,
     clearTraceText,
     clearAvoidMap,
+    updateAvoidMapOverlay,
 }) {
     // ── HUD visibility ────────────────────────────────────────────────────────
     let guiVisible = new URLSearchParams(location.search).get('gui') === 'true';
@@ -197,12 +198,13 @@ export function initGUI({
     // ── Avoidance map ─────────────────────────────────────────────────────────
     const fAvoid = gui.addFolder('Avoidance map');
     fAvoid.add(params, 'chaosAvoidMapThreshold', 0, 1, 0.01).name('chaos threshold (hide above)');
-    fAvoid.add(params, 'avoidMapScale', 0.05, 1.0, 0.01).name('scale');
+    fAvoid.add(params, 'avoidMapScale', 0.05, 1.0, 0.01).name('scale').onChange(() => updateAvoidMapOverlay());
     fAvoid.add(params, 'avoidMapInvert').name('invert colors');
     fAvoid.add(params, 'avoidMapSampleColor').name('sample color');
     fAvoid.add(params, 'avoidMapFixedColor').name('fixed color');
     fAvoid.add(params, 'avoidMapBlackCutoff', 0, 0.5, 0.005).name('color black cutoff');
     fAvoid.add(params, 'randomTeleportOnAvoidMap').name('random teleport');
+    fAvoid.add(params, 'showAvoidMapImage').name('show image').onChange(() => updateAvoidMapOverlay());
     fAvoid.add({ load: () => document.querySelector('#avoid-map-input').click() }, 'load').name('Load map…');
     fAvoid.add({ clear: clearAvoidMap }, 'clear').name('Clear map');
 
