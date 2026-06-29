@@ -704,16 +704,19 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         weight = min(weight + params.spawnFadeRate * params.dt, 1.0);
     }
 
-    // Limit-at-center: override all previous movement — agents outside the radius
-    // are raw-teleported to the canvas centre with no fade.
+    // Limit-at-center: agents outside the radius have a 5% per-frame chance
+    // of being raw-teleported to the canvas centre.
     if (params.limitAtCenter != 0u) {
         let cx = params.canvasW * 0.5;
         let cy = params.canvasH * 0.5;
         let dx = np.x - cx;
         let dy = np.y - cy;
         if (dx * dx + dy * dy > params.limitAtCenterRadius * params.limitAtCenterRadius) {
-            np  = vec2f(cx, cy);
-            vel = vec2f(0.0, 0.0);
+            let lacRng = hash(i ^ (u32(params.time * 1031.0) + 17u));
+            if (lacRng < 0.05) {
+                np  = vec2f(cx, cy);
+                vel = vec2f(0.0, 0.0);
+            }
         }
     }
 
