@@ -78,10 +78,6 @@ export const STORY = [
                 if (this._pendingJoins > 0) {
                     log(this._pendingJoins + ' utenti in attesa — attivazione chunk e avvio audio2.');
                     for (let i = 0; i < this._pendingJoins; i++) sim.activateChunk(1);
-                    setTimeout(() => {
-                        log('dotRespawnChance abilitato (0.002).');
-                        sim.setParam('dotRespawnChance', 0.002);
-                    }, 10_000);
                     this._startAudio2(sim);
                 }
             }, { once: true });
@@ -105,11 +101,7 @@ export const STORY = [
             }
             sim.activateChunk(1);
             if (userCount === 1) {
-                log('primo utente: dotRespawnChance attivo tra 10s.');
-                setTimeout(() => {
-                    log('dotRespawnChance abilitato (0.002).');
-                    sim.setParam('dotRespawnChance', 0.002);
-                }, 10_000);
+                log('primo utente — avvio audio2.');
                 this._startAudio2(sim);
             }
         },
@@ -166,7 +158,8 @@ export const STORY = [
     },
 
     // ── PHASE 3 — IL ROSSO ────────────────────────────────────────────────────
-    // audio4 parte subito. alla fine: 5s di silenzio → colori rosso → PHASE 4.
+    // 10s di attesa → dotRespawnChance abilitato → audio4.
+    // Alla fine di audio4: 5s di silenzio → colori rosso → PHASE 4.
     // File: simAss/narrator/audio4.mp3
     {
         id: PHASE.ROSSO,
@@ -174,19 +167,24 @@ export const STORY = [
             sim.setParam('champLinesAlpha', 0.02);
             sim.enableHarmonyImages();
             sim.startBlinkersLoop();
-            log('PHASE 3 — rosso. immagini harmony abilitate. blinkers loop avviato. audio4 in partenza.');
-            this._audio = sim.playNarratorAudio('audio4.mp3');
-            this._audio.addEventListener('ended', () => {
-                log('audio4 terminato. attesa 5s → colori rosso → PHASE 4.');
-                this._colorTimer = setTimeout(() => {
-                    log('5s scaduti — color1=#ff0000 color2=#ff0000. avanzamento a PHASE 4.');
-                    sim.freezeParams({ color1: '#ff0000', color2: '#ff0000' });
-                    sim.next();
-                }, 5_000);
-            }, { once: true });
+            log('PHASE 3 — rosso. immagini harmony abilitate. blinkers loop avviato. attesa 10s → dotRespawnChance → audio4.');
+            this._respawnTimer = setTimeout(() => {
+                log('10s scaduti — dotRespawnChance abilitato (0.002). audio4 in partenza.');
+                sim.setParam('dotRespawnChance', 0.002);
+                this._audio = sim.playNarratorAudio('audio4.mp3');
+                this._audio.addEventListener('ended', () => {
+                    log('audio4 terminato. attesa 5s → colori rosso → PHASE 4.');
+                    this._colorTimer = setTimeout(() => {
+                        log('5s scaduti — color1=#ff0000 color2=#ff0000. avanzamento a PHASE 4.');
+                        sim.freezeParams({ color1: '#ff0000', color2: '#ff0000' });
+                        sim.next();
+                    }, 5_000);
+                }, { once: true });
+            }, 10_000);
         },
         exit(sim) {
             log('uscita PHASE 3.');
+            clearTimeout(this._respawnTimer);
             clearTimeout(this._colorTimer);
             sim.disableHarmonyImages();
             sim.thawParams();
