@@ -341,7 +341,7 @@ export function initGUI({
     fStoria.add({ prev: () => storyEngine.goto(storyEngine.index - 1) }, 'prev').name('← indietro');
     fStoria.add({ next: () => storyEngine.goto(storyEngine.index + 1) }, 'next').name('avanti →');
 
-    const modeCtrl      = gui.add(simState, 'mode',      ['STORY', 'SHOWCASE']).name('mode');
+    const modeCtrl      = gui.add(simState, 'mode',      ['STORY', 'SHOWCASE', 'VORONOI']).name('mode');
     const colorModeCtrl = gui.add(simState, 'colorMode', ['NORMAL', 'GRAYSCALE', 'GRAYSCALE_INVERTED']).name('color mode');
     const stateCtrl     = gui.add(simState, 'status',    ['NORMAL', 'FREEROAM', 'DOT']).name('status');
     const qrStateCtrl = gui.add(simState, 'qrStatus', ['SHOW', 'HIDE']).name('qr');

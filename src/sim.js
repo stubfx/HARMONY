@@ -2384,6 +2384,14 @@ storyEngine.onGoto = () => storyPhaseCtrl.updateDisplay();
 
 stateCtrl.onChange(v => setStatus(v));
 qrStateCtrl.onChange(() => { updateStateDisplay(); renderTraceCanvas(); });
+modeCtrl.onChange(v => {
+    simState.mode = v;
+    if (v === 'VORONOI') {
+        params.autoAvoidMap = true;
+        gui.controllersRecursive().forEach(c => c.updateDisplay());
+    }
+    updateStateDisplay();
+});
 
 window.addEventListener('keydown', e => {
     if (e.key === 'Control') toggleGUI();
