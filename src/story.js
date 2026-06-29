@@ -91,7 +91,6 @@ export const STORY = [
         },
         onSpectatorJoined(sim, userCount) {
             log('utente connesso — totale: ' + userCount);
-            sim.burstBlinkers();
             if (this._audio1Playing) {
                 this._pendingJoins++;
                 log('audio1 in corso — join ignorato graficamente (pending: ' + this._pendingJoins + ').');

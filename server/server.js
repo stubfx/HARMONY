@@ -95,9 +95,6 @@ function updateUserState(roomId, socketId, type, data) {
         room.users.set(socketId, user);
     }
     user.lastSeen = Date.now();
-    if (type === 'tilt') {
-        user.chaos = data.chaos ?? 0;
-    }
     if (type === 'touch') {
         user.temperature = data.temp ?? 0.5;
         user.coherence   = data.x   ?? 0.5;
@@ -115,25 +112,20 @@ setInterval(() => {
         }
         if (!room.hostSockets.size || !room.connections.size) continue;
 
-        let st = 0, sc = 0, sChaos = 0;
+        let st = 0, sc = 0;
         const activeUsers = [...room.users.values()];
         const n = activeUsers.length;
         if (n > 0) {
             for (const u of activeUsers) {
                 st += u.temperature;
                 sc += u.coherence;
-                sChaos += u.chaos ?? 0;
             }
         }
-
-        const avgChaos = n > 0 ? sChaos / n : 1;
-        room.lastAvgChaos = avgChaos;
 
         const totalUsers = room.connections.size;
         io.to(`${roomId}:hosts`).emit('collective-state', {
             avgTemp:      n > 0 ? st / n : 0.5,
             avgCoherence: n > 0 ? sc / n : 0.5,
-            avgChaos,
             userCount:    totalUsers,
         });
         io.to(`${roomId}:spectators`).emit('note-debounce', { ms: totalUsers * 10 });
@@ -282,7 +274,7 @@ io.on('connection', (socket) => {
                 n++;
             }
             const snapshot = {
-                chaos:       typeof chaos === 'number' ? chaos : (room?.lastAvgChaos ?? 1),
+                chaos:       typeof chaos === 'number' ? chaos : 0.5,
                 users:       room?.connections.size ?? 0,
                 temperature: n > 0 ? st / n : 0.5,
                 coherence:   n > 0 ? sc / n : 0.5,

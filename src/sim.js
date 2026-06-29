@@ -2094,7 +2094,7 @@ _clearHarmonyImageCache();
     });
 
     // Collective swarm state — aggregated by the server from all spectators in the room.
-    socket.on('collective-state', ({ avgTemp, avgCoherence, avgChaos, userCount }) => {
+    socket.on('collective-state', ({ avgTemp, avgCoherence, userCount }) => {
         collectiveTemp      = avgTemp      ?? 0.5;
         collectiveCoherence = avgCoherence ?? 0.5;
         // collectiveChaos is intentionally NOT driven by avgChaos — chaos is manual only.
