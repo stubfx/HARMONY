@@ -2523,13 +2523,15 @@ async function loadAvoidMap(source) {
         const cw = canvas.width, ch = canvas.height;
         const offscreen = new OffscreenCanvas(cw, ch);
         const ctx2 = offscreen.getContext('2d');
-        ctx2.fillStyle = '#ffffff';
+        ctx2.fillStyle = '#000000';
         ctx2.fillRect(0, 0, cw, ch);
         const imgW = img.naturalWidth  || cw;
         const imgH = img.naturalHeight || ch;
         const scale = Math.min(cw / imgW, ch / imgH);
         const dw = imgW * scale, dh = imgH * scale;
+        ctx2.filter = 'invert(1)';
         ctx2.drawImage(img, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
+        ctx2.filter = 'none';
         bmp = await createImageBitmap(offscreen);
     } else {
         const anim = await decodeAnimatedImage(blob);
