@@ -22,9 +22,10 @@ import champLinesWGSL   from './shaders/champLines.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
 import { startSynth, setSynthState, setSynthDroneOnly, addArpInfluence, blinker, BLINKER_TYPES } from './synth.js';
 import * as ambience from './ambience.js';
-import { StoryEngine } from './storyEngine.js';
-import { STORY }       from './story.js';
-import { RESEED }      from './constants.js';
+import { StoryEngine }      from './storyEngine.js';
+import { STORY }            from './story.js';
+import { RESEED }           from './constants.js';
+import { createAvoidMapGen } from './avoidMapGen.js';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const MAX_AGENTS = 5_000_000;
@@ -122,6 +123,7 @@ const params = {
     avoidMapFixedColor:  true,  // true (paired with sampleColor) = use the sampled pixel exactly
     avoidMapBlackCutoff: 0.05,  // luminance floor for the color sample: pixels below this are skipped (particle keeps base color) — mirrors trace blackThreshold
     showAvoidMapImage: false, // debug: overlay avoidmap image on canvas
+    autoAvoidMap:     true,  // continuously generate Voronoi nodal pattern as avoidmap
     qrOverlay:       false, // true = QR on a 2D overlay canvas; agents freed from QR area
     // Primed-spot probe (free agents only)
     probeLen:          15.0, // probe cast distance in canvas pixels
@@ -679,9 +681,11 @@ const placeholderTexView = placeholderTex.createView();
 const imageSampler = screenSmp;  // same settings — reuse
 
 // ── Avoidance map state ───────────────────────────────────────────────────────
-let avoidMapTex     = null;
-let avoidMapTexView = null;
-let hasAvoidMap     = false;
+let avoidMapTex        = null;
+let avoidMapTexView    = null;
+let hasAvoidMap        = false;
+let _autoOwnedAvoidMap = false; // true when auto-gen is the current avoidmap owner
+const _avoidMapGen     = createAvoidMapGen();
 
 // Fade: black quad, alpha blend
 const fadeMod = device.createShaderModule({ code: fadeWGSL });
@@ -2504,11 +2508,38 @@ function _updateAvoidMapOverlay() {
     _avoidMapOverlayEl.style.opacity = '1';
 }
 
+// ── Avoidance map auto-generator ─────────────────────────────────────────────
+function _tickAutoAvoidMap(t) {
+    if (!params.autoAvoidMap || _qrOwnedAvoidMap || _textOwnedAvoidMap) return;
+    if (!_autoOwnedAvoidMap && hasAvoidMap) return; // another source owns the map
+
+    const src = _avoidMapGen.update(t);
+
+    if (!avoidMapTex || avoidMapTex.width !== src.width || avoidMapTex.height !== src.height) {
+        if (avoidMapTex) avoidMapTex.destroy();
+        avoidMapTex = device.createTexture({
+            size:   [src.width, src.height],
+            format: 'rgba8unorm',
+            usage:  GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+        avoidMapTexView    = avoidMapTex.createView();
+        hasAvoidMap        = true;
+        _autoOwnedAvoidMap = true;
+        _avoidMapBitmap    = src;
+        rebuildSimBG();
+        rebuildRenderBG();
+    }
+
+    device.queue.copyExternalImageToTexture({ source: src }, { texture: avoidMapTex }, [src.width, src.height]);
+    if (params.showAvoidMapImage) _updateAvoidMapOverlay();
+}
+
 // ── Avoidance map upload ──────────────────────────────────────────────────────
 async function loadAvoidMap(source) {
     if (_avoidMapSuppressed) return;
-    _qrOwnedAvoidMap   = false; // user-loaded map; neither QR nor text should clear it
+    _qrOwnedAvoidMap   = false;
     _textOwnedAvoidMap = false;
+    _autoOwnedAvoidMap = false;
     const blob = typeof source === 'string'
         ? await fetch(source).then(r => r.blob())
         : source; // File is a Blob
@@ -2566,6 +2597,7 @@ function clearAvoidMap() {
     hasAvoidMap        = false;
     _avoidMapBitmap    = null;
     _textOwnedAvoidMap = false;
+    _autoOwnedAvoidMap = false;
     _updateAvoidMapOverlay();
     rebuildSimBG();
     rebuildRenderBG();
@@ -3165,6 +3197,8 @@ function frame(ts) {
     const rawDt  = Math.min(Math.max(now - prevTime, TIME_MULT), 0.05);
     const dt     = params.useDeltaTime ? rawDt : (1 / 60);
     prevTime     = now;
+
+    _tickAutoAvoidMap(now);
 
     // Vote countdown — update display and fire result when timer expires.
     if (simState.stepStatus === 'VOTE' && simState.voteEndTime) {

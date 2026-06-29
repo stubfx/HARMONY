@@ -204,6 +204,7 @@ export function initGUI({
     fAvoid.add(params, 'avoidMapFixedColor').name('fixed color');
     fAvoid.add(params, 'avoidMapBlackCutoff', 0, 0.5, 0.005).name('color black cutoff');
     fAvoid.add(params, 'randomTeleportOnAvoidMap').name('random teleport');
+    fAvoid.add(params, 'autoAvoidMap').name('auto voronoi pattern');
     fAvoid.add(params, 'showAvoidMapImage').name('show image').onChange(() => updateAvoidMapOverlay());
     fAvoid.add({ load: () => document.querySelector('#avoid-map-input').click() }, 'load').name('Load map…');
     fAvoid.add({ clear: clearAvoidMap }, 'clear').name('Clear map');
