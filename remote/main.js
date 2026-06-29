@@ -73,7 +73,10 @@ function hslToHex(h, s, l) {
 
 function updateAura() {
     if (!auraEl) return;
-    auraEl.style.background = _currentStep <= 0 ? '#000000' : pushedColor;
+    // step 0: nero (nessuna interazione)
+    // step 1: colore pieno aura
+    // step 2+: nero — il colore va sulla sinusoide, non sullo sfondo
+    auraEl.style.background = _currentStep === 1 ? pushedColor : '#000000';
 }
 updateAura();
 
@@ -213,7 +216,6 @@ function _spawnSmoke(x, y, cf) {
 
 function _tickSmoke(ctx2d, w, h) {
     if (_smoke.length === 0) return;
-    ctx2d.clearRect(0, 0, w, h);
     for (let i = _smoke.length - 1; i >= 0; i--) {
         const p = _smoke[i];
         p.x   += p.vx;
@@ -292,15 +294,50 @@ function _initNoteCanvas() {
     let _lastSpawn  = 0;
     let _lastChaosT = 0;
 
+    // ── Sine wave state ───────────────────────────────────────────────────────
+    let _sineAmp   = 0;
+    let _sinePhase = 0;
+
+    function _drawSine(w, h, dt) {
+        if (_currentStep < 1) return;
+        _sineAmp = _touching
+            ? Math.min(1, _sineAmp + 6 * dt)
+            : Math.max(0, _sineAmp - 2 * dt);
+        if (_sineAmp <= 0.01) return;
+
+        const idx    = Math.max(0, _activeNoteIdx);
+        const cycles = 1 + (idx / (KEYS.length - 1)) * 5; // 1–6 cicli visivi
+        const freq   = KEYS[idx]?.freq ?? KEYS[4].freq;
+        _sinePhase  += (freq / 220) * dt * 3;
+
+        const color = _currentStep >= 2 ? pushedColor : '#ffffff';
+        const amp   = h * 0.32 * _sineAmp;
+        const cy    = h / 2;
+
+        ctx2d.save();
+        ctx2d.globalAlpha = _sineAmp * 0.9;
+        ctx2d.strokeStyle = color;
+        ctx2d.lineWidth   = 2.5;
+        ctx2d.beginPath();
+        for (let x = 0; x <= w; x += 2) {
+            const t = (x / w) * cycles * Math.PI * 2 + _sinePhase;
+            const y = cy + Math.sin(t) * amp;
+            x === 0 ? ctx2d.moveTo(x, y) : ctx2d.lineTo(x, y);
+        }
+        ctx2d.stroke();
+        ctx2d.restore();
+    }
+
     (function loop(ts) {
         requestAnimationFrame(loop);
-        // Decay chaos toward zero; driven by note-change increments in _setContNote
-        if (_lastChaosT > 0) {
-            const dt = (ts - _lastChaosT) / 1000;
-            _motionChaos = Math.max(0, _motionChaos - MOTION_DECAY_RATE * dt);
-            _applyChaosVisuals();
-        }
+        const dt = _lastChaosT > 0 ? (ts - _lastChaosT) / 1000 : 0;
+        _motionChaos = Math.max(0, _motionChaos - MOTION_DECAY_RATE * dt);
+        _applyChaosVisuals();
         _lastChaosT = ts;
+
+        ctx2d.clearRect(0, 0, noteCanvasEl.width, noteCanvasEl.height);
+        _drawSine(noteCanvasEl.width, noteCanvasEl.height, dt);
+
         if (_touching && ts - _lastSpawn > 25) {
             _spawnSmoke(_touchX, _touchY, _cf(_touchX, _touchY));
             _lastSpawn = ts;
