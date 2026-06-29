@@ -73,7 +73,7 @@ function hslToHex(h, s, l) {
 
 function updateAura() {
     if (!auraEl) return;
-    auraEl.style.background = pushedColor;
+    auraEl.style.background = _currentStep <= 0 ? '#000000' : pushedColor;
 }
 updateAura();
 
@@ -164,7 +164,7 @@ function _setContNote(noteIdx) {
         _motionChaos = Math.min(1, _motionChaos + 0.05);
         clearTimeout(_noteDebounceTimer);
         _noteDebounceTimer = setTimeout(() => {
-            sendEvent('note', { index: noteIdx, freq: KEYS[noteIdx].freq, color: KEYS[noteIdx].color });
+            if (_currentStep > 0) sendEvent('note', { index: noteIdx, freq: KEYS[noteIdx].freq, color: KEYS[noteIdx].color });
         }, _noteDebounceMs);
     }
     _contGainNode.gain.setTargetAtTime(0.25, t, 0.05);
@@ -176,7 +176,7 @@ function _silenceContNote() {
     _noteDebounceTimer = null;
     _contGainNode.gain.setTargetAtTime(0, _audioCtx.currentTime, 0.12);
     _activeNoteIdx = -1;
-    sendEvent('note-off', {});
+    if (_currentStep > 0) sendEvent('note-off', {});
 }
 
 // ── Chaos vignette ────────────────────────────────────────────────────────────
@@ -309,10 +309,14 @@ function _initNoteCanvas() {
     })(0);
 }
 
-// ── Story step debug display ──────────────────────────────────────────────────
+// ── Story step ────────────────────────────────────────────────────────────────
+let _currentStep = -1;
+
 const _stepDebug = document.querySelector('#step-debug');
 socket.on('story-step', ({ step } = {}) => {
-    if (_stepDebug) _stepDebug.textContent = step >= 0 ? step : '';
+    _currentStep = typeof step === 'number' ? step : -1;
+    if (_stepDebug) _stepDebug.textContent = _currentStep >= 0 ? _currentStep : '';
+    updateAura();
 });
 
 // ── Init on first gesture (AudioContext requires user interaction on iOS) ─────
