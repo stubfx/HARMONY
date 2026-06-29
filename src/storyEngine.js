@@ -20,6 +20,12 @@ export class StoryEngine {
     start()    { this._goto(0); }
     next()     { this._goto(this._index + 1); }
     goto(i)    { this._goto(i); }
+    stop()     {
+        if (this._index < 0) return;
+        this.current?.exit?.(this._sim);
+        this._index = -1;
+        this._onGoto?.(-1);
+    }
 
     _goto(i) {
         if (i < 0 || i >= this._steps.length) return;

@@ -686,6 +686,7 @@ let avoidMapTexView    = null;
 let hasAvoidMap        = false;
 let _autoOwnedAvoidMap = false; // true when auto-gen is the current avoidmap owner
 const _avoidMapGen     = createAvoidMapGen();
+let _avoidMapGenT      = 0;    // advances only on note events, not wall-clock time
 
 // Fade: black quad, alpha blend
 const fadeMod = device.createShaderModule({ code: fadeWGSL });
@@ -1695,8 +1696,9 @@ const rndPick   = arr => arr[Math.floor(Math.random() * arr.length)];
 // status:   'NORMAL' — formula steering + wind active, auto-cycling runs
 //           'FREEROAM' — no formula, no wind; particles drift freely on momentum
 //           'DOT'    — fixed inward-spiral formulas; wind + formula forced on regardless of params
+const _urlMode = _urlParams.get('mode')?.toUpperCase();
 const simState = {
-    mode:              'STORY',
+    mode: (_urlMode === 'STORY' || _urlMode === 'SHOWCASE' || _urlMode === 'VORONOI') ? _urlMode : 'STORY',
     colorMode:         'NORMAL',
     qrStatus:          'HIDE',
     status:            'NORMAL',
@@ -2204,6 +2206,7 @@ _clearHarmonyImageCache();
                 _activeNotesBySpectator.set(event.spectatorId, event.data.index);
                 _recalcNoteFormulas();
                 storyEngine.onNote(event.data.index);
+                _avoidMapGenT += 1.0 + event.data.index * 0.15;
             }
         }
         if (event.type === 'note-off') {
@@ -2298,7 +2301,7 @@ function applySimParams(data) {
     if (status === 'NORMAL' || status === 'FREEROAM' || status === 'DOT') {
         setStatus(status);
     }
-    if (preshow === true)  storyEngine.start();
+    if (preshow === true && simState.mode !== 'VORONOI')  storyEngine.start();
     if (preshow === false) simFacade.reseed();
     if (restart)              seedAgents();
     if (avoidMap === null)    clearAvoidMap();
@@ -2387,6 +2390,7 @@ qrStateCtrl.onChange(() => { updateStateDisplay(); renderTraceCanvas(); });
 modeCtrl.onChange(v => {
     simState.mode = v;
     if (v === 'VORONOI') {
+        storyEngine.stop();
         params.autoAvoidMap = true;
         gui.controllersRecursive().forEach(c => c.updateDisplay());
     }
@@ -2517,11 +2521,11 @@ function _updateAvoidMapOverlay() {
 }
 
 // ── Avoidance map auto-generator ─────────────────────────────────────────────
-function _tickAutoAvoidMap(t) {
+function _tickAutoAvoidMap() {
     if (!params.autoAvoidMap || _qrOwnedAvoidMap || _textOwnedAvoidMap) return;
     if (!_autoOwnedAvoidMap && hasAvoidMap) return; // another source owns the map
 
-    const src = _avoidMapGen.update(t);
+    const src = _avoidMapGen.update(_avoidMapGenT);
 
     if (!avoidMapTex || avoidMapTex.width !== src.width || avoidMapTex.height !== src.height) {
         if (avoidMapTex) avoidMapTex.destroy();
@@ -3206,7 +3210,7 @@ function frame(ts) {
     const dt     = params.useDeltaTime ? rawDt : (1 / 60);
     prevTime     = now;
 
-    _tickAutoAvoidMap(now);
+    _tickAutoAvoidMap();
 
     // Vote countdown — update display and fire result when timer expires.
     if (simState.stepStatus === 'VOTE' && simState.voteEndTime) {
