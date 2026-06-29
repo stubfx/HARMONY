@@ -3,8 +3,8 @@ import { PHASE, RESEED } from './constants.js';
 // ─── Narrator Audio Map ──────────────────────────────────────────────────────
 // All files live in simAss/narrator/. Replace any file to swap the narration.
 //
-//   audio1.mp3    →  preshow           (PHASE 1 — parte subito; si ferma alla prima connessione)
-//   audio2.mp3    →  preshow           (PHASE 1 — parte alla prima connessione; 10s dopo → PHASE 2)
+//   audio1.mp3    →  black             (PHASE 1 — parte subito; si ferma alla prima connessione)
+//   audio2.mp3    →  black             (PHASE 1 — parte alla prima connessione; 10s dopo → PHASE 2)
 //   audio3.mp3    →  nota              (PHASE 2 — parte subito all'entrata)
 //   audio4.mp3    →  rosso             (PHASE 3 — date un colore alla nota)
 //   audio5.mp3    →  immagini-tempesta (PHASE 5 — "Il rombo prima del lampo...")
@@ -55,7 +55,7 @@ export const STORY = [
     // audio2 finisce → sim.next() immediato (testo HARMONY e 10s di attesa in PHASE 2).
     // dotRespawnChance abilitato 10s dopo il primo join effettivo (al termine di audio1).
     {
-        id: PHASE.PRESHOW,
+        id: PHASE.BLACK,
         enter(sim) {
             this._audio2Started = false;
             this._audio1Playing = true;
