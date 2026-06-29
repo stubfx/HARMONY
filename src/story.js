@@ -127,7 +127,7 @@ export const STORY = [
             this._noteTimerStarted = false;
             sim.setParam('limitAtCenter', false);
             sim.freezeParams({ windEnabled: false });
-            sim.setTraceText('HARMONY');
+            sim.loadStaticAvoidMap('circle.png');
             sim.startBackgroundMusic();
             sim.startBlinkersLoop();
             sim.enableFullSynth();
@@ -165,6 +165,7 @@ export const STORY = [
             sim.setColorMode('NORMAL');
             sim.setParam('champLinesAlpha', 0.02);
             sim.enableHarmonyImages();
+            sim.setTraceText('HARMONY');
             log('PHASE 3 — rosso.');
             this._respawnTimer = setTimeout(() => {
                 log('10s scaduti — dotRespawnChance abilitato (0.002). audio4 in partenza.');

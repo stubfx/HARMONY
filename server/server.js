@@ -512,6 +512,22 @@ app.get('/simAss-audio', async (_req, res) => {
     }
 });
 
+// ── Static assets — serves a specific file by name from simAss/static/ ──────
+app.get('/simAss-static/:filename', async (req, res) => {
+    const filename = path.basename(req.params.filename); // prevent path traversal
+    const file     = path.join(_SIM_ASS_DIR, 'static', filename);
+    try {
+        const buf  = await readFile(file);
+        const ext  = path.extname(filename).toLowerCase();
+        const mime = ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.webp' ? 'image/webp' : 'application/octet-stream';
+        console.log(`[simAss-static] serving ${filename}`);
+        res.type(mime).send(buf);
+    } catch (e) {
+        console.warn(`[simAss-static] not found: ${filename}`);
+        res.status(404).json({ error: `not found: ${filename}` });
+    }
+});
+
 // ── Narrator audio — serves a specific file by name from simAss/narrator/ ────
 app.get('/simAss-narrator/:filename', async (req, res) => {
     const filename = path.basename(req.params.filename); // prevent path traversal
