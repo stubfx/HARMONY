@@ -157,6 +157,7 @@ function _startContOsc() {
 
 let _noteDebounceMs    = 0;
 let _noteDebounceTimer = null;
+let _sinePulse         = 0;
 
 function _setContNote(noteIdx) {
     if (_currentStep <= 0 || !_contOscReady) return;
@@ -298,7 +299,7 @@ function _initNoteCanvas() {
     // ── Sine wave state ───────────────────────────────────────────────────────
     let _sineAmp   = 0;
     let _sinePhase = 0;
-    let _sinePulse = 0; // set to 1 on note change, decays quickly → mini burst
+    // _sinePulse is module-level (set by _setContNote on note change)
 
     function _drawSine(w, h, dt) {
         if (_currentStep < 1) return;
