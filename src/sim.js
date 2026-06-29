@@ -1874,6 +1874,20 @@ async function _harmonyConfigWrite(sum, config) {
     }
 }
 
+async function _clearHarmonyImageCache() {
+    try {
+        const db = await _openHarmonyDb();
+        await new Promise((resolve, reject) => {
+            const req = db.transaction(_HARMONY_DB_IMAGES, 'readwrite').objectStore(_HARMONY_DB_IMAGES).clear();
+            req.onsuccess = () => resolve();
+            req.onerror   = (e) => reject(e.target.error);
+        });
+        console.log('[harmony] image cache cleared');
+    } catch (e) {
+        console.warn('[harmony] image cache clear failed:', e.message);
+    }
+}
+
 async function _enterHarmony(sum) {
     if (_harmonyActive && _currentHarmonyKey === sum) return;
     _harmonyActive     = true;
@@ -2040,6 +2054,7 @@ let socket;
 // Base URL for server API calls — VITE_USER_URL in production, own origin as fallback.
 const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
 ambience.init(_apiBase);
+_clearHarmonyImageCache();
 {
     // In dev, Vite runs on a different port from Express, so connect directly to Express.
     // In production, use VITE_SOCKET_URL (the Caddy-fronted public origin) so Socket.IO
@@ -2502,14 +2517,27 @@ async function loadAvoidMap(source) {
         ? await fetch(source).then(r => r.blob())
         : source; // File is a Blob
     clearAvoidGif();
-    const anim = await decodeAnimatedImage(blob);
+    const isSvg = blob.type === 'image/svg+xml' || (typeof source === 'object' && source?.name?.toLowerCase().endsWith('.svg'));
     let bmp;
-    if (anim) {
-        avoidGifFrames = anim.frames; avoidGifDurations = anim.durations;
-        avoidGifFrameIdx = 0; avoidGifNextFrameAt = performance.now() + avoidGifDurations[0];
-        bmp = avoidGifFrames[0];
+    if (isSvg) {
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+        URL.revokeObjectURL(url);
+        const w = img.naturalWidth  || 1024;
+        const h = img.naturalHeight || 1024;
+        const offscreen = new OffscreenCanvas(w, h);
+        offscreen.getContext('2d').drawImage(img, 0, 0, w, h);
+        bmp = await createImageBitmap(offscreen);
     } else {
-        bmp = await createImageBitmap(blob, { colorSpaceConversion: 'none' });
+        const anim = await decodeAnimatedImage(blob);
+        if (anim) {
+            avoidGifFrames = anim.frames; avoidGifDurations = anim.durations;
+            avoidGifFrameIdx = 0; avoidGifNextFrameAt = performance.now() + avoidGifDurations[0];
+            bmp = avoidGifFrames[0];
+        } else {
+            bmp = await createImageBitmap(blob, { colorSpaceConversion: 'none' });
+        }
     }
     if (avoidMapTex) avoidMapTex.destroy();
     avoidMapTex = device.createTexture({
