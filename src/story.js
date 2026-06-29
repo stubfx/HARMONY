@@ -129,6 +129,7 @@ export const STORY = [
             sim.freezeParams({ windEnabled: false });
             sim.setTraceText('HARMONY');
             sim.startBackgroundMusic();
+            sim.startBlinkersLoop();
             sim.enableFullSynth();
             log('PHASE 2 — nota. wind disabilitato. synth completo abilitato. musica di fondo avviata. audio3 parte tra 10s.');
             setTimeout(() => {
@@ -164,8 +165,7 @@ export const STORY = [
             sim.setColorMode('NORMAL');
             sim.setParam('champLinesAlpha', 0.02);
             sim.enableHarmonyImages();
-            sim.startBlinkersLoop();
-            log('PHASE 3 — rosso. immagini harmony abilitate. blinkers loop avviato. attesa 10s → dotRespawnChance → audio4.');
+            log('PHASE 3 — rosso.');
             this._respawnTimer = setTimeout(() => {
                 log('10s scaduti — dotRespawnChance abilitato (0.002). audio4 in partenza.');
                 sim.setParam('dotRespawnChance', 0.002);

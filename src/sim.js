@@ -623,9 +623,12 @@ const simFacade = {
     // Unlock noise/pad/arp — call when the story is ready for the full synth.
     enableFullSynth() { setSynthDroneOnly(false); },
 
-    // Start the ambience music. Routed through ambience.js (Tone.js radio chain).
+    // Start the ambience music and the synth together.
     // Safe to call multiple times — no-op if already started.
-    startBackgroundMusic() { ambience.start(); },
+    startBackgroundMusic() {
+        ambience.start();
+        startSynth().then(() => setSynthState(smoothChaos, smoothCoherence, 0, 0, smoothTemp));
+    },
 
     startBlinkersLoop() {
         ambience.startBlinkersLoop(() => {
@@ -2475,8 +2478,6 @@ document.addEventListener('pointerdown', async () => {
     await unlockAudio();
     if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
     _syncAudioBanner();
-    setSynthDroneOnly(true);
-    startSynth().then(() => setSynthState(1.0, smoothCoherence, 0, 0, smoothTemp));
     storyEngine.start();
 }, { once: true });
 
