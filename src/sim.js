@@ -640,6 +640,7 @@ const simFacade = {
         });
     },
     stopBlinkersLoop()  { ambience.stopBlinkersLoop();  },
+    burstBlinkers(count, intervalMs) { ambience.burstBlinkers(count, intervalMs); },
 
     // Play a narrator audio file from simAss/narrator/.
     // Pass { autoNext: true } to advance to the next step when playback ends.
@@ -2784,7 +2785,6 @@ function writeSoloUB(dt, time) {
         setSynthState(smoothChaos, smoothCoherence, 0, 0, smoothTemp);
         ambience.setChaos(smoothChaos);
     }
-    if (Math.random() < 0.01) console.log('[chaos] smoothChaos→GPU:', smoothChaos.toFixed(4));
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 

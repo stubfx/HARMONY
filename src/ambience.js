@@ -177,3 +177,13 @@ export function stopBlinkersLoop() {
     clearTimeout(_blinkersTimer);
     _blinkersTimer = null;
 }
+
+// Fires `count` blinkers in rapid succession, spaced `intervalMs` apart.
+export function burstBlinkers(count = 4, intervalMs = 150) {
+    for (let i = 0; i < count; i++) {
+        setTimeout(() => {
+            const type = BLINKER_TYPES[Math.floor(Math.random() * BLINKER_TYPES.length)];
+            blinker(type);
+        }, i * intervalMs);
+    }
+}
