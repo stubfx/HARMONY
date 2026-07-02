@@ -304,7 +304,7 @@ function _initNoteCanvas() {
     // _sinePulse is module-level (set by _setContNote on note change)
 
     function _drawSine(w, h, dt) {
-        if (_currentStep < 1) return;
+        return; // sine wave replaced by pixel pool interaction
         _sineAmp = _touching
             ? Math.min(1, _sineAmp + 6 * dt)
             : Math.max(0, _sineAmp - 2 * dt);
@@ -372,7 +372,7 @@ function _initNoteCanvas() {
     }
 
     function _tickPool(ctx2d, w, h, dt, ts) {
-        if (_currentStep !== 0) { _pool.length = 0; return; }
+        if (_currentStep < 0) { _pool.length = 0; return; }
         const cx = w / 2, cy = h / 2;
         if (!_touching) _refillPool(cx, cy);
 
