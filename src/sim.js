@@ -1705,7 +1705,7 @@ const rndPick   = arr => arr[Math.floor(Math.random() * arr.length)];
 //           'DOT'    — fixed inward-spiral formulas; wind + formula forced on regardless of params
 const simState = {
     mode:              'STORY',
-    colorMode:         'NORMAL',
+    colorMode:         'GRAYSCALE',
     qrStatus:          'HIDE',
     status:            'NORMAL',
     storyStep:         null,
@@ -2039,6 +2039,7 @@ let socket;
 const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
 ambience.init(_apiBase);
 _clearHarmonyImageCache();
+loadAvoidMap(`${_apiBase}/simAss-static/full_square.png`);
 {
     // In dev, Vite runs on a different port from Express, so connect directly to Express.
     // In production, use VITE_SOCKET_URL (the Caddy-fronted public origin) so Socket.IO
