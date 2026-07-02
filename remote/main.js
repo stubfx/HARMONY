@@ -310,7 +310,6 @@ function _initNoteCanvas() {
         _sinePulse = Math.max(0, _sinePulse - dt * 5); // decade in ~0.2s
         if (_sineAmp <= 0.01) return;
 
-        const _idleFire = (_currentStep === 0 && !_touching);
         const idx    = _idleFire ? 4 : Math.max(0, _activeNoteIdx);
         const cycles = 1 + (idx / (KEYS.length - 1)) * 5; // 1–6 cicli visivi
         const freq   = KEYS[idx]?.freq ?? KEYS[4].freq;
