@@ -63,8 +63,6 @@
 //   [224] spawnFadeRate        f32   (per-frame weight increment for newly-respawned agents; 0 = stay dark)
 //   [228] limitAtCenter        u32   (1 = agents outside limitAtCenterRadius are raw-teleported to canvas centre)
 //   [232] limitAtCenterRadius  f32   (radius in canvas pixels for the limitAtCenter constraint)
-//   [236] oscillationAmp       f32   (sine-wave direction offset amplitude in radians; 0 = straight)
-//   [240] oscillationFreq      f32   (oscillation frequency in Hz)
 
 struct SoloParams {
     agentCount:     u32,
@@ -126,8 +124,7 @@ struct SoloParams {
     spawnFadeRate:        f32,
     limitAtCenter:        u32,
     limitAtCenterRadius:  f32,
-    oscillationAmp:       f32,
-    oscillationFreq:      f32,
+    _pad2:                u32,
 }
 
 // Per-spectator partition data — color, joystick spawner position, personal wind.
@@ -318,10 +315,6 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         let chVec    = vec2f(cos(chAngle),   sin(chAngle));
         let blended  = normalize(mix(freeVec, chVec, params.chladniBlend));
         dirAngle     = atan2(blended.y, blended.x);
-    }
-    if (params.oscillationAmp > 0.0001) {
-        // Each agent gets a fixed phase offset (golden-angle spread) so they don't all swing in sync.
-        dirAngle += params.oscillationAmp * sin(t * params.oscillationFreq * TWO_PI + f32(i) * 2.39996323);
     }
     let desired  = vec2<f32>(cos(dirAngle), sin(dirAngle));
 

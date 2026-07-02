@@ -158,8 +158,6 @@ const params = {
     releaseBurstSpeed:      30,   // fireworks: speed agents scatter at when a joystick is released (0 = disabled)
     randomTeleportChance:         0.003, // per-frame probability [0–1] any agent jumps to a random canvas position
     randomTeleportOnAvoidMap:     true,  // when true, random teleport is active only while an avoidMap is loaded
-    oscillationAmp:               0.0,  // sine-wave path amplitude (radians); 0 = straight, ~1.0 = very wavy
-    oscillationFreq:              2.0,  // oscillation frequency in Hz
     // Session / QR restore
     remoteTimeout:  0,    // seconds of silence from all remotes before QR is restored (0 = disabled)
     maxSpectators:  1,    // sim QR hides when connected count reaches this threshold
@@ -400,7 +398,7 @@ const agentBuf = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 const soloUB = device.createBuffer({
-    size: 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    size: 240, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const renderUB = device.createBuffer({
     size: 208, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -2788,15 +2786,6 @@ function writeSoloUB(dt, time) {
     f[56] = params.spawnFadeRate;
     u[57] = params.limitAtCenter ? 1 : 0;
     f[58] = params.limitAtCenterRadius;
-    // oscillationAmp is the max amplitude (lowest note). Scale by active note pitch each frame;
-    // fall back to 0 when no notes are held so movement returns to clean.
-    if (params.oscillationAmp > 0 && _activeNotesBySpectator.size > 0) {
-        const minNote = Math.min(..._activeNotesBySpectator.values());
-        f[59] = (1 - minNote / 8) * params.oscillationAmp;
-    } else {
-        f[59] = 0;
-    }
-    f[60] = params.oscillationFreq;
     setChaos(chaosGPU);
     const _synthNow = performance.now();
     if (_synthNow - _lastSynthTick >= 200) {
