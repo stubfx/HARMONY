@@ -59,35 +59,25 @@ export const STORY = [
             this._audio1Playing = true;
             this._pendingJoins  = 0;
 
-            // Step 1: clear avoidmap, pull all particles toward center.
-            log('PHASE 1 — step 1: avoidmap rimossa, convergenza al centro.');
+            log('PHASE 1 — fade out, tutto nero. audio1 in partenza.');
             sim.clearAvoidMap();
-            sim.setFormulas(
-                'atan2(cy - y, cx - x)',
-                'atan2(cy - y, cx - x)',
-            );
-
-            // Step 2: after 500ms go dark and start audio.
-            this._blackTimer = setTimeout(() => {
-                log('PHASE 1 — step 2: tutto nero. audio1 in partenza.');
-                sim.setColorMode('GRAYSCALE');
-                sim.freezeParams({ spectatorSpawnChance: 0, randomTeleportChance: 0, dotRespawnChance: 0, spawnFadeRate: 0 });
-                sim.setParam('champLinesAlpha', 0);
-                sim.setParam('limitAtCenter', true);
-                sim.setParam('limitAtCenterRadius', 100);
-                sim.suppressImages();
-                sim.dormantSeed();
-                this._audio = sim.playNarratorAudio('audio1.mp3');
-                this._audio.addEventListener('ended', () => {
-                    this._audio1Playing = false;
-                    log('audio1 terminato.');
-                    if (this._pendingJoins > 0) {
-                        log(this._pendingJoins + ' utenti in attesa — attivazione chunk e avvio audio2.');
-                        for (let i = 0; i < this._pendingJoins; i++) sim.activateChunk(1);
-                        this._startAudio2(sim);
-                    }
-                }, { once: true });
-            }, 500);
+            sim.setColorMode('GRAYSCALE');
+            sim.freezeParams({ spectatorSpawnChance: 0, randomTeleportChance: 0, dotRespawnChance: 0, spawnFadeRate: 0 });
+            sim.setParam('champLinesAlpha', 0);
+            sim.setParam('limitAtCenter', true);
+            sim.setParam('limitAtCenterRadius', 100);
+            sim.suppressImages();
+            sim.dormantSeed();
+            this._audio = sim.playNarratorAudio('audio1.mp3');
+            this._audio.addEventListener('ended', () => {
+                this._audio1Playing = false;
+                log('audio1 terminato.');
+                if (this._pendingJoins > 0) {
+                    log(this._pendingJoins + ' utenti in attesa — attivazione chunk e avvio audio2.');
+                    for (let i = 0; i < this._pendingJoins; i++) sim.activateChunk(1);
+                    this._startAudio2(sim);
+                }
+            }, { once: true });
         },
         _startAudio2(sim) {
             if (this._audio2Started) return;
@@ -114,7 +104,6 @@ export const STORY = [
         },
         exit(sim) {
             log('uscita PHASE 1 — formule aggiornate, respawn random già attivo.');
-            clearTimeout(this._blackTimer);
             this._audio?.pause();
             this._audio = null;
             sim.restoreImages();
