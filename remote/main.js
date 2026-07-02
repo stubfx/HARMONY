@@ -381,39 +381,34 @@ function _initNoteCanvas() {
         for (let i = _pool.length - 1; i >= 0; i--) {
             const p = _pool[i];
 
+            // Touch repulsion — push dots away from finger
             if (_touching) {
-                const dx   = _touchX - p.x;
-                const dy   = _touchY - p.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < 8) { _pool.splice(i, 1); continue; }
-                // Speed scales with distance so far dots move fast and close dots ease in.
-                const spd = Math.max(400, dist * 6) * dt;
-                p.vx = (dx / dist) * spd;
-                p.vy = (dy / dist) * spd;
-                // Only fade once close — dots stay bright across the whole journey.
-                p.life = dist < 40
-                    ? Math.max(0, p.life - dt * 4)
-                    : Math.min(1, p.life + dt * 4);
-                if (p.life <= 0) { _pool.splice(i, 1); continue; }
-            } else {
-                // Note shake: burst outward from center
-                if (_poolShake > 0) {
-                    const ox   = p.x - cx, oy = p.y - cy;
-                    const od   = Math.sqrt(ox * ox + oy * oy) + 0.001;
-                    p.vx += (ox / od) * _poolShake * 90 * dt + (Math.random() - 0.5) * _poolShake * 50 * dt;
-                    p.vy += (oy / od) * _poolShake * 90 * dt + (Math.random() - 0.5) * _poolShake * 50 * dt;
-                }
-                // Idle float
-                p.vx += Math.sin(ts * 0.001  + p.phase) * 0.25 * dt;
-                p.vy += Math.cos(ts * 0.0007 + p.phase) * 0.18 * dt;
-                // Spring back toward pool disk
-                const dx   = cx - p.x, dy = cy - p.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                p.vx += dx * (dist > POOL_R ? 0.12 : 0.02) * dt;
-                p.vy += dy * (dist > POOL_R ? 0.12 : 0.02) * dt;
-                p.vx *= 0.88; p.vy *= 0.88;
-                p.life = Math.min(1, p.life + dt * 3);
+                const tdx  = p.x - _touchX, tdy = p.y - _touchY;
+                const tdist = Math.sqrt(tdx * tdx + tdy * tdy) + 0.001;
+                const force = Math.max(0, 1 - tdist / 100) * 350;
+                p.vx += (tdx / tdist) * force * dt;
+                p.vy += (tdy / tdist) * force * dt;
             }
+
+            // Note shake: burst outward from center
+            if (_poolShake > 0) {
+                const ox = p.x - cx, oy = p.y - cy;
+                const od = Math.sqrt(ox * ox + oy * oy) + 0.001;
+                p.vx += (ox / od) * _poolShake * 90 * dt + (Math.random() - 0.5) * _poolShake * 50 * dt;
+                p.vy += (oy / od) * _poolShake * 90 * dt + (Math.random() - 0.5) * _poolShake * 50 * dt;
+            }
+
+            // Idle float
+            p.vx += Math.sin(ts * 0.001  + p.phase) * 0.25 * dt;
+            p.vy += Math.cos(ts * 0.0007 + p.phase) * 0.18 * dt;
+
+            // Spring back toward pool disk
+            const dx   = cx - p.x, dy = cy - p.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            p.vx += dx * (dist > POOL_R ? 0.12 : 0.02) * dt;
+            p.vy += dy * (dist > POOL_R ? 0.12 : 0.02) * dt;
+            p.vx *= 0.88; p.vy *= 0.88;
+            p.life = Math.min(1, p.life + dt * 3);
 
             p.x += p.vx; p.y += p.vy;
             ctx2d.globalAlpha = p.life * 0.9;
