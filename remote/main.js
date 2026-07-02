@@ -227,7 +227,7 @@ function _tickSmoke(ctx2d, w, h) {
         p.life -= p.decay;
         if (p.life <= 0) { _smoke.splice(i, 1); continue; }
         ctx2d.globalAlpha = Math.pow(p.life, 1.4) * 0.9;
-        ctx2d.fillStyle = '#ffffff';
+        ctx2d.fillStyle = _currentStep >= 2 ? pushedColor : '#ffffff';
         const s = p.size;
         ctx2d.fillRect(Math.round(p.x) - s, Math.round(p.y) - s, s * 2, s * 2);
     }
@@ -412,7 +412,7 @@ function _initNoteCanvas() {
 
             p.x += p.vx; p.y += p.vy;
             ctx2d.globalAlpha = p.life * 0.9;
-            ctx2d.fillStyle   = '#ffffff';
+            ctx2d.fillStyle   = _currentStep >= 2 ? pushedColor : '#ffffff';
             ctx2d.fillRect(Math.round(p.x) - 1, Math.round(p.y) - 1, 2, 2);
         }
         ctx2d.globalAlpha = 1;
