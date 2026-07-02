@@ -276,8 +276,8 @@ function _initNoteCanvas() {
         noteCanvasEl.setPointerCapture(e.pointerId);
         _touching = true;
         _touchX = e.offsetX; _touchY = e.offsetY;
-        // Safari può ri-sospendere il context dopo un'interruzione; il gesto dell'utente
-        // è il momento giusto per ripristinarlo senza rischiare il blocco autoplay.
+        // Safari may re-suspend AudioContext after interruptions (calls, Siri).
+        // Resume here on user gesture without risking autoplay block.
         if (_audioCtx?.state === 'suspended') _audioCtx.resume();
         _setContNote(_noteIdx(_touchX));
         _applyColor(_touchY);
@@ -302,16 +302,15 @@ function _initNoteCanvas() {
     // _sinePulse is module-level (set by _setContNote on note change)
 
     function _drawSine(w, h, dt) {
-        const _idleFire = (_currentStep === 0 && !_touching);
-        if (_currentStep < 1 && !_idleFire) return;
-        _sineAmp = (_touching || _idleFire)
+        if (_currentStep < 1) return;
+        _sineAmp = _touching
             ? Math.min(1, _sineAmp + 6 * dt)
             : Math.max(0, _sineAmp - 2 * dt);
-        _sinePulse = Math.max(0, _sinePulse - dt * 5); // decade in ~0.2s
+        _sinePulse = Math.max(0, _sinePulse - dt * 5);
         if (_sineAmp <= 0.01) return;
 
-        const idx    = _idleFire ? 4 : Math.max(0, _activeNoteIdx);
-        const cycles = 1 + (idx / (KEYS.length - 1)) * 5; // 1–6 cicli visivi
+        const idx    = Math.max(0, _activeNoteIdx);
+        const cycles = 1 + (idx / (KEYS.length - 1)) * 5;
         const freq   = KEYS[idx]?.freq ?? KEYS[4].freq;
         _sinePhase  += (freq / 220) * dt * 3;
 
@@ -333,6 +332,63 @@ function _initNoteCanvas() {
         ctx2d.restore();
     }
 
+    // ── Center pixel pool ─────────────────────────────────────────────────────
+    // Pixels rest in a disk at center. When the user touches, they are sucked
+    // toward the touch point and disappear, giving the sense of drawing energy.
+    const _pool    = [];
+    const POOL_MAX = 35;
+    const POOL_R   = 22;
+
+    function _refillPool(cx, cy) {
+        while (_pool.length < POOL_MAX) {
+            const angle = Math.random() * Math.PI * 2;
+            const r     = Math.sqrt(Math.random()) * POOL_R;
+            _pool.push({
+                x:    cx + Math.cos(angle) * r,
+                y:    cy + Math.sin(angle) * r,
+                vx:   (Math.random() - 0.5) * 0.2,
+                vy:   (Math.random() - 0.5) * 0.2,
+                life: Math.random() * 0.4, // stagger fade-in
+            });
+        }
+    }
+
+    function _tickPool(ctx2d, w, h, dt) {
+        if (_currentStep !== 0) { _pool.length = 0; return; }
+        const cx = w / 2, cy = h / 2;
+        if (!_touching) _refillPool(cx, cy);
+
+        for (let i = _pool.length - 1; i >= 0; i--) {
+            const p = _pool[i];
+            if (_touching) {
+                const dx   = _touchX - p.x;
+                const dy   = _touchY - p.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 8) { _pool.splice(i, 1); continue; }
+                const spd = (150 + (1 - dist / Math.sqrt(w * w + h * h)) * 200) * dt;
+                p.vx = (dx / dist) * spd;
+                p.vy = (dy / dist) * spd;
+                p.life = Math.max(0, p.life - dt * 3);
+                if (p.life <= 0) { _pool.splice(i, 1); continue; }
+            } else {
+                // Spring back toward pool disk
+                const dx   = cx - p.x;
+                const dy   = cy - p.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const pull = dist > POOL_R ? 0.12 : 0.02;
+                p.vx += dx * pull * dt;
+                p.vy += dy * pull * dt;
+                p.vx *= 0.88; p.vy *= 0.88;
+                p.life = Math.min(1, p.life + dt * 3);
+            }
+            p.x += p.vx; p.y += p.vy;
+            ctx2d.globalAlpha = p.life * 0.9;
+            ctx2d.fillStyle   = '#ffffff';
+            ctx2d.fillRect(Math.round(p.x) - 1, Math.round(p.y) - 1, 2, 2);
+        }
+        ctx2d.globalAlpha = 1;
+    }
+
     (function loop(ts) {
         requestAnimationFrame(loop);
         const dt = _lastChaosT > 0 ? (ts - _lastChaosT) / 1000 : 0;
@@ -340,17 +396,16 @@ function _initNoteCanvas() {
         _applyChaosVisuals();
         _lastChaosT = ts;
 
-        ctx2d.clearRect(0, 0, noteCanvasEl.width, noteCanvasEl.height);
-        _drawSine(noteCanvasEl.width, noteCanvasEl.height, dt);
+        const w = noteCanvasEl.width, h = noteCanvasEl.height;
+        ctx2d.clearRect(0, 0, w, h);
+        _drawSine(w, h, dt);
+        _tickPool(ctx2d, w, h, dt);
 
-        const _idleFire = (_currentStep === 0 && !_touching);
-        const _fireX = _touching ? _touchX : noteCanvasEl.width  / 2;
-        const _fireY = _touching ? _touchY : noteCanvasEl.height / 2;
-        if ((_touching || _idleFire) && ts - _lastSpawn > 25) {
-            _spawnSmoke(_fireX, _fireY, _cf(_fireX, _fireY));
+        if (_touching && ts - _lastSpawn > 25) {
+            _spawnSmoke(_touchX, _touchY, _cf(_touchX, _touchY));
             _lastSpawn = ts;
         }
-        _tickSmoke(ctx2d, noteCanvasEl.width, noteCanvasEl.height);
+        _tickSmoke(ctx2d, w, h);
     })(0);
 }
 
@@ -362,10 +417,12 @@ socket.on('story-step', ({ step } = {}) => {
     updateAura();
 });
 
-// ── Init on first gesture (AudioContext requires user interaction on iOS) ─────
+// ── Init ──────────────────────────────────────────────────────────────────────
+// Canvas loop starts immediately so the pixel pool is visible before first touch.
+// AudioContext requires a user gesture, so the oscillator is deferred.
 const _tapHint = document.querySelector('#tap-hint');
+_initNoteCanvas();
 document.addEventListener('pointerdown', () => {
     _startContOsc();
-    _initNoteCanvas();
     _tapHint?.classList.add('hidden');
 }, { once: true });
