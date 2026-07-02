@@ -76,7 +76,7 @@ function hslToHex(h, s, l) {
 
 function updateAura() {
     if (!auraEl) return;
-    auraEl.style.background = '#000000';
+    auraEl.style.background = _currentStep >= 2 ? pushedColor : '#000000';
 }
 updateAura();
 
@@ -426,16 +426,7 @@ function _initNoteCanvas() {
         _adaptPoolMax(dt);
         _lastChaosT = ts;
 
-        const w = noteCanvasEl.width, h = noteCanvasEl.height;
-        ctx2d.clearRect(0, 0, w, h);
-        _drawSine(w, h, dt);
-        _tickPool(ctx2d, w, h, dt, ts);
-
-        if (_touching && ts - _lastSpawn > 25) {
-            _spawnSmoke(_touchX, _touchY, _cf(_touchX, _touchY));
-            _lastSpawn = ts;
-        }
-        _tickSmoke(ctx2d, w, h);
+        ctx2d.clearRect(0, 0, noteCanvasEl.width, noteCanvasEl.height);
     })(0);
 }
 
