@@ -618,6 +618,7 @@ const simFacade = {
     },
 
     loadStaticAvoidMap(filename) { loadAvoidMap(`${_apiBase}/simAss-static/${filename}`); },
+    clearAvoidMap() { clearAvoidMap(); },
 
     // Set direction and wind formulas (WGSL expressions). Fire-and-forget async.
     setFormulas(dir, wind) { applyFormulas(dir, wind); },
