@@ -482,7 +482,7 @@ function seedAgents({ mode = RESEED.NORMAL } = {}) {
     }
     device.queue.writeBuffer(agentBuf, 0, data);
 }
-seedAgents();
+seedAgents({ mode: RESEED.FADE_FROM_EDGES });
 
 // Raw teleport: move `fraction` of agents to (x, y) with random velocities.
 // No fade — agents keep full weight and appear instantly at the target.
