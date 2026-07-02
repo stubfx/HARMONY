@@ -89,7 +89,7 @@ export const STORY = [
                         this._startAudio2(sim);
                     }
                 }, { once: true });
-            }, 2000);
+            }, 500);
         },
         _startAudio2(sim) {
             if (this._audio2Started) return;
