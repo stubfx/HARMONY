@@ -2340,7 +2340,7 @@ function applySimParams(data) {
         autoClearTimer = null;
         renderTextAvoidMap();
         renderTraceCanvas();
-        if (traceText) 
+        if (traceText) scheduleAutoClear();
     }
     const changed = (k) => k in rest && rest[k] !== params[k];
     const needsRetrace = ['traceScale','qrSize','qrMargin','qrAlignX','qrAlignY',
