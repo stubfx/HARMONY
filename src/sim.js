@@ -2788,7 +2788,14 @@ function writeSoloUB(dt, time) {
     f[56] = params.spawnFadeRate;
     u[57] = params.limitAtCenter ? 1 : 0;
     f[58] = params.limitAtCenterRadius;
-    f[59] = params.oscillationAmp;
+    // oscillationAmp is the max amplitude (lowest note). Scale by active note pitch each frame;
+    // fall back to 0 when no notes are held so movement returns to clean.
+    if (params.oscillationAmp > 0 && _activeNotesBySpectator.size > 0) {
+        const minNote = Math.min(..._activeNotesBySpectator.values());
+        f[59] = (1 - minNote / 8) * params.oscillationAmp;
+    } else {
+        f[59] = 0;
+    }
     f[60] = params.oscillationFreq;
     setChaos(chaosGPU);
     const _synthNow = performance.now();

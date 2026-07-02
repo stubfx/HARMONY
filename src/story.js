@@ -155,7 +155,7 @@ export const STORY = [
             }, 10_000);
         },
         onNote(sim, noteIndex) {
-            // sim.setParam('oscillationAmp', (1 - noteIndex / 8) * 1.0); // low note=wavy, high note=straight — disabled
+            // sim.setParam('oscillationAmp', 1.0); // enable wave: low note=wavy, high note=straight — disabled
             if (!this._notesEnabled || this._noteTimerStarted) return;
             this._noteTimerStarted = true;
             sim.setParam('windEnabled', true);
