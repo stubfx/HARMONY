@@ -551,15 +551,15 @@ const simFacade = {
         const cy  = canvas.height / 2;
         const TAU = Math.PI * 2;
         const data = new Float32Array((end - start) * 8);
+        const burstSpeed = params.releaseBurstSpeed || 30;
         for (let i = 0; i < end - start; i++) {
             const b = i * 8;
             const angle = Math.random() * TAU;
             const va    = Math.random() * TAU;
-            const vs    = 0.5 + Math.random() * 1.5;
             data[b]     = cx + Math.cos(angle) * (Math.random() * 8);
             data[b + 1] = cy + Math.sin(angle) * (Math.random() * 8);
-            data[b + 2] = Math.cos(va) * vs;
-            data[b + 3] = Math.sin(va) * vs;
+            data[b + 2] = Math.cos(va) * burstSpeed;
+            data[b + 3] = Math.sin(va) * burstSpeed;
             data[b + 4] = cx;
             data[b + 5] = cy;
             data[b + 6] = _preshowWeights[start + i];
@@ -617,15 +617,20 @@ const simFacade = {
         if (input) { input.value = text; renderTextAvoidMap(); }
     },
 
+    loadStaticAvoidMap(filename) { loadAvoidMap(`${_apiBase}/simAss-static/${filename}`); },
+
     // Set direction and wind formulas (WGSL expressions). Fire-and-forget async.
     setFormulas(dir, wind) { applyFormulas(dir, wind); },
 
     // Unlock noise/pad/arp — call when the story is ready for the full synth.
     enableFullSynth() { setSynthDroneOnly(false); },
 
-    // Start the ambience music. Routed through ambience.js (Tone.js radio chain).
+    // Start the ambience music and the synth together.
     // Safe to call multiple times — no-op if already started.
-    startBackgroundMusic() { ambience.start(); },
+    startBackgroundMusic() {
+        ambience.start();
+        startSynth().then(() => setSynthState(smoothChaos, smoothCoherence, 0, 0, smoothTemp));
+    },
 
     startBlinkersLoop() {
         ambience.startBlinkersLoop(() => {
@@ -635,6 +640,7 @@ const simFacade = {
         });
     },
     stopBlinkersLoop()  { ambience.stopBlinkersLoop();  },
+    burstBlinkers(count, intervalMs) { ambience.burstBlinkers(count, intervalMs); },
 
     // Play a narrator audio file from simAss/narrator/.
     // Pass { autoNext: true } to advance to the next step when playback ends.
@@ -703,8 +709,29 @@ const fadePipe = device.createRenderPipeline({
     },
     primitive: { topology: 'triangle-list' },
 });
+// Additive-mode fade: pure multiplicative scale — src zeroed out, dst scaled by (1-alpha).
+// Avoids injecting black into the HDR accumulation buffer.
+const fadePipeAdditive = device.createRenderPipeline({
+    layout: 'auto',
+    vertex:   { module: fadeMod, entryPoint: 'vs' },
+    fragment: {
+        module: fadeMod, entryPoint: 'fs',
+        targets: [{
+            format: 'rgba16float',
+            blend: {
+                color: { srcFactor: 'zero', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+                alpha: { srcFactor: 'zero', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+            },
+        }],
+    },
+    primitive: { topology: 'triangle-list' },
+});
 const fadeBG = device.createBindGroup({
     layout: fadePipe.getBindGroupLayout(0),
+    entries: [{ binding: 0, resource: { buffer: fadeUB } }],
+});
+const fadeBGAdditive = device.createBindGroup({
+    layout: fadePipeAdditive.getBindGroupLayout(0),
     entries: [{ binding: 0, resource: { buffer: fadeUB } }],
 });
 
@@ -1478,24 +1505,6 @@ function renderTextAvoidMap() {
 
 // ── Auto-clear timer ──────────────────────────────────────────────────────────
 // Started whenever user-added content (image or text) appears in the trace layer.
-// Fires after params.clearDelay seconds and wipes user text + any non-QR image.
-// Cancelled when the user explicitly clears content; reset when new content arrives.
-// The session QR is considered system content and is never auto-cleared.
-let autoClearTimer = null;
-
-function scheduleAutoClear() {
-    clearTimeout(autoClearTimer);
-    if (params.clearDelay <= 0) return;
-    autoClearTimer = setTimeout(() => {
-        autoClearTimer = null;
-        const input = document.querySelector('#trace-text-input');
-        if (input) input.value = '';
-        imageBitmap = null;
-        renderTextAvoidMap();
-        renderTraceCanvas();
-        console.log('[trace] auto-cleared after', params.clearDelay, 's');
-    }, params.clearDelay * 1000);
-}
 
 // Decodes every frame of an animated image (GIF, animated WebP/AVIF) via the
 // ImageDecoder API. Returns { frames: ImageBitmap[], durations: number[] } or
@@ -1542,7 +1551,7 @@ async function loadMagnetImage(file) {
     }
     renderTextAvoidMap(); // suppress text avoidmap while image is shown
     renderTraceCanvas();
-    scheduleAutoClear();
+    
 }
 
 async function loadTraceImageFromUrl(url, fetchOptions = {}) {
@@ -1561,7 +1570,7 @@ async function loadTraceImageFromUrl(url, fetchOptions = {}) {
         }
         renderTextAvoidMap(); // suppress text avoidmap while image is shown
         renderTraceCanvas();
-        scheduleAutoClear();
+        
     } catch (err) {
         console.warn('[traceImage] failed to load:', url, err.message);
     }
@@ -1930,7 +1939,7 @@ function _exitHarmony() {
     if (!_harmonyActive) return;
     _harmonyActive     = false;
     _currentHarmonyKey = -1;
-    clearAvoidMap();
+    if (_harmonyImagesEnabled) clearAvoidMap();
 }
 
 // Load (or reload) the image for the currently-active harmony sum.
@@ -2088,7 +2097,7 @@ _clearHarmonyImageCache();
     });
 
     // Collective swarm state — aggregated by the server from all spectators in the room.
-    socket.on('collective-state', ({ avgTemp, avgCoherence, avgChaos, userCount }) => {
+    socket.on('collective-state', ({ avgTemp, avgCoherence, userCount }) => {
         collectiveTemp      = avgTemp      ?? 0.5;
         collectiveCoherence = avgCoherence ?? 0.5;
         // collectiveChaos is intentionally NOT driven by avgChaos — chaos is manual only.
@@ -2218,7 +2227,7 @@ _clearHarmonyImageCache();
             const input = document.querySelector('#trace-text-input');
             if (input) input.value = event.data.text;
             renderTraceCanvas();
-            scheduleAutoClear();
+            
         }
     });
 
@@ -2379,7 +2388,10 @@ function applySimParams(data) {
     updateAvoidMapOverlay: _updateAvoidMapOverlay,
 }));
 
-storyEngine.onGoto = () => storyPhaseCtrl.updateDisplay();
+storyEngine.onGoto = (i) => {
+    storyPhaseCtrl.updateDisplay();
+    socket?.emit('story-step', { step: i });
+};
 
 stateCtrl.onChange(v => setStatus(v));
 qrStateCtrl.onChange(() => { updateStateDisplay(); renderTraceCanvas(); });
@@ -2475,8 +2487,6 @@ document.addEventListener('pointerdown', async () => {
     await unlockAudio();
     if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
     _syncAudioBanner();
-    setSynthDroneOnly(true);
-    startSynth().then(() => setSynthState(1.0, smoothCoherence, 0, 0, smoothTemp));
     storyEngine.start();
 }, { once: true });
 
@@ -2591,7 +2601,7 @@ document.querySelector('#trace-text-input').addEventListener('input', () => {
     clearTimeout(traceTextTimer);
     traceTextTimer = setTimeout(() => {
         renderTextAvoidMap();
-        scheduleAutoClear();
+        
     }, 300);
 });
 
@@ -2781,7 +2791,6 @@ function writeSoloUB(dt, time) {
         setSynthState(smoothChaos, smoothCoherence, 0, 0, smoothTemp);
         ambience.setChaos(smoothChaos);
     }
-    if (Math.random() < 0.01) console.log('[chaos] smoothChaos→GPU:', smoothChaos.toFixed(4));
     device.queue.writeBuffer(soloUB, 0, ab);
 }
 
@@ -3307,8 +3316,8 @@ function frame(ts) {
             view: renderTargetView, loadOp: 'load', storeOp: 'store',
         }],
     });
-    rp.setPipeline(fadePipe);
-    rp.setBindGroup(0, fadeBG);
+    rp.setPipeline(params.additiveBlend ? fadePipeAdditive : fadePipe);
+    rp.setBindGroup(0, params.additiveBlend ? fadeBGAdditive : fadeBG);
     rp.draw(3);
     // Agent shadow is a soft splat — incoherent with chunky cells, skip in pixel mode.
     // Runs when an image is loaded (homing shadows) or champions are active (constant shadows).

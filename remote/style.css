@@ -18,38 +18,51 @@ html, body {
     z-index: 0;
     pointer-events: none;
     transition: background 0.6s ease;
-    background: #2495FF;
+    background: #000000;
 }
 
-#join-overlay {
+
+#tap-hint {
     position: fixed;
     inset: 0;
-    z-index: 30;
-    background: #000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.2rem;
+    pointer-events: none;
+    z-index: 20;
+    transition: opacity 0.8s ease;
+}
+
+#tap-hint.hidden { opacity: 0; }
+
+#tap-title {
+    font-size: clamp(3rem, 18vw, 9rem);
+    letter-spacing: 0.12em;
+    font-weight: 300;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+#tap-sub {
+    font-size: 0.7rem;
+    letter-spacing: 0.25em;
+    text-transform: lowercase;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+#step-debug {
+    position: fixed;
+    inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    pointer-events: auto;
-    transition: opacity 0.6s ease;
-}
-
-#join-btn {
-    font-size: 0.85rem;
-    letter-spacing: 0.18em;
-    text-transform: lowercase;
-    color: rgba(255, 255, 255, 0.6);
-    background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 2rem;
-    padding: 0.75rem 2.2rem;
-    cursor: pointer;
-    transition: color 0.3s, border-color 0.3s, box-shadow 0.3s;
-}
-
-#join-btn:active {
-    color: rgba(255, 255, 255, 0.95);
-    border-color: rgba(255, 255, 255, 0.55);
-    box-shadow: 0 0 18px rgba(255, 255, 255, 0.08);
+    font-size: clamp(6rem, 40vw, 20rem);
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.08);
+    pointer-events: none;
+    z-index: 5;
+    letter-spacing: -0.05em;
 }
 
 #harmony-panel {

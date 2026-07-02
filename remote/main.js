@@ -13,8 +13,6 @@ const spectatorId = sessionStorage.getItem('spectator-id') ?? (() => {
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const auraEl          = document.querySelector('#aura');
-const joinOverlayEl   = document.querySelector('#join-overlay');
-const joinBtnEl       = document.querySelector('#join-btn');
 const chaosVignetteEl = document.querySelector('#chaos-vignette');
 const noteCanvasEl    = document.getElementById('note-canvas');
 
@@ -59,6 +57,9 @@ function sendEvent(type, data) {
     socket.emit('user-event', { type, data });
 }
 
+// ── Story step ────────────────────────────────────────────────────────────────
+let _currentStep = -1;
+
 // ── Aura ──────────────────────────────────────────────────────────────────────
 let pushedColor = '#2495FF';
 
@@ -75,7 +76,7 @@ function hslToHex(h, s, l) {
 
 function updateAura() {
     if (!auraEl) return;
-    auraEl.style.background = pushedColor;
+    auraEl.style.background = '#000000';
 }
 updateAura();
 
@@ -156,14 +157,16 @@ function _startContOsc() {
 
 let _noteDebounceMs    = 0;
 let _noteDebounceTimer = null;
+let _sinePulse         = 0;
 
 function _setContNote(noteIdx) {
-    if (!_contOscReady) return;
+    if (_currentStep <= 0 || !_contOscReady) return;
     const t = _audioCtx.currentTime;
     if (noteIdx !== _activeNoteIdx) {
         _contOsc.frequency.setTargetAtTime(KEYS[noteIdx].freq, t, 0.04);
         _activeNoteIdx = noteIdx;
         _motionChaos = Math.min(1, _motionChaos + 0.05);
+        _sinePulse = 1;
         clearTimeout(_noteDebounceTimer);
         _noteDebounceTimer = setTimeout(() => {
             sendEvent('note', { index: noteIdx, freq: KEYS[noteIdx].freq, color: KEYS[noteIdx].color });
@@ -173,7 +176,7 @@ function _setContNote(noteIdx) {
 }
 
 function _silenceContNote() {
-    if (!_contOscReady) return;
+    if (_currentStep <= 0 || !_contOscReady) return;
     clearTimeout(_noteDebounceTimer);
     _noteDebounceTimer = null;
     _contGainNode.gain.setTargetAtTime(0, _audioCtx.currentTime, 0.12);
@@ -215,7 +218,6 @@ function _spawnSmoke(x, y, cf) {
 
 function _tickSmoke(ctx2d, w, h) {
     if (_smoke.length === 0) return;
-    ctx2d.clearRect(0, 0, w, h);
     for (let i = _smoke.length - 1; i >= 0; i--) {
         const p = _smoke[i];
         p.x   += p.vx;
@@ -294,15 +296,52 @@ function _initNoteCanvas() {
     let _lastSpawn  = 0;
     let _lastChaosT = 0;
 
+    // ── Sine wave state ───────────────────────────────────────────────────────
+    let _sineAmp   = 0;
+    let _sinePhase = 0;
+    // _sinePulse is module-level (set by _setContNote on note change)
+
+    function _drawSine(w, h, dt) {
+        if (_currentStep < 1) return;
+        _sineAmp = _touching
+            ? Math.min(1, _sineAmp + 6 * dt)
+            : Math.max(0, _sineAmp - 2 * dt);
+        _sinePulse = Math.max(0, _sinePulse - dt * 5); // decade in ~0.2s
+        if (_sineAmp <= 0.01) return;
+
+        const idx    = Math.max(0, _activeNoteIdx);
+        const cycles = 1 + (idx / (KEYS.length - 1)) * 5; // 1–6 cicli visivi
+        const freq   = KEYS[idx]?.freq ?? KEYS[4].freq;
+        _sinePhase  += (freq / 220) * dt * 3;
+
+        const color = _currentStep >= 2 ? pushedColor : '#ffffff';
+        const amp   = h * 0.32 * _sineAmp * (1 + _sinePulse * 0.6);
+        const cy    = h / 2;
+
+        ctx2d.save();
+        ctx2d.globalAlpha = _sineAmp * 0.9;
+        ctx2d.strokeStyle = color;
+        ctx2d.lineWidth   = 2.5;
+        ctx2d.beginPath();
+        for (let x = 0; x <= w; x += 2) {
+            const t = (x / w) * cycles * Math.PI * 2 + _sinePhase;
+            const y = cy + Math.sin(t) * amp;
+            x === 0 ? ctx2d.moveTo(x, y) : ctx2d.lineTo(x, y);
+        }
+        ctx2d.stroke();
+        ctx2d.restore();
+    }
+
     (function loop(ts) {
         requestAnimationFrame(loop);
-        // Decay chaos toward zero; driven by note-change increments in _setContNote
-        if (_lastChaosT > 0) {
-            const dt = (ts - _lastChaosT) / 1000;
-            _motionChaos = Math.max(0, _motionChaos - MOTION_DECAY_RATE * dt);
-            _applyChaosVisuals();
-        }
+        const dt = _lastChaosT > 0 ? (ts - _lastChaosT) / 1000 : 0;
+        _motionChaos = Math.max(0, _motionChaos - MOTION_DECAY_RATE * dt);
+        _applyChaosVisuals();
         _lastChaosT = ts;
+
+        ctx2d.clearRect(0, 0, noteCanvasEl.width, noteCanvasEl.height);
+        _drawSine(noteCanvasEl.width, noteCanvasEl.height, dt);
+
         if (_touching && ts - _lastSpawn > 25) {
             _spawnSmoke(_touchX, _touchY, _cf(_touchX, _touchY));
             _lastSpawn = ts;
@@ -311,18 +350,18 @@ function _initNoteCanvas() {
     })(0);
 }
 
-// ── Join ──────────────────────────────────────────────────────────────────────
-function dismissOverlay() {
-    if (!joinOverlayEl) return;
-    joinOverlayEl.style.opacity = '0';
-    joinOverlayEl.style.pointerEvents = 'none';
-    setTimeout(() => joinOverlayEl.remove(), 650);
-}
+// ── Story step socket handler ─────────────────────────────────────────────────
+const _stepDebug = document.querySelector('#step-debug');
+socket.on('story-step', ({ step } = {}) => {
+    _currentStep = typeof step === 'number' ? step : -1;
+    if (_stepDebug) _stepDebug.textContent = _currentStep >= 0 ? _currentStep : '';
+    updateAura();
+});
 
-joinBtnEl?.addEventListener('click', () => {
-    // AudioContext + reverb must be created inside a user gesture (iOS Safari).
-    // Doing it here pre-warms the reverb buffer so the first touch is stutter-free.
+// ── Init on first gesture (AudioContext requires user interaction on iOS) ─────
+const _tapHint = document.querySelector('#tap-hint');
+document.addEventListener('pointerdown', () => {
     _startContOsc();
     _initNoteCanvas();
-    dismissOverlay();
-});
+    _tapHint?.classList.add('hidden');
+}, { once: true });

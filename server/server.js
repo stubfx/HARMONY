@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID }    from 'node:crypto';
 import * as Utils        from './server-utils.js';
 import { narrate, generateIdleImage, generateIdleAudio } from './openai-api.js';
-import { readdir, readFile, writeFile, stat, unlink } from 'node:fs/promises';
+import { readdir, readFile, writeFile } from 'node:fs/promises';
 
 dotenv.config();
 
@@ -81,6 +81,7 @@ function getOrCreateRoom(roomId) {
             users:        new Map(), // socketId  → UserState
             votes:        new Map(), // socketId  → choice string (one vote per spectator)
             audioLocked:  null,      // null = unknown; true/false reported by sim
+            storyStep:    -1,        // current story step index; -1 = not started
         });
     }
     return rooms.get(roomId);
@@ -95,9 +96,6 @@ function updateUserState(roomId, socketId, type, data) {
         room.users.set(socketId, user);
     }
     user.lastSeen = Date.now();
-    if (type === 'tilt') {
-        user.chaos = data.chaos ?? 0;
-    }
     if (type === 'touch') {
         user.temperature = data.temp ?? 0.5;
         user.coherence   = data.x   ?? 0.5;
@@ -115,30 +113,33 @@ setInterval(() => {
         }
         if (!room.hostSockets.size || !room.connections.size) continue;
 
-        let st = 0, sc = 0, sChaos = 0;
+        let st = 0, sc = 0;
         const activeUsers = [...room.users.values()];
         const n = activeUsers.length;
         if (n > 0) {
             for (const u of activeUsers) {
                 st += u.temperature;
                 sc += u.coherence;
-                sChaos += u.chaos ?? 0;
             }
         }
-
-        const avgChaos = n > 0 ? sChaos / n : 1;
-        room.lastAvgChaos = avgChaos;
 
         const totalUsers = room.connections.size;
         io.to(`${roomId}:hosts`).emit('collective-state', {
             avgTemp:      n > 0 ? st / n : 0.5,
             avgCoherence: n > 0 ? sc / n : 0.5,
-            avgChaos,
             userCount:    totalUsers,
         });
         io.to(`${roomId}:spectators`).emit('note-debounce', { ms: totalUsers * 10 });
     }
 }, 300);
+
+// ── Story step broadcast — 1 s tick ──────────────────────────────────────────
+setInterval(() => {
+    for (const [roomId, room] of rooms) {
+        if (!room.connections.size) continue;
+        io.to(`${roomId}:spectators`).emit('story-step', { step: room.storyStep });
+    }
+}, 1000);
 
 // ── Admin auth endpoint ───────────────────────────────────────────────────────
 app.post('/admin-auth', (req, res) => {
@@ -171,6 +172,13 @@ io.on('connection', (socket) => {
     });
 
 
+
+    // Sim reports the current story step index.
+    socket.on('story-step', ({ step }) => {
+        const room = assignedRoom ? rooms.get(assignedRoom) : null;
+        if (!room?.hostSockets.has(socket.id)) return;
+        room.storyStep = typeof step === 'number' ? step : -1;
+    });
 
     // Sim reports its AudioContext lock state so the admin panel can show a warning.
     socket.on('audio-state', ({ locked }) => {
@@ -282,7 +290,7 @@ io.on('connection', (socket) => {
                 n++;
             }
             const snapshot = {
-                chaos:       typeof chaos === 'number' ? chaos : (room?.lastAvgChaos ?? 1),
+                chaos:       typeof chaos === 'number' ? chaos : 0.5,
                 users:       room?.connections.size ?? 0,
                 temperature: n > 0 ? st / n : 0.5,
                 coherence:   n > 0 ? sc / n : 0.5,
@@ -391,29 +399,13 @@ app.post('/rndImage', async (_req, res) => {
 // ── simAss assets — ./simAss/{images,music}/, max 10, 1-day lifespan ─────────
 const _SIM_ASS_DIR   = path.join(__dirname, '..', 'simAss');
 const _IMAGE_MIME    = { '.webp': 'image/webp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml' };
-const SIM_ASS_MAX    = 10;
-const _FILE_LIFESPAN = 24 * 60 * 60 * 1000; // 1 day in ms
+const SIM_ASS_MAX = 10;
 
 const _generating = { image: false, audio: false };
 
-async function _simAssFiles(dir, { checkExpiry = true } = {}) {
-    const now   = Date.now();
+async function _simAssFiles(dir) {
     const names = await readdir(dir).catch(() => []);
-    const valid = [];
-    for (const name of names) {
-        if (name.startsWith('.')) continue;
-        const full = path.join(dir, name);
-        try {
-            const s = await stat(full);
-            if (checkExpiry && now - s.mtimeMs > _FILE_LIFESPAN) {
-                await unlink(full);
-                console.log(`[simAss] expired and deleted: ${name}`);
-            } else {
-                valid.push(name);
-            }
-        } catch { /* file disappeared between readdir and stat — ignore */ }
-    }
-    return valid;
+    return names.filter(n => !n.startsWith('.'));
 }
 
 async function _genAndSaveImage(dir) {
@@ -445,7 +437,7 @@ async function _genAndSaveAudio(dir) {
 
 app.get('/simAss-image', async (_req, res) => {
     const dir   = path.join(_SIM_ASS_DIR, 'images');
-    const files = await _simAssFiles(dir, { checkExpiry: false });
+    const files = await _simAssFiles(dir);
     console.log(`[simAss-image] request — ${files.length} file(s) available: [${files.join(', ')}]`);
     if (files.length === 0) {
         console.log('[simAss-image] no files in simAss/images — nothing to serve');
@@ -490,7 +482,7 @@ app.post('/simAss-config', express.json({ limit: '512kb' }), async (req, res) =>
 
 app.get('/simAss-audio', async (_req, res) => {
     const dir   = path.join(_SIM_ASS_DIR, 'music');
-    const files = await _simAssFiles(dir, { checkExpiry: false });
+    const files = await _simAssFiles(dir);
     console.log(`[simAss-audio] request — ${files.length} file(s) available: [${files.join(', ')}]`);
     if (files.length === 0) {
         console.log('[simAss-audio] no files — generating synchronously…');
@@ -509,6 +501,22 @@ app.get('/simAss-audio', async (_req, res) => {
     if (files.length < SIM_ASS_MAX) {
         console.log(`[simAss-audio] below cap (${files.length}/${SIM_ASS_MAX}) — triggering background generation`);
         _genAndSaveAudio(dir).catch(e => console.error('[simAss-audio] bg gen failed:', e.message));
+    }
+});
+
+// ── Static assets — serves a specific file by name from simAss/static/ ──────
+app.get('/simAss-static/:filename', async (req, res) => {
+    const filename = path.basename(req.params.filename); // prevent path traversal
+    const file     = path.join(_SIM_ASS_DIR, 'static', filename);
+    try {
+        const buf  = await readFile(file);
+        const ext  = path.extname(filename).toLowerCase();
+        const mime = ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.webp' ? 'image/webp' : 'application/octet-stream';
+        console.log(`[simAss-static] serving ${filename}`);
+        res.type(mime).send(buf);
+    } catch (e) {
+        console.warn(`[simAss-static] not found: ${filename}`);
+        res.status(404).json({ error: `not found: ${filename}` });
     }
 });
 

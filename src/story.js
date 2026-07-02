@@ -116,28 +116,35 @@ export const STORY = [
     },
 
     // ── PHASE 2 — LA NOTA ─────────────────────────────────────────────────────
-    // Entra subito da PHASE 1. Imposta testo HARMONY e aspetta 10s (respawn già attivo).
-    // Poi audio3 parte. wind disabilitato fino alla prima nota.
-    // Prima nota → wind on → timer 20s → sim.next().
-    // Il timer da 20s parte una sola volta.
+    // Entra subito da PHASE 1. Aspetta 10s, poi audio3.
+    // Note ignorate finché audio3 non finisce (evita che note spedite durante
+    // audio2 o durante audio3 scattino il timer in anticipo).
+    // Prima nota dopo audio3 → wind on → timer 20s → sim.next().
     {
         id: PHASE.NOTA,
         _noteTimerStarted: false,
+        _notesEnabled: false,
         enter(sim) {
             this._noteTimerStarted = false;
+            this._notesEnabled = false;
             sim.setParam('limitAtCenter', false);
             sim.freezeParams({ windEnabled: false });
-            sim.setTraceText('HARMONY');
+            sim.loadStaticAvoidMap('circle.png');
             sim.startBackgroundMusic();
+            sim.startBlinkersLoop();
             sim.enableFullSynth();
-            log('PHASE 2 — nota. wind disabilitato. synth completo abilitato. musica di fondo avviata. audio3 parte tra 10s.');
+            log('PHASE 2 — nota. note disabilitate fino a fine audio3. audio3 parte tra 10s.');
             setTimeout(() => {
                 log('10s scaduti — audio3 in partenza.');
                 this._audio = sim.playNarratorAudio('audio3.mp3');
+                this._audio.addEventListener('ended', () => {
+                    log('audio3 terminato — note abilitate.');
+                    this._notesEnabled = true;
+                }, { once: true });
             }, 10_000);
         },
         onNote(sim, noteIndex) {
-            if (this._noteTimerStarted) return;
+            if (!this._notesEnabled || this._noteTimerStarted) return;
             this._noteTimerStarted = true;
             sim.setParam('windEnabled', true);
             log('prima nota ricevuta (index ' + noteIndex + '). wind abilitato. timer 20s avviato → PHASE 3.');
@@ -155,7 +162,7 @@ export const STORY = [
     },
 
     // ── PHASE 3 — IL ROSSO ────────────────────────────────────────────────────
-    // 10s di attesa → dotRespawnChance abilitato → audio4.
+    // NORMAL color → HARMONY text subito → timer 10s → immagini harmony → audio4.
     // Alla fine di audio4: 5s di silenzio → colori rosso → PHASE 4.
     // File: simAss/narrator/audio4.mp3
     {
@@ -163,11 +170,11 @@ export const STORY = [
         enter(sim) {
             sim.setColorMode('NORMAL');
             sim.setParam('champLinesAlpha', 0.02);
-            sim.enableHarmonyImages();
-            sim.startBlinkersLoop();
-            log('PHASE 3 — rosso. immagini harmony abilitate. blinkers loop avviato. attesa 10s → dotRespawnChance → audio4.');
+            sim.setTraceText('HARMONY');
+            log('PHASE 3 — rosso. testo HARMONY attivo. immagini e audio tra 10s.');
             this._respawnTimer = setTimeout(() => {
-                log('10s scaduti — dotRespawnChance abilitato (0.002). audio4 in partenza.');
+                log('10s scaduti — immagini harmony abilitate. dotRespawnChance abilitato (0.002). audio4 in partenza.');
+                sim.enableHarmonyImages();
                 sim.setParam('dotRespawnChance', 0.002);
                 this._audio = sim.playNarratorAudio('audio4.mp3');
                 this._audio.addEventListener('ended', () => {
