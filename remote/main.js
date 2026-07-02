@@ -427,10 +427,17 @@ function _initNoteCanvas() {
         _lastChaosT = ts;
 
         ctx2d.clearRect(0, 0, noteCanvasEl.width, noteCanvasEl.height);
+
+        if (_touching && ts - _lastSpawn > 25) {
+            _spawnSmoke(_touchX, _touchY, _cf(_touchX, _touchY));
+            _lastSpawn = ts;
+        }
+        _tickSmoke(ctx2d, noteCanvasEl.width, noteCanvasEl.height);
     })(0);
 }
 
 // ── Story step socket handler ─────────────────────────────────────────────────
+// _stepDebug is intentional — keep it. Small phase number at top for director use.
 const _stepDebug = document.querySelector('#step-debug');
 socket.on('story-step', ({ step } = {}) => {
     _currentStep = typeof step === 'number' ? step : -1;
