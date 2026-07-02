@@ -42,7 +42,7 @@ if (!ADMIN_PASS)  console.warn('[server] ADMIN_PASSWORD not set — /admin will 
 if (!N8N_SECRET)  console.warn('[server] N8N_SECRET not set — /spectator-push is unauthenticated');
 
 const ORIGINS = [
-    'https://stubfx.io',
+    'https://thesis.lucamolluso.com',
     'https://localhost',
     'https://192.168.1.12',
     ...(process.env.EXTRA_ORIGINS ?? '').split(',').filter(Boolean),
