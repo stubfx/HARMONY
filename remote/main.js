@@ -302,14 +302,16 @@ function _initNoteCanvas() {
     // _sinePulse is module-level (set by _setContNote on note change)
 
     function _drawSine(w, h, dt) {
-        if (_currentStep < 1) return;
-        _sineAmp = _touching
+        const _idleFire = (_currentStep === 0 && !_touching);
+        if (_currentStep < 1 && !_idleFire) return;
+        _sineAmp = (_touching || _idleFire)
             ? Math.min(1, _sineAmp + 6 * dt)
             : Math.max(0, _sineAmp - 2 * dt);
         _sinePulse = Math.max(0, _sinePulse - dt * 5); // decade in ~0.2s
         if (_sineAmp <= 0.01) return;
 
-        const idx    = Math.max(0, _activeNoteIdx);
+        const _idleFire = (_currentStep === 0 && !_touching);
+        const idx    = _idleFire ? 4 : Math.max(0, _activeNoteIdx);
         const cycles = 1 + (idx / (KEYS.length - 1)) * 5; // 1–6 cicli visivi
         const freq   = KEYS[idx]?.freq ?? KEYS[4].freq;
         _sinePhase  += (freq / 220) * dt * 3;
@@ -342,8 +344,11 @@ function _initNoteCanvas() {
         ctx2d.clearRect(0, 0, noteCanvasEl.width, noteCanvasEl.height);
         _drawSine(noteCanvasEl.width, noteCanvasEl.height, dt);
 
-        if (_touching && ts - _lastSpawn > 25) {
-            _spawnSmoke(_touchX, _touchY, _cf(_touchX, _touchY));
+        const _idleFire = (_currentStep === 0 && !_touching);
+        const _fireX = _touching ? _touchX : noteCanvasEl.width  / 2;
+        const _fireY = _touching ? _touchY : noteCanvasEl.height / 2;
+        if ((_touching || _idleFire) && ts - _lastSpawn > 25) {
+            _spawnSmoke(_fireX, _fireY, _cf(_fireX, _fireY));
             _lastSpawn = ts;
         }
         _tickSmoke(ctx2d, noteCanvasEl.width, noteCanvasEl.height);
