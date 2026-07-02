@@ -158,6 +158,7 @@ function _startContOsc() {
 let _noteDebounceMs    = 0;
 let _noteDebounceTimer = null;
 let _sinePulse         = 0;
+let _poolShake         = 0; // set to 1 on each note change, decays in _tickPool
 
 function _setContNote(noteIdx) {
     if (_currentStep <= 0 || !_contOscReady) return;
@@ -167,6 +168,7 @@ function _setContNote(noteIdx) {
         _activeNoteIdx = noteIdx;
         _motionChaos = Math.min(1, _motionChaos + 0.05);
         _sinePulse = 1;
+        _poolShake = 1;
         clearTimeout(_noteDebounceTimer);
         _noteDebounceTimer = setTimeout(() => {
             sendEvent('note', { index: noteIdx, freq: KEYS[noteIdx].freq, color: KEYS[noteIdx].color });
@@ -333,33 +335,52 @@ function _initNoteCanvas() {
     }
 
     // ── Center pixel pool ─────────────────────────────────────────────────────
-    // Pixels rest in a disk at center. When the user touches, they are sucked
-    // toward the touch point and disappear, giving the sense of drawing energy.
+    // Pixels rest in a disk at center. On touch they drain toward the finger;
+    // on note change they burst outward then spring back. Adaptive count keeps
+    // fps above 30 while maximising density (floor: 30, no hard ceiling).
     const _pool    = [];
-    const POOL_MAX = 35;
     const POOL_R   = 22;
+    let   _poolMax = 105;
+    const _POOL_MIN      = 30;
+    const _POOL_HARD_MAX = 600;
+    const _fpsHistory    = [];
+
+    function _adaptPoolMax(dt) {
+        if (dt <= 0) return;
+        _fpsHistory.push(dt);
+        if (_fpsHistory.length > 20) _fpsHistory.shift();
+        if (_fpsHistory.length < 10) return;
+        const avg = _fpsHistory.reduce((a, b) => a + b, 0) / _fpsHistory.length;
+        const fps = 1 / avg;
+        if      (fps > 40) _poolMax = Math.min(_POOL_HARD_MAX, _poolMax + 5);
+        else if (fps < 28) _poolMax = Math.max(_POOL_MIN,      _poolMax - 10);
+    }
 
     function _refillPool(cx, cy) {
-        while (_pool.length < POOL_MAX) {
+        while (_pool.length < _poolMax) {
             const angle = Math.random() * Math.PI * 2;
             const r     = Math.sqrt(Math.random()) * POOL_R;
             _pool.push({
-                x:    cx + Math.cos(angle) * r,
-                y:    cy + Math.sin(angle) * r,
-                vx:   (Math.random() - 0.5) * 0.2,
-                vy:   (Math.random() - 0.5) * 0.2,
-                life: Math.random() * 0.4, // stagger fade-in
+                x:     cx + Math.cos(angle) * r,
+                y:     cy + Math.sin(angle) * r,
+                vx:    (Math.random() - 0.5) * 0.2,
+                vy:    (Math.random() - 0.5) * 0.2,
+                phase: Math.random() * Math.PI * 2, // idle float phase offset
+                life:  Math.random() * 0.4,         // stagger fade-in
             });
         }
     }
 
-    function _tickPool(ctx2d, w, h, dt) {
+    function _tickPool(ctx2d, w, h, dt, ts) {
         if (_currentStep !== 0) { _pool.length = 0; return; }
         const cx = w / 2, cy = h / 2;
         if (!_touching) _refillPool(cx, cy);
 
+        _poolShake = Math.max(0, _poolShake - dt * 4);
+
         for (let i = _pool.length - 1; i >= 0; i--) {
             const p = _pool[i];
+
             if (_touching) {
                 const dx   = _touchX - p.x;
                 const dy   = _touchY - p.y;
@@ -371,16 +392,25 @@ function _initNoteCanvas() {
                 p.life = Math.max(0, p.life - dt * 3);
                 if (p.life <= 0) { _pool.splice(i, 1); continue; }
             } else {
+                // Note shake: burst outward from center
+                if (_poolShake > 0) {
+                    const ox   = p.x - cx, oy = p.y - cy;
+                    const od   = Math.sqrt(ox * ox + oy * oy) + 0.001;
+                    p.vx += (ox / od) * _poolShake * 90 * dt + (Math.random() - 0.5) * _poolShake * 50 * dt;
+                    p.vy += (oy / od) * _poolShake * 90 * dt + (Math.random() - 0.5) * _poolShake * 50 * dt;
+                }
+                // Idle float
+                p.vx += Math.sin(ts * 0.001  + p.phase) * 0.25 * dt;
+                p.vy += Math.cos(ts * 0.0007 + p.phase) * 0.18 * dt;
                 // Spring back toward pool disk
-                const dx   = cx - p.x;
-                const dy   = cy - p.y;
+                const dx   = cx - p.x, dy = cy - p.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
-                const pull = dist > POOL_R ? 0.12 : 0.02;
-                p.vx += dx * pull * dt;
-                p.vy += dy * pull * dt;
+                p.vx += dx * (dist > POOL_R ? 0.12 : 0.02) * dt;
+                p.vy += dy * (dist > POOL_R ? 0.12 : 0.02) * dt;
                 p.vx *= 0.88; p.vy *= 0.88;
                 p.life = Math.min(1, p.life + dt * 3);
             }
+
             p.x += p.vx; p.y += p.vy;
             ctx2d.globalAlpha = p.life * 0.9;
             ctx2d.fillStyle   = '#ffffff';
@@ -394,12 +424,13 @@ function _initNoteCanvas() {
         const dt = _lastChaosT > 0 ? (ts - _lastChaosT) / 1000 : 0;
         _motionChaos = Math.max(0, _motionChaos - MOTION_DECAY_RATE * dt);
         _applyChaosVisuals();
+        _adaptPoolMax(dt);
         _lastChaosT = ts;
 
         const w = noteCanvasEl.width, h = noteCanvasEl.height;
         ctx2d.clearRect(0, 0, w, h);
         _drawSine(w, h, dt);
-        _tickPool(ctx2d, w, h, dt);
+        _tickPool(ctx2d, w, h, dt, ts);
 
         if (_touching && ts - _lastSpawn > 25) {
             _spawnSmoke(_touchX, _touchY, _cf(_touchX, _touchY));
