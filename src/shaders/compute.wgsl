@@ -220,15 +220,15 @@ fn imgAlphaAt(canvasPx: vec2<f32>, texDims: vec2<u32>) -> f32 {
 }
 
 // Sample avoidance map strength at a canvas-pixel position.
-// Cover fit: texture scaled so it fills the entire canvas while preserving its
-// aspect ratio (like object-fit:cover) — the larger axis determines the scale,
-// the shorter axis overflows and is cropped. avoidMapScale zooms in/out on top.
+// Contain fit: texture scaled so it fits entirely within the canvas while
+// preserving aspect ratio (like object-fit:contain) — the smaller axis
+// determines the scale; the other axis has empty margins. avoidMapScale zooms in/out on top.
 // Returns red channel [0, 1]; 0 outside the visible texture area.
 fn avoidMapStrAt(canvasPx: vec2<f32>) -> f32 {
     let dims  = textureDimensions(avoidMapTex, 0u);
     let texSz = vec2<f32>(f32(dims.x), f32(dims.y));
 
-    let coverScale = max(params.canvasW / texSz.x, params.canvasH / texSz.y)
+    let coverScale = min(params.canvasW / texSz.x, params.canvasH / texSz.y)
                    * params.avoidMapScale;
 
     let center = vec2<f32>(params.canvasW, params.canvasH) * 0.5;

@@ -2510,7 +2510,7 @@ function _updateAvoidMapOverlay() {
     _avoidMapOverlayEl.height = H;
     const ctx2 = _avoidMapOverlayEl.getContext('2d');
     ctx2.clearRect(0, 0, W, H);
-    const coverScale = Math.max(W / _avoidMapBitmap.width, H / _avoidMapBitmap.height) * params.avoidMapScale;
+    const coverScale = Math.min(W / _avoidMapBitmap.width, H / _avoidMapBitmap.height) * params.avoidMapScale;
     const dw = _avoidMapBitmap.width  * coverScale;
     const dh = _avoidMapBitmap.height * coverScale;
     ctx2.globalAlpha = 0.5;
