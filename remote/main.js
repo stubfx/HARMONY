@@ -386,10 +386,14 @@ function _initNoteCanvas() {
                 const dy   = _touchY - p.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
                 if (dist < 8) { _pool.splice(i, 1); continue; }
-                const spd = (150 + (1 - dist / Math.sqrt(w * w + h * h)) * 200) * dt;
+                // Speed scales with distance so far dots move fast and close dots ease in.
+                const spd = Math.max(400, dist * 6) * dt;
                 p.vx = (dx / dist) * spd;
                 p.vy = (dy / dist) * spd;
-                p.life = Math.max(0, p.life - dt * 3);
+                // Only fade once close — dots stay bright across the whole journey.
+                p.life = dist < 40
+                    ? Math.max(0, p.life - dt * 4)
+                    : Math.min(1, p.life + dt * 4);
                 if (p.life <= 0) { _pool.splice(i, 1); continue; }
             } else {
                 // Note shake: burst outward from center
