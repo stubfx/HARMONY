@@ -35,6 +35,7 @@ const GOL_W = 192;
 const params = {
     // Agents
     agentCount:  2_000_000,
+    autoScale:   true,       // adaptive quality: reduce renderScale then agentCount to hold 60 fps
     // Motion
     stepLen:     2.0,
     turnRate:    0.04,
@@ -1737,6 +1738,8 @@ let gui, swarmDebug, dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence, dbgChao
 let applyGUIVisibility, toggleGUI, updateGizmo;
 let golEnabledCtrl  = null;
 let storyPhaseCtrl  = null;
+let agentCountCtrl  = null;
+let renderScaleCtrl = null;
 
 function updateStateDisplay() {
     modeCtrl?.updateDisplay();
@@ -2375,6 +2378,7 @@ function applySimParams(data) {
     dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence, dbgChaos,
     golEnabledCtrl,
     storyPhaseCtrl,
+    agentCountCtrl, renderScaleCtrl,
     applyGUIVisibility, toggleGUI, updateGizmo,
 } = initGUI({
     params, socket, simState, MAX_AGENTS,
@@ -3117,6 +3121,20 @@ async function finalizeCapture(buf, w, h, padded) {
     }
 }
 
+// ── Adaptive quality ──────────────────────────────────────────────────────────
+const AQ = {
+    smoothedFPS:    60,
+    cooldown:       0,
+    LOW_FPS:        56,    // start stepping down when smoothed FPS falls below this
+    ALPHA:          0.05,  // EMA coefficient (~20-frame time constant)
+    SCALE_STEP:     0.05,  // renderScale reduction per step
+    SCALE_MIN:      0.5,   // floor for render scale
+    SCALE_COOLDOWN: 60,    // frames between render-scale steps
+    AGENT_FACTOR:   0.90,  // agentCount multiplier per step (10% reduction)
+    AGENT_MIN:      10_000,
+    AGENT_COOLDOWN: 120,   // frames between agent-count steps
+};
+
 // ── Frame loop ────────────────────────────────────────────────────────────────
 const TIME_MULT = 0.001;
 let prevTime  = performance.now() * TIME_MULT;
@@ -3132,6 +3150,25 @@ function frame(ts) {
     const rawDt  = Math.min(Math.max(now - prevTime, TIME_MULT), 0.05);
     const dt     = params.useDeltaTime ? rawDt : (1 / 60);
     prevTime     = now;
+
+    // Adaptive quality — step down renderScale then agentCount to maintain 60 fps.
+    if (params.autoScale) {
+        AQ.smoothedFPS = AQ.ALPHA * (1 / rawDt) + (1 - AQ.ALPHA) * AQ.smoothedFPS;
+        if (--AQ.cooldown <= 0 && AQ.smoothedFPS < AQ.LOW_FPS) {
+            if (params.renderScale > AQ.SCALE_MIN + 0.001) {
+                params.renderScale = Math.max(AQ.SCALE_MIN,
+                    +(params.renderScale - AQ.SCALE_STEP).toFixed(2));
+                applyResize();
+                renderScaleCtrl?.updateDisplay();
+                AQ.cooldown = AQ.SCALE_COOLDOWN;
+            } else if (params.agentCount > AQ.AGENT_MIN) {
+                params.agentCount = Math.max(AQ.AGENT_MIN,
+                    Math.floor(params.agentCount * AQ.AGENT_FACTOR));
+                agentCountCtrl?.updateDisplay();
+                AQ.cooldown = AQ.AGENT_COOLDOWN;
+            }
+        }
+    }
 
     // Vote countdown — update display and fire result when timer expires.
     if (simState.stepStatus === 'VOTE' && simState.voteEndTime) {
