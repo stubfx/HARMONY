@@ -116,25 +116,11 @@ struct Agent {
     primed: f32,   // written by compute each frame: 1.0 = homing, 0.0 = free
 }
 
-struct SpectatorSlot {
-    colorR:     f32,
-    colorG:     f32,
-    colorB:     f32,
-    isActive:   u32,
-    touchX:     f32,
-    touchY:     f32,
-    isTouching: u32,
-    _p0:        u32,
-    _p1:        u32,
-    _p2:        u32,
-}
-
-@group(0) @binding(0) var<uniform>       params:         SoloRenderParams;
-@group(0) @binding(1) var<storage, read> agents:         array<Agent>;
-@group(0) @binding(2) var                imgSmp:         sampler;
-@group(0) @binding(3) var                imgTex:         texture_2d<f32>;
-@group(0) @binding(4) var<storage, read> spectatorSlots: array<SpectatorSlot, 16>;
-@group(0) @binding(5) var                avoidMapTex:    texture_2d<f32>;
+@group(0) @binding(0) var<uniform>       params:    SoloRenderParams;
+@group(0) @binding(1) var<storage, read> agents:    array<Agent>;
+@group(0) @binding(2) var                imgSmp:    sampler;
+@group(0) @binding(3) var                imgTex:    texture_2d<f32>;
+@group(0) @binding(4) var<storage, read> colorBuf:  array<u32>;
 
 struct VsOut {
     @builtin(position) pos:        vec4<f32>,
@@ -146,38 +132,6 @@ struct VsOut {
     @location(5)       proximityT: f32,  // 0 = far from home, 1 = at home
 }
 
-fn hash(n: u32) -> f32 {
-    var x = n;
-    x = x ^ (x >> 16u);
-    x = x * 0x45d9f3bu;
-    x = x ^ (x >> 16u);
-    return f32(x) * (1.0 / 4294967296.0);
-}
-
-// Sample RGB from the avoidance map at a canvas-pixel position, using the same
-// cover-fit + scale mapping as the compute shader's avoidMapStrAt so positions
-// stay aligned between the avoidance force and the color sample.
-// Returns vec4(rgb, validFlag); validFlag is 0 when the sample lands outside
-// the texture's visible area (caller falls back to the default base color).
-fn avoidMapColorAt(canvasPx: vec2<f32>) -> vec4<f32> {
-    let dims  = textureDimensions(avoidMapTex, 0u);
-    let texSz = vec2<f32>(f32(dims.x), f32(dims.y));
-    let coverScale = max(params.canvasW / texSz.x, params.canvasH / texSz.y)
-                   * params.avoidMapScale;
-    let center = vec2<f32>(params.canvasW, params.canvasH) * 0.5;
-    let uv     = (canvasPx - center) / (texSz * coverScale) + 0.5;
-    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { return vec4<f32>(0.0); }
-    let tx = u32(clamp(uv.x, 0.0, 1.0) * f32(dims.x - 1u));
-    let ty = u32(clamp(uv.y, 0.0, 1.0) * f32(dims.y - 1u));
-    let s   = textureLoad(avoidMapTex, vec2<u32>(tx, ty), 0u);
-    let rgb = select(s.rgb, vec3<f32>(1.0) - s.rgb, params.avoidMapInvert != 0u);
-    // Skip samples darker than the cutoff so near-black pixels don't paint
-    // particles invisible; caller falls back to the default base color. Rec. 601
-    // luma — same weighting the blit shader uses for grayscale.
-    let luma = dot(rgb, vec3<f32>(0.299, 0.587, 0.114));
-    let valid = select(0.0, 1.0, luma > params.avoidMapBlackCutoff);
-    return vec4<f32>(rgb, valid);
-}
 
 @vertex fn vs(@builtin(vertex_index) vi: u32) -> VsOut {
     let agentId = vi / 6u;
@@ -222,55 +176,10 @@ fn avoidMapColorAt(canvasPx: vec2<f32>) -> vec4<f32> {
     }
     let finalNdc = ndc + corners[corner] * half * 2.0;
 
-    // Two-colour palette assigned by agent index, no velocity interpolation.
-    // Conceptually colors[agentId % N]; currently two colours.
-    let color1 = vec3f(params.color1R, params.color1G, params.color1B);
-    let color2 = vec3f(params.color2R, params.color2G, params.color2B);
+    // Color was pre-computed once per agent by the colorPrepass compute shader.
+    let color = unpack4x8unorm(colorBuf[agentId]).rgb;
 
     let isHoming = params.hasImage != 0u && agent.primed > 0.5;
-    var defaultColor = select(color1, color2, (agentId % 2u) == 1u);
-    // Room audio leans the whole palette toward color2 (color1 agents shift; color2 agents stay).
-    defaultColor = mix(defaultColor, color2, clamp(params.color2Mix, 0.0, 1.0));
-
-    // Resolve spectator slot assignment first — spectator particles NEVER sample avoidmap color.
-    let inSpectatorRange = params.spectatorCount > 0u && agentId < u32(f32(params.agentCount) * params.spectatorAgentShare);
-    var slotIsActive = false;
-    var slotColor    = defaultColor;
-    if (inSpectatorRange) {
-        let slot = spectatorSlots[agentId % params.spectatorCount];
-        if (slot.isActive != 0u) {
-            slotIsActive = true;
-            let rnd = hash(agentId) * 0.6 + 0.7;
-            slotColor = clamp(vec3f(slot.colorR, slot.colorG, slot.colorB) * rnd, vec3f(0.0), vec3f(1.0));
-        }
-    }
-
-    // AvoidMap color sampling — free particles only (not in spectator range, not homing).
-    // Probability is chaos-driven: 30% at harmony (chaos=0), 100% at full chaos (chaos=1).
-    if (!inSpectatorRange && params.avoidMapSampleColor != 0u && params.hasAvoidMap != 0u && !isHoming) {
-        let sampleProb = 0.30 + params.avoidMapSampleChaos * 0.70;
-        if (hash(agentId ^ 0xdeadbeefu) < sampleProb) {
-            let s = avoidMapColorAt(agent.pos);
-            if (s.a > 0.5) {
-                defaultColor = s.rgb;
-            }
-        }
-    }
-
-    var color = select(defaultColor, slotColor, slotIsActive);
-
-    // Chaos override — a chaos-driven fraction of ALL agents (spectator or free) ignores
-    // everything above and takes the raw chaosColor. Probability = chaosColorFraction * chaos.
-    let chaosThreshold = params.chaosColorFraction * params.avoidMapSampleChaos;
-    if (hash(agentId ^ 0xbad1deau) < chaosThreshold) {
-        color = vec3f(params.chaosColorR, params.chaosColorG, params.chaosColorB);
-    }
-
-    // Idle override — runs last so it wins over chaos color when no spectators connected.
-    // JS sets idleColorFraction to 0 the moment any spectator connects.
-    if (hash(agentId ^ 0xd1e0c01au) < params.idleColorFraction) {
-        color = vec3f(params.idleColorR, params.idleColorG, params.idleColorB);
-    }
 
     let homeUV = vec2<f32>(
         (agent.home.x - params.imgX0) / (params.imgX1 - params.imgX0),
