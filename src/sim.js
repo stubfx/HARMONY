@@ -1025,13 +1025,14 @@ rebuildOffscreen();
 // subset (blit/grid/gol step) — simBG still references the recreated shadow-density
 // and GoL textures (bindings 5 and 7), so it must be rebuilt too or the next submit
 // uses a destroyed texture. Used on resize and on every renderScale change.
-function applyResize() {
+function applyResize({ skipSeed = false } = {}) {
     setSize();
     rebuildOffscreen();
     rebuildSimBG();
     renderTraceCanvas();
     rebuildAgentShadowBG();
     rebuildAgentShadowDensityBG();
+    if (skipSeed) return;
     if (_preshowActive) {
         const prevLit = _preshowLitCount;
         simFacade.dormantSeed();
@@ -3158,7 +3159,7 @@ function frame(ts) {
             if (params.renderScale > AQ.SCALE_MIN + 0.001) {
                 params.renderScale = Math.max(AQ.SCALE_MIN,
                     +(params.renderScale - AQ.SCALE_STEP).toFixed(2));
-                applyResize();
+                applyResize({ skipSeed: true });
                 renderScaleCtrl?.updateDisplay();
                 AQ.cooldown = AQ.SCALE_COOLDOWN;
             } else if (params.agentCount > AQ.AGENT_MIN) {
