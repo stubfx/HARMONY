@@ -1768,6 +1768,7 @@ let golEnabledCtrl  = null;
 let storyPhaseCtrl  = null;
 let agentCountCtrl  = null;
 let renderScaleCtrl = null;
+let brightnessCtrl  = null;
 
 function updateStateDisplay() {
     modeCtrl?.updateDisplay();
@@ -2406,7 +2407,7 @@ function applySimParams(data) {
     dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence, dbgChaos,
     golEnabledCtrl,
     storyPhaseCtrl,
-    agentCountCtrl, renderScaleCtrl,
+    agentCountCtrl, renderScaleCtrl, brightnessCtrl,
     applyGUIVisibility, toggleGUI, updateGizmo,
 } = initGUI({
     params, socket, simState, MAX_AGENTS,
@@ -3184,9 +3185,13 @@ function frame(ts) {
         AQ.smoothedFPS = AQ.ALPHA * (1 / rawDt) + (1 - AQ.ALPHA) * AQ.smoothedFPS;
         if (--AQ.cooldown <= 0 && AQ.smoothedFPS < AQ.LOW_FPS) {
             if (params.agentCount > AQ.AGENT_MIN) {
+                const prevCount   = params.agentCount;
                 params.agentCount = Math.max(AQ.AGENT_MIN,
                     Math.floor(params.agentCount * AQ.AGENT_FACTOR));
                 agentCountCtrl?.updateDisplay();
+                const cut = prevCount - params.agentCount;
+                params.brightness = Math.min(0.5, params.brightness + Math.floor(cut / 100_000) * 0.02);
+                brightnessCtrl?.updateDisplay();
                 AQ.cooldown = AQ.AGENT_COOLDOWN;
             } else if (params.renderScale > AQ.SCALE_MIN + 0.001) {
                 params.renderScale = Math.max(AQ.SCALE_MIN,

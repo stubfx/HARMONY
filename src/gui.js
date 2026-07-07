@@ -114,7 +114,7 @@ export function initGUI({
     fVis.add(params, 'chaosColorFraction', 0, 1, 0.01).name('chaos color %');
     fVis.addColor(params, 'idleColor').name('idle color');
     fVis.add(params, 'idleColorFraction', 0, 1, 0.01).name('idle color %');
-    fVis.add(params, 'brightness', 0.01, 0.5, 0.005).name('brightness');
+    const brightnessCtrl = fVis.add(params, 'brightness', 0.01, 0.5, 0.005).name('brightness');
     fVis.add(params, 'additiveBlend').name('additive blend');
     fVis.add(params, 'blendAmount', 0, 1, 0.01).name('blend amount');
     fVis.add(params, 'pixelGrid').name('pixel grid');
@@ -371,6 +371,7 @@ export function initGUI({
         golEnabledCtrl,
         agentCountCtrl,
         renderScaleCtrl,
+        brightnessCtrl,
         applyGUIVisibility,
         toggleGUI,
         storyPhaseCtrl,
