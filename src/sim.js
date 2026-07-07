@@ -70,7 +70,7 @@ const params = {
     shadowBoost: 0.0,         // inverse-brightness boost: peaks at ~12% luminance, negligible above 60%
     pixelGrid:      false,    // chunky low-res grid (downsample → nearest-sample blit) — final stage before canvas
     pixelGridCells: 700,      // cell count along the X axis; Y count is derived from canvas aspect ratio
-    glareEnabled:    true,    // additive bloom/glare pass over the final blit
+    glareEnabled:    false,   // additive bloom/glare pass over the final blit
     glareIntensity:  0.15,    // composite strength (0 = off, 1 = full)
     glareThreshold:  0.6,     // luminance threshold — only pixels above this feed into the bloom
     // Magnet
