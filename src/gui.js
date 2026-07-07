@@ -117,6 +117,9 @@ export function initGUI({
     const brightnessCtrl = fVis.add(params, 'brightness', 0.01, 0.5, 0.005).name('brightness');
     fVis.add(params, 'additiveBlend').name('additive blend');
     fVis.add(params, 'blendAmount', 0, 1, 0.01).name('blend amount');
+    fVis.add(params, 'glareEnabled').name('glare');
+    fVis.add(params, 'glareIntensity',  0, 1,   0.01).name('glare intensity');
+    fVis.add(params, 'glareThreshold',  0, 1,   0.01).name('glare threshold');
     fVis.add(params, 'pixelGrid').name('pixel grid');
     fVis.add(params, 'pixelGridCells', 20, 2000, 1).name('grid cells').onChange(() => rebuildGridTex());
 
