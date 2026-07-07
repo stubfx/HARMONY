@@ -49,10 +49,10 @@ const params = {
     autoWind:    true,   // cycle through WIND_FORMULAS every 10 s
     // Visual
     renderScale:    1.0,    // multiplied with DPR — reduce on high-res screens
-    trailDecay:     0.04,
+    trailDecay:     0.02,
     trailEnabled:   true,  // false = no trail; buffer cleared each frame
     bgBlackCutoff:  0.05, // luminance below which trail pixels are clamped to 0 at display time
-    pointSize:      3.0,
+    pointSize:      3.5,
     color1:      '#ffffff',   // first palette colour
     color2:      '#ffffff',   // second palette colour (assigned by agent index % 2)
     chaosColor:         '#ff2244',  // colour taken by chaosColorFraction of all agents at full chaos
