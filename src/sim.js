@@ -18,7 +18,6 @@ import downsampleWGSL   from './shaders/downsample.wgsl?raw';
 import windVisWGSL      from './shaders/wind-vis.wgsl?raw';
 import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
 import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
-import colorPrepassWGSL from './shaders/colorPrepass.wgsl?raw';
 import champLinesWGSL   from './shaders/champLines.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
 import { startSynth, setSynthState, setSynthDroneOnly, addArpInfluence, blinker, BLINKER_TYPES } from './synth.js';
@@ -398,11 +397,6 @@ ctx.configure({
 const agentBuf = device.createBuffer({
     size: MAX_AGENTS * 32,    // [pos.xy, vel.xy, home.xy, weight, primed] = 8 × f32 = 32 bytes
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-});
-// One packed rgba8unorm u32 per agent — written by colorPrepass, read by render vertex shader.
-const colorBuf = device.createBuffer({
-    size: MAX_AGENTS * 4,
-    usage: GPUBufferUsage.STORAGE,
 });
 const soloUB = device.createBuffer({
     size: 240, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -793,14 +787,6 @@ const renderPipeNormal = device.createRenderPipeline({
 let renderBG       = null;
 let renderBGNormal = null;
 
-// Color prepass — computes per-agent color once per frame; render vertex shader reads colorBuf.
-const colorPrepassMod  = device.createShaderModule({ code: colorPrepassWGSL });
-const colorPrepassPipe = device.createComputePipeline({
-    layout: 'auto',
-    compute: { module: colorPrepassMod, entryPoint: 'main' },
-});
-let colorPrepassBG = null;
-
 // Blit: copy offscreen → canvas swap-chain
 const blitMod = device.createShaderModule({ code: blitWGSL });
 const blitPipe = device.createRenderPipeline({
@@ -1086,31 +1072,18 @@ let avoidGifNextFrameAt = 0;
 // Rebuilds particle render bind group — called after pipeline creation, on image change,
 // and on avoid-map change (avoid map at binding 5 feeds the optional per-particle color sampling).
 function rebuildRenderBG() {
-    const texView = (hasImage && imageTexView) ? imageTexView : placeholderTexView;
+    const texView      = (hasImage && imageTexView) ? imageTexView : placeholderTexView;
+    const avoidView    = (hasAvoidMap && avoidMapTexView) ? avoidMapTexView : placeholderTexView;
     const entries = [
         { binding: 0, resource: { buffer: renderUB } },
         { binding: 1, resource: { buffer: agentBuf } },
         { binding: 2, resource: imageSampler },
         { binding: 3, resource: texView },
-        { binding: 4, resource: { buffer: colorBuf } },
+        { binding: 4, resource: { buffer: spectatorSlotsBuf } },
+        { binding: 5, resource: avoidView },
     ];
     renderBG       = device.createBindGroup({ layout: renderPipe.getBindGroupLayout(0),       entries });
     renderBGNormal = device.createBindGroup({ layout: renderPipeNormal.getBindGroupLayout(0), entries });
-    rebuildColorPrepassBG();
-}
-
-function rebuildColorPrepassBG() {
-    const avoidView = (hasAvoidMap && avoidMapTexView) ? avoidMapTexView : placeholderTexView;
-    colorPrepassBG = device.createBindGroup({
-        layout: colorPrepassPipe.getBindGroupLayout(0),
-        entries: [
-            { binding: 0, resource: { buffer: renderUB } },
-            { binding: 1, resource: { buffer: agentBuf } },
-            { binding: 2, resource: { buffer: spectatorSlotsBuf } },
-            { binding: 3, resource: avoidView },
-            { binding: 4, resource: { buffer: colorBuf } },
-        ],
-    });
 }
 rebuildRenderBG();
 rebuildAgentShadowBG();
@@ -3304,15 +3277,6 @@ function frame(ts) {
         cp.setBindGroup(0, simBG);
         cp.dispatchWorkgroups(Math.ceil(params.agentCount / 64));
         cp.end();
-    }
-
-    // Color prepass: compute per-agent color once; render vertex shader reads colorBuf.
-    if (colorPrepassBG) {
-        const cp2 = enc.beginComputePass();
-        cp2.setPipeline(colorPrepassPipe);
-        cp2.setBindGroup(0, colorPrepassBG);
-        cp2.dispatchWorkgroups(Math.ceil(params.agentCount / 64));
-        cp2.end();
     }
 
     // Shadow density pass: clear to black, render bright additive splats per homing agent.
