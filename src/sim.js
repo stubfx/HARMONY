@@ -3159,7 +3159,7 @@ const AQ = {
     SCALE_MIN:      0.5,   // floor for render scale
     SCALE_COOLDOWN: 60,    // frames between render-scale steps
     AGENT_FACTOR:   0.90,  // agentCount multiplier per step (10% reduction)
-    AGENT_MIN:      10_000,
+    AGENT_MIN:      100_000,
     AGENT_COOLDOWN: 120,   // frames between agent-count steps
 };
 
@@ -3179,21 +3179,21 @@ function frame(ts) {
     const dt     = params.useDeltaTime ? rawDt : (1 / 60);
     prevTime     = now;
 
-    // Adaptive quality — step down renderScale then agentCount to maintain 60 fps.
+    // Adaptive quality — step down agentCount first, renderScale as last resort.
     if (params.autoScale) {
         AQ.smoothedFPS = AQ.ALPHA * (1 / rawDt) + (1 - AQ.ALPHA) * AQ.smoothedFPS;
         if (--AQ.cooldown <= 0 && AQ.smoothedFPS < AQ.LOW_FPS) {
-            if (params.renderScale > AQ.SCALE_MIN + 0.001) {
+            if (params.agentCount > AQ.AGENT_MIN) {
+                params.agentCount = Math.max(AQ.AGENT_MIN,
+                    Math.floor(params.agentCount * AQ.AGENT_FACTOR));
+                agentCountCtrl?.updateDisplay();
+                AQ.cooldown = AQ.AGENT_COOLDOWN;
+            } else if (params.renderScale > AQ.SCALE_MIN + 0.001) {
                 params.renderScale = Math.max(AQ.SCALE_MIN,
                     +(params.renderScale - AQ.SCALE_STEP).toFixed(2));
                 applyResize({ skipSeed: true });
                 renderScaleCtrl?.updateDisplay();
                 AQ.cooldown = AQ.SCALE_COOLDOWN;
-            } else if (params.agentCount > AQ.AGENT_MIN) {
-                params.agentCount = Math.max(AQ.AGENT_MIN,
-                    Math.floor(params.agentCount * AQ.AGENT_FACTOR));
-                agentCountCtrl?.updateDisplay();
-                AQ.cooldown = AQ.AGENT_COOLDOWN;
             }
         }
     }
