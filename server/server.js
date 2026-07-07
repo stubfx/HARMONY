@@ -21,7 +21,6 @@ import path              from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID }    from 'node:crypto';
 import * as Utils        from './server-utils.js';
-import { narrate, generateIdleImage, generateIdleAudio } from './openai-api.js';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 
 dotenv.config();
@@ -42,7 +41,7 @@ if (!ADMIN_PASS)  console.warn('[server] ADMIN_PASSWORD not set — /admin will 
 if (!N8N_SECRET)  console.warn('[server] N8N_SECRET not set — /spectator-push is unauthenticated');
 
 const ORIGINS = [
-    'https://stubfx.io',
+    'https://thesis.lucamolluso.com',
     'https://localhost',
     'https://192.168.1.12',
     ...(process.env.EXTRA_ORIGINS ?? '').split(',').filter(Boolean),
@@ -278,32 +277,6 @@ io.on('connection', (socket) => {
         if (targetSocketId) io.to(targetSocketId).emit('device-message', data);
     });
 
-    // ── OpenAI narration (keypress 'f' on host) ───────────────────────────────
-    socket.on('openai-narrate', async ({ chaos, image } = {}) => {
-        if (!assignedRoom) return;
-        try {
-            const room  = rooms.get(assignedRoom);
-            let sp = 0, sr = 0, st = 0, sc = 0, n = 0;
-            for (const u of (room?.users?.values() ?? [])) {
-                sp += u.pitch ?? 0.5; sr += u.roll ?? 0.5;
-                st += u.temperature ?? 0.5; sc += u.coherence ?? 0.5;
-                n++;
-            }
-            const snapshot = {
-                chaos:       typeof chaos === 'number' ? chaos : 0.5,
-                users:       room?.connections.size ?? 0,
-                temperature: n > 0 ? st / n : 0.5,
-                coherence:   n > 0 ? sc / n : 0.5,
-                imageBase64: typeof image === 'string' && image.length > 0 ? image : null,
-            };
-            const { base64, text } = await narrate(assignedRoom, snapshot);
-            socket.emit('openai-audio', { base64, mimeType: 'audio/mpeg', text });
-            console.log('[openai] narrated — chaos:', snapshot.chaos.toFixed(3), '| users:', snapshot.users, '| chars:', text.length);
-        } catch (err) {
-            console.error('[openai] narrate error:', err.message);
-        }
-    });
-
     socket.on('disconnect', () => {
         if (!assignedRoom) return;
         console.log('[socket] disconnected      room:', assignedRoom);
@@ -399,41 +372,12 @@ app.post('/rndImage', async (_req, res) => {
 // ── simAss assets — ./simAss/{images,music}/, max 10, 1-day lifespan ─────────
 const _SIM_ASS_DIR   = path.join(__dirname, '..', 'simAss');
 const _IMAGE_MIME    = { '.webp': 'image/webp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml' };
-const SIM_ASS_MAX = 10;
-
-const _generating = { image: false, audio: false };
 
 async function _simAssFiles(dir) {
     const names = await readdir(dir).catch(() => []);
     return names.filter(n => !n.startsWith('.'));
 }
 
-async function _genAndSaveImage(dir) {
-    if (_generating.image) { console.log('[simAss-image] generation already in progress — skipping'); return; }
-    _generating.image = true;
-    console.log('[simAss-image] starting generation…');
-    try {
-        const base64   = await generateIdleImage();
-        const buf      = Buffer.from(base64, 'base64');
-        const filename = `simAss_${Date.now()}.webp`;
-        await writeFile(path.join(dir, filename), buf);
-        console.log(`[simAss-image] saved ${filename}  size=${buf.length}B`);
-        return { buf, mime: 'image/webp' };
-    } finally { _generating.image = false; }
-}
-
-async function _genAndSaveAudio(dir) {
-    if (_generating.audio) { console.log('[simAss-audio] generation already in progress — skipping'); return; }
-    _generating.audio = true;
-    console.log('[simAss-audio] starting generation…');
-    try {
-        const buf      = await generateIdleAudio();
-        const filename = `simAss_${Date.now()}.mp3`;
-        await writeFile(path.join(dir, filename), buf);
-        console.log(`[simAss-audio] saved ${filename}  size=${buf.length}B`);
-        return { buf, mime: 'audio/mpeg' };
-    } finally { _generating.audio = false; }
-}
 
 app.get('/simAss-image', async (_req, res) => {
     const dir   = path.join(_SIM_ASS_DIR, 'images');
@@ -485,23 +429,13 @@ app.get('/simAss-audio', async (_req, res) => {
     const files = await _simAssFiles(dir);
     console.log(`[simAss-audio] request — ${files.length} file(s) available: [${files.join(', ')}]`);
     if (files.length === 0) {
-        console.log('[simAss-audio] no files — generating synchronously…');
-        try {
-            const { buf, mime } = await _genAndSaveAudio(dir);
-            return res.type(mime).send(buf);
-        } catch (err) {
-            console.error('[simAss-audio] generation failed:', err.message);
-            return res.status(500).json({ error: err.message });
-        }
+        console.log('[simAss-audio] no files in simAss/music — nothing to serve');
+        return res.status(404).json({ error: 'no audio available' });
     }
     const chosen = files[Math.floor(Math.random() * files.length)];
     const file   = path.join(dir, chosen);
-    console.log(`[simAss-audio] serving ${chosen}  (${files.length}/${SIM_ASS_MAX})`);
+    console.log(`[simAss-audio] serving ${chosen}`);
     res.type('audio/mpeg').send(await readFile(file));
-    if (files.length < SIM_ASS_MAX) {
-        console.log(`[simAss-audio] below cap (${files.length}/${SIM_ASS_MAX}) — triggering background generation`);
-        _genAndSaveAudio(dir).catch(e => console.error('[simAss-audio] bg gen failed:', e.message));
-    }
 });
 
 // ── Static assets — serves a specific file by name from simAss/static/ ──────

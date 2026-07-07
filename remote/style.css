@@ -53,16 +53,14 @@ html, body {
 
 #step-debug {
     position: fixed;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: clamp(6rem, 40vw, 20rem);
-    font-weight: 700;
-    color: rgba(255, 255, 255, 0.08);
+    top: 0.6rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: rgba(255, 255, 255, 0.4);
     pointer-events: none;
-    z-index: 5;
-    letter-spacing: -0.05em;
+    z-index: 30;
 }
 
 #harmony-panel {

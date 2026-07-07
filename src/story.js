@@ -3,21 +3,20 @@ import { PHASE, RESEED } from './constants.js';
 // ─── Narrator Audio Map ──────────────────────────────────────────────────────
 // All files live in simAss/narrator/. Replace any file to swap the narration.
 //
-//   audio1.mp3    →  black             (PHASE 1 — parte subito; si ferma alla prima connessione)
-//   audio2.mp3    →  black             (PHASE 1 — parte alla prima connessione; 10s dopo → PHASE 2)
-//   audio3.mp3    →  nota              (PHASE 2 — parte subito all'entrata)
-//   audio4.mp3    →  rosso             (PHASE 3 — date un colore alla nota)
+//   audio1.mp3    →  black             (PHASE 1 — starts immediately; stops on first connection)
+//   audio2.mp3    →  black             (PHASE 1 — starts on first connection; 10s later → PHASE 2)
+//   audio3.mp3    →  nota              (PHASE 2 — starts immediately on enter)
+//   audio4.mp3    →  rosso             (PHASE 3 — give a color to the note)
 //   audio5.mp3    →  immagini-tempesta (PHASE 5 — "Il rombo prima del lampo...")
-//   audio6.mp3    →  testo             (PHASE 7 — una parola a testa)
-//   audio7.mp3    →  chiusura          (PHASE 8 — l'armonia non e' la stessa nota)
+//   audio6.mp3    →  testo             (PHASE 7 — one word each)
+//   audio7.mp3    →  chiusura          (PHASE 8 — harmony is not the same note)
 //
-// immagini-bigbang (PHASE 6) non ha audio (note di regia: "non si commenta").
+// immagini-bigbang (PHASE 6) has no audio (director's note: "no commentary needed").
 
-// ─── Nota sui parametri hardcodati ───────────────────────────────────────────
-// Tutti i timer, le soglie e i nomi dei file sono volutamente hardcodati in
-// questo file. E' intenzionale: ogni fase ha tempi precisi scelti in fase di
-// regia, e avere tutto qui rende facile modificare qualsiasi dettaglio senza
-// cercare tra i parametri del sim.
+// ─── Note on hardcoded parameters ────────────────────────────────────────────
+// All timers, thresholds and filenames are intentionally hardcoded in this file.
+// Each phase has precise timings chosen during direction, and keeping everything
+// here makes it easy to tweak any detail without hunting through sim params.
 
 // ─── Story Steps ────────────────────────────────────────────────────────────
 // Each object is one step. Order matters — the engine runs them in sequence.
@@ -47,20 +46,21 @@ const log = (msg) => console.log(`[story] ${msg}`);
 
 export const STORY = [
 
-    // ── PHASE 1 — CONNESSIONE ─────────────────────────────────────────────────
-    // audio1 parte subito all'entrata.
-    // Durante audio1 i join degli spettatori vengono ignorati graficamente (accodati).
-    // audio1 finisce → se ci sono utenti accodati, attiva i loro chunk e avvia audio2;
-    //                  altrimenti aspetta il primo utente normalmente.
-    // audio2 finisce → sim.next() immediato (testo HARMONY e 10s di attesa in PHASE 2).
-    // dotRespawnChance abilitato 10s dopo il primo join effettivo (al termine di audio1).
+    // ── PHASE 1 — CONNECTION ──────────────────────────────────────────────────
+    // audio1 starts immediately on enter.
+    // Spectator joins are ignored visually during audio1 (queued).
+    // audio1 ends → if queued users exist, activate their chunks and start audio2;
+    //               otherwise wait for the first user normally.
+    // audio2 ends → immediate sim.next() (HARMONY text + 10s wait in PHASE 2).
     {
         id: PHASE.BLACK,
         enter(sim) {
             this._audio2Started = false;
             this._audio1Playing = true;
-            this._pendingJoins = 0;
-            log('PHASE 1 — connessione. spirale verso l\'esterno. audio1 in partenza.');
+            this._pendingJoins  = 0;
+
+            log('PHASE 1 — fade out, tutto nero. audio1 in partenza.');
+            sim.clearAvoidMap();
             sim.setColorMode('GRAYSCALE');
             sim.freezeParams({ spectatorSpawnChance: 0, randomTeleportChance: 0, dotRespawnChance: 0, spawnFadeRate: 0 });
             sim.setParam('champLinesAlpha', 0);
@@ -115,11 +115,11 @@ export const STORY = [
         },
     },
 
-    // ── PHASE 2 — LA NOTA ─────────────────────────────────────────────────────
-    // Entra subito da PHASE 1. Aspetta 10s, poi audio3.
-    // Note ignorate finché audio3 non finisce (evita che note spedite durante
-    // audio2 o durante audio3 scattino il timer in anticipo).
-    // Prima nota dopo audio3 → wind on → timer 20s → sim.next().
+    // ── PHASE 2 — THE NOTE ────────────────────────────────────────────────────
+    // Enters immediately from PHASE 1. Waits 10s, then audio3.
+    // Notes are ignored until audio3 finishes (prevents notes sent during audio2
+    // or audio3 from triggering the timer early).
+    // First note after audio3 → wind on → 20s timer → sim.next().
     {
         id: PHASE.NOTA,
         _noteTimerStarted: false,
@@ -161,9 +161,9 @@ export const STORY = [
         },
     },
 
-    // ── PHASE 3 — IL ROSSO ────────────────────────────────────────────────────
-    // NORMAL color → HARMONY text subito → timer 10s → immagini harmony → audio4.
-    // Alla fine di audio4: 5s di silenzio → colori rosso → PHASE 4.
+    // ── PHASE 3 — RED ─────────────────────────────────────────────────────────
+    // NORMAL color → HARMONY text immediately → 10s timer → harmony images → audio4.
+    // After audio4 ends: 5s silence → red colors → PHASE 4.
     // File: simAss/narrator/audio4.mp3
     {
         id: PHASE.ROSSO,
@@ -198,7 +198,7 @@ export const STORY = [
         },
     },
 
-    // ── PHASE 4 — IMMAGINE: CUORE ─────────────────────────────────────────────
+    // ── PHASE 4 — IMAGE: HEART ────────────────────────────────────────────────
     // TODO: implement image appearance logic (how the image fades/arrives on screen).
     // Narrator speaks after silence; advances when audio ends.
     // File: simAss/narrator/audio4.mp3
@@ -206,7 +206,7 @@ export const STORY = [
         id: PHASE.IMMAGINI_CUORE,
         enter(sim) {
             log('PHASE 4 — cuore. audio4 in partenza.');
-            // TODO: load cuore image into avoidmap
+            // TODO: load heart image into avoidmap
             this._audio = sim.playNarratorAudio('audio4.mp3', { autoNext: true });
         },
         exit(sim) {
@@ -216,7 +216,7 @@ export const STORY = [
         },
     },
 
-    // ── PHASE 5 — IMMAGINE: TEMPESTA ──────────────────────────────────────────
+    // ── PHASE 5 — IMAGE: STORM ────────────────────────────────────────────────
     // TODO: implement image appearance logic.
     // Narrator speaks; advances when audio ends.
     // File: simAss/narrator/audio5.mp3
@@ -224,7 +224,7 @@ export const STORY = [
         id: PHASE.IMMAGINI_TEMPESTA,
         enter(sim) {
             log('PHASE 5 — tempesta. audio5 in partenza.');
-            // TODO: load tempesta image into avoidmap
+            // TODO: load storm image into avoidmap
             this._audio = sim.playNarratorAudio('audio5.mp3', { autoNext: true });
         },
         exit(sim) {
@@ -234,15 +234,15 @@ export const STORY = [
         },
     },
 
-    // ── PHASE 6 — IMMAGINE: BIG BANG ──────────────────────────────────────────
+    // ── PHASE 6 — IMAGE: BIG BANG ─────────────────────────────────────────────
     // TODO: implement image appearance logic.
-    // No narration (script note: "non si commenta").
+    // No narration (director's note: "no commentary needed").
     // Shown for 5 seconds, then cuts to black and auto-advances.
     {
         id: PHASE.IMMAGINI_BIGBANG,
         enter(sim) {
             log('PHASE 6 — bigbang. timer 5s avviato (no audio).');
-            // TODO: load bigbang image into avoidmap
+            // TODO: load big bang image into avoidmap
             this._timer = setTimeout(() => {
                 log('5s scaduti — avanzamento a PHASE 7.');
                 sim.next();
@@ -255,7 +255,7 @@ export const STORY = [
         },
     },
 
-    // ── PHASE 7 — IL TESTO ────────────────────────────────────────────────────
+    // ── PHASE 7 — TEXT ────────────────────────────────────────────────────────
     // Narrator speaks; advances automatically when audio ends.
     // File: simAss/narrator/audio6.mp3
     {
@@ -271,7 +271,7 @@ export const STORY = [
         },
     },
 
-    // ── PHASE 8 — CHIUSURA ────────────────────────────────────────────────────
+    // ── PHASE 8 — CLOSING ─────────────────────────────────────────────────────
     // Narrator speaks. Last step — no next().
     // File: simAss/narrator/audio7.mp3
     {

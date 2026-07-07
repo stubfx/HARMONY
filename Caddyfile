@@ -4,16 +4,16 @@
 }
 
 # ── Production ─────────────────────────────────────────────────────────────────
-# Two domains, two responsibilities:
+# Three domains, two responsibilities:
 #
-#   stubfx.io        — serves the Vite production build (static files from dist/)
-#   api.stubfx.io    — reverse-proxies to Express (Socket.IO + API endpoints)
+#   thesis.lucamolluso.com   — serves the Vite production build (static files from dist/)
+#   api.lucamolluso.com      — reverse-proxies to Express (API endpoints, VITE_API_URL)
+#   socket.lucamolluso.com   — reverse-proxies to Express (Socket.IO, VITE_SOCKET_URL)
 #
-# The browser clients connect Socket.IO to api.stubfx.io (VITE_SOCKET_URL in .env).
-# CORS on Express must list stubfx.io as an allowed origin (already the default).
+# CORS on Express must list thesis.lucamolluso.com as an allowed origin.
 # Caddy handles TLS automatically via Let's Encrypt — no extra config needed.
 
-stubfx.io {
+thesis.lucamolluso.com {
     root * /var/www/thesis-sim/dist
 
     encode gzip
@@ -30,9 +30,14 @@ stubfx.io {
     file_server
 }
 
-api.stubfx.io {
-    # All Express API endpoints, including Socket.IO long-polling and WebSocket.
+api.lucamolluso.com {
+    # Express API endpoints (static assets, images, narration).
     # Caddy proxies WebSocket upgrade handshakes automatically.
+    reverse_proxy localhost:3000
+}
+
+socket.lucamolluso.com {
+    # Socket.IO long-polling and WebSocket upgrade.
     reverse_proxy localhost:3000
 }
 

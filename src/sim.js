@@ -18,6 +18,7 @@ import downsampleWGSL   from './shaders/downsample.wgsl?raw';
 import windVisWGSL      from './shaders/wind-vis.wgsl?raw';
 import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
 import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
+import colorPrepassWGSL from './shaders/colorPrepass.wgsl?raw';
 import champLinesWGSL   from './shaders/champLines.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
 import { startSynth, setSynthState, setSynthDroneOnly, addArpInfluence, blinker, BLINKER_TYPES } from './synth.js';
@@ -35,6 +36,7 @@ const GOL_W = 192;
 const params = {
     // Agents
     agentCount:  2_000_000,
+    autoScale:   true,       // adaptive quality: reduce renderScale then agentCount to hold 60 fps
     // Motion
     stepLen:     2.0,
     turnRate:    0.04,
@@ -397,6 +399,11 @@ const agentBuf = device.createBuffer({
     size: MAX_AGENTS * 32,    // [pos.xy, vel.xy, home.xy, weight, primed] = 8 × f32 = 32 bytes
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
+// One packed rgba8unorm u32 per agent — written by colorPrepass, read by render vertex shader.
+const colorBuf = device.createBuffer({
+    size: MAX_AGENTS * 4,
+    usage: GPUBufferUsage.STORAGE,
+});
 const soloUB = device.createBuffer({
     size: 240, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
@@ -480,7 +487,7 @@ function seedAgents({ mode = RESEED.NORMAL } = {}) {
     }
     device.queue.writeBuffer(agentBuf, 0, data);
 }
-seedAgents();
+seedAgents({ mode: RESEED.FADE_FROM_EDGES });
 
 // Raw teleport: move `fraction` of agents to (x, y) with random velocities.
 // No fade — agents keep full weight and appear instantly at the target.
@@ -618,6 +625,7 @@ const simFacade = {
     },
 
     loadStaticAvoidMap(filename) { loadAvoidMap(`${_apiBase}/simAss-static/${filename}`); },
+    clearAvoidMap() { clearAvoidMap(); },
 
     // Set direction and wind formulas (WGSL expressions). Fire-and-forget async.
     setFormulas(dir, wind) { applyFormulas(dir, wind); },
@@ -784,6 +792,14 @@ const renderPipeNormal = device.createRenderPipeline({
 // renderBG / renderBGNormal are rebuilt whenever the image changes (see rebuildRenderBG)
 let renderBG       = null;
 let renderBGNormal = null;
+
+// Color prepass — computes per-agent color once per frame; render vertex shader reads colorBuf.
+const colorPrepassMod  = device.createShaderModule({ code: colorPrepassWGSL });
+const colorPrepassPipe = device.createComputePipeline({
+    layout: 'auto',
+    compute: { module: colorPrepassMod, entryPoint: 'main' },
+});
+let colorPrepassBG = null;
 
 // Blit: copy offscreen → canvas swap-chain
 const blitMod = device.createShaderModule({ code: blitWGSL });
@@ -1023,13 +1039,14 @@ rebuildOffscreen();
 // subset (blit/grid/gol step) — simBG still references the recreated shadow-density
 // and GoL textures (bindings 5 and 7), so it must be rebuilt too or the next submit
 // uses a destroyed texture. Used on resize and on every renderScale change.
-function applyResize() {
+function applyResize({ skipSeed = false } = {}) {
     setSize();
     rebuildOffscreen();
     rebuildSimBG();
     renderTraceCanvas();
     rebuildAgentShadowBG();
     rebuildAgentShadowDensityBG();
+    if (skipSeed) return;
     if (_preshowActive) {
         const prevLit = _preshowLitCount;
         simFacade.dormantSeed();
@@ -1069,18 +1086,31 @@ let avoidGifNextFrameAt = 0;
 // Rebuilds particle render bind group — called after pipeline creation, on image change,
 // and on avoid-map change (avoid map at binding 5 feeds the optional per-particle color sampling).
 function rebuildRenderBG() {
-    const texView      = (hasImage && imageTexView) ? imageTexView : placeholderTexView;
-    const avoidView    = (hasAvoidMap && avoidMapTexView) ? avoidMapTexView : placeholderTexView;
+    const texView = (hasImage && imageTexView) ? imageTexView : placeholderTexView;
     const entries = [
         { binding: 0, resource: { buffer: renderUB } },
         { binding: 1, resource: { buffer: agentBuf } },
         { binding: 2, resource: imageSampler },
         { binding: 3, resource: texView },
-        { binding: 4, resource: { buffer: spectatorSlotsBuf } },
-        { binding: 5, resource: avoidView },
+        { binding: 4, resource: { buffer: colorBuf } },
     ];
     renderBG       = device.createBindGroup({ layout: renderPipe.getBindGroupLayout(0),       entries });
     renderBGNormal = device.createBindGroup({ layout: renderPipeNormal.getBindGroupLayout(0), entries });
+    rebuildColorPrepassBG();
+}
+
+function rebuildColorPrepassBG() {
+    const avoidView = (hasAvoidMap && avoidMapTexView) ? avoidMapTexView : placeholderTexView;
+    colorPrepassBG = device.createBindGroup({
+        layout: colorPrepassPipe.getBindGroupLayout(0),
+        entries: [
+            { binding: 0, resource: { buffer: renderUB } },
+            { binding: 1, resource: { buffer: agentBuf } },
+            { binding: 2, resource: { buffer: spectatorSlotsBuf } },
+            { binding: 3, resource: avoidView },
+            { binding: 4, resource: { buffer: colorBuf } },
+        ],
+    });
 }
 rebuildRenderBG();
 rebuildAgentShadowBG();
@@ -1705,7 +1735,7 @@ const rndPick   = arr => arr[Math.floor(Math.random() * arr.length)];
 //           'DOT'    — fixed inward-spiral formulas; wind + formula forced on regardless of params
 const simState = {
     mode:              'STORY',
-    colorMode:         'NORMAL',
+    colorMode:         'GRAYSCALE',
     qrStatus:          'HIDE',
     status:            'NORMAL',
     storyStep:         null,
@@ -1736,6 +1766,8 @@ let gui, swarmDebug, dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence, dbgChao
 let applyGUIVisibility, toggleGUI, updateGizmo;
 let golEnabledCtrl  = null;
 let storyPhaseCtrl  = null;
+let agentCountCtrl  = null;
+let renderScaleCtrl = null;
 
 function updateStateDisplay() {
     modeCtrl?.updateDisplay();
@@ -2039,6 +2071,7 @@ let socket;
 const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
 ambience.init(_apiBase);
 _clearHarmonyImageCache();
+loadAvoidMap(`${_apiBase}/simAss-static/full_square.png`);
 {
     // In dev, Vite runs on a different port from Express, so connect directly to Express.
     // In production, use VITE_SOCKET_URL (the Caddy-fronted public origin) so Socket.IO
@@ -2233,10 +2266,6 @@ _clearHarmonyImageCache();
 
     socket.on('connect_error', () => console.warn('[socket] connection failed, will retry…'));
 
-    socket.on('openai-audio', ({ base64, mimeType = 'audio/mpeg' } = {}) => {
-        if (!base64) return;
-        playAudio(base64, mimeType).catch(e => console.warn('[openai-audio]', e));
-    });
 }
 
 const voteCountdownEl = document.querySelector('#vote-countdown');
@@ -2377,6 +2406,7 @@ function applySimParams(data) {
     dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence, dbgChaos,
     golEnabledCtrl,
     storyPhaseCtrl,
+    agentCountCtrl, renderScaleCtrl,
     applyGUIVisibility, toggleGUI, updateGizmo,
 } = initGUI({
     params, socket, simState, MAX_AGENTS,
@@ -2402,12 +2432,6 @@ window.addEventListener('keydown', e => {
         const t = e.target;
         if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
         _captureRequested = true;
-    }
-    if (e.key === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        const t = e.target;
-        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-        _narrateChaosVal         = smoothChaos;
-        _narrateCaptureRequested = true;
     }
 });
 
@@ -2509,7 +2533,7 @@ function _updateAvoidMapOverlay() {
     _avoidMapOverlayEl.height = H;
     const ctx2 = _avoidMapOverlayEl.getContext('2d');
     ctx2.clearRect(0, 0, W, H);
-    const coverScale = Math.max(W / _avoidMapBitmap.width, H / _avoidMapBitmap.height) * params.avoidMapScale;
+    const coverScale = Math.min(W / _avoidMapBitmap.width, H / _avoidMapBitmap.height) * params.avoidMapScale;
     const dw = _avoidMapBitmap.width  * coverScale;
     const dh = _avoidMapBitmap.height * coverScale;
     ctx2.globalAlpha = 0.5;
@@ -2987,10 +3011,6 @@ const _windVisAB=new ArrayBuffer(32);  const _windVisF=new Float32Array(_windVis
 // as the frame, after the blit pass, so we always grab what was just on screen.
 let _captureRequested = false;
 
-// Press 'f' to narrate — captures frame first, then emits with base64 image.
-let _narrateCaptureRequested = false;
-let _narrateChaosVal         = 0;
-
 // Trigger a browser download of a Blob under the given filename.
 function downloadBlob(blob, filename) {
     const url = URL.createObjectURL(blob);
@@ -3129,40 +3149,19 @@ async function finalizeCapture(buf, w, h, padded) {
     }
 }
 
-async function finalizeNarrateCapture(buf, w, h, padded, chaosVal) {
-    try {
-        await buf.mapAsync(GPUMapMode.READ);
-        const src    = new Uint8Array(buf.getMappedRange());
-        const isBGRA = canvasFormat === 'bgra8unorm';
-        const out    = new Uint8ClampedArray(w * h * 4);
-        const stride = w * 4;
-        for (let y = 0; y < h; y++) {
-            const srcOff = y * padded;
-            const dstOff = y * stride;
-            for (let x = 0; x < stride; x += 4) {
-                out[dstOff + x]     = isBGRA ? src[srcOff + x + 2] : src[srcOff + x];
-                out[dstOff + x + 1] = src[srcOff + x + 1];
-                out[dstOff + x + 2] = isBGRA ? src[srcOff + x]     : src[srcOff + x + 2];
-                out[dstOff + x + 3] = 255;
-            }
-        }
-        buf.unmap();
-        buf.destroy();
-
-        const tmp = document.createElement('canvas');
-        tmp.width = w; tmp.height = h;
-        const c2d = tmp.getContext('2d');
-        c2d.putImageData(new ImageData(out, w, h), 0, 0);
-
-        const dataUrl = tmp.toDataURL('image/jpeg', 0.7);
-        const base64  = dataUrl.slice(dataUrl.indexOf(',') + 1);
-
-        socket.emit('openai-narrate', { chaos: chaosVal, image: base64 });
-    } catch (e) {
-        console.warn('[narrate-capture]', e);
-        socket.emit('openai-narrate', { chaos: chaosVal });
-    }
-}
+// ── Adaptive quality ──────────────────────────────────────────────────────────
+const AQ = {
+    smoothedFPS:    60,
+    cooldown:       0,
+    LOW_FPS:        56,    // start stepping down when smoothed FPS falls below this
+    ALPHA:          0.05,  // EMA coefficient (~20-frame time constant)
+    SCALE_STEP:     0.05,  // renderScale reduction per step
+    SCALE_MIN:      0.5,   // floor for render scale
+    SCALE_COOLDOWN: 60,    // frames between render-scale steps
+    AGENT_FACTOR:   0.90,  // agentCount multiplier per step (10% reduction)
+    AGENT_MIN:      100_000,
+    AGENT_COOLDOWN: 120,   // frames between agent-count steps
+};
 
 // ── Frame loop ────────────────────────────────────────────────────────────────
 const TIME_MULT = 0.001;
@@ -3179,6 +3178,25 @@ function frame(ts) {
     const rawDt  = Math.min(Math.max(now - prevTime, TIME_MULT), 0.05);
     const dt     = params.useDeltaTime ? rawDt : (1 / 60);
     prevTime     = now;
+
+    // Adaptive quality — step down agentCount first, renderScale as last resort.
+    if (params.autoScale) {
+        AQ.smoothedFPS = AQ.ALPHA * (1 / rawDt) + (1 - AQ.ALPHA) * AQ.smoothedFPS;
+        if (--AQ.cooldown <= 0 && AQ.smoothedFPS < AQ.LOW_FPS) {
+            if (params.agentCount > AQ.AGENT_MIN) {
+                params.agentCount = Math.max(AQ.AGENT_MIN,
+                    Math.floor(params.agentCount * AQ.AGENT_FACTOR));
+                agentCountCtrl?.updateDisplay();
+                AQ.cooldown = AQ.AGENT_COOLDOWN;
+            } else if (params.renderScale > AQ.SCALE_MIN + 0.001) {
+                params.renderScale = Math.max(AQ.SCALE_MIN,
+                    +(params.renderScale - AQ.SCALE_STEP).toFixed(2));
+                applyResize({ skipSeed: true });
+                renderScaleCtrl?.updateDisplay();
+                AQ.cooldown = AQ.SCALE_COOLDOWN;
+            }
+        }
+    }
 
     // Vote countdown — update display and fire result when timer expires.
     if (simState.stepStatus === 'VOTE' && simState.voteEndTime) {
@@ -3286,6 +3304,15 @@ function frame(ts) {
         cp.setBindGroup(0, simBG);
         cp.dispatchWorkgroups(Math.ceil(params.agentCount / 64));
         cp.end();
+    }
+
+    // Color prepass: compute per-agent color once; render vertex shader reads colorBuf.
+    if (colorPrepassBG) {
+        const cp2 = enc.beginComputePass();
+        cp2.setPipeline(colorPrepassPipe);
+        cp2.setBindGroup(0, colorPrepassBG);
+        cp2.dispatchWorkgroups(Math.ceil(params.agentCount / 64));
+        cp2.end();
     }
 
     // Shadow density pass: clear to black, render bright additive splats per homing agent.
@@ -3409,28 +3436,9 @@ function frame(ts) {
         );
     }
 
-    // Narrator capture: same GPU readback but returns base64 JPEG without download.
-    let narrateBuf = null, narrateW = 0, narrateH = 0, narratePadded = 0;
-    if (_narrateCaptureRequested) {
-        _narrateCaptureRequested = false;
-        narrateW      = curTex.width;
-        narrateH      = curTex.height;
-        narratePadded = Math.ceil(narrateW * 4 / 256) * 256;
-        narrateBuf    = device.createBuffer({
-            size:  narratePadded * narrateH,
-            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-        });
-        enc.copyTextureToBuffer(
-            { texture: curTex },
-            { buffer: narrateBuf, bytesPerRow: narratePadded, rowsPerImage: narrateH },
-            [narrateW, narrateH, 1],
-        );
-    }
-
     device.queue.submit([enc.finish()]);
 
     if (captureBuf) finalizeCapture(captureBuf, captureW, captureH, capturePadded);
-    if (narrateBuf) finalizeNarrateCapture(narrateBuf, narrateW, narrateH, narratePadded, _narrateChaosVal);
 
     // Fireworks burst is one-shot — this frame's compute consumed it, so clear the
     // flags now and re-upload, leaving the scattered agents to fly out on their own.

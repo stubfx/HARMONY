@@ -57,9 +57,10 @@ export function initGUI({
 
     // ── Motion ────────────────────────────────────────────────────────────────
     const fMotion = gui.addFolder('Motion');
-    fMotion.add(params, 'agentCount', 1_000, MAX_AGENTS, 1_000)
+    const agentCountCtrl = fMotion.add(params, 'agentCount', 1_000, MAX_AGENTS, 1_000)
         .name('agents')
         .onChange(() => seedAgents());
+    fMotion.add(params, 'autoScale').name('auto-scale quality');
     fMotion.add(params, 'stepLen',      0.1, 8,    0.1).name('base speed');
     fMotion.add(params, 'turnRate',     0.005, 0.3, 0.005).name('turn rate');
     fMotion.add(params, 'maxSpeed',     1,    15,   0.5).name('max speed');
@@ -97,7 +98,7 @@ export function initGUI({
 
     // ── Visual ────────────────────────────────────────────────────────────────
     const fVis = gui.addFolder('Visual');
-    fVis.add(params, 'renderScale', 0.1, 1.0, 0.05).name('render scale').onChange(applyResize);
+    const renderScaleCtrl = fVis.add(params, 'renderScale', 0.1, 1.0, 0.05).name('render scale').onChange(applyResize);
     fVis.add(params, 'traceScale', 0.1, 1.0, 0.05).name('trace res').onChange(renderTraceCanvas);
     fVis.add(params, 'trailEnabled').name('trail on');
     fVis.add(params, 'trailDecay',    0.005, 0.4,  0.005).name('trail decay');
@@ -368,6 +369,8 @@ export function initGUI({
         dbgCoherence,
         dbgChaos,
         golEnabledCtrl,
+        agentCountCtrl,
+        renderScaleCtrl,
         applyGUIVisibility,
         toggleGUI,
         storyPhaseCtrl,
