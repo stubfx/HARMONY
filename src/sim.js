@@ -52,7 +52,7 @@ const params = {
     trailDecay:     0.04,
     trailEnabled:   true,  // false = no trail; buffer cleared each frame
     bgBlackCutoff:  0.05, // luminance below which trail pixels are clamped to 0 at display time
-    pointSize:      1.3,
+    pointSize:      3.0,
     color1:      '#ffffff',   // first palette colour
     color2:      '#ffffff',   // second palette colour (assigned by agent index % 2)
     chaosColor:         '#ff2244',  // colour taken by chaosColorFraction of all agents at full chaos

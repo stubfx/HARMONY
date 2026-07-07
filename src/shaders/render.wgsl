@@ -129,7 +129,8 @@ struct VsOut {
     @location(2)       bright:     f32,
     @location(3)       homeUV:     vec2<f32>,
     @location(4)       primed:     f32,
-    @location(5)       proximityT: f32,  // 0 = far from home, 1 = at home
+    @location(5)       proximityT: f32,
+    @location(6)       quadUV:     vec2<f32>,  // local quad position (-0.5..0.5) for circle mask
 }
 
 
@@ -146,7 +147,7 @@ struct VsOut {
 
     // Dormant agents (preshow weight = 0) are clipped off-screen.
     if (agent.weight < 0.001) {
-        return VsOut(vec4<f32>(10.0, 10.0, 0.0, 1.0), vec3<f32>(0.0), vec2<f32>(0.0), 0.0, vec2<f32>(0.0), 0.0, 0.0);
+        return VsOut(vec4<f32>(10.0, 10.0, 0.0, 1.0), vec3<f32>(0.0), vec2<f32>(0.0), 0.0, vec2<f32>(0.0), 0.0, 0.0, vec2<f32>(0.0));
     }
 
     var ndc:  vec2<f32>;
@@ -192,13 +193,18 @@ struct VsOut {
     let rawT       = 1.0 - clamp(distToHome / max(params.homingProximityRange, 1.0), 0.0, 1.0);
     let proximityT = mix(params.homingMinAlpha, 1.0, rawT);
 
-    return VsOut(vec4<f32>(finalNdc, 0.0, 1.0), color, agent.pos, agent.weight, homeUV, agent.primed, proximityT);
+    return VsOut(vec4<f32>(finalNdc, 0.0, 1.0), color, agent.pos, agent.weight, homeUV, agent.primed, proximityT, corners[corner]);
 }
 
 @fragment fn fs(in: VsOut) -> @location(0) vec4<f32> {
+    // Soft circular mask: smoothstep from bright centre to transparent edge.
+    // quadUV is in [-0.5, 0.5]; length() ranges 0 (centre) to ~0.707 (corner).
+    // The circle is inscribed in the quad — anything beyond radius 0.5 is clipped.
+    let circleAlpha = 1.0 - smoothstep(0.2, 0.5, length(in.quadUV));
+
     // Debug mode: homing agents (primed=1) render bright white regardless of image/chaos state.
     if (params.debugHoming != 0u && in.primed > 0.5) {
-        let b = params.blendAmount;
+        let b = params.blendAmount * circleAlpha;
         return vec4<f32>(b, b, b, b);
     }
 
@@ -220,19 +226,13 @@ struct VsOut {
             imgSample = textureSampleLevel(imgTex, imgSmp, uv, 0.0);
         }
 
-        // Vignette for output alpha — purely visual, the primed gate already accounts for it.
-        // Proximity factor fades the agent in as it closes in on its home pixel.
         let distEdge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
         let vig      = select(smoothstep(0.0, max(params.vignetteEdge, 0.0001), distEdge), 1.0, params.qrMode != 0u);
-        let a        = imgSample.a * vig * in.proximityT;
-        // Max blend (operation:'max', factors:'one') ignores alpha — pre-multiply so the
-        // max comparison sees distance-scaled colours instead of raw image values.
-        // blendAmount scales the contribution in both modes: alpha for additive
-        // (less accumulation), rgb for max (dimmer source in the per-channel max).
+        let a        = imgSample.a * vig * in.proximityT * circleAlpha;
         let b = params.blendAmount * in.bright;
         if (params.additiveBlend == 0u) { return vec4<f32>(imgSample.rgb * a * b, a * b); }
         return vec4<f32>(imgSample.rgb * b, a * b);
     }
-    let b = params.blendAmount * in.bright;
+    let b = params.blendAmount * in.bright * circleAlpha;
     return vec4<f32>(in.color * b, params.brightness * b);
 }
