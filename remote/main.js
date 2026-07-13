@@ -101,17 +101,27 @@ let _contOsc      = null;
 let _contGainNode = null;
 let _contOscReady = false;
 let _activeNoteIdx = -1;
+let _emitSound     = false;   // whether the note pad produces sound; set externally (story step), audio stays step-agnostic
 
 function _ensureAudioCtx() {
-    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (_audioCtx.state === 'suspended') _audioCtx.resume();
+    if (!_audioCtx) {
+        _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        // iOS 16.4+: declare a playback session so Web Audio is routed through the
+        // media channel — it then ignores the hardware silent switch and follows the
+        // media volume instead of the (often muted) ringer volume.
+        if ('audioSession' in navigator) navigator.audioSession.type = 'playback';
+    }
+    // iOS may leave the context 'suspended' or in the non-standard 'interrupted'
+    // state (after a call, Siri, or focus loss). Resume on anything but 'running'.
+    if (_audioCtx.state !== 'running') _audioCtx.resume();
     return _audioCtx;
 }
 
-// Safari iOS sospende l'AudioContext quando la pagina va in background o arriva
-// un'interruzione (chiamata, Siri). Ripristiniamo al ritorno senza richiedere un gesto.
+// Safari iOS suspends/interrupts the AudioContext when the page goes to the
+// background or an interruption arrives (call, Siri). Restore it on return
+// without requiring a fresh user gesture.
 document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && _audioCtx?.state === 'suspended') {
+    if (document.visibilityState === 'visible' && _audioCtx && _audioCtx.state !== 'running') {
         _audioCtx.resume();
     }
 });
@@ -155,13 +165,34 @@ function _startContOsc() {
     _contOscReady = true;
 }
 
+// Older iOS (< 16.4) has no navigator.audioSession. Playing a silent looping
+// <audio> element on the unlock gesture flips the media session category so that
+// subsequent Web Audio output is routed through the media channel too, ignoring
+// the silent switch. No-op where navigator.audioSession is available.
+let _silentKickEl = null;
+function _silentAudioKick() {
+    if ('audioSession' in navigator || _silentKickEl) return;
+    const sr = 8000, n = Math.floor(sr * 0.05);
+    const buf = new ArrayBuffer(44 + n * 2);
+    const dv  = new DataView(buf);
+    const wr  = (o, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+    wr(0, 'RIFF'); dv.setUint32(4, 36 + n * 2, true); wr(8, 'WAVE');
+    wr(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true);
+    dv.setUint16(22, 1, true); dv.setUint32(24, sr, true);
+    dv.setUint32(28, sr * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+    wr(36, 'data'); dv.setUint32(40, n * 2, true);   // samples stay zero → silence
+    _silentKickEl = new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })));
+    _silentKickEl.loop = true;
+    _silentKickEl.play().catch(() => {});
+}
+
 let _noteDebounceMs    = 0;
 let _noteDebounceTimer = null;
 let _sinePulse         = 0;
 let _poolShake         = 0; // set to 1 on each note change, decays in _tickPool
 
 function _setContNote(noteIdx) {
-    if (_currentStep <= 0 || !_contOscReady) return;
+    if (!_emitSound || !_contOscReady) return;
     const t = _audioCtx.currentTime;
     if (noteIdx !== _activeNoteIdx) {
         _contOsc.frequency.setTargetAtTime(KEYS[noteIdx].freq, t, 0.04);
@@ -178,7 +209,7 @@ function _setContNote(noteIdx) {
 }
 
 function _silenceContNote() {
-    if (_currentStep <= 0 || !_contOscReady) return;
+    if (!_emitSound || !_contOscReady) return;
     clearTimeout(_noteDebounceTimer);
     _noteDebounceTimer = null;
     _contGainNode.gain.setTargetAtTime(0, _audioCtx.currentTime, 0.12);
@@ -278,9 +309,9 @@ function _initNoteCanvas() {
         noteCanvasEl.setPointerCapture(e.pointerId);
         _touching = true;
         _touchX = e.offsetX; _touchY = e.offsetY;
-        // Safari may re-suspend AudioContext after interruptions (calls, Siri).
-        // Resume here on user gesture without risking autoplay block.
-        if (_audioCtx?.state === 'suspended') _audioCtx.resume();
+        // Safari may re-suspend or interrupt the AudioContext after interruptions
+        // (calls, Siri). Resume here on user gesture without risking autoplay block.
+        if (_audioCtx && _audioCtx.state !== 'running') _audioCtx.resume();
         _setContNote(_noteIdx(_touchX));
         _applyColor(_touchY);
     });
@@ -441,6 +472,7 @@ function _initNoteCanvas() {
 const _stepDebug = document.querySelector('#step-debug');
 socket.on('story-step', ({ step } = {}) => {
     _currentStep = typeof step === 'number' ? step : -1;
+    _emitSound   = _currentStep > 0;   // note pad is audible from step 1 onward
     if (_stepDebug) _stepDebug.textContent = _currentStep >= 0 ? _currentStep : '';
     updateAura();
 });
@@ -451,6 +483,7 @@ socket.on('story-step', ({ step } = {}) => {
 const _tapHint = document.querySelector('#tap-hint');
 _initNoteCanvas();
 document.addEventListener('pointerdown', () => {
+    _silentAudioKick();
     _startContOsc();
     _tapHint?.classList.add('hidden');
 }, { once: true });
