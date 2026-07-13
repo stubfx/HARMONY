@@ -38,7 +38,7 @@ const GOL_W = 192;
 const params = {
     // Agents
     agentCount:  2_000_000,
-    autoScale:   true,       // adaptive quality: reduce renderScale then agentCount to hold 60 fps
+    autoScale:   false,      // adaptive quality: reduce renderScale then agentCount to hold 60 fps
     // Motion
     stepLen:     2.0,
     turnRate:    0.04,
@@ -185,9 +185,11 @@ const params = {
 };
 
 // ── URL param overrides ───────────────────────────────────────────────────────
-// ?s=<uuid>       — pin the sim to a specific session room (survives reloads via URL)
-// ?amount=<n>     — override the starting agent count (still adjustable in the GUI)
-// ?pixelGrid=true — start with the chunky low-res pixel-grid mode enabled
+// ?s=<uuid>        — pin the sim to a specific session room (survives reloads via URL)
+// ?n=<n>           — override the starting agent count (still adjustable in the GUI)
+// ?pixelGrid=true  — start with the chunky low-res pixel-grid mode enabled
+// ?r=<0-1>         — initial render scale (clamped to 0.1–1.0)
+// ?autoscale=true  — enable adaptive quality (reduces renderScale / agentCount to hold 60 fps)
 const _urlParams     = new URLSearchParams(location.search);
 const _forcedSession = _urlParams.get('s') || null;
 {
@@ -195,14 +197,18 @@ const _forcedSession = _urlParams.get('s') || null;
     if (v === 'true' || v === '1') params.pixelGrid = true;
 }
 {
-    const n = parseInt(_urlParams.get('amount') ?? '', 10);
+    const n = parseInt(_urlParams.get('n') ?? '', 10);
     if (Number.isFinite(n) && n > 0)
         params.agentCount = Math.max(1_000, Math.min(MAX_AGENTS, n));
 }
 {
     // resolution: initial render scale, 0–1 (clamped to the slider's 0.1–1.0 range).
-    const r = parseFloat(_urlParams.get('resolution') ?? '');
+    const r = parseFloat(_urlParams.get('r') ?? '');
     if (Number.isFinite(r)) params.renderScale = Math.max(0.1, Math.min(1.0, r));
+}
+{
+    const v = _urlParams.get('autoscale');
+    if (v === 'true' || v === '1') params.autoScale = true;
 }
 
 const DEFAULT_DIR  = 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI';
