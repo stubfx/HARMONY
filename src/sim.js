@@ -1858,6 +1858,7 @@ let applyGUIVisibility, toggleGUI, updateGizmo;
 let golEnabledCtrl  = null;
 let storyPhaseCtrl  = null;
 let agentCountCtrl  = null;
+let autoScaleCtrl   = null;
 let renderScaleCtrl = null;
 let brightnessCtrl  = null;
 
@@ -2498,7 +2499,7 @@ function applySimParams(data) {
     dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence, dbgChaos,
     golEnabledCtrl,
     storyPhaseCtrl,
-    agentCountCtrl, renderScaleCtrl, brightnessCtrl,
+    agentCountCtrl, autoScaleCtrl, renderScaleCtrl, brightnessCtrl,
     applyGUIVisibility, toggleGUI, updateGizmo,
 } = initGUI({
     params, socket, simState, MAX_AGENTS,
@@ -2509,6 +2510,9 @@ function applySimParams(data) {
     clearMagnetImage, clearTraceText, clearAvoidMap,
     updateAvoidMapOverlay: _updateAvoidMapOverlay,
 }));
+
+// Sync GUI with URL params that were applied before initGUI ran.
+autoScaleCtrl.updateDisplay();
 
 storyEngine.onGoto = (i) => {
     storyPhaseCtrl.updateDisplay();

@@ -60,7 +60,7 @@ export function initGUI({
     const agentCountCtrl = fMotion.add(params, 'agentCount', 1_000, MAX_AGENTS, 1_000)
         .name('agents')
         .onChange(() => seedAgents());
-    fMotion.add(params, 'autoScale').name('auto-scale quality');
+    const autoScaleCtrl = fMotion.add(params, 'autoScale').name('auto-scale quality');
     fMotion.add(params, 'stepLen',      0.1, 8,    0.1).name('base speed');
     fMotion.add(params, 'turnRate',     0.005, 0.3, 0.005).name('turn rate');
     fMotion.add(params, 'maxSpeed',     1,    15,   0.5).name('max speed');
@@ -373,6 +373,7 @@ export function initGUI({
         dbgChaos,
         golEnabledCtrl,
         agentCountCtrl,
+        autoScaleCtrl,
         renderScaleCtrl,
         brightnessCtrl,
         applyGUIVisibility,
