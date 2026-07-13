@@ -93,8 +93,8 @@ Display / projection
 Spectators  (/remote/?s=<uuid>)
     │  Socket.IO  'join-session'   →  server
     │  Socket.IO  'user-event'     →  server → 'remote-event' → simulation (tilt aggregated only)
-    │  Socket.IO  'peer-joined'   ←─  server  { userCount }  — aura pulse + QR threshold check
-    │  Socket.IO  'peer-left'     ←─  server  { userCount }  — QR reappears if count drops below max
+    │  Socket.IO  'peer-joined'   ←─  server  { userCount }  — brief aura dimming pulse
+    │  Socket.IO  'peer-left'     ←─  server  { userCount }  — emitted by server; ignored by the current note-pad remote
     ▼
 Node.js server  (:3000)
     │  always: io.to(room).emit('remote-event', ...)  — chaos aggregated, other events forwarded directly
@@ -111,7 +111,7 @@ Node.js server  (:3000)
    - **Large trace image** in the canvas centre — the particle field writes the QR pattern after the intro delay
 4. Spectators scan the QR, open `/remote/?s=<uuid>`, connect via Socket.IO
 5. Server emits `spectator-joined` to the host — a brief gust fires in the particle field
-6. Server emits `peer-joined` (with updated `userCount`) to all other spectators — aura pulse; remote QR hides if `userCount ≥ maxSpectators` (configured in Session GUI)
+6. Server emits `peer-joined` (with updated `userCount`) to all other spectators — each phone shows a brief aura dimming pulse
 7. Every 300 ms the server aggregates all spectators' state and emits `collective-state` to the host
 8. Spectator touch/text events are forwarded directly as `remote-event`; `lastRemoteActivity` timestamp is updated on every event
 9. When a spectator disconnects, server emits `spectator-left` (with `userCount`) to host and `peer-left` to remaining spectators
@@ -265,18 +265,7 @@ returns whenever the room is empty or goes quiet.
 The QR bitmap is kept permanently in memory (`qrBitmap`) and restored by `restoreQR()`
 without any network round-trip. The auto-clear timer never applies to the QR.
 
-### Remote page persistent QR
-
-The spectator page (`/remote/`) renders a small always-visible QR in its bottom-right
-corner. This encodes the full page URL (including `?s=` and `?max=`) so another person
-can scan from the phone of someone already connected — useful when the big screen is not
-visible.
-
-The remote QR **fades out automatically** when either condition is met:
-- The user interacts for the first time (touch, tilt, or text submit) — no need to share once you're in
-- `userCount` reported by the server reaches the `maxSpectators` threshold (Session GUI → QR hides at N users)
-
-It **reappears** if `userCount` drops back below the threshold (and the user has not yet interacted).
+> **Note:** the QR lives only on the simulation display. The current spectator page (`/remote/`) does **not** render its own QR — earlier builds showed a persistent share-QR in the corner, but the HARMONY note pad removed it.
 
 ### Content auto-clear
 
@@ -288,20 +277,40 @@ The timer restarts whenever content changes. The QR is immune to auto-clear.
 
 ## Remote Spectator Interactions
 
-Spectators open the `/remote/` page on their phones. The page has a virtual joystick centered on screen, a color picker and text input always visible at the top, and tilt support. The join button reads "swarm". A star field canvas (65 stars drifting counter to joystick direction, streaking on fast moves) is visible only in DRAW mode.
+Spectators open the `/remote/` page on their phones. The shipped remote is the **HARMONY note pad**: a full-screen touch canvas over a dark aura, with a centred "HARMONY / touch to begin" hint that fades on the first touch. There is no joystick, color picker, text field, or "swarm" button — a single finger on the canvas drives everything. Dragging maps the two screen axes to two channels:
 
-| Channel | Phone gesture | Aggregation | Simulation effect |
-|---------|--------------|-------------|-------------------|
-| **Joystick** | Use the virtual joystick | Forwarded directly as `remote-event` | Moves the spectator's spawner across the canvas; agents teleport to spawner at scaled spawn chance |
-| **Color** | Color picker at top of page | Forwarded directly to simulation | Assigned color for that spectator's agents |
-| **Shake** | Shake the phone | Forwarded as `color-pick` + `shake` | Bursts the spectator's agents outward AND picks a new random color from the local palette |
-| **Tilt / Motion** | Move phone in any direction | Server aggregates motion magnitude into `avgChaos` | Chaos level — device motion increases chaos; stillness decays it toward harmony |
-| **Note (HARMONY)** | Touch the HARMONY canvas on the remote page | `note` event debounced server-side before forwarding | Drives formula injection into the compute shader (note wind) and triggers harmony avoidMap on `sum % 4 === 0` |
-| **Text** | Type in the text input at top | Forwarded directly to simulation | Trace attractor — particle field writes the word |
+- **X → note.** The canvas is divided into 9 vertical bands playing an A-minor pentatonic run from D3 to A4 (`KEYS` in `remote/main.js:84-94`). Sliding across bands changes the active note; each change also emits a `note` event.
+- **Y → color hue.** Vertical position sets a hue from 0° (top) to 270° (bottom), quantised to 10° steps and converted with `hslToHex(hue, 80, 50)`. The result is pushed as a `color-pick` event and tints the phone's own aura.
+
+| Channel | Phone gesture | Routing | Simulation effect |
+|---------|--------------|---------|-------------------|
+| **Note (X)** | Slide horizontally across the note canvas | `note` event debounced per-device before send | Injects a note-wind formula into the compute shader; note indices summing to a multiple of 4 trigger the harmony avoidMap (`sum % 4 === 0`) |
+| **Color (Y)** | Slide vertically | `color-pick` forwarded directly | Assigned color for that spectator's agents; also tints the phone aura |
+| **Release** | Lift the finger | `note-off` forwarded directly | Silences the note and drops the spectator's note-wind contribution |
+
+The events the remote actually emits are `join-session` (on connect), `note { index, freq, color }`, `note-off`, and `color-pick { color }` (sent once on join with the default color, then on every hue change).
+
+**Visuals on the phone:** a digital pixel-pool rests at canvas centre — the dots drain toward and are repelled by the finger, and burst outward on each note change before springing back. Smoke puffs trail under the touch point, and a chaos vignette darkens the screen edges, its intensity following the decaying `_motionChaos` level.
+
+### Dormant backend
+
+The joystick spawner, tilt/shake chaos, text input (`story-text`), and vote mechanics described elsewhere in this document are **not exercised by the shipped remote UI** — the current `/remote/` page sends only `join-session`, `note`, `note-off`, and `color-pick`. The corresponding parameters and `remote-event` handlers still exist in `src/sim.js` and `server/server.js` and remain wired; they are simply dormant until a future remote build drives them again.
+
+### Sound on the phone
+
+Each phone runs its own small Web Audio note synth (`remote/main.js:96-166`) — the note you play is heard locally on your own device, independent of the simulation display's audio. A single continuous triangle oscillator feeds a lowpass filter (2200 Hz) → gain node → `destination`, with a parallel send into a convolver reverb (a 1.8 s procedurally generated impulse). Touching the pad opens the gain; lifting closes it. Pitch follows the same A-minor pentatonic table as the visuals and glides between notes with `setTargetAtTime` (~40 ms), so sliding across bands portamentos rather than steps.
+
+The synth is gated by `_emitSound`: it is audible only from **story step 1 onward** (`_emitSound = _currentStep > 0`, set in the `story-step` handler at `remote/main.js:473-478`). Before the story starts, touching the pad still moves the visuals and sends events, but stays silent.
+
+**iOS caveats.** Mobile Safari makes Web Audio playback awkward, so the remote takes three measures:
+
+- **Playback audio session (iOS 16.4+).** When the context is first created the remote sets `navigator.audioSession.type = 'playback'`, routing Web Audio through the media channel. The synth then ignores the hardware silent switch and follows the media volume rather than the (often muted) ringer volume.
+- **Resume on `interrupted`.** iOS can leave the `AudioContext` in the non-standard `'interrupted'` state after a call, Siri, or focus loss — not just `'suspended'`. The remote resumes the context on any state other than `'running'` (on the unlock gesture, on `visibilitychange`, and on each `pointerdown`).
+- **Silent `<audio>` kick (pre-16.4 fallback).** On devices without `navigator.audioSession`, a silent looping `<audio>` element is started on the first touch gesture. This flips the media session category so subsequent Web Audio output is routed through the media channel too, again bypassing the silent switch. It is a no-op where `audioSession` is available.
 
 ### Note send debounce
 
-To prevent server flooding when users slide across notes rapidly, the `note` socket event is debounced on each spectator's device. The oscillator and aura visuals update immediately on every note change; only the server send is delayed. The debounce duration is broadcast by the server as `note-debounce: { ms }` and equals `userCount × 10 ms` — so at 1 user the delay is 10 ms; at 10 users it is 100 ms. The server re-broadcasts this value to all spectators on join, on disconnect, and every 300 ms in the collective-state ticker.
+To prevent server flooding when users slide across notes rapidly, the `note` socket event is debounced on each spectator's device. The synth and aura visuals update immediately on every note change; only the server send is delayed. The debounce duration is broadcast by the server as `note-debounce: { ms }` and equals `userCount × 10 ms` — so at 1 user the delay is 10 ms; at 10 users it is 100 ms (`server/server.js:131,245`). The server re-broadcasts this value to all spectators on join, on disconnect, and every 300 ms in the collective-state ticker.
 
 ### Feedback loops
 
@@ -555,7 +564,6 @@ The map is refreshed every 30 seconds — if the hash changes, the old map is cl
 | spawner timeout (s) | Seconds of joystick silence before spawner deactivates |
 | release burst (fireworks) | Scatter speed for a spectator's agents the moment they stop controlling (joystick released or timed out); 0 = off |
 | idle restore QR (s) | Seconds of silence from all remotes before QR trace is restored; 0 = disabled |
-| QR hides at N users | Remote page QR fades when `userCount` reaches this threshold |
 
 ---
 
@@ -652,6 +660,8 @@ caddy run
 
 ## Audio System
 
+> **This section covers audio on the *simulation display* (the host / projection machine).** Each spectator's phone runs its own separate, independent note synth — see [Sound on the phone](#sound-on-the-phone) under Remote Spectator Interactions.
+
 Two independent channels mix into the Web Audio destination simultaneously.
 
 ### Channel 1 — Tone.js generative synth (`src/synth.js`)
@@ -715,7 +725,7 @@ The admin panel (and any other controller) drives the simulation by sending a `s
 | `wind` | `string` | New wind formula (WGSL expression returning radians) |
 | `step` | any | Story step ID — resets `storyStepComplete`, `storyVoteResult`, and `stepStatus` for a new step |
 | `stepDuration` | number | Seconds until the step auto-completes |
-| `stepStatus` | `"IDLE" \| "DRAW" \| "VOTE" \| "TEXT" \| "RAISE" \| "PULSE" \| "WAVE"` | Spectator interaction mode — relayed to all remote devices via Socket.IO |
+| `stepStatus` | `"HARMONY" \| "IDLE" \| "DRAW" \| "VOTE" \| "TEXT" \| "RAISE" \| "PULSE" \| "WAVE"` | Spectator interaction mode — relayed to all remote devices via Socket.IO. `HARMONY` is the current default (`src/sim.js:1836`) and drives the shipped note-pad remote |
 | `optionA` | string | First vote option label (required with `VOTE` steps) |
 | `optionB` | string | Second vote option label (required with `VOTE` steps) |
 | `caption` | `string \| null` | Subtitle text drawn at the bottom of the canvas as a particle attractor; `null` clears it |
@@ -777,14 +787,17 @@ Caddy handles TLS automatically via Let's Encrypt and proxies WebSocket upgrade 
 | Parameter | Effect |
 |-----------|--------|
 | `?gui=true` | Start with GUI, monitor, and formula panel visible |
-| `?resolution=<0-1>` | Initial render scale (clamped to 0.1–1.0). Sets the `render scale` GUI slider at boot; lower = fewer pixels, higher frame rate |
+| `?s=<uuid>` | Pin the sim to a specific session room (survives reloads via the URL) |
+| `?n=<n>` | Override the starting agent count (clamped to 1 000 – `MAX_AGENTS`); still adjustable in the GUI |
+| `?r=<0-1>` | Initial render scale (clamped to 0.1–1.0). Sets the `render scale` GUI slider at boot; lower = fewer pixels, higher frame rate |
+| `?autoscale=true` | Enable adaptive quality — the sim lowers `renderScale` then `agentCount` to hold 60 fps (off by default) |
+| `?pixelGrid=true` | Start with the chunky low-res pixel-grid mode enabled |
 
 **Remote page (`/remote/`)**
 
 | Parameter | Effect |
 |-----------|--------|
-| `?s=<uuid>` | Session room UUID — required to join a simulation session |
-| `?max=<n>` | Spectator threshold above which the persistent QR on the remote page hides (default 10 if absent; controlled via Session → QR hides at N users in the sim GUI — not included in the scanned QR) |
+| `?s=<uuid>` | Session room UUID — required to join a simulation session (the only param the remote reads) |
 
 ---
 
@@ -820,17 +833,14 @@ thesis-sim/
 │       └── image-debug.wgsl Grayscale image region debug overlay
 │
 ├── remote/
-│   ├── index.html           Spectator page (served at /remote/?s=<uuid>);
-│   │                        includes persistent #session-qr canvas (bottom-right corner)
-│   ├── main.js              Socket.IO client — joystick (spawner direction + velocity),
-│   │                        tilt (personal wind), color picker, text events; star field
-│   │                        canvas drifts counter to joystick; aura reflects tilt and
-│   │                        selected color; peer-joined/peer-left for QR visibility;
-│   │                        QR auto-hides on first interaction or full room
-│   ├── style.css            Dark atmospheric design, ripple animation, tilt indicator,
-│   │                        session-qr fade transition
-│   ├── gyro.js              Device orientation helpers (pitch, roll, motion magnitude)
-│   └── motion.js            Motion smoothing
+│   ├── index.html           Spectator page (served at /remote/?s=<uuid>): HARMONY note pad —
+│   │                        aura, "touch to begin" tap-hint, note-canvas, chaos-vignette
+│   ├── main.js              Socket.IO client — HARMONY note pad: X→note / Y→color-hue on a
+│   │                        full-screen canvas; per-device Web Audio note synth (triangle →
+│   │                        lowpass → gain + reverb) with iOS audioSession handling; pixel-pool
+│   │                        + smoke + chaos-vignette visuals; emits join-session, note,
+│   │                        note-off, color-pick; peer-joined aura pulse
+│   └── style.css            Dark atmospheric design — aura gradient, tap-hint, chaos vignette
 │
 ├── admin/
 │   ├── index.html           Admin controller panel (password-protected; URL: /admin/?s=<uuid>)
@@ -871,3 +881,5 @@ WebGPU is required. No WebGL fallback.
 | Firefox | Nightly | `dom.webgpu.enabled` in `about:config` |
 
 HTTPS is required on iOS (handled by Caddy).
+
+On iOS, Web Audio is silenced by the hardware ringer/silent switch and follows the ringer volume unless the page declares a *playback* audio session. The remote page now declares one (see [Sound on the phone](#sound-on-the-phone)), so per-phone notes play through the media channel regardless of the silent switch.
