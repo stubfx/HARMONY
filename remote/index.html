@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="it">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
@@ -9,16 +9,24 @@
     </head>
     <body>
         <script type="module" src="./main.js"></script>
-        <div id="aura"></div>
-        <div id="tap-hint">
-            <span id="tap-title">HARMONY</span>
-            <span id="tap-sub">touch to begin</span>
-        </div>
+
+        <!-- The screen the color fills when a color is confirmed -->
+        <div id="full-color"></div>
+
+        <!-- The single white point -->
+        <div id="dot"></div>
+
+        <!-- Note picker (cells injected by main.js) -->
+        <div id="note-picker"></div>
+        <button id="note-confirm" type="button">questa</button>
+
+        <!-- Color palette (swatches injected by main.js) -->
+        <div id="palette"></div>
+
+        <!-- One instruction at a time -->
+        <div id="instruction"></div>
+
         <!-- step-debug: intentional debug element — shows current story phase number. keep it. -->
-    <div id="step-debug"></div>
-        <div id="harmony-panel">
-            <canvas id="note-canvas"></canvas>
-            <div id="chaos-vignette"></div>
-        </div>
+        <div id="step-debug"></div>
     </body>
 </html>

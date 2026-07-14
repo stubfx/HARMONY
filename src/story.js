@@ -1,80 +1,81 @@
-import { PHASE, RESEED } from './constants.js';
+import { PHASE } from './constants.js';
 
+// ─── HARMONY — two parallel arcs synced by the voice ─────────────────────────
+// Big screen (the collective):
+//   NERO → PUNTI CONFINATI → PUNTI LIBERI → CAMPO REATTIVO → HARMONY → CAMPO CAMBIATO
+// Phone (the individual):
+//   NERO → PUNTO → NOTA → COLORE → NERO
+// The audience contributes exactly two decisions: one note and one color.
+//
 // ─── Narrator Audio Map ──────────────────────────────────────────────────────
 // All files live in simAss/narrator/. Replace any file to swap the narration.
+// The content is the user's responsibility; the story only wires the filenames
+// and never *depends* on a file existing (a missing file is treated as instant end).
 //
-//   audio1.mp3    →  black             (PHASE 1 — starts immediately; stops on first connection)
-//   audio2.mp3    →  black             (PHASE 1 — starts on first connection; 10s later → PHASE 2)
-//   audio3.mp3    →  nota              (PHASE 2 — starts immediately on enter)
-//   audio4.mp3    →  rosso             (PHASE 3 — give a color to the note)
-//   audio5.mp3    →  immagini-tempesta (PHASE 5 — "Il rombo prima del lampo...")
-//   audio6.mp3    →  testo             (PHASE 7 — one word each)
-//   audio7.mp3    →  chiusura          (PHASE 8 — harmony is not the same note)
-//
-// immagini-bigbang (PHASE 6) has no audio (director's note: "no commentary needed").
+//   audio1.mp3  →  ENTER   (starts immediately; "collegati")
+//   audio2.mp3  →  ENTER   (starts on first connection; on end → FREE)
+//   audio3.mp3  →  FREE    ("ora guarda lo schermo")
+//   audio4.mp3  →  TUNE    ("trova una nota")
+//   audio5.mp3  →  COLOR   ("scegli un colore")
+//   audio6.mp3  →  HARMONY (spoken over the climax; optional)
+//   audio7.mp3  →  CLOSE   ("puoi chiudere")
 
 // ─── Note on hardcoded parameters ────────────────────────────────────────────
-// All timers, thresholds and filenames are intentionally hardcoded in this file.
-// Each phase has precise timings chosen during direction, and keeping everything
-// here makes it easy to tweak any detail without hunting through sim params.
+// All timers, thresholds and filenames are intentionally hardcoded here. Each
+// phase has precise timings chosen during direction; keeping everything in one
+// file makes it easy to tweak without hunting through sim params.
 
-// ─── Story Steps ────────────────────────────────────────────────────────────
-// Each object is one step. Order matters — the engine runs them in sequence.
-//
-// Hooks available on each step:
-//   enter(sim)                — called when the step becomes active
-//   exit(sim)                 — called before moving to the next step
-//   onSpectatorJoined(sim, n) — called each time a spectator connects
-//   onNote(sim, noteIndex)    — called each time any spectator plays a note
-//
-// sim primitives:
-//   sim.dormantSeed()              — seed all agents invisible (weight=0)
-//   sim.activateChunk(fraction)    — light up next N% of agents from center
-//   sim.freezeParams(overrides)    — save + override named params
-//   sim.thawParams()               — restore params saved by freezeParams
-//   sim.reseed({ mode })           — full reseed; mode: RESEED.FADE_FROM_EDGES → perimeter spawn at weight=0
-//   sim.next()                     — advance to the next step
-//   sim.setParam(key, val)         — override a single param
-//   sim.suppressImages()           — block loadAvoidMap (images from admin)
-//   sim.restoreImages()            — re-enable loadAvoidMap
-//   sim.enableHarmonyImages()      — allow harmony to show its avoidmap image (off by default)
-//   sim.disableHarmonyImages()     — hide harmony image; blocks future ones until re-enabled
-//   sim.playNarratorAudio(file)    — play simAss/narrator/<file>; auto-next on ended
-//   sim.setTraceText(text)         — set the trace text input and re-render the avoidmap
+// One field language throughout — "il punto". Agents spiral toward the centre
+// (dir) with a tangential offset (wind) so the cloud orbits instead of collapsing.
+// Confinement radius and speed do the storytelling, not a second formula set.
+const FIELD_DIR  = 'atan2(cy - y, cx - x) + sin(t * 1.4 + length(vec2(x-cx,y-cy)) * 0.012) * PI * 0.38';
+const FIELD_WIND = 'atan2(cy - y, cx - x) + PI * 0.46 + sin(t * 0.65 + length(vec2(x-cx,y-cy)) * 0.007) * 0.6';
+
+// Minimum time a voice-led phase stays up even if its narration is short.
+const FLOOR_FREE  =  7_000;
+const FLOOR_TUNE  = 25_000;
+const FLOOR_COLOR = 15_000;
 
 const log = (msg) => console.log(`[story] ${msg}`);
 
+// Advance to the next step no sooner than `floorMs` after the phase was entered.
+function advanceAfterFloor(step, sim, floorMs) {
+    const elapsed = Date.now() - (step._t0 ?? Date.now());
+    const wait    = Math.max(0, floorMs - elapsed);
+    step._advTimer = setTimeout(() => sim.next(), wait);
+}
+
 export const STORY = [
 
-    // ── PHASE 1 — CONNECTION ──────────────────────────────────────────────────
-    // audio1 starts immediately on enter.
-    // Spectator joins are ignored visually during audio1 (queued).
-    // audio1 ends → if queued users exist, activate their chunks and start audio2;
-    //               otherwise wait for the first user normally.
-    // audio2 ends → immediate sim.next() (HARMONY text + 10s wait in PHASE 2).
+    // ── PHASE 1 — ENTER (connessione) ─────────────────────────────────────────
+    // Points appear at the centre on each join, confined and vibrating. audio1
+    // plays immediately; joins during audio1 are queued. On first real join audio2
+    // starts, and when audio2 ends we advance to FREE.
     {
-        id: PHASE.BLACK,
+        id: PHASE.ENTER,
         enter(sim) {
-            this._audio2Started = false;
             this._audio1Playing = true;
+            this._audio2Started = false;
             this._pendingJoins  = 0;
 
-            log('PHASE 1 — fade out, tutto nero. audio1 in partenza.');
-            sim.clearAvoidMap();
+            log('PHASE 1 — ENTER. nero, punti confinati. audio1 in partenza.');
+            sim.resetStoryChoices();
             sim.setColorMode('GRAYSCALE');
-            sim.freezeParams({ spectatorSpawnChance: 0, randomTeleportChance: 0, dotRespawnChance: 0, spawnFadeRate: 0 });
-            sim.setParam('champLinesAlpha', 0);
+            sim.clearAvoidMap();                 // remove the boot placeholder square
+            sim.setParam('autoDir',  false);     // no random formula cycling during the show
+            sim.setParam('autoWind', false);
+            sim.setFormulas(FIELD_DIR, FIELD_WIND);
+            sim.setParam('windEnabled', true);
             sim.setParam('limitAtCenter', true);
-            sim.setParam('limitAtCenterRadius', 100);
-            sim.suppressImages();
+            sim.setParam('limitAtCenterRadius', 110);
             sim.dormantSeed();
+
             this._audio = sim.playNarratorAudio('audio1.mp3');
             this._audio.addEventListener('ended', () => {
                 this._audio1Playing = false;
                 log('audio1 terminato.');
                 if (this._pendingJoins > 0) {
-                    log(this._pendingJoins + ' utenti in attesa — attivazione chunk e avvio audio2.');
-                    for (let i = 0; i < this._pendingJoins; i++) sim.activateChunk(1);
+                    for (let i = 0; i < this._pendingJoins; i++) sim.activateChunk(0.18);
                     this._startAudio2(sim);
                 }
             }, { once: true });
@@ -85,7 +86,7 @@ export const STORY = [
             log('audio2 in partenza.');
             this._audio = sim.playNarratorAudio('audio2.mp3');
             this._audio.addEventListener('ended', () => {
-                log('audio2 terminato — avanzamento immediato a PHASE 2.');
+                log('audio2 terminato — avanzamento a FREE.');
                 sim.next();
             }, { once: true });
         },
@@ -93,191 +94,170 @@ export const STORY = [
             log('utente connesso — totale: ' + userCount);
             if (this._audio1Playing) {
                 this._pendingJoins++;
-                log('audio1 in corso — join ignorato graficamente (pending: ' + this._pendingJoins + ').');
                 return;
             }
-            sim.activateChunk(1);
-            if (userCount === 1) {
-                log('primo utente — avvio audio2.');
-                this._startAudio2(sim);
-            }
+            sim.activateChunk(0.18);             // a burst of points at the centre per join
+            if (userCount === 1) this._startAudio2(sim);
         },
         exit(sim) {
-            log('uscita PHASE 1 — formule aggiornate, respawn random già attivo.');
+            log('uscita PHASE 1.');
             this._audio?.pause();
             this._audio = null;
-            sim.restoreImages();
-            sim.thawParams();
-            sim.setFormulas(
-                'atan2(cy - y, cx - x) + sin(t * 1.4 + length(vec2(x-cx,y-cy)) * 0.012) * PI * 0.38',
-                'atan2(cy - y, cx - x) + PI * 0.46 + sin(t * 0.65 + length(vec2(x-cx,y-cy)) * 0.007) * 0.6',
-            );
         },
     },
 
-    // ── PHASE 2 — THE NOTE ────────────────────────────────────────────────────
-    // Enters immediately from PHASE 1. Waits 10s, then audio3.
-    // Notes are ignored until audio3 finishes (prevents notes sent during audio2
-    // or audio3 from triggering the timer early).
-    // First note after audio3 → wind on → 20s timer → sim.next().
+    // ── PHASE 2 — FREE (punti liberi) ─────────────────────────────────────────
+    // The constraint relaxes: any still-dormant points light at the centre, then
+    // the confinement radius grows over ~7 s so the cloud distends. audio3 tells
+    // the audience to look at the screen.
     {
-        id: PHASE.NOTA,
-        _noteTimerStarted: false,
-        _notesEnabled: false,
+        id: PHASE.FREE,
         enter(sim) {
-            this._noteTimerStarted = false;
-            this._notesEnabled = false;
-            sim.setParam('limitAtCenter', false);
-            sim.freezeParams({ windEnabled: false });
-            sim.loadStaticAvoidMap('circle.png');
-            sim.startBackgroundMusic();
-            sim.startBlinkersLoop();
-            sim.enableFullSynth();
-            log('PHASE 2 — nota. note disabilitate fino a fine audio3. audio3 parte tra 10s.');
-            setTimeout(() => {
-                log('10s scaduti — audio3 in partenza.');
-                this._audio = sim.playNarratorAudio('audio3.mp3');
-                this._audio.addEventListener('ended', () => {
-                    log('audio3 terminato — note abilitate.');
-                    this._notesEnabled = true;
-                }, { once: true });
-            }, 10_000);
-        },
-        onNote(sim, noteIndex) {
-            if (!this._notesEnabled || this._noteTimerStarted) return;
-            this._noteTimerStarted = true;
+            log('PHASE 2 — FREE. distensione progressiva.');
+            this._t0 = Date.now();
+            sim.setColorMode('GRAYSCALE');
+            sim.setFormulas(FIELD_DIR, FIELD_WIND);
             sim.setParam('windEnabled', true);
-            log('prima nota ricevuta (index ' + noteIndex + '). wind abilitato. timer 20s avviato → PHASE 3.');
-            setTimeout(() => {
-                log('20s scaduti — avanzamento a PHASE 3.');
-                sim.next();
-            }, 20_000);
+            sim.setParam('limitAtCenter', true);
+            sim.activateChunk(1);                                 // light the remainder
+            this._cancelTween = sim.tweenParam('limitAtCenterRadius', 450, 7_000);
+
+            this._audio = sim.playNarratorAudio('audio3.mp3');
+            this._audio.addEventListener('ended', () => advanceAfterFloor(this, sim, FLOOR_FREE), { once: true });
         },
         exit(sim) {
             log('uscita PHASE 2.');
-            sim.thawParams();
+            this._cancelTween?.();
+            clearTimeout(this._advTimer);
             this._audio?.pause();
             this._audio = null;
         },
     },
 
-    // ── PHASE 3 — RED ─────────────────────────────────────────────────────────
-    // NORMAL color → HARMONY text immediately → 10s timer → harmony images → audio4.
-    // After audio4 ends: 5s silence → red colors → PHASE 4.
-    // File: simAss/narrator/audio4.mp3
+    // ── PHASE 3 — TUNE (campo reattivo) ───────────────────────────────────────
+    // Live notes make the field breathe: low notes gather/slow it, high notes
+    // open/speed it, the whole crowd acting as one body (see sim.breathImpulse).
+    // Notes do NOT trigger harmony or images here. The audience tries and then
+    // confirms a single note; on confirm the phone stops sending live notes.
     {
-        id: PHASE.ROSSO,
+        id: PHASE.TUNE,
         enter(sim) {
-            sim.setColorMode('NORMAL');
-            sim.setParam('champLinesAlpha', 0.02);
-            sim.setTraceText('HARMONY');
-            log('PHASE 3 — rosso. testo HARMONY attivo. immagini e audio tra 10s.');
-            this._respawnTimer = setTimeout(() => {
-                log('10s scaduti — immagini harmony abilitate. dotRespawnChance abilitato (0.002). audio4 in partenza.');
-                sim.enableHarmonyImages();
-                sim.setParam('dotRespawnChance', 0.002);
-                this._audio = sim.playNarratorAudio('audio4.mp3');
-                this._audio.addEventListener('ended', () => {
-                    log('audio4 terminato. attesa 5s → colori rosso → PHASE 4.');
-                    this._colorTimer = setTimeout(() => {
-                        log('5s scaduti — color1=#ff0000 color2=#ff0000. avanzamento a PHASE 4.');
-                        sim.freezeParams({ color1: '#ff0000', color2: '#ff0000' });
-                        sim.next();
-                    }, 5_000);
-                }, { once: true });
-            }, 10_000);
+            log('PHASE 3 — TUNE. il campo respira con le note.');
+            this._t0 = Date.now();
+            sim.setColorMode('GRAYSCALE');
+            sim.setFormulas(FIELD_DIR, FIELD_WIND);
+            sim.setParam('windEnabled', true);
+            sim.setParam('limitAtCenter', true);
+            sim.setParam('limitAtCenterRadius', 420);
+            sim.setParam('maxSpeed', 4.0);
+            sim.setParam('stepLen',  2.0);
+            sim.startBreath();                                    // captures the base params above
+
+            this._audio = sim.playNarratorAudio('audio4.mp3');
+            this._audio.addEventListener('ended', () => advanceAfterFloor(this, sim, FLOOR_TUNE), { once: true });
+        },
+        onNoteConfirm(sim, spectatorId, index) {
+            log('nota confermata — spettatore ' + String(spectatorId).slice(0, 8) + ' → index ' + index);
         },
         exit(sim) {
             log('uscita PHASE 3.');
-            clearTimeout(this._respawnTimer);
-            clearTimeout(this._colorTimer);
-            sim.disableHarmonyImages();
-            sim.thawParams();
+            sim.stopBreath();
+            clearTimeout(this._advTimer);
             this._audio?.pause();
             this._audio = null;
         },
     },
 
-    // ── PHASE 4 — IMAGE: HEART ────────────────────────────────────────────────
-    // TODO: implement image appearance logic (how the image fades/arrives on screen).
-    // Narrator speaks after silence; advances when audio ends.
-    // File: simAss/narrator/audio4.mp3
+    // ── PHASE 4 — COLOR (scelta del colore) ───────────────────────────────────
+    // The field holds steady (still white/black). The phone shows a discrete
+    // palette; the chosen color is buffered on the host and does NOT reach the
+    // screen until the climax.
     {
-        id: PHASE.IMMAGINI_CUORE,
+        id: PHASE.COLOR,
         enter(sim) {
-            log('PHASE 4 — cuore. audio4 in partenza.');
-            // TODO: load heart image into avoidmap
-            this._audio = sim.playNarratorAudio('audio4.mp3', { autoNext: true });
+            log('PHASE 4 — COLOR. colore bufferizzato, schermo ancora bianco/nero.');
+            this._t0 = Date.now();
+            sim.setColorMode('GRAYSCALE');                        // guarantees no color leak
+            sim.setParam('limitAtCenter', true);
+            sim.setParam('limitAtCenterRadius', 420);
+
+            this._audio = sim.playNarratorAudio('audio5.mp3');
+            this._audio.addEventListener('ended', () => advanceAfterFloor(this, sim, FLOOR_COLOR), { once: true });
+        },
+        onColorConfirm(sim, spectatorId, color) {
+            log('colore confermato — spettatore ' + String(spectatorId).slice(0, 8) + ' → ' + color);
         },
         exit(sim) {
             log('uscita PHASE 4.');
+            clearTimeout(this._advTimer);
             this._audio?.pause();
             this._audio = null;
         },
     },
 
-    // ── PHASE 5 — IMAGE: STORM ────────────────────────────────────────────────
-    // TODO: implement image appearance logic.
-    // Narrator speaks; advances when audio ends.
-    // File: simAss/narrator/audio5.mp3
+    // ── PHASE 5 — HARMONY (climax) ────────────────────────────────────────────
+    // Scripted montage between the two surfaces:
+    //   dim the white points → brief void (phones cut to black via the step cue)
+    //   → reignite a colored, spread field (~35% points take the group's palette)
+    //   + the confirmed notes enter as one sustained chord → abstract shapes.
+    // Advances to CLOSE at the end of the sequence (not audio-driven).
     {
-        id: PHASE.IMMAGINI_TEMPESTA,
+        id: PHASE.HARMONY,
         enter(sim) {
-            log('PHASE 5 — tempesta. audio5 in partenza.');
-            // TODO: load storm image into avoidmap
-            this._audio = sim.playNarratorAudio('audio5.mp3', { autoNext: true });
+            log('PHASE 5 — HARMONY. climax scriptato.');
+            this._timers  = [];
+            this._cancels = [];
+            const at = (ms, fn) => this._timers.push(setTimeout(fn, ms));
+
+            this._audio = sim.playNarratorAudio('audio6.mp3');    // optional voice over the climax
+
+            // 1) Dim the white points over ~1.6 s.
+            this._cancels.push(sim.tweenParam('brightness', 0.003, 1_600));
+
+            // 2) ~0.6 s of void, then reignite: spread the field (invisible while dark),
+            //    switch to color, write the confirmed colors, ring the chord.
+            at(2_200, () => {
+                log('riaccensione colorata + accordo.');
+                sim.reseed();                                     // spread across the canvas (dark → unseen)
+                sim.setParam('limitAtCenter', true);
+                sim.setParam('limitAtCenterRadius', 800);         // wide disc → shapes read across the screen
+                sim.setColorMode('NORMAL');
+                sim.applyConfirmedColors();
+                this._cancels.push(sim.tweenParam('brightness', 0.06, 900));
+                sim.climaxChord(7);
+            });
+
+            // 3) Abstract shapes revealed by particle avoidance, ~7 s each.
+            at(3_800,  () => { log('forma 1.'); sim.loadStaticAvoidMap('shape1.png'); });
+            at(10_800, () => { log('forma 2.'); sim.loadStaticAvoidMap('shape2.png'); });
+            at(17_800, () => { log('forma 3.'); sim.loadStaticAvoidMap('shape3.png'); });
+
+            // 4) Clear and move on.
+            at(24_800, () => { log('fine forme — avanzamento a CLOSE.'); sim.clearAvoidMap(); sim.next(); });
         },
         exit(sim) {
             log('uscita PHASE 5.');
+            this._timers?.forEach(clearTimeout);
+            this._cancels?.forEach(fn => fn?.());
             this._audio?.pause();
             this._audio = null;
         },
     },
 
-    // ── PHASE 6 — IMAGE: BIG BANG ─────────────────────────────────────────────
-    // TODO: implement image appearance logic.
-    // No narration (director's note: "no commentary needed").
-    // Shown for 5 seconds, then cuts to black and auto-advances.
+    // ── PHASE 6 — CLOSE (campo cambiato) ──────────────────────────────────────
+    // A free, colored, transformed field — like FREE but it carries the group's
+    // colors. The phone is black; the voice says the audience can leave.
+    // Terminal step — no next().
     {
-        id: PHASE.IMMAGINI_BIGBANG,
+        id: PHASE.CLOSE,
         enter(sim) {
-            log('PHASE 6 — bigbang. timer 5s avviato (no audio).');
-            // TODO: load big bang image into avoidmap
-            this._timer = setTimeout(() => {
-                log('5s scaduti — avanzamento a PHASE 7.');
-                sim.next();
-            }, 5_000);
-        },
-        exit(sim) {
-            log('uscita PHASE 6.');
-            clearTimeout(this._timer);
-            // TODO: cut to black before advancing
-        },
-    },
-
-    // ── PHASE 7 — TEXT ────────────────────────────────────────────────────────
-    // Narrator speaks; advances automatically when audio ends.
-    // File: simAss/narrator/audio6.mp3
-    {
-        id: PHASE.TESTO,
-        enter(sim) {
-            log('PHASE 7 — testo. audio6 in partenza.');
-            this._audio = sim.playNarratorAudio('audio6.mp3', { autoNext: true });
-        },
-        exit(sim) {
-            log('uscita PHASE 7.');
-            this._audio?.pause();
-            this._audio = null;
-        },
-    },
-
-    // ── PHASE 8 — CLOSING ─────────────────────────────────────────────────────
-    // Narrator speaks. Last step — no next().
-    // File: simAss/narrator/audio7.mp3
-    {
-        id: PHASE.CHIUSURA,
-        enter(sim) {
-            log('PHASE 8 — chiusura. audio7 in partenza. fine storia.');
+            log('PHASE 6 — CLOSE. campo libero colorato. audio7. fine storia.');
+            sim.setColorMode('NORMAL');
+            sim.setFormulas(FIELD_DIR, FIELD_WIND);
+            sim.setParam('windEnabled', true);
+            sim.setParam('limitAtCenter', true);
+            sim.setParam('limitAtCenterRadius', 550);
+            sim.applyConfirmedColors();                           // keep the colors present
             this._audio = sim.playNarratorAudio('audio7.mp3');
         },
         exit(sim) {
