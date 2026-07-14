@@ -92,9 +92,10 @@ Display / projection
 
 Spectators  (/remote/?s=<uuid>)
     │  Socket.IO  'join-session'   →  server
-    │  Socket.IO  'user-event'     →  server → 'remote-event' → simulation (tilt aggregated only)
-    │  Socket.IO  'peer-joined'   ←─  server  { userCount }  — brief aura dimming pulse
-    │  Socket.IO  'peer-left'     ←─  server  { userCount }  — emitted by server; ignored by the current note-pad remote
+    │  Socket.IO  'user-event'     →  server → 'remote-event' → simulation (note/confirm events)
+    │  Socket.IO  'story-step'    ←─  server  { step }  — drives the phone's 5-state machine
+    │  Socket.IO  'peer-joined'   ←─  server  { userCount }  — emitted by server; ignored by the current phone
+    │  Socket.IO  'peer-left'     ←─  server  { userCount }  — emitted by server; ignored by the current phone
     ▼
 Node.js server  (:3000)
     │  always: io.to(room).emit('remote-event', ...)  — chaos aggregated, other events forwarded directly
@@ -110,10 +111,10 @@ Node.js server  (:3000)
    - **Small scannable overlay** in the bottom-left UI panel (click to open)
    - **Large trace image** in the canvas centre — the particle field writes the QR pattern after the intro delay
 4. Spectators scan the QR, open `/remote/?s=<uuid>`, connect via Socket.IO
-5. Server emits `spectator-joined` to the host — a brief gust fires in the particle field
-6. Server emits `peer-joined` (with updated `userCount`) to all other spectators — each phone shows a brief aura dimming pulse
+5. Server emits `spectator-joined` to the host — during the story a burst of points appears at the centre
+6. Server emits `peer-joined` (with updated `userCount`) to all other spectators — ignored by the current phone
 7. Every 300 ms the server aggregates all spectators' state and emits `collective-state` to the host
-8. Spectator touch/text events are forwarded directly as `remote-event`; `lastRemoteActivity` timestamp is updated on every event
+8. Spectator note/confirm events are forwarded directly as `remote-event`; `lastRemoteActivity` timestamp is updated on every event
 9. When a spectator disconnects, server emits `spectator-left` (with `userCount`) to host and `peer-left` to remaining spectators
 10. Simulation restores the QR trace in three ways (whichever fires first):
     - `spectator-left` arrives with `userCount === 0`
@@ -173,7 +174,18 @@ The coherence multiplier is applied to `turnRate` in JavaScript before writing t
 
 ## Story System
 
-A client-side story engine (`src/story.js` + `src/storyEngine.js`) runs autonomously inside the browser.
+A client-side story engine (`src/story.js` + `src/storyEngine.js`) runs autonomously inside the browser. The story (`HARMONY`) is told as **two parallel arcs synced by the voice** — the big screen is the collective, the phone is the individual — and the audience contributes exactly **two decisions: one note and one color**.
+
+**Phase model (6 phases, `PHASE` in `src/constants.js`):**
+
+| # | Phase | Big screen (collective) | Phone (individual) |
+|---|-------|-------------------------|--------------------|
+| 0 | `ENTER` | points appear at the centre on each join, confined, vibrating | black → white point + "connesso" |
+| 1 | `FREE` | the constraint relaxes, the cloud distends (~7 s) | white point (drifts) + "ora guarda lo schermo" |
+| 2 | `TUNE` | the field **breathes** with live notes (low = collected/slow, high = open/fast) | note picker: try → confirm → "nota scelta" |
+| 3 | `COLOR` | holds steady, still white/black (the color is buffered) | discrete palette → choice → full-screen color |
+| 4 | `HARMONY` | climax: dim → void → colored reignition + chord + abstract shapes | fade to black + "ora guarda" |
+| 5 | `CLOSE` | free, colored, transformed field | black → "puoi chiudere" |
 
 `story.js` exports an array of step objects. Each step can define:
 
@@ -182,7 +194,9 @@ A client-side story engine (`src/story.js` + `src/storyEngine.js`) runs autonomo
 | `enter` | `(sim)` | When this step becomes active |
 | `exit` | `(sim)` | Just before advancing to the next step |
 | `onSpectatorJoined` | `(sim, userCount)` | Every time a spectator connects while this step is active |
-| `onNote` | `(sim, noteIndex)` | Every time any spectator plays a note while this step is active |
+| `onNote` | `(sim, noteIndex)` | Every time any spectator plays a live note while this step is active |
+| `onNoteConfirm` | `(sim, spectatorId, index)` | When a spectator confirms their note (phase `TUNE`) |
+| `onColorConfirm` | `(sim, spectatorId, color)` | When a spectator confirms their color (phase `COLOR`) |
 
 `storyEngine.js` exports a `StoryEngine` class. `StoryEngine.start()` is called automatically before the first `requestAnimationFrame`. Steps advance by calling `sim.next()`.
 
@@ -192,35 +206,39 @@ A client-side story engine (`src/story.js` + `src/storyEngine.js`) runs autonomo
 |-----------|--------|
 | `dormantSeed()` | Seeds all agents invisible (weight=0); stores original weights |
 | `activateChunk(fraction)` | Activates the next N% of dormant agents, spawning from canvas center |
-| `freezeParams(overrides)` | Saves current param values and applies overrides immediately |
-| `thawParams()` | Restores all params saved by `freezeParams` |
+| `freezeParams(overrides)` / `thawParams()` | Save+override / restore named params |
 | `reseed({ mode })` | Full reseed; `mode: RESEED.FADE_FROM_EDGES` spawns from perimeter at weight=0 for a gradual fade-in |
 | `next()` | Advances to the next story step |
 | `setParam(key, val)` | Overrides a single param without affecting the freeze/thaw saved state |
+| `tweenParam(key, to, ms)` | Linearly eases a numeric param over `ms`; returns a cancel fn |
+| `setColorMode(mode)` | `NORMAL` / `GRAYSCALE` / `GRAYSCALE_INVERTED` |
 | `setTraceText(text)` | Sets the trace text input and re-renders the avoidmap texture |
-| `suppressImages()` | Blocks `loadAvoidMap` — external images from the admin are ignored |
-| `restoreImages()` | Re-enables `loadAvoidMap` |
-| `enableHarmonyImages()` | Allows harmony note-sum events to show their AI-generated avoidmap image (off by default) |
-| `disableHarmonyImages()` | Hides the harmony image and blocks future ones until re-enabled |
-| `playNarratorAudio(file, { autoNext })` | Plays `simAss/narrator/<file>` via the `/simAss-narrator/` endpoint; if `autoNext: true`, calls `sim.next()` automatically when playback ends |
+| `loadStaticAvoidMap(file)` / `clearAvoidMap()` | Load a mask from `simAss/static/` as the avoidance map / clear it |
+| `startBreath()` / `breathImpulse(avgNote, count)` / `breathRelease()` / `stopBreath()` | Phase `TUNE`: enable the note-driven field breath, push an impulse (crowd average note + capped count), ease back to rest, restore base params |
+| `applyConfirmedColors()` | Climax: write each spectator's confirmed color into its slot (~`spectatorAgentShare`% of points take it; needs `colorMode NORMAL`) |
+| `climaxChord(durationSec)` | Climax: voice the confirmed notes as one sustained pentatonic chord |
+| `resetStoryChoices()` | Clears the buffered note/color choices (called on the first phase) |
+| `playNarratorAudio(file, { autoNext })` | Plays `simAss/narrator/<file>` via `/simAss-narrator/`; `autoNext: true` calls `sim.next()` when playback ends |
+
+The spontaneous note-sum harmony system (`enableHarmonyImages` / `disableHarmonyImages` and the note→formula machinery) still exists in `sim.js` but is **not triggered** by the current HARMONY story — the climax shapes are scripted, not note-driven.
 
 ### Narrator audio
 
-All narrator MP3s live in `simAss/narrator/`. The server exposes them at `GET /simAss-narrator/:filename` (served by name, not randomly). The facade method `playNarratorAudio` plays the file and optionally advances the story on `ended`. Call `this._audio?.pause()` in `exit()` to stop playback if the step is skipped.
+All narrator MP3s live in `simAss/narrator/`. The server exposes them at `GET /simAss-narrator/:filename` (served by name, not randomly). `playNarratorAudio` plays the file; the story attaches its own `ended` handler (a phase advances no sooner than a per-phase floor). A missing file is treated as an instant end so the story is never stuck. Call `this._audio?.pause()` in `exit()` to stop playback if the step is skipped.
 
-**Audio map for `story01`:**
+**Audio map (content is the director's responsibility — swap the files freely):**
 
-| File | Step | Phase | Trigger |
-|------|------|-------|---------|
-| `audio1.mp3` | `preshow` | PHASE 1 | Plays immediately on enter; stops when first spectator connects |
-| `audio2.mp3` | `preshow` | PHASE 1 | Plays on first spectator connect; 10 s after end → advance to PHASE 2 |
-| `audio3.mp3` | `nota` | PHASE 2 | Plays 10 s after enter; 20 s after first note → advance to PHASE 3 |
-| `audio4.mp3` | `rosso` | PHASE 3 | Plays on enter; autoNext |
-| `audio5.mp3` | `immagini-tempesta` | PHASE 5 | Plays on enter; autoNext |
-| `audio6.mp3` | `testo` | PHASE 7 | Plays on enter; autoNext |
-| `audio7.mp3` | `chiusura` | PHASE 8 | Plays on enter; last step, no autoNext |
+| File | Phase | Trigger |
+|------|-------|---------|
+| `audio1.mp3` | `ENTER` | Plays immediately on enter |
+| `audio2.mp3` | `ENTER` | Plays on first spectator connect; on end → `FREE` |
+| `audio3.mp3` | `FREE` | On enter; on end (≥7 s floor) → `TUNE` |
+| `audio4.mp3` | `TUNE` | On enter; on end (≥25 s floor) → `COLOR` |
+| `audio5.mp3` | `COLOR` | On enter; on end (≥15 s floor) → `HARMONY` |
+| `audio6.mp3` | `HARMONY` | Optional voice over the scripted climax |
+| `audio7.mp3` | `CLOSE` | On enter; terminal, no autoNext |
 
-`immagini-cuore` (PHASE 4) and `immagini-bigbang` (PHASE 6) have no narration. `immagini-bigbang` auto-advances after 5 s.
+The climax sequence (dim → void → reignition + chord → three shapes at ~7 s each → `CLOSE`) is driven by scripted timers in `PHASE.HARMONY.enter()`, not by audio.
 
 This story system coexists with the step-based story mode (step IDs, vote steps, captions) driven by `applySimParams` — the client story runs on its own schedule while the admin panel or `applySimParams` handles content delivery.
 
@@ -265,7 +283,7 @@ returns whenever the room is empty or goes quiet.
 The QR bitmap is kept permanently in memory (`qrBitmap`) and restored by `restoreQR()`
 without any network round-trip. The auto-clear timer never applies to the QR.
 
-> **Note:** the QR lives only on the simulation display. The current spectator page (`/remote/`) does **not** render its own QR — earlier builds showed a persistent share-QR in the corner, but the HARMONY note pad removed it.
+> **Note:** the QR lives only on the simulation display. The spectator page (`/remote/`) does **not** render its own QR.
 
 ### Content auto-clear
 
@@ -277,45 +295,50 @@ The timer restarts whenever content changes. The QR is immune to auto-clear.
 
 ## Remote Spectator Interactions
 
-Spectators open the `/remote/` page on their phones. The shipped remote is the **HARMONY note pad**: a full-screen touch canvas over a dark aura, with a centred "HARMONY / touch to begin" hint that fades on the first touch. There is no joystick, color picker, text field, or "swarm" button — a single finger on the canvas drives everything. Dragging maps the two screen axes to two channels:
+Spectators open the `/remote/` page on their phones. The phone is a **minimal five-state machine** — black background, monospace, one instruction at a time, and the UI disappears as soon as its task is done. The state is a function of the global story phase (the `story-step` event) plus a local sub-state after the audience confirms its note/color:
 
-- **X → note.** The canvas is divided into 9 vertical bands playing an A-minor pentatonic run from D3 to A4 (`KEYS` in `remote/main.js:84-94`). Sliding across bands changes the active note; each change also emits a `note` event.
-- **Y → color hue.** Vertical position sets a hue from 0° (top) to 270° (bottom), quantised to 10° steps and converted with `hslToHex(hue, 80, 50)`. The result is pushed as a `color-pick` event and tints the phone's own aura.
+```
+BLACK → WHITE_DOT → NOTE_PICKER → COLOR_PALETTE → FULL_COLOR → BLACK
+```
 
-| Channel | Phone gesture | Routing | Simulation effect |
-|---------|--------------|---------|-------------------|
-| **Note (X)** | Slide horizontally across the note canvas | `note` event debounced per-device before send | Injects a note-wind formula into the compute shader; note indices summing to a multiple of 4 trigger the harmony avoidMap (`sum % 4 === 0`) |
-| **Color (Y)** | Slide vertically | `color-pick` forwarded directly | Assigned color for that spectator's agents; also tints the phone aura |
-| **Release** | Lift the finger | `note-off` forwarded directly | Silences the note and drops the spectator's note-wind contribution |
+| Phase (`story-step`) | Phone shows |
+|----------------------|-------------|
+| `ENTER` (0) | a single breathing white point + "connesso" |
+| `FREE` (1) | the point drifts + "ora guarda lo schermo" |
+| `TUNE` (2) | a 9-cell A-minor pentatonic **note picker** (D3–A4) — try, then confirm |
+| `COLOR` (3) | an 8-swatch discrete **palette** — tap one → the screen fills with that color |
+| `HARMONY` (4) | fades to black + "ora guarda" |
+| `CLOSE` (5) | black → "puoi chiudere" |
 
-The events the remote actually emits are `join-session` (on connect), `note { index, freq, color }`, `note-off`, and `color-pick { color }` (sent once on join with the default color, then on every hue change).
+**The two decisions:**
 
-**Visuals on the phone:** a digital pixel-pool rests at canvas centre — the dots drain toward and are repelled by the finger, and burst outward on each note change before springing back. Smoke puffs trail under the touch point, and a chaos vignette darkens the screen edges, its intensity following the decaying `_motionChaos` level.
+- **Note (`TUNE`).** Press/drag across the vertical note cells to *try* — each preview plays a short local pluck and emits a live `note` (driving the field breath), then `note-off` on release. A **confirm** button appears after the first try; tapping it emits `note-confirm { index }`, the phone shows "nota scelta", and it stops sending live notes.
+- **Color (`COLOR`).** Tapping a swatch emits `color-confirm { color }` and fills the phone with that color. The color is **buffered on the host** and does not reach the big screen until the climax.
+
+The events the phone emits are `join-session` (on connect), `note { index, freq }`, `note-off`, `note-confirm { index }`, and `color-confirm { color }`. The continuous `color-pick` of earlier builds is gone.
 
 ### Dormant backend
 
-The joystick spawner, tilt/shake chaos, text input (`story-text`), and vote mechanics described elsewhere in this document are **not exercised by the shipped remote UI** — the current `/remote/` page sends only `join-session`, `note`, `note-off`, and `color-pick`. The corresponding parameters and `remote-event` handlers still exist in `src/sim.js` and `server/server.js` and remain wired; they are simply dormant until a future remote build drives them again.
+The joystick spawner, tilt/shake chaos, text input (`story-text`), vote mechanics, and the spontaneous note-sum harmony described elsewhere in this document are **not exercised by the current remote UI**. Their parameters and `remote-event` handlers still exist in `src/sim.js` and `server/server.js` and remain wired; they are simply dormant.
 
 ### Sound on the phone
 
-Each phone runs its own small Web Audio note synth (`remote/main.js:96-166`) — the note you play is heard locally on your own device, independent of the simulation display's audio. A single continuous triangle oscillator feeds a lowpass filter (2200 Hz) → gain node → `destination`, with a parallel send into a convolver reverb (a 1.8 s procedurally generated impulse). Touching the pad opens the gain; lifting closes it. Pitch follows the same A-minor pentatonic table as the visuals and glides between notes with `setTargetAtTime` (~40 ms), so sliding across bands portamentos rather than steps.
-
-The synth is gated by `_emitSound`: it is audible only from **story step 1 onward** (`_emitSound = _currentStep > 0`, set in the `story-step` handler at `remote/main.js:473-478`). Before the story starts, touching the pad still moves the visuals and sends events, but stays silent.
+During `TUNE` each preview plays a short **plucked** tone locally (triangle oscillator, fast attack, ~0.5 s decay, into a small convolver reverb) — heard on your own device, independent of the big screen. There is no sustained tone: the full, sustained sound is reserved for the host's **climax chord**, which voices all the confirmed notes together. Local sound is gated to the `TUNE` phase before the note is confirmed.
 
 **iOS caveats.** Mobile Safari makes Web Audio playback awkward, so the remote takes three measures:
 
-- **Playback audio session (iOS 16.4+).** When the context is first created the remote sets `navigator.audioSession.type = 'playback'`, routing Web Audio through the media channel. The synth then ignores the hardware silent switch and follows the media volume rather than the (often muted) ringer volume.
-- **Resume on `interrupted`.** iOS can leave the `AudioContext` in the non-standard `'interrupted'` state after a call, Siri, or focus loss — not just `'suspended'`. The remote resumes the context on any state other than `'running'` (on the unlock gesture, on `visibilitychange`, and on each `pointerdown`).
-- **Silent `<audio>` kick (pre-16.4 fallback).** On devices without `navigator.audioSession`, a silent looping `<audio>` element is started on the first touch gesture. This flips the media session category so subsequent Web Audio output is routed through the media channel too, again bypassing the silent switch. It is a no-op where `audioSession` is available.
+- **Playback audio session (iOS 16.4+).** When the context is first created the remote sets `navigator.audioSession.type = 'playback'`, routing Web Audio through the media channel so it ignores the hardware silent switch and follows the media volume.
+- **Resume on `interrupted`.** iOS can leave the `AudioContext` in the non-standard `'interrupted'` state after a call, Siri, or focus loss — not just `'suspended'`. The remote resumes the context on any state other than `'running'` (on the unlock gesture, on `visibilitychange`, and on `pointerdown`).
+- **Silent `<audio>` kick (pre-16.4 fallback).** On devices without `navigator.audioSession`, a silent looping `<audio>` element is started on the first touch gesture, flipping the media session category so Web Audio bypasses the silent switch. No-op where `audioSession` is available.
 
 ### Note send debounce
 
-To prevent server flooding when users slide across notes rapidly, the `note` socket event is debounced on each spectator's device. The synth and aura visuals update immediately on every note change; only the server send is delayed. The debounce duration is broadcast by the server as `note-debounce: { ms }` and equals `userCount × 10 ms` — so at 1 user the delay is 10 ms; at 10 users it is 100 ms (`server/server.js:131,245`). The server re-broadcasts this value to all spectators on join, on disconnect, and every 300 ms in the collective-state ticker.
+To prevent server flooding when many users play at once, the live `note` socket event is debounced on each device. The local pluck fires immediately; only the server send is delayed. The debounce duration is broadcast by the server as `note-debounce: { ms }` and equals `userCount × 10 ms` — 10 ms at 1 user, 100 ms at 10 users. The server re-broadcasts this on join, on disconnect, and every 300 ms in the collective-state ticker.
 
 ### Feedback loops
 
-- **On the big screen**: every new spectator join fires a brief directional gust in the particle field — a visible pulse that confirms the join without any text or notification
-- **On the phone**: the aura behind the screen reflects the selected color (center hue) and motion chaos (vignette intensity). When another spectator joins, all phones feel a brief aura dimming pulse.
+- **On the big screen**: every new spectator join adds a burst of points at the centre during `ENTER`; during `TUNE` the whole field breathes with the crowd's live notes.
+- **On the phone**: the phone reflects the story phase directly (point → picker → palette → color → black), and the confirmed color returns to the audience on the big screen at the climax.
 
 See [behavior.md](behavior.md) for the full art-direction intent behind these interactions.
 

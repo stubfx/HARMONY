@@ -16,7 +16,7 @@ This is the sensation we are designing for: participation without authorship.
 
 ## How the body speaks to the swarm
 
-> *The sections below describe the intended experience across the piece's full vocabulary. The currently shipped remote centres on the **HARMONY note pad** — slide horizontally to play a note, vertically to pick a colour. The touch/words/vote channels remain part of the design intent but are dormant in the current build.*
+> *The sections below describe the intended experience across the piece's full vocabulary. The currently shipped piece is **HARMONY**: two parallel arcs synced by the voice — the big screen is the collective, the phone is the individual. The phone is a minimal five-state surface and the audience makes exactly two decisions: it **acquires a note and a color, then lets them go** (the simulation receives them at the climax). The touch/words/vote channels below remain part of the design intent but are dormant in the current build.*
 
 ### Touch — your own swarm
 
@@ -84,16 +84,14 @@ That wonder is the work.
 
 ---
 
-## The Preshow
+## The opening (ENTER)
 
 Before the piece begins, the screen is black. Not dormant — running, waiting. Every particle already exists; none of them are visible. A voice begins to speak.
 
-The narration has two movements. The first (`audio1`) plays from the moment the room opens — before anyone has connected. It speaks into the empty space. When the first person scans the QR and joins, that first voice stops and a second voice begins (`audio2`). The arrival of a listener changes what is said. This transition is not announced.
+The narration has two movements. The first (`audio1`) plays from the moment the room opens — before anyone has connected. It speaks into the empty space. When the first person scans the QR and joins, a second voice begins (`audio2`). The arrival of a listener changes what is said. This transition is not announced.
 
-While the second voice speaks, more people scan the QR and connect. Each connection wakes a portion of the swarm from the canvas centre — particles drift outward, accumulating. The swarm doesn't grow; it reveals itself. The dark between the particles is not absence. It is potential that hasn't been claimed yet.
+While the second voice speaks, more people scan the QR and connect. Each connection wakes a burst of points at the canvas centre — confined to a small disc and vibrating inside it. The swarm doesn't grow; it reveals itself. The dark between the points is not absence. It is potential that hasn't been claimed yet.
 
-The preshow ends ten seconds after the second voice finishes. At that point the story begins — agents stay where they are, and the slow respawn already active continues without interruption.
+When the second voice finishes, the story advances to **FREE**: the confinement relaxes and the cloud distends outward over several seconds — the points, once confined, become free.
 
-After ten seconds from the first connection, a slow trickle of new particles begins to respawn at the canvas edges — invisible at first, fading in over about a second. This is intentional: the swarm breathes even before the piece begins.
-
-Remote phones during preshow show a flat coloured background — no sphere, no animation. The colour changes as people touch the screen, giving each person a quiet signal that they are already part of something before the lights come on.
+Each phone in this opening shows a single breathing white point with the word *connesso* — a quiet signal that this person is already part of something before the lights come up. No sphere, no colour yet; just the point.
