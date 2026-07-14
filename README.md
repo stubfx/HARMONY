@@ -222,23 +222,25 @@ A client-side story engine (`src/story.js` + `src/storyEngine.js`) runs autonomo
 
 The spontaneous note-sum harmony system (`enableHarmonyImages` / `disableHarmonyImages` and the note→formula machinery) still exists in `sim.js` but is **not triggered** by the current HARMONY story — the climax shapes are scripted, not note-driven.
 
-### Narrator audio
+### Narrator
 
-All narrator MP3s live in `simAss/narrator/`. The server exposes them at `GET /simAss-narrator/:filename` (served by name, not randomly). `playNarratorAudio` plays the file; the story attaches its own `ended` handler (a phase advances no sooner than a per-phase floor). A missing file is treated as an instant end so the story is never stuck. Call `this._audio?.pause()` in `exit()` to stop playback if the step is skipped.
+> **Temporary — narration is printed, not played.** The narrator MP3s aren't recorded yet, so each phase currently **prints** the lines the voice should say to the console (`[voce·PHASE] …`) and advances on a fixed **2 s beat** (`STEP_MS` + `narrate()` in `story.js`). Phases with several beats step through them 2 s apart; the climax keeps its own choreographed timers and narrates each beat as it fires. The lines live in the `LINES` map in `story.js`. When the audio is recorded, swap `narrate()` back for `sim.playNarratorAudio('audioN.mp3')` and advance on its `ended` event.
 
-**Audio map (content is the director's responsibility — swap the files freely):**
+`playNarratorAudio(file, { autoNext })` (still on the facade) plays a file from `simAss/narrator/` via `GET /simAss-narrator/:filename`; a missing file is treated as an instant end so the story is never stuck.
 
-| File | Phase | Trigger |
-|------|-------|---------|
+**Voice map — which line drives which phase (rough audio mapping for later):**
+
+| Slot | Phase | Trigger (once audio exists) |
+|------|-------|-----------------------------|
 | `audio1.mp3` | `ENTER` | Plays immediately on enter |
 | `audio2.mp3` | `ENTER` | Plays on first spectator connect; on end → `FREE` |
-| `audio3.mp3` | `FREE` | On enter; on end (≥7 s floor) → `TUNE` |
-| `audio4.mp3` | `TUNE` | On enter; on end (≥25 s floor) → `COLOR` |
-| `audio5.mp3` | `COLOR` | On enter; on end (≥15 s floor) → `HARMONY` |
+| `audio3.mp3` | `FREE` | On enter; on end → `TUNE` |
+| `audio4.mp3` | `TUNE` | On enter; on end → `COLOR` |
+| `audio5.mp3` | `COLOR` | On enter; on end → `HARMONY` |
 | `audio6.mp3` | `HARMONY` | Optional voice over the scripted climax |
 | `audio7.mp3` | `CLOSE` | On enter; terminal, no autoNext |
 
-The climax sequence (dim → void → reignition + chord → three shapes at ~7 s each → `CLOSE`) is driven by scripted timers in `PHASE.HARMONY.enter()`, not by audio.
+The climax sequence (dim → void → reignition + chord → three shapes at ~7 s each → `CLOSE`) is driven by scripted timers in `PHASE.HARMONY.enter()`, not by narration.
 
 This story system coexists with the step-based story mode (step IDs, vote steps, captions) driven by `applySimParams` — the client story runs on its own schedule while the admin panel or `applySimParams` handles content delivery.
 
