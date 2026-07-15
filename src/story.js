@@ -3,15 +3,15 @@ import { PHASE, RESEED } from './constants.js';
 // ─── Narrator Audio Map ──────────────────────────────────────────────────────
 // All files live in simAss/narrator/. Replace any file to swap the narration.
 //
-//   audio1.mp3    →  black             (PHASE 1 — starts immediately; stops on first connection)
-//   audio2.mp3    →  black             (PHASE 1 — starts on first connection; 10s later → PHASE 2)
-//   audio3.mp3    →  nota              (PHASE 2 — starts immediately on enter)
-//   audio4.mp3    →  rosso             (PHASE 3 — give a color to the note)
-//   audio5.mp3    →  immagini-tempesta (PHASE 5 — "Il rombo prima del lampo...")
-//   audio6.mp3    →  testo             (PHASE 7 — one word each)
-//   audio7.mp3    →  chiusura          (PHASE 8 — harmony is not the same note)
+//   audio1.mp3  →  PHASE 1 — starts immediately; stops on first connection
+//   audio2.mp3  →  PHASE 1 — starts on first connection; 10s later → PHASE 2
+//   audio3.mp3  →  PHASE 2 — starts immediately on enter
+//   audio4.mp3  →  PHASE 3 — give a color to the note
+//   audio5.mp3  →  PHASE 5 — "Il rombo prima del lampo..."
+//   audio6.mp3  →  PHASE 7 — one word each
+//   audio7.mp3  →  PHASE 8 — harmony is not the same note
 //
-// immagini-bigbang (PHASE 6) has no audio (director's note: "no commentary needed").
+// PHASE 6 has no audio (director's note: "no commentary needed").
 
 // ─── Note on hardcoded parameters ────────────────────────────────────────────
 // All timers, thresholds and filenames are intentionally hardcoded in this file.
@@ -53,7 +53,7 @@ export const STORY = [
     //               otherwise wait for the first user normally.
     // audio2 ends → immediate sim.next() (HARMONY text + 10s wait in PHASE 2).
     {
-        id: PHASE.BLACK,
+        id: PHASE.P1,
         enter(sim) {
             this._audio2Started = false;
             this._audio1Playing = true;
@@ -121,7 +121,7 @@ export const STORY = [
     // or audio3 from triggering the timer early).
     // First note after audio3 → wind on → 20s timer → sim.next().
     {
-        id: PHASE.NOTA,
+        id: PHASE.P2,
         _noteTimerStarted: false,
         _notesEnabled: false,
         enter(sim) {
@@ -161,24 +161,24 @@ export const STORY = [
         },
     },
 
-    // ── PHASE 3 — RED ─────────────────────────────────────────────────────────
+    // ── PHASE 3 ───────────────────────────────────────────────────────────────
     // NORMAL color → HARMONY text immediately → 10s timer → harmony images → audio4.
-    // After audio4 ends: 5s silence → red colors → PHASE 4.
+    // After audio4 ends: 5s silence → color → PHASE 4.
     // File: simAss/narrator/audio4.mp3
     {
-        id: PHASE.ROSSO,
+        id: PHASE.P3,
         enter(sim) {
             sim.setColorMode('NORMAL');
             sim.setParam('champLinesAlpha', 0.02);
             sim.setTraceText('HARMONY');
-            log('PHASE 3 — rosso. testo HARMONY attivo. immagini e audio tra 10s.');
+            log('PHASE 3. testo HARMONY attivo. immagini e audio tra 10s.');
             this._respawnTimer = setTimeout(() => {
                 log('10s scaduti — immagini harmony abilitate. dotRespawnChance abilitato (0.002). audio4 in partenza.');
                 sim.enableHarmonyImages();
                 sim.setParam('dotRespawnChance', 0.002);
                 this._audio = sim.playNarratorAudio('audio4.mp3');
                 this._audio.addEventListener('ended', () => {
-                    log('audio4 terminato. attesa 5s → colori rosso → PHASE 4.');
+                    log('audio4 terminato. attesa 5s → colori → PHASE 4.');
                     this._colorTimer = setTimeout(() => {
                         log('5s scaduti — color1=#ff0000 color2=#ff0000. avanzamento a PHASE 4.');
                         sim.freezeParams({ color1: '#ff0000', color2: '#ff0000' });
@@ -191,7 +191,7 @@ export const STORY = [
             log('uscita PHASE 3.');
             clearTimeout(this._respawnTimer);
             clearTimeout(this._colorTimer);
-            sim.disableHarmonyImages();
+            // Harmony images stay enabled from here on (intentionally not disabled).
             sim.thawParams();
             this._audio?.pause();
             this._audio = null;
@@ -203,7 +203,7 @@ export const STORY = [
     // Narrator speaks after silence; advances when audio ends.
     // File: simAss/narrator/audio4.mp3
     {
-        id: PHASE.IMMAGINI_CUORE,
+        id: PHASE.P4,
         enter(sim) {
             log('PHASE 4 — cuore. audio4 in partenza.');
             // TODO: load heart image into avoidmap
@@ -221,7 +221,7 @@ export const STORY = [
     // Narrator speaks; advances when audio ends.
     // File: simAss/narrator/audio5.mp3
     {
-        id: PHASE.IMMAGINI_TEMPESTA,
+        id: PHASE.P5,
         enter(sim) {
             log('PHASE 5 — tempesta. audio5 in partenza.');
             // TODO: load storm image into avoidmap
@@ -239,7 +239,7 @@ export const STORY = [
     // No narration (director's note: "no commentary needed").
     // Shown for 5 seconds, then cuts to black and auto-advances.
     {
-        id: PHASE.IMMAGINI_BIGBANG,
+        id: PHASE.P6,
         enter(sim) {
             log('PHASE 6 — bigbang. timer 5s avviato (no audio).');
             // TODO: load big bang image into avoidmap
@@ -259,7 +259,7 @@ export const STORY = [
     // Narrator speaks; advances automatically when audio ends.
     // File: simAss/narrator/audio6.mp3
     {
-        id: PHASE.TESTO,
+        id: PHASE.P7,
         enter(sim) {
             log('PHASE 7 — testo. audio6 in partenza.');
             this._audio = sim.playNarratorAudio('audio6.mp3', { autoNext: true });
@@ -275,7 +275,7 @@ export const STORY = [
     // Narrator speaks. Last step — no next().
     // File: simAss/narrator/audio7.mp3
     {
-        id: PHASE.CHIUSURA,
+        id: PHASE.P8,
         enter(sim) {
             log('PHASE 8 — chiusura. audio7 in partenza. fine storia.');
             this._audio = sim.playNarratorAudio('audio7.mp3');
