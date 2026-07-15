@@ -718,6 +718,22 @@ const simFacade = {
         }
         uploadSpectatorSlots();
     },
+    // Hard full-field reveal. applyConfirmedColors() only paints the spectator
+    // slots (~spectatorAgentShare of the points); this also drives the base
+    // gradient (params.color1/color2) from the audience palette so the WHOLE
+    // field turns colored. Falls back to a warm two-tone if nobody confirmed.
+    // Needs colorMode NORMAL to be visible.
+    applyPaletteToField() {
+        const distinct = [...new Set(_confirmedColors.values())];
+        if (distinct.length > 0) {
+            params.color1 = distinct[0];
+            params.color2 = distinct[1] ?? distinct[0];
+        } else {
+            params.color1 = '#ff3b30';
+            params.color2 = '#ff9500';
+        }
+        this.applyConfirmedColors();
+    },
     // Voice the confirmed notes as one sustained chord. Falls back to an A-minor
     // pentatonic triad if nobody confirmed a note.
     climaxChord(durationSec = 6) {
