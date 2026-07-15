@@ -617,17 +617,17 @@ Re-seeds all agents: positions are randomised from screen centre, home coordinat
 
 ## Remote / Swarm Inputs
 
-Spectators open `/remote/?s=<uuid>` on their phones. The remote is a **minimal five-state machine** — `BLACK → WHITE_DOT → NOTE_PICKER → COLOR_PALETTE → FULL_COLOR → BLACK` — driven by the story phase (`story-step`) plus a local note/color confirmation. The audience makes exactly two decisions: one **note** (9-cell A-minor pentatonic, D3–A4) and one **color** (8-swatch discrete palette). The page emits `join-session` (on connect), `note { index, freq }`, `note-off`, `note-confirm { index }`, and `color-confirm { color }`. During `TUNE` each note preview plays a short pluck locally through its own Web Audio synth. See **Remote Spectator Interactions** in [README.md](README.md) for the full description.
+Spectators open `/remote/?s=<uuid>` on their phones. The **shipped remote is the HARMONY note pad** — a full-screen touch canvas over a dark aura with a "HARMONY / touch to begin" hint. A single finger drives two channels: horizontal position selects a note (9-key A-minor pentatonic, D3–A4), vertical position selects a color hue. The page emits only four events: `join-session` (on connect), `note { index, freq, color }`, `note-off`, and `color-pick { color }`. Each phone also plays the note locally through its own Web Audio synth. See **Remote Spectator Interactions** in [README.md](README.md) for the full description.
 
 The server maintains a per-room state table (one entry per connected spectator, pruned after 15 s of inactivity).
 
-> **Dormant / removed machinery.** The joystick spawner, text (`story-text`), and vote subsections below describe input channels the **current remote UI does not send**; their parameters and `remote-event` handlers still exist in `src/sim.js` and `server/server.js`. The **motion/shake** channel and the continuous **`color-pick`** handler were *removed* in the HARMONY rewrite — the sim no longer reacts to those event types. Subsections are flagged inline.
+> **Dormant machinery.** The joystick spawner, motion/shake chaos, text (`story-text`), and vote subsections below describe input channels the **current remote UI does not send** — the shipped HARMONY note pad emits only note and color events. Their parameters and `remote-event` handlers still exist in `src/sim.js` and `server/server.js` and are documented here for completeness; the affected subsections are flagged inline.
 
 ---
 
 ### Motion / Shake
 
-> **Removed** — the current remote does not send motion/chaos events, and the sim's `shake` / `color-pick` handlers were removed in the HARMONY rewrite. The description below documents the earlier behaviour; the collective-state chaos plumbing (synth, avoidMap suppression, chaos color) is still intact and can be driven manually.
+> **Dormant** — the current HARMONY remote does not send motion/chaos events; the sim/server machinery below remains intact.
 
 **Phone gesture:** move or shake the phone.
 **Data sent:** `chaos` (0–1), derived from `devicemotion` acceleration magnitude, decaying over time at rest.
@@ -636,7 +636,7 @@ The server maintains a per-room state table (one entry per connected spectator, 
 1. **Aura feedback** — chaos level modulates the vignette intensity of the atmospheric gradient on the spectator's own phone screen. More motion = darker, more intense aura edge.
 2. **Collective chaos** — the server averages all active spectators' chaos and emits `avgChaos`. This value is **received but not applied automatically**: `collectiveChaos` is not driven by `avgChaos` so motion alone no longer triggers the chaos system. Chaos can be activated manually (via the GUI or `applySimParams`). To re-enable automatic motion-driven chaos, uncomment `collectiveChaos = avgChaos ?? 0` in the `collective-state` handler. The chaos system itself — noise magnitude, avoidMap suppression, chaos color fraction, all synth parameters — is fully intact and responds correctly once chaos is non-zero.
 
-**Shake detection** (earlier builds, now removed): acceleration magnitude above 22 m/s² with a 1.2 s cooldown once triggered `color-pick` + `shake` events to reset the spectator's color. The current phone sends neither event, and the sim no longer handles them.
+**Shake detection** (used only for color reset): acceleration magnitude above 22 m/s² with a 1.2 s cooldown. Triggers `color-pick` + `shake` events — resets the spectator's color to the simulation base palette.
 
 ---
 

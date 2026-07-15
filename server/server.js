@@ -177,9 +177,6 @@ io.on('connection', (socket) => {
         const room = assignedRoom ? rooms.get(assignedRoom) : null;
         if (!room?.hostSockets.has(socket.id)) return;
         room.storyStep = typeof step === 'number' ? step : -1;
-        // Forward immediately (in addition to the 1 s tick) so phase cues — e.g. the
-        // climax "phones to black" — reach spectators with sub-100 ms latency.
-        io.to(`${assignedRoom}:spectators`).emit('story-step', { step: room.storyStep });
     });
 
     // Sim reports its AudioContext lock state so the admin panel can show a warning.

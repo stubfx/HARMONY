@@ -23,7 +23,7 @@ import champLinesWGSL   from './shaders/champLines.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
 import bloomWGSL        from './shaders/bloom.wgsl?raw';
 import glareWGSL        from './shaders/glare.wgsl?raw';
-import { startSynth, setSynthState, setSynthDroneOnly, blinker, BLINKER_TYPES, playConfirmedChord } from './synth.js';
+import { startSynth, setSynthState, setSynthDroneOnly, addArpInfluence, blinker, BLINKER_TYPES } from './synth.js';
 import * as ambience from './ambience.js';
 import { StoryEngine } from './storyEngine.js';
 import { STORY }       from './story.js';
@@ -674,92 +674,6 @@ const simFacade = {
         }, { once: true });
         audio.play().catch(e => console.warn('[narrator] play() rejected:', e));
         return audio;
-    },
-
-    // ── Breath (PHASE.TUNE) ────────────────────────────────────────────────
-    // Enable field breathing; capture the base motion params to restore on stop.
-    startBreath() {
-        _breathActive          = true;
-        _breathBaseMaxSpeed    = params.maxSpeed;
-        _breathBaseStepLen     = params.stepLen;
-        _breathBaseLimitRadius = params.limitAtCenterRadius;
-        _breathOpenSmooth      = 0.5; _breathOpenTarget      = 0.5;
-        _breathIntensity       = 0;   _breathIntensityTarget = 0;
-    },
-    // avgNote: mean active note index (0–8). count: number of active notes.
-    // Low notes → collected/slow; high notes → open/fast. Count scales amplitude
-    // with a ceiling so a crowd breathes as one body, not as a sum.
-    breathImpulse(avgNote, count) {
-        if (!_breathActive) return;
-        _breathOpenTarget      = Math.max(0, Math.min(1, avgNote / 8));
-        _breathIntensityTarget = Math.min(1, count / 4);
-    },
-    // Note(s) released — ease back to the resting field.
-    breathRelease() {
-        _breathOpenTarget      = 0.5;
-        _breathIntensityTarget = 0;
-    },
-    stopBreath() {
-        _breathActive              = false;
-        params.maxSpeed            = _breathBaseMaxSpeed;
-        params.stepLen             = _breathBaseStepLen;
-        params.limitAtCenterRadius = _breathBaseLimitRadius;
-    },
-
-    // ── Climax helpers (PHASE.HARMONY) ─────────────────────────────────────
-    // Write each spectator's confirmed color into its slot → ~spectatorAgentShare
-    // of the points take that color. Needs colorMode NORMAL to be visible.
-    applyConfirmedColors() {
-        for (const slot of activeSlots) {
-            const hex = _confirmedColors.get(slot.spectatorId);
-            if (!hex) continue;
-            const [r, g, b] = hexToF(hex);
-            slot.colorR = r; slot.colorG = g; slot.colorB = b;
-        }
-        uploadSpectatorSlots();
-    },
-    // Hard full-field reveal. applyConfirmedColors() only paints the spectator
-    // slots (~spectatorAgentShare of the points); this also drives the base
-    // gradient (params.color1/color2) from the audience palette so the WHOLE
-    // field turns colored. Falls back to a warm two-tone if nobody confirmed.
-    // Needs colorMode NORMAL to be visible.
-    applyPaletteToField() {
-        const distinct = [...new Set(_confirmedColors.values())];
-        if (distinct.length > 0) {
-            params.color1 = distinct[0];
-            params.color2 = distinct[1] ?? distinct[0];
-        } else {
-            params.color1 = '#ff3b30';
-            params.color2 = '#ff9500';
-        }
-        this.applyConfirmedColors();
-    },
-    // Voice the confirmed notes as one sustained chord. Falls back to an A-minor
-    // pentatonic triad if nobody confirmed a note.
-    climaxChord(durationSec = 6) {
-        let freqs = [..._confirmedNotes.values()]
-            .map(i => PENTATONIC_FREQS[i])
-            .filter(Number.isFinite);
-        if (freqs.length === 0) freqs = [PENTATONIC_FREQS[3], PENTATONIC_FREQS[4], PENTATONIC_FREQS[6]];
-        playConfirmedChord(freqs, durationSec);
-    },
-
-    // Linearly tween a numeric param toward `to` over `ms`. Returns a cancel fn.
-    tweenParam(key, to, ms) {
-        const from  = params[key];
-        const start = performance.now();
-        const id = setInterval(() => {
-            const k = Math.min(1, (performance.now() - start) / ms);
-            params[key] = from + (to - from) * k;
-            if (k >= 1) clearInterval(id);
-        }, 16);
-        return () => clearInterval(id);
-    },
-
-    // Clear story-scoped buffers — called on the first phase (PHASE.ENTER).
-    resetStoryChoices() {
-        _confirmedNotes.clear();
-        _confirmedColors.clear();
     },
 };
 const storyEngine = new StoryEngine(STORY, simFacade);
@@ -2013,30 +1927,8 @@ const SPECTATOR_PALETTE = [
 //   dx, dy, magnitude, lastInputTime }
 const activeSlots = [];
 
-// A-minor pentatonic D3–A4 — mirrors the phone's KEYS[].freq order. Note index → Hz.
-const PENTATONIC_FREQS = [146.83, 164.81, 196.00, 220.00, 261.63, 293.66, 329.63, 392.00, 440.00];
-
 // Note-driven formula selection: sum of active note indices → modulo on formula arrays.
 const _activeNotesBySpectator = new Map(); // spectatorId → noteIndex (0–8)
-
-// ── Story: confirmed choices (phase 3 note, phase 4 color) ────────────────────
-// Buffered per spectator until the climax. Colors are NOT written to slots until
-// PHASE.HARMONY so the points stay white/black during phases 1–4.
-const _confirmedNotes  = new Map(); // spectatorId → noteIndex (0–8)
-const _confirmedColors = new Map(); // spectatorId → hex string
-
-// ── Breath impulse (PHASE.TUNE) ───────────────────────────────────────────────
-// Live notes gently modulate the field's openness/speed instead of injecting wind
-// formulas. Values are eased each frame in writeSoloUB (same 0.8 s time constant as
-// the collective-state smoothing) so notes make the field "breathe" and release.
-let _breathActive          = false;
-let _breathOpenTarget      = 0.5;  // 0 = collected/slow, 1 = open/fast, 0.5 = resting
-let _breathOpenSmooth      = 0.5;
-let _breathIntensityTarget = 0;    // 0–1, from active-note count (capped)
-let _breathIntensity       = 0;
-let _breathBaseMaxSpeed    = 5.0;  // captured on startBreath, restored on stopBreath
-let _breathBaseStepLen     = 2.0;
-let _breathBaseLimitRadius = 300;
 let _noteFormulaTimer  = null;
 let _formulaHeat       = 0;           // [0,1] — cresce ad ogni cambio nota, decade nel tempo
 let _formulaHeatLastT  = Date.now();  // timestamp ultimo cambio (per calcolare dt decay)
@@ -2235,15 +2127,6 @@ function _recalcNoteFormulas() {
     _noteFormulaTimer = setTimeout(() => applyFormulas(newDir, newWind), debounceMs);
 }
 
-// Aggregate all live notes into a single breath impulse: average index sets the
-// field's openness, the count sets its amplitude (capped inside breathImpulse).
-function _driveBreathFromNotes() {
-    const vals = [..._activeNotesBySpectator.values()];
-    if (vals.length === 0) { simFacade.breathRelease(); return; }
-    const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
-    simFacade.breathImpulse(avg, vals.length);
-}
-
 function uploadSpectatorSlots() {
     const ab = new ArrayBuffer(640);
     const f  = new Float32Array(ab);
@@ -2367,8 +2250,8 @@ loadAvoidMap(`${_apiBase}/simAss-static/full_square.png`);
         }
         if (spectatorId && activeSlots.length < MAX_SPECTATOR_SLOTS) {
             const isFirst = activeSlots.length === 0;
-            // Start white and stay white — the confirmed color is buffered on the host
-            // and only written into the slot at the climax (see applyConfirmedColors).
+            // Start with a neutral white — the phone sends a 'color-pick' immediately
+            // after joining with its locally generated palette color, which overwrites this.
             activeSlots.push({ spectatorId, colorR: 1, colorG: 1, colorB: 1, spawnerX: 0.5, spawnerY: 0.5, spawnerLocationActive: 0, dx: 0, dy: 0, magnitude: 0, velocity: 0, _smoothDx: 0, _smoothDy: 0, lastInputTime: 0, burst: 0, burstSeed: 0 });
             uploadSpectatorSlots();
             if (isFirst) {
@@ -2407,9 +2290,6 @@ loadAvoidMap(`${_apiBase}/simAss-static/full_square.png`);
                 uploadSpectatorSlots();
             }
             _activeNotesBySpectator.delete(spectatorId);
-            _driveBreathFromNotes();
-            _confirmedNotes.delete(spectatorId);
-            _confirmedColors.delete(spectatorId);
         }
     });
 
@@ -2439,27 +2319,29 @@ loadAvoidMap(`${_apiBase}/simAss-static/full_square.png`);
                 uploadSpectatorSlots();
             }
         }
-        // Live note (PHASE.TUNE "prova") — drives the field breath only. It does NOT
-        // inject wind formulas or trigger harmony; the climax shapes are scripted.
-        if (event.type === 'note' && typeof event.data?.index === 'number') {
-            _activeNotesBySpectator.set(event.spectatorId, event.data.index);
-            _driveBreathFromNotes();
-            storyEngine.onNote(event.data.index);
+        if (event.type === 'color-pick') {
+            const slot = activeSlots.find(s => s.spectatorId === event.spectatorId);
+            if (slot && typeof event.data?.color === 'string') {
+                const [r, g, b] = hexToF(event.data.color);
+                slot.colorR = r; slot.colorG = g; slot.colorB = b;
+                uploadSpectatorSlots();
+            }
+        }
+        if (event.type === 'shake' || event.type === 'note') {
+            const slot = activeSlots.find(s => s.spectatorId === event.spectatorId);
+            if (slot) {
+                triggerReleaseBurst(slot);
+                uploadSpectatorSlots();
+            }
+            if (event.type === 'note' && event.data?.freq) addArpInfluence(event.data.freq);
+            if (event.type === 'note' && typeof event.data?.index === 'number') {
+                _activeNotesBySpectator.set(event.spectatorId, event.data.index);
+                _recalcNoteFormulas();
+                storyEngine.onNote(event.data.index);
+            }
         }
         if (event.type === 'note-off') {
             _activeNotesBySpectator.delete(event.spectatorId);
-            _driveBreathFromNotes();
-        }
-        // Confirmed choices — buffered until the climax (color is NOT applied yet).
-        if (event.type === 'note-confirm' && typeof event.data?.index === 'number') {
-            _confirmedNotes.set(event.spectatorId, event.data.index);
-            _activeNotesBySpectator.delete(event.spectatorId); // stop breathing on this one
-            _driveBreathFromNotes();
-            storyEngine.onNoteConfirm(event.spectatorId, event.data.index);
-        }
-        if (event.type === 'color-confirm' && typeof event.data?.color === 'string') {
-            _confirmedColors.set(event.spectatorId, event.data.color);
-            storyEngine.onColorConfirm(event.spectatorId, event.data.color);
         }
         if (event.type === 'pulse-tap') {
             pulseEnergy = Math.min(pulseEnergy + PULSE_INCREMENT, PULSE_MAX);
@@ -2914,17 +2796,6 @@ function writeSoloUB(dt, time) {
     smoothCoherence = smoothCoherence * a + collectiveCoherence * (1 - a);
     smoothChaos     = smoothChaos     * a + collectiveChaos     * (1 - a);
 
-    // Breath (PHASE.TUNE): ease openness/amplitude toward their targets, then map
-    // to effective motion params. open ∈ [-1,1]: negative = collected/slow (low
-    // notes), positive = open/fast (high notes). Intensity caps the swing so a
-    // crowd stays one body. At rest (no notes) both ease back to neutral → base.
-    _breathOpenSmooth = _breathOpenSmooth * a + _breathOpenTarget      * (1 - a);
-    _breathIntensity  = _breathIntensity  * a + _breathIntensityTarget * (1 - a);
-    const _breathOpen = (_breathOpenSmooth - 0.5) * 2 * _breathIntensity;
-    const _effMaxSpeed    = _breathActive ? _breathBaseMaxSpeed    * (1 + _breathOpen * 0.70) : params.maxSpeed;
-    const _effStepLen     = _breathActive ? _breathBaseStepLen     * (1 + _breathOpen * 0.50) : params.stepLen;
-    const _effLimitRadius = _breathActive ? _breathBaseLimitRadius * (1 + _breathOpen * 0.60) : params.limitAtCenterRadius;
-
     // Decay join brightness pulse exponentially each frame
     burstBrightness *= BURST_DECAY;
     if (burstBrightness < BURST_THRESHOLD) burstBrightness = 0;
@@ -2948,14 +2819,14 @@ function writeSoloUB(dt, time) {
     u[0] = params.agentCount;
     f[1] = canvas.width;
     f[2] = canvas.height;
-    f[3] = _effStepLen;
+    f[3] = params.stepLen;
     f[4] = dt;
     f[5] = time;
     const isIdle = simState.status === 'FREEROAM';
     const isDot  = simState.status === 'DOT';
     f[6] = isIdle ? 0.0 : (isDot || params.windEnabled ? params.windStr : 0.0);
     f[7] = params.turnRate * coherenceMult;  // coherence scales how sharply agents follow the formula
-    f[8] = _effMaxSpeed;
+    f[8] = params.maxSpeed;
     f[9] = params.minSpeed;
     u[10] = (hasImage && params.traceEnabled) ? 1 : 0;
     f[11] = params.magnetStr;
@@ -3032,7 +2903,7 @@ function writeSoloUB(dt, time) {
     f[55] = params.chladniBlend;
     f[56] = params.spawnFadeRate;
     u[57] = params.limitAtCenter ? 1 : 0;
-    f[58] = _effLimitRadius;
+    f[58] = params.limitAtCenterRadius;
     setChaos(chaosGPU);
     const _synthNow = performance.now();
     if (_synthNow - _lastSynthTick >= 200) {

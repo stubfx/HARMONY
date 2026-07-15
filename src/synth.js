@@ -190,26 +190,6 @@ export function setSynthBusVolume(db) {
     if (_synthBus) _synthBus.volume.value = db;
 }
 
-// ── Climax chord — the confirmed notes "enter together" ───────────────────────
-// Builds a sustained chord from the given frequencies (deduplicated) and plays it
-// once. Used at the story climax to voice the collective's confirmed notes.
-let _chordSynth = null;
-export async function playConfirmedChord(freqs, durationSec = 6) {
-    if (!Array.isArray(freqs) || freqs.length === 0) return;
-    await Tone.start();
-    if (!_chordSynth) {
-        const reverb = new Tone.Reverb({ decay: 12, wet: 0.7 }).toDestination();
-        await reverb.ready;
-        _chordSynth = new Tone.PolySynth(Tone.Synth, {
-            oscillator: { type: 'triangle' },
-            envelope:   { attack: 1.2, decay: 1.5, sustain: 0.7, release: 4 },
-            volume:     -13,
-        }).connect(reverb);
-    }
-    const notes = [...new Set(freqs.filter(f => Number.isFinite(f) && f > 0))];
-    if (notes.length) _chordSynth.triggerAttackRelease(notes, durationSec);
-}
-
 export function stopSynth() {
     if (!_ready) return;
     _arpSeq?.stop();

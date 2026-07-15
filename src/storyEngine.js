@@ -36,12 +36,4 @@ export class StoryEngine {
     onNote(noteIndex) {
         this.current?.onNote?.(this._sim, noteIndex);
     }
-
-    onNoteConfirm(spectatorId, index) {
-        this.current?.onNoteConfirm?.(this._sim, spectatorId, index);
-    }
-
-    onColorConfirm(spectatorId, color) {
-        this.current?.onColorConfirm?.(this._sim, spectatorId, color);
-    }
 }
