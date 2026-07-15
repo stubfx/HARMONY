@@ -2336,6 +2336,8 @@ loadAvoidMap(`${_apiBase}/simAss-static/full_square.png`);
             if (event.type === 'note' && event.data?.freq) addArpInfluence(event.data.freq);
             if (event.type === 'note' && typeof event.data?.index === 'number') {
                 _activeNotesBySpectator.set(event.spectatorId, event.data.index);
+                const _noteSum = [..._activeNotesBySpectator.values()].reduce((a, b) => a + b, 0);
+                console.log(`[note] index ${event.data.index} · sum ${_noteSum} · harmony ${_noteSum % 4 === 0}`);
                 _recalcNoteFormulas();
                 storyEngine.onNote(event.data.index);
             }
