@@ -473,7 +473,9 @@ const _stepDebug = document.querySelector('#step-debug');
 socket.on('story-step', ({ step } = {}) => {
     _currentStep = typeof step === 'number' ? step : -1;
     _emitSound   = _currentStep > 0;   // note pad is audible from step 1 onward
-    if (_stepDebug) _stepDebug.textContent = _currentStep >= 0 ? _currentStep : '';
+    // Debug display only: show the 1-based phase number to match the host GUI.
+    // The wire value and all gating above stay 0-based (the STORY array index).
+    if (_stepDebug) _stepDebug.textContent = _currentStep >= 0 ? _currentStep + 1 : '';
     updateAura();
 });
 
