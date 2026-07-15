@@ -6,5 +6,4 @@ prev-images/
 .AANT/
 
 # simAss generated assets (images + music from ElevenLabs / OpenAI — runtime only)
-simAss/images/*
 simAss/music/*
