@@ -64,6 +64,8 @@ Clear the text by selecting all and deleting in the input field. If an image is 
 
 Total number of active particles. Changing this re-seeds all agents (positions and home coordinates are reassigned). The GPU buffer is always allocated at maximum size; this parameter only changes how many agents the compute dispatch and draw calls actually process.
 
+Can be set at boot via the `?n=<count>` URL parameter (clamped to 1 000 – `MAX_AGENTS`), which initialises the starting agent count before the first frame; it stays adjustable in the GUI afterwards. This parallels the `render scale` → `?r` boot override.
+
 ### base speed (`stepLen`)
 **Range:** 0.1 – 8 | **Default:** 2.0
 
@@ -148,7 +150,14 @@ When on (and wind is enabled), a scheduler randomly picks a new formula from the
 
 Canvas resolution multiplier applied on top of the device pixel ratio (DPR). At 1.0 on a 2x HiDPI screen the offscreen texture is rendered at 2× native — sharp but expensive. Reducing this to 0.5 halves the texture in each dimension (¼ the pixels), significantly improving frame rate on high-resolution displays. Changing this re-seeds agents.
 
-Can be set at boot via the `?resolution=<0-1>` URL parameter (clamped to the 0.1–1.0 range), which initialises this slider before the first frame.
+Can be set at boot via the `?r=<0-1>` URL parameter (clamped to the 0.1–1.0 range), which initialises this slider before the first frame.
+
+### auto-scale quality (`autoScale`)
+**Default:** off
+
+When on, the sim monitors frame rate and automatically lowers `renderScale` (then `agentCount`) to keep the target 60 fps. Recovers gradually when performance improves. Off by default so the visual quality is deterministic; useful for underpowered devices.
+
+Enable at boot via the `?autoscale=true` URL parameter.
 
 ### trail on (`trailEnabled`)
 **Default:** on
@@ -608,13 +617,17 @@ Re-seeds all agents: positions are randomised from screen centre, home coordinat
 
 ## Remote / Swarm Inputs
 
-Spectators open `/remote/?s=<uuid>` on their phones. The page features a virtual joystick centered on screen and a color picker always visible at the top. A star field canvas (65 stars drifting counter to joystick direction, streaking on fast moves) is visible only in DRAW step status. The join button reads "swarm" and the device message is shown large and centered.
+Spectators open `/remote/?s=<uuid>` on their phones. The **shipped remote is the HARMONY note pad** — a full-screen touch canvas over a dark aura with a "HARMONY / touch to begin" hint. A single finger drives two channels: horizontal position selects a note (9-key A-minor pentatonic, D3–A4), vertical position selects a color hue. The page emits only four events: `join-session` (on connect), `note { index, freq, color }`, `note-off`, and `color-pick { color }`. Each phone also plays the note locally through its own Web Audio synth. See **Remote Spectator Interactions** in [README.md](README.md) for the full description.
 
 The server maintains a per-room state table (one entry per connected spectator, pruned after 15 s of inactivity).
+
+> **Dormant machinery.** The joystick spawner, motion/shake chaos, text (`story-text`), and vote subsections below describe input channels the **current remote UI does not send** — the shipped HARMONY note pad emits only note and color events. Their parameters and `remote-event` handlers still exist in `src/sim.js` and `server/server.js` and are documented here for completeness; the affected subsections are flagged inline.
 
 ---
 
 ### Motion / Shake
+
+> **Dormant** — the current HARMONY remote does not send motion/chaos events; the sim/server machinery below remains intact.
 
 **Phone gesture:** move or shake the phone.
 **Data sent:** `chaos` (0–1), derived from `devicemotion` acceleration magnitude, decaying over time at rest.
@@ -629,6 +642,8 @@ The server maintains a per-room state table (one entry per connected spectator, 
 
 ### Joystick — personal spawner
 
+> **Dormant** — the current HARMONY remote has no joystick and does not send spawner events; the sim/server machinery below remains intact.
+
 **Phone gesture:** use the virtual joystick centered on the remote page.
 **Data sent:** `dx`, `dy`, `magnitude` (0–1), `velocity` (0–1, normalized finger speed). Throttled to 300 ms; velocity is computed from finger speed.
 **Routing:** forwarded directly as `remote-event` (not aggregated server-side).
@@ -638,12 +653,16 @@ The server maintains a per-room state table (one entry per connected spectator, 
 
 ### Text — story input
 
+> **Dormant** — the current HARMONY remote has no text input and does not send `story-text`; the sim/server machinery below remains intact.
+
 **Phone gesture:** a centered text input panel appears on the phone screen.
 **When shown:** only when `stepStatus` is `"TEXT"` (sent via the `remote-ui` socket event). Hidden at all other times — spectators cannot open it manually.
 **Data sent:** `text` string via `story-text` socket event.
 **After submit:** the panel collapses automatically and the phone returns to its rest state.
 
 ### Shake — color reset
+
+> **Dormant** — the current HARMONY remote does not detect shake; the sim/server machinery below remains intact.
 
 **Phone gesture:** shake the phone sharply.
 **Detection:** acceleration magnitude > 22 m/s² with a 1.2 s cooldown. Only active in DRAW step status.
@@ -921,6 +940,8 @@ Per-frame probability that a free agent inside the QR bounding box is respawned.
 ### vote duration (s) (`voteDuration`)
 **Range:** 5 – 120 | **Default:** 30
 
+> **Dormant** — the current HARMONY remote has no vote UI; this parameter and the vote mechanics below remain wired in the sim/server but are not driven by the shipped remote.
+
 Seconds the vote panel stays open on spectator phones. Both the remote devices and the simulation's main display show a live countdown. When the timer expires the sim emits a `vote-result` event containing the winning option label and whether it was A or B, then the remote devices automatically revert to their rest state (joystick).
 
 ### idle restore QR (s) (`remoteTimeout`)
@@ -931,7 +952,7 @@ Seconds of silence from all remote devices before the QR trace is automatically 
 ### QR hides at N users (`maxSpectators`)
 **Range:** 1 – 50 | **Default:** 1
 
-The remote page's persistent QR code fades when the connected spectator count reaches this threshold. This value is baked into the QR URL at generation time — changing it mid-session requires the QR to be regenerated (restart the simulation).
+> **Inert** — this param is still declared (`src/sim.js:170`) but is read nowhere. It once controlled a persistent share-QR on the spectator page that faded past this spectator count; the HARMONY note pad removed that QR, and the remote URL (`?s=` only) no longer carries a `?max=` value. The param remains as a vestige and currently has no effect.
 
 ---
 
@@ -948,7 +969,7 @@ Story mode layers a scripted, sequential narrative on top of the simulation. The
 | Field | Type | Description |
 |-------|------|-------------|
 | `step` | any | Step identifier — echoed back in every heartbeat. Receiving a new `step` resets vote state and sets `stepStatus` to `"IDLE"` unless overridden. When no step is active (`null`), the remote always shows the joystick regardless of `stepStatus` |
-| `stepStatus` | `"IDLE"` \| `"DRAW"` \| `"VOTE"` \| `"TEXT"` | Spectator interaction mode for this step. Only meaningful while a step is active — if no step is set, the remote keeps the joystick visible. Defaults to `"IDLE"` when a new step arrives without an explicit value |
+| `stepStatus` | `"HARMONY"` \| `"IDLE"` \| `"DRAW"` \| `"VOTE"` \| `"TEXT"` | Spectator interaction mode for this step. `"HARMONY"` is the current default (`src/sim.js:1836`) and the mode the shipped remote implements. Only meaningful while a step is active — if no step is set, the remote keeps its rest UI. Defaults to `"IDLE"` when a new step arrives without an explicit value |
 | `optionA` | string | Label for the first vote option — required when `stepStatus` is `"VOTE"` |
 | `optionB` | string | Label for the second vote option — required when `stepStatus` is `"VOTE"` |
 | `caption` | string \| null | Subtitle text drawn at the bottom of the simulation canvas as a particle attractor (white glyphs, same pipeline as `traceText`). Word-wrapped to 80 % canvas width. `null` or `""` clears it |
@@ -972,6 +993,7 @@ A text input step:
 
 | Value | Remote UI | Gesture surface |
 |-------|-----------|-----------------|
+| `"HARMONY"` | Full-screen note pad (X = note, Y = color hue) — the current default (`src/sim.js:1836`) and the only mode the shipped remote implements | Slide to play notes and pick a hue |
 | `"IDLE"` | Atmospheric surface, no interaction | All gestures passive |
 | `"DRAW"` | Atmospheric surface, full interaction | Joystick, color picker, shake all active |
 | `"VOTE"` | Two full-screen buttons labelled `optionA` / `optionB` with live countdown | Joystick hidden; vote buttons active |
@@ -983,6 +1005,8 @@ A text input step:
 When `stepStatus` changes, the sim broadcasts a `remote-ui` Socket.IO event to all spectators. The remote page switches its interface immediately.
 
 ### Vote mechanics
+
+> **Dormant** — the current HARMONY remote has no vote UI; the mechanics below remain wired in the sim/server but are not driven by the shipped remote.
 
 - Each spectator can vote once per step; subsequent taps overwrite their previous vote
 - Server counts A vs B votes and emits a running `story-vote-update` tally to the host sim after every change

@@ -20,8 +20,9 @@ struct V { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> }
     // Inversion runs here (post-tonemap) so additive HDR accumulation isn't broken.
     let inverted = p.colorMode == 2u;
     let bg       = select(0.0, 1.0, inverted);
-    if (luma < p.cutoff) { return vec4<f32>(vec3<f32>(bg), 1.0); }
-    if (p.colorMode == 0u) { return vec4<f32>(boosted, col.a); }
+    // Smooth fade to background near cutoff instead of hard snap-to-black.
+    let softFade = smoothstep(0.0, p.cutoff, luma);
+    if (p.colorMode == 0u) { return vec4<f32>(boosted * softFade, col.a); }
     let g = select(luma, 1.0 - luma, inverted);
-    return vec4<f32>(vec3<f32>(g), col.a);
+    return vec4<f32>(vec3<f32>(mix(bg, g, softFade)), col.a);
 }

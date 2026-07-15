@@ -3,7 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>swarm</title>
+    <title>HARMONY</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bellefair&display=swap" rel="stylesheet">
@@ -131,35 +132,27 @@
         }
         #mon-params-list .k { color: #b8e8ff; }
 
-        /* ── Audio unlock nudge ─────────────────────────────────────────────── */
+        /* ── Start overlay — opaque black, hides the sim until "click to start" ── */
         #audio-unlock {
             position: fixed;
             inset: 0;
             z-index: 20;
-            background: transparent;
+            background: #000;
             border: none;
             cursor: pointer;
-            color: transparent;
+            color: rgba(255, 255, 255, 0.82);
             font-family: 'Bellefair', serif;
             text-align: center;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 1.2rem;
-            transition: opacity 0.5s;
+            transition: opacity 0.6s ease;
         }
         #audio-unlock .unlock-title {
-            font-size: clamp(1.6rem, 4vw, 3.2rem);
-            letter-spacing: 0.125em;
+            font-size: clamp(1.4rem, 3.2vw, 2.4rem);
+            letter-spacing: 0.2em;
             padding-left: 0.2em;
             line-height: 1;
-        }
-        #audio-unlock .unlock-countdown {
-            font-size: clamp(0.55rem, 1vw, 0.85rem);
-            letter-spacing: 0.15em;
-            padding-left: 0.15em;
-            opacity: 0.75;
         }
         #audio-unlock.unlocked { opacity: 0; pointer-events: none; }
 
@@ -187,14 +180,15 @@
         <span id="mon-fps"></span>
         <span id="mon-agents"></span>
         <span id="mon-params-title">URL params</span>
-        <span id="mon-params-list"><span class="k">?s=&lt;uuid&gt;</span>      session room
-<span class="k">?amount=&lt;n&gt;</span>     starting agent count
-<span class="k">?test=1</span>          n8n test mode
-<span class="k">?password=&lt;x&gt;</span>   echoed in heartbeat
-<span class="k">?gui=true</span>        open with HUD visible
-<span class="k">?n8n=off</span>         disable all n8n calls
-<span class="k">?pixelGrid=true</span>  chunky low-res pixel grid
-<span class="k">?resolution=&lt;0-1&gt;</span> render scale at boot (0.1–1.0)</span>
+        <span id="mon-params-list"><span class="k">?s=&lt;uuid&gt;</span>       session room
+<span class="k">?n=&lt;n&gt;</span>          starting agent count
+<span class="k">?r=&lt;0-1&gt;</span>        render scale at boot (0.1–1.0)
+<span class="k">?autoscale=true</span> adaptive quality (holds 60 fps)
+<span class="k">?pixelGrid=true</span> chunky low-res pixel grid
+<span class="k">?gui=true</span>       open with HUD visible
+<span class="k">?n8n=off</span>        disable all n8n calls
+<span class="k">?test=1</span>         n8n test mode
+<span class="k">?password=&lt;x&gt;</span>  echoed in heartbeat</span>
     </div>
 
     <div id="ui">
@@ -227,27 +221,8 @@
 
     <div id="vote-countdown"></div>
     <button id="audio-unlock">
-        <span class="unlock-title">HARMONY</span>
-        <span class="unlock-countdown" id="unlock-countdown"></span>
+        <span class="unlock-title">click to start</span>
     </button>
-    <script>
-        (function () {
-            const TARGET = new Date('2026-07-25T00:00:00');
-            const el = document.getElementById('unlock-countdown');
-            function tick() {
-                const diff = TARGET - Date.now();
-                if (diff <= 0) { el.textContent = '25 · VII · MMXXVI'; return; }
-                const d  = Math.floor(diff / 86400000);
-                const h  = Math.floor((diff % 86400000) / 3600000);
-                const m  = Math.floor((diff % 3600000)  / 60000);
-                const s  = Math.floor((diff % 60000)    / 1000);
-                const pad = n => String(n).padStart(2, '0');
-                el.textContent = `${d}d  ${pad(h)}h  ${pad(m)}m  ${pad(s)}s`;
-            }
-            tick();
-            setInterval(tick, 1000);
-        })();
-    </script>
 
     <input id="image-input"     type="file" accept="image/*" style="display:none;">
     <input id="avoid-map-input" type="file" accept="image/*" style="display:none;">

@@ -60,7 +60,7 @@ export function initGUI({
     const agentCountCtrl = fMotion.add(params, 'agentCount', 1_000, MAX_AGENTS, 1_000)
         .name('agents')
         .onChange(() => seedAgents());
-    fMotion.add(params, 'autoScale').name('auto-scale quality');
+    const autoScaleCtrl = fMotion.add(params, 'autoScale').name('auto-scale quality');
     fMotion.add(params, 'stepLen',      0.1, 8,    0.1).name('base speed');
     fMotion.add(params, 'turnRate',     0.005, 0.3, 0.005).name('turn rate');
     fMotion.add(params, 'maxSpeed',     1,    15,   0.5).name('max speed');
@@ -114,11 +114,14 @@ export function initGUI({
     fVis.add(params, 'chaosColorFraction', 0, 1, 0.01).name('chaos color %');
     fVis.addColor(params, 'idleColor').name('idle color');
     fVis.add(params, 'idleColorFraction', 0, 1, 0.01).name('idle color %');
-    fVis.add(params, 'brightness', 0.01, 0.5, 0.005).name('brightness');
+    const brightnessCtrl = fVis.add(params, 'brightness', 0.01, 0.5, 0.005).name('brightness');
     fVis.add(params, 'additiveBlend').name('additive blend');
     fVis.add(params, 'blendAmount', 0, 1, 0.01).name('blend amount');
+    fVis.add(params, 'glareEnabled').name('glare');
+    fVis.add(params, 'glareIntensity',  0, 1,   0.01).name('glare intensity');
+    fVis.add(params, 'glareThreshold',  0, 1,   0.01).name('glare threshold');
     fVis.add(params, 'pixelGrid').name('pixel grid');
-    fVis.add(params, 'pixelGridCells', 20, 1000, 1).name('grid cells').onChange(() => rebuildGridTex());
+    fVis.add(params, 'pixelGridCells', 20, 2000, 1).name('grid cells').onChange(() => rebuildGridTex());
 
     // ── Export (screenshot, 's' key) ────────────────────────────────────────────
     const fExport = gui.addFolder('Export');
@@ -370,7 +373,9 @@ export function initGUI({
         dbgChaos,
         golEnabledCtrl,
         agentCountCtrl,
+        autoScaleCtrl,
         renderScaleCtrl,
+        brightnessCtrl,
         applyGUIVisibility,
         toggleGUI,
         storyPhaseCtrl,

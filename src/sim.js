@@ -21,6 +21,8 @@ import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
 import colorPrepassWGSL from './shaders/colorPrepass.wgsl?raw';
 import champLinesWGSL   from './shaders/champLines.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
+import bloomWGSL        from './shaders/bloom.wgsl?raw';
+import glareWGSL        from './shaders/glare.wgsl?raw';
 import { startSynth, setSynthState, setSynthDroneOnly, addArpInfluence, blinker, BLINKER_TYPES } from './synth.js';
 import * as ambience from './ambience.js';
 import { StoryEngine } from './storyEngine.js';
@@ -36,7 +38,7 @@ const GOL_W = 192;
 const params = {
     // Agents
     agentCount:  2_000_000,
-    autoScale:   true,       // adaptive quality: reduce renderScale then agentCount to hold 60 fps
+    autoScale:   false,      // adaptive quality: reduce renderScale then agentCount to hold 60 fps
     // Motion
     stepLen:     2.0,
     turnRate:    0.04,
@@ -49,10 +51,10 @@ const params = {
     autoWind:    true,   // cycle through WIND_FORMULAS every 10 s
     // Visual
     renderScale:    1.0,    // multiplied with DPR — reduce on high-res screens
-    trailDecay:     0.04,
+    trailDecay:     0.02,
     trailEnabled:   true,  // false = no trail; buffer cleared each frame
     bgBlackCutoff:  0.05, // luminance below which trail pixels are clamped to 0 at display time
-    pointSize:      1.3,
+    pointSize:      3.5,
     color1:      '#ffffff',   // first palette colour
     color2:      '#ffffff',   // second palette colour (assigned by agent index % 2)
     chaosColor:         '#ff2244',  // colour taken by chaosColorFraction of all agents at full chaos
@@ -68,6 +70,9 @@ const params = {
     shadowBoost: 0.0,         // inverse-brightness boost: peaks at ~12% luminance, negligible above 60%
     pixelGrid:      false,    // chunky low-res grid (downsample → nearest-sample blit) — final stage before canvas
     pixelGridCells: 700,      // cell count along the X axis; Y count is derived from canvas aspect ratio
+    glareEnabled:    false,   // additive bloom/glare pass over the final blit
+    glareIntensity:  0.15,    // composite strength (0 = off, 1 = full)
+    glareThreshold:  0.6,     // luminance threshold — only pixels above this feed into the bloom
     // Magnet
     traceEnabled:   false, // master on/off for trace image homing (image stays loaded)
     debugHoming:    false, // render homing agents bright white regardless of image/chaos
@@ -180,9 +185,11 @@ const params = {
 };
 
 // ── URL param overrides ───────────────────────────────────────────────────────
-// ?s=<uuid>       — pin the sim to a specific session room (survives reloads via URL)
-// ?amount=<n>     — override the starting agent count (still adjustable in the GUI)
-// ?pixelGrid=true — start with the chunky low-res pixel-grid mode enabled
+// ?s=<uuid>        — pin the sim to a specific session room (survives reloads via URL)
+// ?n=<n>           — override the starting agent count (still adjustable in the GUI)
+// ?pixelGrid=true  — start with the chunky low-res pixel-grid mode enabled
+// ?r=<0-1>         — initial render scale (clamped to 0.1–1.0)
+// ?autoscale=true  — enable adaptive quality (reduces renderScale / agentCount to hold 60 fps)
 const _urlParams     = new URLSearchParams(location.search);
 const _forcedSession = _urlParams.get('s') || null;
 {
@@ -190,14 +197,18 @@ const _forcedSession = _urlParams.get('s') || null;
     if (v === 'true' || v === '1') params.pixelGrid = true;
 }
 {
-    const n = parseInt(_urlParams.get('amount') ?? '', 10);
+    const n = parseInt(_urlParams.get('n') ?? '', 10);
     if (Number.isFinite(n) && n > 0)
         params.agentCount = Math.max(1_000, Math.min(MAX_AGENTS, n));
 }
 {
     // resolution: initial render scale, 0–1 (clamped to the slider's 0.1–1.0 range).
-    const r = parseFloat(_urlParams.get('resolution') ?? '');
+    const r = parseFloat(_urlParams.get('r') ?? '');
     if (Number.isFinite(r)) params.renderScale = Math.max(0.1, Math.min(1.0, r));
+}
+{
+    const v = _urlParams.get('autoscale');
+    if (v === 'true' || v === '1') params.autoScale = true;
 }
 
 const DEFAULT_DIR  = 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI';
@@ -813,6 +824,40 @@ const blitPipe = device.createRenderPipeline({
     primitive: { topology: 'triangle-list' },
 });
 
+// Bloom + glare: threshold → downsample → blur H → blur V → additive composite onto swap-chain.
+const bloomMod            = device.createShaderModule({ code: bloomWGSL });
+const bloomDownsamplePipe = device.createComputePipeline({
+    layout: 'auto',
+    compute: { module: bloomMod, entryPoint: 'downsample' },
+});
+const bloomBlurPipe = device.createComputePipeline({
+    layout: 'auto',
+    compute: { module: bloomMod, entryPoint: 'blur' },
+});
+const glareMod  = device.createShaderModule({ code: glareWGSL });
+const glarePipe = device.createRenderPipeline({
+    layout: 'auto',
+    vertex:   { module: glareMod, entryPoint: 'vs' },
+    fragment: {
+        module: glareMod, entryPoint: 'fs',
+        targets: [{
+            format: canvasFormat,
+            blend: {
+                color: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' },
+                alpha: { srcFactor: 'one',        dstFactor: 'one', operation: 'add' },
+            },
+        }],
+    },
+    primitive: { topology: 'triangle-list' },
+});
+// bloomUB: BloomParams (32 bytes); glareUB: BloomCompositeParams (16 bytes)
+const bloomUB = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+const glareUB = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+const _bloomAB = new ArrayBuffer(32); const _bloomU32 = new Uint32Array(_bloomAB); const _bloomF32 = new Float32Array(_bloomAB);
+const _glareAB = new ArrayBuffer(16); const _glareF32 = new Float32Array(_glareAB);
+let bloomTexA = null, bloomTexB = null;
+let bloomDownsampleBG = null, bloomBlurHBG = null, bloomBlurVBG = null, glareBG = null;
+
 // Downsample: full-res offscreen → small gridTex with per-cell area average.
 // Used only when params.pixelGrid is on.
 const downsampleMod = device.createShaderModule({ code: downsampleWGSL });
@@ -1029,10 +1074,56 @@ function rebuildOffscreen() {
     rp.end();
     device.queue.submit([enc.finish()]);
 
+    rebuildBloomTex();
     // Grid resources depend on offscreenView, so rebuild them whenever offscreen changes.
     rebuildGridTex();
 }
 rebuildOffscreen();
+
+function rebuildBloomTex() {
+    if (bloomTexA) bloomTexA.destroy();
+    if (bloomTexB) bloomTexB.destroy();
+    const bw = Math.max(1, Math.ceil(canvas.width  / 2));
+    const bh = Math.max(1, Math.ceil(canvas.height / 2));
+    const usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING;
+    bloomTexA = device.createTexture({ size: [bw, bh], format: 'rgba8unorm', usage });
+    bloomTexB = device.createTexture({ size: [bw, bh], format: 'rgba8unorm', usage });
+    bloomDownsampleBG = device.createBindGroup({
+        layout: bloomDownsamplePipe.getBindGroupLayout(0),
+        entries: [
+            { binding: 0, resource: { buffer: bloomUB } },
+            { binding: 1, resource: screenSmp },
+            { binding: 2, resource: offscreenView },
+            { binding: 3, resource: bloomTexA.createView() },
+        ],
+    });
+    bloomBlurHBG = device.createBindGroup({
+        layout: bloomBlurPipe.getBindGroupLayout(0),
+        entries: [
+            { binding: 0, resource: { buffer: bloomUB } },
+            { binding: 1, resource: screenSmp },
+            { binding: 2, resource: bloomTexA.createView() },
+            { binding: 3, resource: bloomTexB.createView() },
+        ],
+    });
+    bloomBlurVBG = device.createBindGroup({
+        layout: bloomBlurPipe.getBindGroupLayout(0),
+        entries: [
+            { binding: 0, resource: { buffer: bloomUB } },
+            { binding: 1, resource: screenSmp },
+            { binding: 2, resource: bloomTexB.createView() },
+            { binding: 3, resource: bloomTexA.createView() },
+        ],
+    });
+    glareBG = device.createBindGroup({
+        layout: glarePipe.getBindGroupLayout(0),
+        entries: [
+            { binding: 0, resource: { buffer: glareUB } },
+            { binding: 1, resource: screenSmp },
+            { binding: 2, resource: bloomTexA.createView() },
+        ],
+    });
+}
 
 // Full resolution-change rebuild: recreate every canvas-sized resource AND every
 // bind group that samples those textures. rebuildOffscreen alone rebuilds only a
@@ -1767,7 +1858,9 @@ let applyGUIVisibility, toggleGUI, updateGizmo;
 let golEnabledCtrl  = null;
 let storyPhaseCtrl  = null;
 let agentCountCtrl  = null;
+let autoScaleCtrl   = null;
 let renderScaleCtrl = null;
+let brightnessCtrl  = null;
 
 function updateStateDisplay() {
     modeCtrl?.updateDisplay();
@@ -2406,7 +2499,7 @@ function applySimParams(data) {
     dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence, dbgChaos,
     golEnabledCtrl,
     storyPhaseCtrl,
-    agentCountCtrl, renderScaleCtrl,
+    agentCountCtrl, autoScaleCtrl, renderScaleCtrl, brightnessCtrl,
     applyGUIVisibility, toggleGUI, updateGizmo,
 } = initGUI({
     params, socket, simState, MAX_AGENTS,
@@ -2417,6 +2510,9 @@ function applySimParams(data) {
     clearMagnetImage, clearTraceText, clearAvoidMap,
     updateAvoidMapOverlay: _updateAvoidMapOverlay,
 }));
+
+// Sync GUI with URL params that were applied before initGUI ran.
+autoScaleCtrl.updateDisplay();
 
 storyEngine.onGoto = (i) => {
     storyPhaseCtrl.updateDisplay();
@@ -3184,9 +3280,13 @@ function frame(ts) {
         AQ.smoothedFPS = AQ.ALPHA * (1 / rawDt) + (1 - AQ.ALPHA) * AQ.smoothedFPS;
         if (--AQ.cooldown <= 0 && AQ.smoothedFPS < AQ.LOW_FPS) {
             if (params.agentCount > AQ.AGENT_MIN) {
+                const prevCount   = params.agentCount;
                 params.agentCount = Math.max(AQ.AGENT_MIN,
                     Math.floor(params.agentCount * AQ.AGENT_FACTOR));
                 agentCountCtrl?.updateDisplay();
+                const cut = prevCount - params.agentCount;
+                params.brightness = Math.min(0.5, params.brightness + Math.floor(cut / 100_000) * 0.02);
+                brightnessCtrl?.updateDisplay();
                 AQ.cooldown = AQ.AGENT_COOLDOWN;
             } else if (params.renderScale > AQ.SCALE_MIN + 0.001) {
                 params.renderScale = Math.max(AQ.SCALE_MIN,
@@ -3369,6 +3469,40 @@ function frame(ts) {
     // downsample pass is needed — gridTex already holds the chunky cell-aligned
     // image. The blit still reads it with a nearest sampler for the upscale.)
 
+    // Bloom: threshold-downsample → blur H → blur V into bloomTexA, ready for glare composite.
+    if (params.glareEnabled && bloomTexA && !usingPixel) {
+        const bw = bloomTexA.width, bh = bloomTexA.height;
+        const wx = Math.ceil(bw / 8), wy = Math.ceil(bh / 8);
+        // Downsample pass
+        _bloomU32[0] = canvas.width; _bloomU32[1] = canvas.height;
+        _bloomU32[2] = bw;           _bloomU32[3] = bh;
+        _bloomF32[4] = params.glareThreshold; _bloomF32[5] = 0;
+        _bloomU32[6] = 0; _bloomU32[7] = 4;
+        device.queue.writeBuffer(bloomUB, 0, _bloomAB);
+        const cp1 = enc.beginComputePass();
+        cp1.setPipeline(bloomDownsamplePipe);
+        cp1.setBindGroup(0, bloomDownsampleBG);
+        cp1.dispatchWorkgroups(wx, wy);
+        cp1.end();
+        // Blur H
+        _bloomU32[0] = bw; _bloomU32[1] = bh; _bloomU32[2] = bw; _bloomU32[3] = bh;
+        _bloomU32[6] = 1;  // horizontal
+        device.queue.writeBuffer(bloomUB, 0, _bloomAB);
+        const cp2 = enc.beginComputePass();
+        cp2.setPipeline(bloomBlurPipe);
+        cp2.setBindGroup(0, bloomBlurHBG);
+        cp2.dispatchWorkgroups(wx, wy);
+        cp2.end();
+        // Blur V
+        _bloomU32[6] = 0;  // vertical
+        device.queue.writeBuffer(bloomUB, 0, _bloomAB);
+        const cp3 = enc.beginComputePass();
+        cp3.setPipeline(bloomBlurPipe);
+        cp3.setBindGroup(0, bloomBlurVBG);
+        cp3.dispatchWorkgroups(wx, wy);
+        cp3.end();
+    }
+
     // Blit offscreen (or gridTex when pixelGrid on) → canvas, then optional overlays
     const curTex = ctx.getCurrentTexture();
     const bp = enc.beginRenderPass({
@@ -3380,6 +3514,14 @@ function frame(ts) {
     bp.setPipeline(blitPipe);
     bp.setBindGroup(0, params.pixelGrid && gridBlitBG ? gridBlitBG : blitBG);
     bp.draw(3);
+    if (params.glareEnabled && glareBG && !usingPixel) {
+        _glareF32[0] = 1; _glareF32[1] = 1; _glareF32[2] = 1;
+        _glareF32[3] = params.glareIntensity;
+        device.queue.writeBuffer(glareUB, 0, _glareAB);
+        bp.setPipeline(glarePipe);
+        bp.setBindGroup(0, glareBG);
+        bp.draw(6);
+    }
     if (params.showWindVis && windVisPipe) {
         bp.setPipeline(windVisPipe);
         bp.setBindGroup(0, windVisBG);

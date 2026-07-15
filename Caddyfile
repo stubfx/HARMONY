@@ -1,8 +1,3 @@
-{
-    # Restrict admin interface to a local unix socket.
-    admin "unix//run/caddy/admin.socket"
-}
-
 # ── Production ─────────────────────────────────────────────────────────────────
 # Three domains, two responsibilities:
 #
@@ -14,7 +9,7 @@
 # Caddy handles TLS automatically via Let's Encrypt — no extra config needed.
 
 thesis.lucamolluso.com {
-    root * /var/www/thesis-sim/dist
+    root * /home/admin/HARMONY/dist
 
     encode gzip
 
@@ -27,6 +22,16 @@ thesis.lucamolluso.com {
         try_files {path} /index.html
     }
 
+    file_server
+}
+
+remote.lucamolluso.com {
+    root * /home/admin/HARMONY/dist
+
+    encode gzip
+
+    # Serve the remote UI; token validation is handled by the app, not Caddy.
+    try_files {path} /remote/index.html
     file_server
 }
 

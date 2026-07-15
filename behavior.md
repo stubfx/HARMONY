@@ -16,6 +16,8 @@ This is the sensation we are designing for: participation without authorship.
 
 ## How the body speaks to the swarm
 
+> *The sections below describe the intended experience across the piece's full vocabulary. The currently shipped remote centres on the **HARMONY note pad** — slide horizontally to play a note, vertically to pick a colour. The touch/words/vote channels remain part of the design intent but are dormant in the current build.*
+
 ### Touch — your own swarm
 
 Each person who joins is assigned a color and a slice of the particle field. Those particles are yours in color only: they live everywhere, mixed into the whole. When you move the joystick, a small fraction of them teleport to wherever the spawner is heading, as though the field is orienting toward you. Hold still and they collect. Move quickly and they scatter and regroup. Lift your finger and they drift back into the current.
