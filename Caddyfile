@@ -13,10 +13,14 @@ thesis.lucamolluso.com {
 
     encode gzip
 
-    # MPA fallbacks: /remote/* → remote/index.html, everything else → index.html.
+    # MPA fallbacks: /remote/* → remote/index.html, /simremotes/* →
+    # simremotes/index.html, everything else → index.html.
     # This mirrors the Express catch-all routes used in development.
     handle /remote/* {
         try_files {path} /remote/index.html
+    }
+    handle /simremotes/* {
+        try_files {path} /simremotes/index.html
     }
     handle {
         try_files {path} /index.html
