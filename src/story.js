@@ -215,12 +215,18 @@ export const STORY = [
     {
         id: PHASE.P4,
         enter(sim) {
-            log('PHASE 4 — cuore. audio4 in partenza.');
+            // Hold 5s after the drop so its energetic body is audible before audio4
+            // narration ducks the bed, then start audio4.
+            log('PHASE 4 — cuore. audio4 tra 5s (il drop resta udibile prima del ducking).');
             // TODO: load heart image into avoidmap
-            this._audio = sim.playNarratorAudio('audio4.mp3', { autoNext: true });
+            this._audioTimer = setTimeout(() => {
+                log('5s scaduti — audio4 in partenza.');
+                this._audio = sim.playNarratorAudio('audio4.mp3', { autoNext: true });
+            }, 5_000);
         },
         exit(sim) {
             log('uscita PHASE 4.');
+            clearTimeout(this._audioTimer);
             this._audio?.pause();
             this._audio = null;
         },
