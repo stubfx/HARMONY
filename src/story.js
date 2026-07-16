@@ -276,11 +276,17 @@ export const STORY = [
 
     // ── PHASE 8 — CLOSING ─────────────────────────────────────────────────────
     // Narrator speaks. Last step — no next().
+    // The AANT logo replaces the HARMONY text as the avoid map: harmony images are
+    // disabled first so a note change can't overwrite it, the text input is cleared,
+    // then the static logo is loaded (it owns the avoid map and won't be cleared).
     // File: simAss/narrator/audio7.mp3
     {
         id: PHASE.P8,
         enter(sim) {
-            log('PHASE 8 — chiusura. audio7 in partenza. fine storia.');
+            log('PHASE 8 — chiusura. logo AANT come avoid map. audio7 in partenza. fine storia.');
+            sim.disableHarmonyImages();
+            sim.setTraceText('');
+            sim.loadStaticAvoidMap('aant_logo.png');
             this._audio = sim.playNarratorAudio('audio7.mp3');
         },
         exit(sim) {
