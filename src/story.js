@@ -63,6 +63,7 @@ export const STORY = [
             this._audio1Playing = true;
             this._pendingJoins  = 0;
 
+            sim.setSynthEnergy(0, 0); // calm bed — reset any post-drop energy on restart
             log('PHASE 1 — fade out, tutto nero. audio1 in partenza.');
             sim.clearAvoidMap();
             sim.setColorMode('GRAYSCALE');
@@ -137,6 +138,7 @@ export const STORY = [
             sim.startBackgroundMusic();
             sim.startBlinkersLoop();
             sim.enableFullSynth();
+            sim.setSynthEnergy(0, 0); // calm bed — reset any post-drop energy on restart
             log('PHASE 2 — nota. note disabilitate fino a fine audio3. audio3 parte tra 10s.');
             setTimeout(() => {
                 log('10s scaduti — audio3 in partenza.');
