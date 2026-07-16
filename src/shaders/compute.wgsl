@@ -128,7 +128,7 @@ struct SoloParams {
 }
 
 // Per-spectator partition data — color, joystick spawner position, personal wind.
-// 12 × f32/u32 = 48 bytes per slot; 16 slots = 768 bytes total.
+// 11 × f32/u32 = 44 bytes per slot; 16 slots = 704 bytes total.
 struct SpectatorSlot {
     colorR:               f32,
     colorG:               f32,
@@ -139,7 +139,8 @@ struct SpectatorSlot {
     spawnerLocationActive: u32,
     formulaIdx:           u32,   // per-spectator direction formula index (picked by that spectator's note)
     burst:                u32,   // 1 for the single frame after the joystick is released — scatter this slot's agents
-    burstSeed:            u32,   // per-release random seed so each burst differs
+    burstSeed:            u32,   // per-release random seed so each burst differs (also seeds the blip point)
+    blip:                 u32,   // 1 for the single frame after this spectator taps a blip target — teleport their agents
 }
 
 struct Agent {
@@ -444,7 +445,20 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     if (params.spectatorCount > 0u && i < u32(f32(params.agentCount) * params.spectatorAgentShare)) {
         let slot = spectatorSlots[i % params.spectatorCount];
         if (slot.isActive != 0u) {
-            if (slot.burst != 0u && params.releaseBurstSpeed > 0.0) {
+            if (slot.blip != 0u) {
+                // Blip: this spectator tapped their target — teleport most of their
+                // own agents to a single shared random point so it reads as the user
+                // making the burst themselves. The point is derived from burstSeed so
+                // every one of their agents lands together; a per-agent hash keeps a
+                // fraction behind so the cluster stays legible against the flow.
+                if (hash(i ^ (slot.burstSeed + 101u)) < 0.7) {
+                    let bx = hash(slot.burstSeed + 3u);
+                    let by = hash(slot.burstSeed + 7u);
+                    np = vec2<f32>(bx * params.canvasW, by * params.canvasH);
+                    let ang = hash(i ^ slot.burstSeed) * 6.28318530718;
+                    vel = vec2<f32>(cos(ang), sin(ang)) * (0.5 + hash(i) * 1.5);
+                }
+            } else if (slot.burst != 0u && params.releaseBurstSpeed > 0.0) {
                 // Fireworks: the joystick was just released — fling this slot's agents
                 // outward in random directions. The normal max-speed clamp reins them
                 // back in over the next frames, so they scatter then rejoin the flow.

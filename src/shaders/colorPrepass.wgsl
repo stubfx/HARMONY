@@ -73,6 +73,8 @@ struct Agent {
     primed: f32,
 }
 
+// Only colorR/G/B + isActive are read here; the rest is padding to match the
+// 11-field / 44-byte stride of the compute shader's SpectatorSlot layout.
 struct SpectatorSlot {
     colorR:     f32,
     colorG:     f32,
@@ -84,6 +86,7 @@ struct SpectatorSlot {
     _p0:        u32,
     _p1:        u32,
     _p2:        u32,
+    _p3:        u32,
 }
 
 @group(0) @binding(0) var<uniform>       params:         SoloRenderParams;

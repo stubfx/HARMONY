@@ -416,9 +416,9 @@ const golUB = device.createBuffer({
 const contamUB = device.createBuffer({
     size: 176, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
-// SpectatorSlots: 16 slots × 40 bytes (10 × f32/u32 per slot) = 640 bytes
+// SpectatorSlots: 16 slots × 44 bytes (11 × f32/u32 per slot) = 704 bytes
 const spectatorSlotsBuf = device.createBuffer({
-    size: 640, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    size: 704, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 
 function seedAgents({ mode = RESEED.NORMAL } = {}) {
@@ -1857,22 +1857,23 @@ function _recalcNoteFormulas() {
 }
 
 function uploadSpectatorSlots() {
-    const ab = new ArrayBuffer(640);
+    const ab = new ArrayBuffer(704);
     const f  = new Float32Array(ab);
     const u  = new Uint32Array(ab);
     for (let i = 0; i < activeSlots.length; i++) {
-        const b = i * 10;
+        const b = i * 11;
         const s = activeSlots[i];
-        f[b + 0] = s.colorR;
-        f[b + 1] = s.colorG;
-        f[b + 2] = s.colorB;
-        u[b + 3] = 1;
-        f[b + 4] = s.spawnerX;
-        f[b + 5] = s.spawnerY;
-        u[b + 6] = s.spawnerLocationActive;
-        u[b + 7] = (s.formulaIdx ?? 0) >>> 0;
-        u[b + 8] = s.burst ? 1 : 0;
-        u[b + 9] = s.burstSeed >>> 0;
+        f[b + 0]  = s.colorR;
+        f[b + 1]  = s.colorG;
+        f[b + 2]  = s.colorB;
+        u[b + 3]  = 1;
+        f[b + 4]  = s.spawnerX;
+        f[b + 5]  = s.spawnerY;
+        u[b + 6]  = s.spawnerLocationActive;
+        u[b + 7]  = (s.formulaIdx ?? 0) >>> 0;
+        u[b + 8]  = s.burst ? 1 : 0;
+        u[b + 9]  = s.burstSeed >>> 0;
+        u[b + 10] = s.blip ? 1 : 0;
     }
     device.queue.writeBuffer(spectatorSlotsBuf, 0, ab);
 }
@@ -1980,7 +1981,7 @@ loadAvoidMap(`${_apiBase}/simAss-static/full_square.png`);
             const isFirst = activeSlots.length === 0;
             // Start with a neutral white — the phone sends a 'color-pick' immediately
             // after joining with its locally generated palette color, which overwrites this.
-            activeSlots.push({ spectatorId, colorR: 1, colorG: 1, colorB: 1, spawnerX: 0.5, spawnerY: 0.5, spawnerLocationActive: 0, dx: 0, dy: 0, magnitude: 0, velocity: 0, _smoothDx: 0, _smoothDy: 0, lastInputTime: 0, burst: 0, burstSeed: 0, formulaIdx: 0 });
+            activeSlots.push({ spectatorId, colorR: 1, colorG: 1, colorB: 1, spawnerX: 0.5, spawnerY: 0.5, spawnerLocationActive: 0, dx: 0, dy: 0, magnitude: 0, velocity: 0, _smoothDx: 0, _smoothDy: 0, lastInputTime: 0, burst: 0, burstSeed: 0, blip: 0, formulaIdx: 0 });
             uploadSpectatorSlots();
             if (isFirst) {
                 _preConnectionFormulas = {
@@ -2074,11 +2075,17 @@ loadAvoidMap(`${_apiBase}/simAss-static/full_square.png`);
             _activeNotesBySpectator.delete(event.spectatorId);
         }
         if (event.type === 'blip') {
-            // Same effect the sim fires on its own from time to time (the ambience
-            // blinkers loop, startBlinkersLoop): a random chime plus a raw teleport
-            // of a fraction of the agents to a random spot — no blinding brightness burst.
+            // A random chime (like the sim's own ambient blips) plus a one-shot
+            // teleport of *this spectator's own* agents to a shared random point, so
+            // the burst reads as the actual user making it. The point is derived on
+            // the GPU from burstSeed; the flag is cleared after the frame consumes it.
             blinker(BLINKER_TYPES[Math.floor(Math.random() * BLINKER_TYPES.length)]);
-            _rawTeleport(Math.random() * canvas.width, Math.random() * canvas.height, 0.1);
+            const slot = activeSlots.find(s => s.spectatorId === event.spectatorId);
+            if (slot) {
+                slot.blip      = 1;
+                slot.burstSeed = (Math.random() * 0x7fffffff) >>> 0;
+                uploadSpectatorSlots();
+            }
         }
         if (event.type === 'pulse-tap') {
             pulseEnergy = Math.min(pulseEnergy + PULSE_INCREMENT, PULSE_MAX);
@@ -3213,11 +3220,14 @@ function frame(ts) {
 
     if (captureBuf) finalizeCapture(captureBuf, captureW, captureH, capturePadded);
 
-    // Fireworks burst is one-shot — this frame's compute consumed it, so clear the
-    // flags now and re-upload, leaving the scattered agents to fly out on their own.
+    // Fireworks burst and blip teleport are one-shot — this frame's compute consumed
+    // them, so clear the flags now and re-upload, leaving the moved agents on their own.
     if (activeSlots.length) {
         let burstDirty = false;
-        for (const slot of activeSlots) { if (slot.burst) { slot.burst = 0; burstDirty = true; } }
+        for (const slot of activeSlots) {
+            if (slot.burst) { slot.burst = 0; burstDirty = true; }
+            if (slot.blip)  { slot.blip  = 0; burstDirty = true; }
+        }
         if (burstDirty) uploadSpectatorSlots();
     }
 
