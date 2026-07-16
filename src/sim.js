@@ -1932,12 +1932,10 @@ const activeSlots = [];
 // Note-driven formula selection: sum of active note indices → modulo on formula arrays.
 const _activeNotesBySpectator = new Map(); // spectatorId → noteIndex (0–8)
 let _noteFormulaTimer  = null;
-let _formulaHeat       = 0;           // [0,1] — cresce ad ogni cambio nota, decade nel tempo
-let _formulaHeatLastT  = Date.now();  // timestamp ultimo cambio (per calcolare dt decay)
-const _FORMULA_DEBOUNCE_MIN  = 200;   // ms — debounce a freddo
-const _FORMULA_DEBOUNCE_MAX  = 1000;  // ms — debounce a caldo (massimo)
-const _HEAT_PER_CHANGE = 0.25;        // ogni cambio nota aggiunge 25% di calore
-const _HEAT_DECAY_RATE = 0.5;         // decade del 50% al secondo → freddo in ~2s senza input
+let _pendingFormulas   = null;        // latest { dir, wind } requested while throttled
+let _lastFormulaApplyT = 0;           // timestamp of the last applied formula change
+const _FORMULA_LEAD_MS      = 200;    // small settle delay before the first change after idle
+const _FORMULA_MIN_INTERVAL = 5000;   // movement formulas change at most once every 5 s
 
 // ── Harmony state ─────────────────────────────────────────────────────────────
 // The cache key is the raw note sum — each unique note combination gets its own
@@ -1951,6 +1949,9 @@ let _harmonyHeld          = false;  // pins the shown image so it can't flash aw
 let _harmonyHoldTimer     = null;
 const _HARMONY_HOLD_MIN   = 3000;   // once an image is shown, keep it 3–10 s even as notes change
 const _HARMONY_HOLD_MAX   = 10000;
+let _harmonyCooldownUntil = 0;      // after an image disappears, block a new one until this time
+const _HARMONY_COOLDOWN_MIN = 15000; // 15–20 s quiet gap between images
+const _HARMONY_COOLDOWN_MAX = 20000;
 let _preConnectionFormulas = null;  // { dir, wind } saved when the first spectator connects
 let _chladniSum = 0;                // current harmony sum driving Chladni mode params
 
@@ -2043,26 +2044,32 @@ async function _clearHarmonyImageCache() {
 
 // Pin the currently shown harmony image for a random 3–10 s. While held,
 // _evalHarmony() is a no-op, so rapid note changes can't swap or clear the
-// image. On release we re-evaluate against whatever notes are playing then.
+// image. On release the image disappears and _exitHarmony() opens the cooldown.
 function _startHarmonyHold() {
     _harmonyHeld = true;
     clearTimeout(_harmonyHoldTimer);
     const ms = _HARMONY_HOLD_MIN + Math.random() * (_HARMONY_HOLD_MAX - _HARMONY_HOLD_MIN);
     _harmonyHoldTimer = setTimeout(() => {
         _harmonyHeld = false;
-        _evalHarmony();
+        if (_harmonyActive) _exitHarmony(); // hold done: image disappears, cooldown begins
     }, ms);
 }
 
-// Decide whether to show, swap, or clear the harmony image for the current
-// notes. Gated by the hold so a displayed image survives a burst of changes.
+// Decide whether to show or clear the harmony image for the current notes.
+// Gated by the hold (image stays 3–10 s) and the cooldown (15–20 s quiet gap
+// after it disappears) so images don't spam on the busy note stream.
 function _evalHarmony() {
     if (_harmonyHeld) return;
     let sum = 0;
     for (const idx of _activeNotesBySpectator.values()) sum += idx;
     const wantHarmony = _activeNotesBySpectator.size > 0 && (sum % 4 === 0);
-    if (wantHarmony && (!_harmonyActive || sum !== _currentHarmonyKey)) _enterHarmony(sum);
-    else if (!wantHarmony && _harmonyActive) _exitHarmony();
+    if (wantHarmony) {
+        if (_harmonyActive) return;                     // one already showing/loading
+        if (Date.now() < _harmonyCooldownUntil) return; // still in the quiet gap
+        _enterHarmony(sum);
+    } else if (_harmonyActive) {
+        _exitHarmony();
+    }
 }
 
 async function _enterHarmony(sum) {
@@ -2095,6 +2102,9 @@ function _exitHarmony() {
     if (!_harmonyActive) return;
     _harmonyActive     = false;
     _currentHarmonyKey = -1;
+    // Image just disappeared: enforce a 15–20 s quiet gap before the next one.
+    _harmonyCooldownUntil = Date.now() + _HARMONY_COOLDOWN_MIN
+        + Math.random() * (_HARMONY_COOLDOWN_MAX - _HARMONY_COOLDOWN_MIN);
     if (_harmonyImagesEnabled) clearAvoidMap();
 }
 
@@ -2114,6 +2124,24 @@ async function _loadCurrentHarmonyImage() {
     }
 }
 
+// Throttle movement-formula changes to at most once every 5 s. Unlike the
+// harmony image there's no quiet gap — back-to-back changes are fine, they're
+// just rate-limited. The first change after idle settles in quickly; while a
+// change is pending, later notes only update the target, they don't reschedule.
+function _scheduleFormulas(dir, wind) {
+    _pendingFormulas = { dir, wind };
+    if (_noteFormulaTimer) return;
+    const sinceLast = Date.now() - _lastFormulaApplyT;
+    const delay = Math.max(_FORMULA_LEAD_MS, _FORMULA_MIN_INTERVAL - sinceLast);
+    _noteFormulaTimer = setTimeout(() => {
+        _noteFormulaTimer  = null;
+        _lastFormulaApplyT = Date.now();
+        const f = _pendingFormulas;
+        _pendingFormulas = null;
+        applyFormulas(f.dir, f.wind);
+    }, delay);
+}
+
 function _recalcNoteFormulas() {
     let sum = 0;
     for (const idx of _activeNotesBySpectator.values()) sum += idx;
@@ -2131,13 +2159,7 @@ function _recalcNoteFormulas() {
         // Still recompile for the wind formula change (wind is not uniform-driven).
         const newWind = WIND_FORMULAS[sum % WIND_FORMULAS.length];
         if (windInput) windInput.value = newWind;
-        const now = Date.now();
-        const dt  = (now - _formulaHeatLastT) / 1000;
-        _formulaHeatLastT = now;
-        _formulaHeat = Math.min(1, Math.max(0, _formulaHeat - _HEAT_DECAY_RATE * dt) + _HEAT_PER_CHANGE);
-        const debounceMs = _FORMULA_DEBOUNCE_MIN + _formulaHeat * (_FORMULA_DEBOUNCE_MAX - _FORMULA_DEBOUNCE_MIN);
-        clearTimeout(_noteFormulaTimer);
-        _noteFormulaTimer = setTimeout(() => applyFormulas(dirInput?.value || DEFAULT_DIR, newWind), debounceMs);
+        _scheduleFormulas(dirInput?.value || DEFAULT_DIR, newWind);
         return;
     }
 
@@ -2145,15 +2167,7 @@ function _recalcNoteFormulas() {
     const newWind = WIND_FORMULAS[sum % WIND_FORMULAS.length];
     if (dirInput)  dirInput.value  = newDir;
     if (windInput) windInput.value = newWind;
-
-    const now = Date.now();
-    const dt  = (now - _formulaHeatLastT) / 1000;
-    _formulaHeatLastT = now;
-    _formulaHeat = Math.min(1, Math.max(0, _formulaHeat - _HEAT_DECAY_RATE * dt) + _HEAT_PER_CHANGE);
-    const debounceMs = _FORMULA_DEBOUNCE_MIN + _formulaHeat * (_FORMULA_DEBOUNCE_MAX - _FORMULA_DEBOUNCE_MIN);
-
-    clearTimeout(_noteFormulaTimer);
-    _noteFormulaTimer = setTimeout(() => applyFormulas(newDir, newWind), debounceMs);
+    _scheduleFormulas(newDir, newWind);
 }
 
 function uploadSpectatorSlots() {
