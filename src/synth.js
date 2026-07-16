@@ -126,20 +126,20 @@ export async function startSynth() {
         '8n',
     );
 
-    // ── Bass — pulsing sub-bass on 8ths, gated by energy (silent until the drop) ─
+    // ── Bass — rounded sub-bass on quarter notes, gated by energy (silent until the drop) ─
     _bassVol = new Tone.Volume(SILENT);
-    const bassFilter = new Tone.Filter({ frequency: 500, type: 'lowpass', rolloff: -24 });
+    const bassFilter = new Tone.Filter({ frequency: 220, type: 'lowpass', rolloff: -24 });
     const bass = new Tone.Synth({
-        oscillator: { type: 'sawtooth' },
-        envelope:   { attack: 0.01, decay: 0.16, sustain: 0.2, release: 0.2 },
+        oscillator: { type: 'triangle' },
+        envelope:   { attack: 0.02, decay: 0.2, sustain: 0.2, release: 0.35 },
         volume:     -8,
     });
     bass.connect(bassFilter);
     bassFilter.connect(_bassVol);
     _bassVol.connect(master);
     _bassLoop = new Tone.Loop((time) => {
-        bass.triggerAttackRelease(Math.random() < 0.5 ? 'A1' : 'E1', '8n', time);
-    }, '8n');
+        bass.triggerAttackRelease(Math.random() < 0.5 ? 'A1' : 'E1', '4n', time);
+    }, '4n');
 
     Tone.getTransport().bpm.value = 110;
     _arpSeq.start(0);
@@ -207,8 +207,9 @@ function _applyState() {
     smoothTo(_arpVol.volume, Tone.gainToDb(arpGain));
 
     // Bass — the post-drop rhythm. Silent at rest (energy 0), it fades in with
-    // energy so the environment clearly changes from the drop on.
-    smoothTo(_bassVol.volume, e > 0.001 ? Tone.gainToDb(e * 0.8) : SILENT);
+    // energy so the environment shifts from the drop on — kept low so it grounds
+    // the body without driving it.
+    smoothTo(_bassVol.volume, e > 0.001 ? Tone.gainToDb(e * 0.35) : SILENT);
 
     // Arp tempo ← temperature (+ energy boost): higher = faster arpeggiation
     Tone.getTransport().bpm.value = BPM_MIN + tmp * BPM_TEMP_RANGE + e * BPM_ENERGY_BOOST;
@@ -382,10 +383,11 @@ export async function triggerImpact() {
 }
 
 // ── "The simulation speaks" — binary phase cue ────────────────────────────────
-// Replaces recorded narration in the later phases: the sim announces itself with a
-// short sequence of blips that encode a small integer in binary, most-significant
-// bit first. A 1 bit is a bright tone, a 0 bit the octave below. One-shot and
-// auto-disposing, modelled on blinker() — a small machine "voice" over the bed.
+// Replaces recorded narration in the later phases: the sim announces itself by
+// encoding a small integer in binary, most-significant bit first, as a single
+// continuous sine tone that glides between a high pitch (a 1 bit) and the octave
+// below (a 0 bit). One-shot and auto-disposing — a soft machine "voice" that
+// slides through its bits rather than beeping them, so it blends into the bed.
 const SPEAK_BIT_MS    = 200;   // slot length per bit (sounded tone + trailing gap)
 const SPEAK_TONE_MS   = 120;   // sounded portion of each slot
 const SPEAK_ONE_FREQ  = 1245;  // Hz — a 1 bit
@@ -402,16 +404,25 @@ export async function speakBinary(n, { bitMs = SPEAK_BIT_MS } = {}) {
     await _ensurePingReverb();
     const bits  = Math.max(0, n | 0).toString(2);
     const synth = new Tone.Synth({
-        oscillator: { type: 'square' },
-        envelope:   { attack: 0.005, decay: 0.04, sustain: 0.4, release: 0.05 },
-        volume:     -19,
+        oscillator: { type: 'sine' },
+        envelope:   { attack: 0.09, decay: 0.1, sustain: 0.85, release: 0.5 },
+        volume:     -17,
     }).connect(_pingReverb);
 
-    const t0 = Tone.now() + 0.02;
-    for (let i = 0; i < bits.length; i++) {
-        const freq = bits[i] === '1' ? SPEAK_ONE_FREQ : SPEAK_ZERO_FREQ;
-        synth.triggerAttackRelease(freq, SPEAK_TONE_MS / 1000, t0 + (i * bitMs) / 1000);
+    const t0    = Tone.now() + 0.02;
+    const dur   = (bits.length * bitMs) / 1000;
+    const glide = (bitMs / 1000) * 0.55; // portamento time between bit pitches
+
+    // One continuous sine held across the whole cue; the pitch glides between the
+    // high ("1") and octave-down ("0") frequencies, so the ups and downs read as a
+    // smooth melodic contour that sits inside the bed rather than discrete beeps.
+    const freqAt = i => (bits[i] === '1' ? SPEAK_ONE_FREQ : SPEAK_ZERO_FREQ);
+    synth.triggerAttack(freqAt(0), t0);
+    synth.frequency.setValueAtTime(freqAt(0), t0);
+    for (let i = 1; i < bits.length; i++) {
+        synth.frequency.exponentialRampToValueAtTime(freqAt(i), t0 + (i * bitMs) / 1000 + glide);
     }
+    synth.triggerRelease(t0 + dur);
     setTimeout(() => synth.dispose(), bits.length * bitMs + 900);
 }
 
