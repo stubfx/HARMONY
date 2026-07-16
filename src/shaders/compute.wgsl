@@ -137,7 +137,7 @@ struct SpectatorSlot {
     spawnerX:             f32,
     spawnerY:             f32,
     spawnerLocationActive: u32,
-    _p0:                  u32,
+    formulaIdx:           u32,   // per-spectator direction formula index (picked by that spectator's note)
     burst:                u32,   // 1 for the single frame after the joystick is released — scatter this slot's agents
     burstSeed:            u32,   // per-release random seed so each burst differs
 }
@@ -307,7 +307,16 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let cx  = params.canvasW * 0.5;
     let cy  = params.canvasH * 0.5;
 
-    let freeAngle = evalDirFormula(x, y, t, idx, cx, cy);
+    // Per-spectator movement: agents in the spectator share follow their owning
+    // spectator's chosen formula (picked by that spectator's note); everyone else
+    // follows the global formula. Same partition as the spawner-teleport below.
+    var freeAngle = evalDirFormula(x, y, t, idx, cx, cy);
+    if (params.spectatorCount > 0u && i < u32(f32(params.agentCount) * params.spectatorAgentShare)) {
+        let dirSlot = spectatorSlots[i % params.spectatorCount];
+        if (dirSlot.isActive != 0u) {
+            freeAngle = evalDirFormulaBank(dirSlot.formulaIdx, x, y, t, idx, cx, cy);
+        }
+    }
     var dirAngle  = freeAngle;
     if (params.chladniActive != 0u && params.chladniBlend > 0.0) {
         let chAngle  = chladniDirAngle(x, y, cx, cy, params.chladniM, params.chladniN, params.chladniSym);

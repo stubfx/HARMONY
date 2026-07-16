@@ -155,7 +155,7 @@ const params = {
     freeroamLock:        true,
     freeroamLockDelay:   30,   // seconds in FREEROAM before reverting to NORMAL (timer resets each time FREEROAM is re-entered)
     // Spectator partitioning
-    spectatorAgentShare:       35,   // % of agents assigned to spectators (0 = sim only, 100 = full user control)
+    spectatorAgentShare:       50,   // % of agents assigned to spectators (0 = sim only, 100 = full user control)
     spectatorSpawnChance:      0.01, // base per-frame spawn probability (scaled by user count × multiplier)
     spectatorSpawnMultiplier:  3,    // scales spawn chance proportionally with active user count
     spawnerSpeed:           0.3,  // canvas fractions per second the spawner moves at full joystick deflection
@@ -285,6 +285,22 @@ const DIR_FORMULAS = [
     ...LINE_CELL_DIR,
     ...LINE_CELL_DIR,
     ...LINE_CELL_DIR,
+];
+
+// Per-spectator direction bank — one distinct flow field per note index (0–8),
+// so each spectator's note picks the movement of their share of the dots. This
+// is compiled once into a switch in the shader; changing which index a spectator
+// uses is just a buffer write (no recompile). Keep length aligned with KEYS (9).
+const SPECTATOR_DIR_FORMULAS = [
+    'sin(x * 0.006) * cos(y * 0.006) * TWO_PI',                              // 0 — cells
+    'sin(x * 0.006) * PI',                                                   // 1 — vertical lines
+    'sin(y * 0.006) * PI',                                                   // 2 — horizontal lines
+    'atan2(y - cy, x - cx) + t * 0.3',                                       // 3 — spiral CW
+    'atan2(y - cy, x - cx) - t * 0.4',                                       // 4 — spiral CCW
+    'sin((x + y) * 0.005) * TWO_PI',                                         // 5 — diagonal bands
+    'sin(x * 0.009 + sin(y * 0.006 + t)) * TWO_PI',                          // 6 — turbulence
+    'sin(length(vec2(x-cx,y-cy)) * 0.015 - t * 2.5) * TWO_PI',              // 7 — radial waves
+    'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI',     // 8 — radial pulse
 ];
 
 // 20 wind formulas cycled automatically when params.autoWind is true.
@@ -1774,8 +1790,19 @@ function rebuildSimBG() {
 }
 
 async function buildSimPipeline(dir, wind) {
+    // Per-spectator direction bank: fixed set compiled once into a switch. Agents
+    // owned by a spectator index into it via their slot's formulaIdx (a buffer
+    // value), so a spectator changing their note costs a buffer write, not a recompile.
+    const bankCases = SPECTATOR_DIR_FORMULAS
+        .map((f, i) => `        case ${i}u: { return ${f}; }`)
+        .join('\n');
+    const bankFn =
+        `fn evalDirFormulaBank(fi:u32,x:f32,y:f32,t:f32,idx:f32,cx:f32,cy:f32)->f32{\n`
+        + `    switch fi {\n${bankCases}\n        default: { }\n    }\n`
+        + `    return ${SPECTATOR_DIR_FORMULAS[0]};\n}`;
     const fnDefs = [
         `fn evalDirFormula(x:f32,y:f32,t:f32,idx:f32,cx:f32,cy:f32)->f32{ return ${dir}; }`,
+        bankFn,
         `fn evalWindFormula(x:f32,y:f32,t:f32,idx:f32,cx:f32,cy:f32)->f32{ return ${wind}; }`,
         ``,
     ].join('\n');
@@ -2183,7 +2210,7 @@ function uploadSpectatorSlots() {
         f[b + 4] = s.spawnerX;
         f[b + 5] = s.spawnerY;
         u[b + 6] = s.spawnerLocationActive;
-        u[b + 7] = 0;
+        u[b + 7] = (s.formulaIdx ?? 0) >>> 0;
         u[b + 8] = s.burst ? 1 : 0;
         u[b + 9] = s.burstSeed >>> 0;
     }
@@ -2297,7 +2324,7 @@ loadAvoidMap(`${_apiBase}/simAss-static/full_square.png`);
             const isFirst = activeSlots.length === 0;
             // Start with a neutral white — the phone sends a 'color-pick' immediately
             // after joining with its locally generated palette color, which overwrites this.
-            activeSlots.push({ spectatorId, colorR: 1, colorG: 1, colorB: 1, spawnerX: 0.5, spawnerY: 0.5, spawnerLocationActive: 0, dx: 0, dy: 0, magnitude: 0, velocity: 0, _smoothDx: 0, _smoothDy: 0, lastInputTime: 0, burst: 0, burstSeed: 0 });
+            activeSlots.push({ spectatorId, colorR: 1, colorG: 1, colorB: 1, spawnerX: 0.5, spawnerY: 0.5, spawnerLocationActive: 0, dx: 0, dy: 0, magnitude: 0, velocity: 0, _smoothDx: 0, _smoothDy: 0, lastInputTime: 0, burst: 0, burstSeed: 0, formulaIdx: 0 });
             uploadSpectatorSlots();
             if (isFirst) {
                 _preConnectionFormulas = {
@@ -2376,6 +2403,10 @@ loadAvoidMap(`${_apiBase}/simAss-static/full_square.png`);
             const slot = activeSlots.find(s => s.spectatorId === event.spectatorId);
             if (slot) {
                 triggerReleaseBurst(slot);
+                // This spectator's note selects the movement formula for their dots.
+                if (event.type === 'note' && typeof event.data?.index === 'number') {
+                    slot.formulaIdx = event.data.index;
+                }
                 uploadSpectatorSlots();
             }
             if (event.type === 'note' && event.data?.freq) addArpInfluence(event.data.freq);
@@ -2590,17 +2621,19 @@ windInput.value = DOT_WIND;
 // STATUS=FREEROAM suspends cycling; followFormula / windEnabled guard the rest.
 setInterval(() => {
     if (simState.status !== 'NORMAL') return;
-    if (activeSlots.length > 0) return; // idle only — freeze formula while users are connected
 
     let newDir  = dirInput.value;
     let newWind = windInput.value;
     let changed = false;
 
-    if (params.autoDir && params.followFormula) {
+    // Direction auto-cycle is idle-only: during the show each spectator drives
+    // their own movement formula, so the global direction stays put.
+    if (activeSlots.length === 0 && params.autoDir && params.followFormula) {
         newDir = rndPick(DIR_FORMULAS);
         dirInput.value = newDir;
         changed = true;
     }
+    // Wind cycles constantly — a shared force over every dot, show or idle.
     if (params.autoWind && params.windEnabled) {
         newWind = rndPick(WIND_FORMULAS);
         windInput.value = newWind;
@@ -2869,10 +2902,7 @@ function writeSoloUB(dt, time) {
     f[5] = time;
     const isIdle = simState.status === 'FREEROAM';
     const isDot  = simState.status === 'DOT';
-    // Wind is disabled while any spectator is connected (the Chladni field is
-    // active then) so it doesn't fight the standing-wave pattern.
-    const chladniOn = _preConnectionFormulas !== null;
-    f[6] = (isIdle || chladniOn) ? 0.0 : (isDot || params.windEnabled ? params.windStr : 0.0);
+    f[6] = isIdle ? 0.0 : (isDot || params.windEnabled ? params.windStr : 0.0);
     f[7] = params.turnRate * coherenceMult;  // coherence scales how sharply agents follow the formula
     f[8] = params.maxSpeed;
     f[9] = params.minSpeed;
