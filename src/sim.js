@@ -21,7 +21,7 @@ import champLinesWGSL   from './shaders/champLines.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
 import bloomWGSL        from './shaders/bloom.wgsl?raw';
 import glareWGSL        from './shaders/glare.wgsl?raw';
-import { startSynth, setSynthState, setSynthDroneOnly, setSynthBusVolume, setSynthEnergy, addArpInfluence, blinker, BLINKER_TYPES, playRiser, triggerImpact } from './synth.js';
+import { startSynth, setSynthState, setSynthDroneOnly, setSynthBusVolume, setSynthEnergy, addArpInfluence, blinker, BLINKER_TYPES, playRiser, triggerImpact, speakBinary } from './synth.js';
 import * as ambience from './ambience.js';
 import { StoryEngine } from './storyEngine.js';
 import { STORY }       from './story.js';
@@ -636,6 +636,10 @@ const simFacade = {
     // Set the synth energy level (0 = calm bed, 1 = post-drop). Used to reset the
     // energetic body back to calm when the show restarts.
     setSynthEnergy(e, rampSec) { setSynthEnergy(e, rampSec); },
+
+    // The simulation "speaks" its phase number as a short binary tone sequence,
+    // replacing recorded narration in the later phases.
+    speakPhase(n) { speakBinary(n); },
 
     startBlinkersLoop() {
         ambience.startBlinkersLoop(() => {

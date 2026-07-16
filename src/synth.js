@@ -381,3 +381,37 @@ export async function triggerImpact() {
     setSynthEnergy(1, 1.2);
 }
 
+// ── "The simulation speaks" — binary phase cue ────────────────────────────────
+// Replaces recorded narration in the later phases: the sim announces itself with a
+// short sequence of blips that encode a small integer in binary, most-significant
+// bit first. A 1 bit is a bright tone, a 0 bit the octave below. One-shot and
+// auto-disposing, modelled on blinker() — a small machine "voice" over the bed.
+const SPEAK_BIT_MS    = 200;   // slot length per bit (sounded tone + trailing gap)
+const SPEAK_TONE_MS   = 120;   // sounded portion of each slot
+const SPEAK_ONE_FREQ  = 1245;  // Hz — a 1 bit
+const SPEAK_ZERO_FREQ = 623;   // Hz — a 0 bit (an octave down)
+
+// Total duration (ms) of the cue for `n` — deterministic so callers can time a
+// follow-up (e.g. auto-advancing a story phase) without awaiting playback.
+export function binaryCueDurationMs(n, bitMs = SPEAK_BIT_MS) {
+    return Math.max(0, n | 0).toString(2).length * bitMs;
+}
+
+export async function speakBinary(n, { bitMs = SPEAK_BIT_MS } = {}) {
+    await Tone.start();
+    await _ensurePingReverb();
+    const bits  = Math.max(0, n | 0).toString(2);
+    const synth = new Tone.Synth({
+        oscillator: { type: 'square' },
+        envelope:   { attack: 0.005, decay: 0.04, sustain: 0.4, release: 0.05 },
+        volume:     -19,
+    }).connect(_pingReverb);
+
+    const t0 = Tone.now() + 0.02;
+    for (let i = 0; i < bits.length; i++) {
+        const freq = bits[i] === '1' ? SPEAK_ONE_FREQ : SPEAK_ZERO_FREQ;
+        synth.triggerAttackRelease(freq, SPEAK_TONE_MS / 1000, t0 + (i * bitMs) / 1000);
+    }
+    setTimeout(() => synth.dispose(), bits.length * bitMs + 900);
+}
+

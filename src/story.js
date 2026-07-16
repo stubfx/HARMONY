@@ -6,12 +6,11 @@ import { PHASE, RESEED } from './constants.js';
 //   audio1.mp3  →  PHASE 1 — starts immediately; stops on first connection
 //   audio2.mp3  →  PHASE 1 — starts on first connection; 10s later → PHASE 2
 //   audio3.mp3  →  PHASE 2 — starts immediately on enter
-//   audio4.mp3  →  PHASE 3 — give a color to the note
-//   audio5.mp3  →  PHASE 5 — "Il rombo prima del lampo..."
-//   audio6.mp3  →  PHASE 7 — one word each
-//   audio7.mp3  →  PHASE 8 — harmony is not the same note
+//   audio4.mp3  →  PHASE 3 & 4 — give a color to the note
 //
-// PHASE 6 has no audio (director's note: "no commentary needed").
+// PHASES 5, 7 and 8 no longer use recorded narration: the simulation "speaks" its
+// own phase number as a short binary tone sequence (sim.speakPhase). PHASE 6 has
+// no audio (director's note: "no commentary needed").
 
 // ─── Note on hardcoded parameters ────────────────────────────────────────────
 // All timers, thresholds and filenames are intentionally hardcoded in this file.
@@ -47,6 +46,11 @@ const log = (msg) => console.log(`[story] ${msg}`);
 // PHASE 3 riser build-up length (ms). The generative drop's impact and the red
 // colour reveal both fire when this timer elapses, so they land perfectly synced.
 const RISER_MS = 4000;
+
+// How long the narration-free phases (5, 7) hold on screen before auto-advancing.
+// They no longer wait on an audio 'ended' event; the binary phase cue plays near
+// the start of this window. Matches PHASE 6's silent hold.
+const PHASE_CUE_HOLD_MS = 5000;
 
 export const STORY = [
 
@@ -236,19 +240,22 @@ export const STORY = [
 
     // ── PHASE 5 — IMAGE: STORM ────────────────────────────────────────────────
     // TODO: implement image appearance logic.
-    // Narrator speaks; advances when audio ends.
-    // File: simAss/narrator/audio5.mp3
+    // No narration — the sim speaks its phase number as a binary cue, then the
+    // phase holds for PHASE_CUE_HOLD_MS before auto-advancing.
     {
         id: PHASE.P5,
         enter(sim) {
-            log('PHASE 5 — tempesta. audio5 in partenza.');
+            log(`PHASE 5 — tempesta. cue binario ${this.id}. avanzamento tra ${Math.round(PHASE_CUE_HOLD_MS / 1000)}s.`);
             // TODO: load storm image into avoidmap
-            this._audio = sim.playNarratorAudio('audio5.mp3', { autoNext: true });
+            sim.speakPhase(this.id);
+            this._timer = setTimeout(() => {
+                log('hold scaduto — avanzamento a PHASE 6.');
+                sim.next();
+            }, PHASE_CUE_HOLD_MS);
         },
         exit(sim) {
             log('uscita PHASE 5.');
-            this._audio?.pause();
-            this._audio = null;
+            clearTimeout(this._timer);
         },
     },
 
@@ -274,39 +281,39 @@ export const STORY = [
     },
 
     // ── PHASE 7 — TEXT ────────────────────────────────────────────────────────
-    // Narrator speaks; advances automatically when audio ends.
-    // File: simAss/narrator/audio6.mp3
+    // No narration — the sim speaks its phase number as a binary cue, then the
+    // phase holds for PHASE_CUE_HOLD_MS before auto-advancing.
     {
         id: PHASE.P7,
         enter(sim) {
-            log('PHASE 7 — testo. audio6 in partenza.');
-            this._audio = sim.playNarratorAudio('audio6.mp3', { autoNext: true });
+            log(`PHASE 7 — testo. cue binario ${this.id}. avanzamento tra ${Math.round(PHASE_CUE_HOLD_MS / 1000)}s.`);
+            sim.speakPhase(this.id);
+            this._timer = setTimeout(() => {
+                log('hold scaduto — avanzamento a PHASE 8.');
+                sim.next();
+            }, PHASE_CUE_HOLD_MS);
         },
         exit(sim) {
             log('uscita PHASE 7.');
-            this._audio?.pause();
-            this._audio = null;
+            clearTimeout(this._timer);
         },
     },
 
     // ── PHASE 8 — CLOSING ─────────────────────────────────────────────────────
-    // Narrator speaks. Last step — no next().
+    // Last step — no next(). No narration; the sim speaks its phase number as a
+    // binary cue over the closing.
     // The AANT logo replaces the HARMONY text as the avoid map: harmony images are
     // disabled first so a note change can't overwrite it, the text input is cleared,
     // then the static logo is loaded (it owns the avoid map and won't be cleared).
-    // File: simAss/narrator/audio7.mp3
     {
         id: PHASE.P8,
         enter(sim) {
-            log('PHASE 8 — chiusura. logo AANT come avoid map. audio7 in partenza. fine storia.');
+            log('PHASE 8 — chiusura. logo AANT come avoid map. cue binario 8. fine storia.');
             sim.disableHarmonyImages();
             sim.setTraceText('');
             sim.loadStaticAvoidMap('aant_logo.png');
-            this._audio = sim.playNarratorAudio('audio7.mp3');
+            sim.speakPhase(this.id);
         },
-        exit(sim) {
-            this._audio?.pause();
-            this._audio = null;
-        },
+        exit(sim) {},
     },
 ];
