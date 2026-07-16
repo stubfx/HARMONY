@@ -32,7 +32,7 @@ const ARP_POOL = ['A3','B3','C4','D4','E4','F4','G4','A4','B4','C5','E5','G5'];
 
 let _ready = false;
 let _padVol, _padFilter, _padLFO, _droneVol, _arpVol, _arpSeq;
-let _kickVol, _kickLoop, _bassVol, _bassLoop;   // post-drop rhythm layers
+let _bassVol, _bassLoop;   // post-drop rhythm layer
 let _synthBus = null;  // top-level synth bus volume
 
 // Energy: 0 = ambient bed, 1 = post-drop energetic. Ramped by setSynthEnergy().
@@ -126,22 +126,6 @@ export async function startSynth() {
         '8n',
     );
 
-    // ── Kick — four-on-the-floor pulse, gated by energy (silent until the drop) ──
-    const kickReverb = new Tone.Reverb({ decay: 1.5, wet: 0.12 });
-    _kickVol = new Tone.Volume(SILENT);
-    const kick = new Tone.MembraneSynth({
-        pitchDecay: 0.045,
-        octaves:    5,
-        oscillator: { type: 'sine' },
-        envelope:   { attack: 0.001, decay: 0.35, sustain: 0, release: 0.2 },
-        volume:     -4,
-    });
-    kick.connect(kickReverb);
-    kickReverb.connect(_kickVol);
-    _kickVol.connect(master);
-    await kickReverb.ready;
-    _kickLoop = new Tone.Loop((time) => { kick.triggerAttackRelease('C1', '8n', time); }, '4n');
-
     // ── Bass — pulsing sub-bass on 8ths, gated by energy (silent until the drop) ─
     _bassVol = new Tone.Volume(SILENT);
     const bassFilter = new Tone.Filter({ frequency: 500, type: 'lowpass', rolloff: -24 });
@@ -159,7 +143,6 @@ export async function startSynth() {
 
     Tone.getTransport().bpm.value = 110;
     _arpSeq.start(0);
-    _kickLoop.start(0);
     _bassLoop.start(0);
     Tone.getTransport().start();
 
@@ -223,9 +206,8 @@ function _applyState() {
     const arpGain = ARP_GAIN_BASE + e * ARP_GAIN_ENERGY;
     smoothTo(_arpVol.volume, Tone.gainToDb(arpGain));
 
-    // Kick + bass — the post-drop rhythm section. Silent at rest (energy 0), it
-    // fades in with energy so the environment clearly changes from the drop on.
-    smoothTo(_kickVol.volume, e > 0.001 ? Tone.gainToDb(e)       : SILENT);
+    // Bass — the post-drop rhythm. Silent at rest (energy 0), it fades in with
+    // energy so the environment clearly changes from the drop on.
     smoothTo(_bassVol.volume, e > 0.001 ? Tone.gainToDb(e * 0.8) : SILENT);
 
     // Arp tempo ← temperature (+ energy boost): higher = faster arpeggiation
@@ -267,7 +249,6 @@ export function setSynthBusVolume(db) {
 export function stopSynth() {
     if (!_ready) return;
     _arpSeq?.stop();
-    _kickLoop?.stop();
     _bassLoop?.stop();
     Tone.getTransport().stop();
     Tone.getDestination().volume.setTargetAtTime(SILENT, Tone.now(), 0.5);
