@@ -62,6 +62,7 @@ export const STORY = [
             log('PHASE 1 — fade out, tutto nero. audio1 in partenza.');
             sim.clearAvoidMap();
             sim.setColorMode('GRAYSCALE');
+            sim.disableFormulaCycle(); // reset on (re)start: direction holds the DOT spiral until PHASE 3
             sim.freezeParams({ spectatorSpawnChance: 0, randomTeleportChance: 0, dotRespawnChance: 0, spawnFadeRate: 0 });
             sim.setParam('champLinesAlpha', 0);
             sim.setParam('limitAtCenter', true);
@@ -171,7 +172,8 @@ export const STORY = [
             sim.setColorMode('NORMAL');
             sim.setParam('champLinesAlpha', 0.02);
             sim.setTraceText('HARMONY');
-            log('PHASE 3. testo HARMONY attivo. immagini e audio tra 10s.');
+            sim.enableFormulaCycle(); // HARMONY revealed: let the note sum cycle direction, not just DOT
+            log('PHASE 3. testo HARMONY attivo. formula cycle abilitato. immagini e audio tra 10s.');
             this._respawnTimer = setTimeout(() => {
                 log('10s scaduti — immagini harmony abilitate. dotRespawnChance abilitato (0.002). audio4 in partenza.');
                 sim.enableHarmonyImages();
