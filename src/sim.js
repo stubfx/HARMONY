@@ -155,7 +155,7 @@ const params = {
     freeroamLock:        true,
     freeroamLockDelay:   30,   // seconds in FREEROAM before reverting to NORMAL (timer resets each time FREEROAM is re-entered)
     // Spectator partitioning
-    spectatorAgentShare:       50,   // % of agents assigned to spectators (0 = sim only, 100 = full user control)
+    spectatorAgentShare:       80,   // % of agents assigned to spectators (0 = sim only, 100 = full user control)
     spectatorSpawnChance:      0.01, // base per-frame spawn probability (scaled by user count × multiplier)
     spectatorSpawnMultiplier:  3,    // scales spawn chance proportionally with active user count
     spawnerSpeed:           0.3,  // canvas fractions per second the spawner moves at full joystick deflection
