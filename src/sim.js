@@ -627,6 +627,8 @@ const simFacade = {
     },
     disableHarmonyImages() {
         _harmonyImagesEnabled = false;
+        _harmonyHeld = false;
+        clearTimeout(_harmonyHoldTimer);
         if (_harmonyActive) clearAvoidMap();
     },
 
@@ -1945,6 +1947,10 @@ let _harmonyActive        = false;
 let _harmonyImagesEnabled = false;  // when false, harmony images are suppressed (enabled per-phase)
 let _currentHarmonyKey    = -1;     // active sum value, -1 = no harmony
 const _harmonyFetching    = new Set(); // sums currently being fetched
+let _harmonyHeld          = false;  // pins the shown image so it can't flash away on rapid note changes
+let _harmonyHoldTimer     = null;
+const _HARMONY_HOLD_MIN   = 3000;   // once an image is shown, keep it 3–10 s even as notes change
+const _HARMONY_HOLD_MAX   = 10000;
 let _preConnectionFormulas = null;  // { dir, wind } saved when the first spectator connects
 let _chladniSum = 0;                // current harmony sum driving Chladni mode params
 
@@ -2035,6 +2041,30 @@ async function _clearHarmonyImageCache() {
     }
 }
 
+// Pin the currently shown harmony image for a random 3–10 s. While held,
+// _evalHarmony() is a no-op, so rapid note changes can't swap or clear the
+// image. On release we re-evaluate against whatever notes are playing then.
+function _startHarmonyHold() {
+    _harmonyHeld = true;
+    clearTimeout(_harmonyHoldTimer);
+    const ms = _HARMONY_HOLD_MIN + Math.random() * (_HARMONY_HOLD_MAX - _HARMONY_HOLD_MIN);
+    _harmonyHoldTimer = setTimeout(() => {
+        _harmonyHeld = false;
+        _evalHarmony();
+    }, ms);
+}
+
+// Decide whether to show, swap, or clear the harmony image for the current
+// notes. Gated by the hold so a displayed image survives a burst of changes.
+function _evalHarmony() {
+    if (_harmonyHeld) return;
+    let sum = 0;
+    for (const idx of _activeNotesBySpectator.values()) sum += idx;
+    const wantHarmony = _activeNotesBySpectator.size > 0 && (sum % 4 === 0);
+    if (wantHarmony && (!_harmonyActive || sum !== _currentHarmonyKey)) _enterHarmony(sum);
+    else if (!wantHarmony && _harmonyActive) _exitHarmony();
+}
+
 async function _enterHarmony(sum) {
     if (_harmonyActive && _currentHarmonyKey === sum) return;
     _harmonyActive     = true;
@@ -2055,6 +2085,7 @@ async function _enterHarmony(sum) {
     }
     if (_harmonyImagesEnabled && _currentHarmonyKey === sum) { // guard: sum or flag may have changed while awaiting
         await loadAvoidMap(new Blob([cached.bytes], { type: cached.mime }));
+        _startHarmonyHold();
     }
 
 }
@@ -2077,19 +2108,17 @@ async function _loadCurrentHarmonyImage() {
         try { cached = await _fetchIdleImageBytes(); }
         catch (e) { console.warn('[harmony] image reload failed:', e.message); return; }
     }
-    if (_harmonyActive && _harmonyImagesEnabled && _currentHarmonyKey === sum)
+    if (_harmonyActive && _harmonyImagesEnabled && _currentHarmonyKey === sum) {
         await loadAvoidMap(new Blob([cached.bytes], { type: cached.mime }));
+        _startHarmonyHold();
+    }
 }
 
 function _recalcNoteFormulas() {
     let sum = 0;
     for (const idx of _activeNotesBySpectator.values()) sum += idx;
 
-    const hasNotes = _activeNotesBySpectator.size > 0;
-
-    const wantHarmony = hasNotes && (sum % 4 === 0);
-    if (wantHarmony && (!_harmonyActive || sum !== _currentHarmonyKey)) _enterHarmony(sum);
-    else if (!wantHarmony && _harmonyActive) _exitHarmony();
+    _evalHarmony();
 
     if (_activeNotesBySpectator.size === 0) {
         if (activeSlots.length > 0) _chladniSum = 0; // back to base mode, no recompile needed
