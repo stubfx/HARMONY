@@ -694,10 +694,10 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
 
     // Random global teleport: any agent has a per-frame chance to jump to a random position.
-    // When the avoidMap is active the blip must land ON its white content — the sampled
-    // avoid score (red channel) must clear a small threshold. Try a few random points and
-    // take the first that hits a white dot; if none do, cancel the teleport this frame so
-    // blips don't scatter over empty space. Sets weight=0 so fade-in starts next frame.
+    // When the avoidMap is active the blip must land OFF its white content — the sampled
+    // avoid score (red channel) must stay below a small threshold. Try a few random points
+    // and take the first that misses the white dots; if none do, cancel the teleport this
+    // frame so blips don't materialise inside the image. Sets weight=0 so fade-in starts next.
     var justTeleported = false;
     if (params.randomTeleportChance > 0.0) {
         let tRng = hash(i ^ (u32(params.time * 1013.0) + 29u));
@@ -709,7 +709,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                     let rx = hash(i ^ (u32(params.time * 997.0) + 3u  + k * 101u));
                     let ry = hash(i ^ (u32(params.time * 971.0) + 11u + k * 149u));
                     let c  = vec2f(rx * params.canvasW, ry * params.canvasH);
-                    if (avoidMapStrAt(c) > 0.05) { candidate = c; placed = true; break; }
+                    if (avoidMapStrAt(c) < 0.05) { candidate = c; placed = true; break; }
                 }
             } else {
                 let rx = hash(i ^ (u32(params.time * 997.0) + 3u));
