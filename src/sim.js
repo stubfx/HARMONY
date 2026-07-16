@@ -2074,10 +2074,11 @@ loadAvoidMap(`${_apiBase}/simAss-static/full_square.png`);
             _activeNotesBySpectator.delete(event.spectatorId);
         }
         if (event.type === 'blip') {
-            const slot = activeSlots.find(s => s.spectatorId === event.spectatorId);
-            if (slot) { triggerReleaseBurst(slot); uploadSpectatorSlots(); }
-            blinker('blip');
-            burstBrightness = BURST_BRIGHTNESS;
+            // Same effect the sim fires on its own from time to time (the ambience
+            // blinkers loop, startBlinkersLoop): a random chime plus a raw teleport
+            // of a fraction of the agents to a random spot — no blinding brightness burst.
+            blinker(BLINKER_TYPES[Math.floor(Math.random() * BLINKER_TYPES.length)]);
+            _rawTeleport(Math.random() * canvas.width, Math.random() * canvas.height, 0.1);
         }
         if (event.type === 'pulse-tap') {
             pulseEnergy = Math.min(pulseEnergy + PULSE_INCREMENT, PULSE_MAX);
