@@ -7,7 +7,7 @@
 // Speed drives brightness. A fading trail accumulates on an offscreen texture.
 
 import { initGUI }      from './gui.js';
-import { stopAudio, isActive, getVolume, playAudio, playAudioBg, unlockAudio, setDuckLevel, isAudioLocked, isAudioReady, onAudioStateChange, setChaos } from './audio.js';
+import { stopAudio, isActive, getVolume, playAudio, playAudioBg, unlockAudio, setDuckLevel, isAudioLocked, isAudioReady, onAudioStateChange } from './audio.js';
 import QRCode           from 'qrcode';
 import { io as ioConnect } from 'socket.io-client';
 import soloSimTemplate  from './shaders/compute.wgsl?raw';
@@ -21,7 +21,7 @@ import champLinesWGSL   from './shaders/champLines.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
 import bloomWGSL        from './shaders/bloom.wgsl?raw';
 import glareWGSL        from './shaders/glare.wgsl?raw';
-import { startSynth, setSynthState, setSynthDroneOnly, addArpInfluence, blinker, BLINKER_TYPES } from './synth.js';
+import { startSynth, setSynthState, setSynthDroneOnly, setSynthBusVolume, addArpInfluence, blinker, BLINKER_TYPES, playRiser, triggerImpact } from './synth.js';
 import * as ambience from './ambience.js';
 import { StoryEngine } from './storyEngine.js';
 import { STORY }       from './story.js';
@@ -55,8 +55,6 @@ const params = {
     pointSize:      3.5,
     color1:      '#ffffff',   // first palette colour
     color2:      '#ffffff',   // second palette colour (assigned by agent index % 2)
-    chaosColor:         '#ff2244',  // colour taken by chaosColorFraction of all agents at full chaos
-    chaosColorFraction: 0.5,        // max fraction of agents that use chaosColor (at chaos=1)
     idleColor:          '#ffffff',  // colour shown when no spectators connected
     idleColorFraction:  0,          // fraction of agents that take idleColor when idle
     brightness:  0.06,        // per-particle alpha; prevents additive saturation to white
@@ -101,7 +99,6 @@ const params = {
     // Avoidance
     avoidForceStr:        1.0,  // multiplier on avoidance-map deflection forces
     avoidMapScale:        1.0,  // avoidance map coverage as fraction of canvas (1.0 = full)
-    chaosAvoidMapThreshold: 0.6, // above this smoothChaos, avoidMap is suppressed visually
     avoidMapInvert:  false, // true = read the map as 1 - r, so light areas become non-avoid and dark areas become the avoid signal
     avoidMapSampleColor: true,  // true = particles take their base color from the avoid map sample at their position
     avoidMapFixedColor:  true,  // true (paired with sampleColor) = use the sampled pixel exactly
@@ -625,7 +622,16 @@ const simFacade = {
     // Safe to call multiple times — no-op if already started.
     startBackgroundMusic() {
         ambience.start();
-        startSynth().then(() => setSynthState(smoothChaos, smoothCoherence, 0, 0, smoothTemp));
+        startSynth().then(() => setSynthState(smoothCoherence, 0, 0, smoothTemp));
+    },
+
+    // Generative "drop" — the PHASE 3 red reveal build-up and impact.
+    // playRiser starts the build; triggerImpact resolves it and adds a visual punch.
+    playRiser(durationMs) { playRiser(durationMs); },
+    triggerImpact() {
+        triggerImpact();
+        burstBrightness = BURST_BRIGHTNESS;
+        ambience.burstBlinkers(6, 90);
     },
 
     startBlinkersLoop() {
@@ -642,12 +648,20 @@ const simFacade = {
     // Pass { autoNext: true } to advance to the next step when playback ends.
     // Returns the Audio element so the caller can pause it on exit if needed.
     playNarratorAudio(filename, { autoNext = false } = {}) {
+        const DUCK_DB = -10; // duck the generative bed (synth + ambience) under narration
         const audio = new Audio(`${_apiBase}/simAss-narrator/${filename}`);
-        const onEnd = () => { if (autoNext) storyEngine.next(); };
+        const restoreBed = () => { setSynthBusVolume(0); ambience.setVolume(0); };
+        const onEnd = () => { restoreBed(); if (autoNext) storyEngine.next(); };
+        audio.addEventListener('play', () => {
+            setSynthBusVolume(DUCK_DB);
+            ambience.setVolume(DUCK_DB);
+        }, { once: true });
         audio.addEventListener('ended', onEnd, { once: true });
         audio.addEventListener('error', (e) => {
             console.warn(`[narrator] failed to load "${filename}" — skipping.`, e);
-            onEnd(); // treat missing file as instant end so story is never stuck
+            // Treat a missing/broken file as an instant end: dispatch 'ended' so both the
+            // bed restore above and any caller 'ended' logic (e.g. PHASE 3's build→drop) run.
+            audio.dispatchEvent(new Event('ended'));
         }, { once: true });
         audio.play().catch(e => console.warn('[narrator] play() rejected:', e));
         return audio;
@@ -1521,7 +1535,7 @@ let stateCtrl     = null;
 let qrStateCtrl   = null;
 let modeCtrl      = null;
 let colorModeCtrl = null;
-let gui, swarmDebug, dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence, dbgChaos;
+let gui, swarmDebug, dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence;
 let applyGUIVisibility, toggleGUI, updateGizmo;
 let golEnabledCtrl  = null;
 let storyPhaseCtrl  = null;
@@ -1937,16 +1951,12 @@ loadAvoidMap(`${_apiBase}/simAss-static/full_square.png`);
     socket.on('collective-state', ({ avgTemp, avgCoherence, userCount }) => {
         collectiveTemp      = avgTemp      ?? 0.5;
         collectiveCoherence = avgCoherence ?? 0.5;
-        // collectiveChaos is intentionally NOT driven by avgChaos — chaos is manual only.
-        // To re-enable: collectiveChaos = avgChaos ?? 0;
         swarmDebug.users     = userCount ?? 0;
         swarmDebug.temp      = +(avgTemp      ?? 0.5).toFixed(3);
         swarmDebug.coherence = +(avgCoherence ?? 0.5).toFixed(3);
-        swarmDebug.chaos     = 0;
         dbgUsers.updateDisplay();
         dbgTemp.updateDisplay();
         dbgCoherence.updateDisplay();
-        dbgChaos.updateDisplay();
     });
 
     // A spectator joined — assign a slot, send them their color, brightness burst.
@@ -1987,12 +1997,10 @@ loadAvoidMap(`${_apiBase}/simAss-static/full_square.png`);
                 _chladniSum = 0;
                 applyFormulas(saved.dir, saved.wind);
             }
-            collectiveChaos     = 0;
-            smoothChaos         = 0;
             collectiveCoherence = 0.5;
             collectiveTemp      = 0.5;
-            setSynthState(0.0, 0.5, 0, 0, 0.5);
-            ambience.stop(smoothChaos); // last user left — fade out music
+            setSynthState(0.5, 0, 0, 0.5);
+            ambience.stop(); // last user left — fade out music
         }
         if (spectatorId) {
             const idx = activeSlots.findIndex(s => s.spectatorId === spectatorId);
@@ -2198,7 +2206,7 @@ function applySimParams(data) {
 ({
     gui, swarmDebug,
     modeCtrl, colorModeCtrl, stateCtrl, qrStateCtrl,
-    dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence, dbgChaos,
+    dbgUsers, dbgPitch, dbgRoll, dbgTemp, dbgCoherence,
     golEnabledCtrl,
     storyPhaseCtrl,
     agentCountCtrl, autoScaleCtrl, renderScaleCtrl, brightnessCtrl,
@@ -2462,11 +2470,9 @@ canvas.addEventListener('mouseleave', () => { mouseCanvasX = -1; mouseCanvasY = 
 // Smoothed each frame via exponential moving average to avoid jarring jumps.
 let collectiveTemp      = 0.5; // target temperature [0=cold … 1=warm] (from touch Y)
 let collectiveCoherence = 0.5; // target coherence [0=chaos … 1=order] (from touch X)
-let collectiveChaos     = 0;   // target chaos [0=armonia … 1=max noise] (from note activity)
 
 let smoothTemp        = 0.5;
 let smoothCoherence   = 0.5;
-let smoothChaos       = 0;
 let _lastSynthTick    = 0;    // throttle: call setSynthState at most every 200ms
 
 // ── Join burst state ──────────────────────────────────────────────────────────
@@ -2489,7 +2495,6 @@ function writeSoloUB(dt, time) {
     const a = Math.exp(-dt / 0.8);
     smoothTemp      = smoothTemp      * a + collectiveTemp      * (1 - a);
     smoothCoherence = smoothCoherence * a + collectiveCoherence * (1 - a);
-    smoothChaos     = smoothChaos     * a + collectiveChaos     * (1 - a);
 
     // Decay join brightness pulse exponentially each frame
     burstBrightness *= BURST_DECAY;
@@ -2537,7 +2542,7 @@ function writeSoloUB(dt, time) {
     f[21] = 0;
     f[22] = params.avoidForceStr;
     u[23] = isQR ? 1 : 0;  // qrMode — QR respawn rect active
-    const avoidMapActive = hasAvoidMap && smoothChaos <= params.chaosAvoidMapThreshold;
+    const avoidMapActive = hasAvoidMap;
     u[24] = avoidMapActive ? 1 : 0;
     f[25] = params.avoidMapScale;
     u[26] = params.bounceEdges ? 1 : 0;
@@ -2574,18 +2579,10 @@ function writeSoloUB(dt, time) {
         f[41] = 0; f[42] = 0; f[43] = 0; f[44] = 0;
     }
     u[45] = params.avoidMapInvert ? 1 : 0;
-    // GoL driven by chaos threshold — updates params.golEnabled only on crossing so GUI toggle works
-    const wantGoL = smoothChaos > 0.3;
-    if (wantGoL !== params.golEnabled) {
-        params.golEnabled = wantGoL;
-        if (wantGoL) seedGoL();
-        golEnabledCtrl?.updateDisplay();
-    }
-    u[46] = params.golEnabled ? 1 : 0;
+    u[46] = params.golEnabled ? 1 : 0;   // GoL stays GUI-only
     f[47] = params.golStrength;
     f[48] = params.releaseBurstSpeed;
-    const chaosGPU = activeSlots.length > 0 ? Math.min(smoothChaos / 0.3, 1.0) : 0;
-    f[49] = chaosGPU;
+    f[49] = 0;   // retired: chaos
     const teleportActive = !params.randomTeleportOnAvoidMap || hasAvoidMap;
     f[50] = teleportActive ? params.randomTeleportChance : 0;
     u[51] = _preConnectionFormulas !== null ? 1 : 0;
@@ -2598,12 +2595,10 @@ function writeSoloUB(dt, time) {
     f[56] = params.spawnFadeRate;
     u[57] = params.limitAtCenter ? 1 : 0;
     f[58] = params.limitAtCenterRadius;
-    setChaos(chaosGPU);
     const _synthNow = performance.now();
     if (_synthNow - _lastSynthTick >= 200) {
         _lastSynthTick = _synthNow;
-        setSynthState(smoothChaos, smoothCoherence, 0, 0, smoothTemp);
-        ambience.setChaos(smoothChaos);
+        setSynthState(smoothCoherence, 0, 0, smoothTemp);
     }
     device.queue.writeBuffer(soloUB, 0, ab);
 }
@@ -2615,19 +2610,13 @@ function writeRenderUB() {
     const c1 = hexToF(params.color1);
     const c2 = hexToF(params.color2);
 
-    // Blend c1 toward warm orange as collective chaos rises (no param change — GPU only)
-    const _cw = smoothChaos;
-    const _c1r = c1[0] + (1.0 - c1[0]) * _cw;
-    const _c1g = c1[1] + (0.25 - c1[1]) * _cw;
-    const _c1b = c1[2] + (0.0  - c1[2]) * _cw;
-
     u[0] = params.agentCount;
     f[1] = canvas.width;
     f[2] = canvas.height;
     f[3] = params.pointSize;
-    f[4] = _c1r;
-    f[5] = _c1g;
-    f[6] = _c1b;
+    f[4] = c1[0];
+    f[5] = c1[1];
+    f[6] = c1[2];
     f[7] = params.maxSpeed;
     u[8]  = 0;   // retired: trace homing
     f[9]  = 0;
@@ -2666,9 +2655,8 @@ function writeRenderUB() {
         f[28] = 1;
     }
     f[29] = params.blendAmount;
-    // Avoid map options for per-particle color sampling. Gated on chaos threshold
-    // so high chaos suppresses the avoidMap without unloading the texture.
-    const avoidMapActive = hasAvoidMap && smoothChaos <= params.chaosAvoidMapThreshold;
+    // Avoid map options for per-particle color sampling.
+    const avoidMapActive = hasAvoidMap;
     u[30] = avoidMapActive ? 1 : 0;
     f[31] = params.avoidMapScale;
     u[32] = params.avoidMapInvert ? 1 : 0;
@@ -2679,14 +2667,11 @@ function writeRenderUB() {
     f[37] = params.championSize;
     // Room audio leans the base palette toward color2: 0 at silence, → color2AudioStr at peak.
     f[38] = (isActive() ? getVolume() : 0) * params.color2AudioStr;
-    // AvoidMap color sampling probability: 0.30 + chaos*0.70 (30% at harmony, 100% at full chaos)
-    f[39] = smoothChaos;
-    // Chaos color override — fraction of all agents forced to chaosColor, scales with chaos
-    const cc = hexToF(params.chaosColor);
-    f[40] = cc[0];
-    f[41] = cc[1];
-    f[42] = cc[2];
-    f[43] = params.chaosColorFraction;
+    f[39] = 0;   // retired: avoidMapSampleChaos
+    f[40] = 0;   // retired: chaosColorR
+    f[41] = 0;   // retired: chaosColorG
+    f[42] = 0;   // retired: chaosColorB
+    f[43] = 0;   // retired: chaosColorFraction (0 → override disabled)
     // Idle color override — only active when no spectators connected (JS zeroes fraction when active)
     const ic = hexToF(params.idleColor);
     f[44] = ic[0];

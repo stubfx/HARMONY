@@ -43,7 +43,7 @@ export function initGUI({
     }
 
     // ── lil-gui instance ──────────────────────────────────────────────────────
-    const swarmDebug = { users: 0, pitch: 0.5, roll: 0.5, temp: 0.5, coherence: 0.5, chaos: 1 };
+    const swarmDebug = { users: 0, pitch: 0.5, roll: 0.5, temp: 0.5, coherence: 0.5 };
     const gui = new GUI({ title: 'Wind Particles', width: 260 });
     if (!guiVisible) gui.domElement.style.display = 'none';
 
@@ -110,8 +110,6 @@ export function initGUI({
     fVis.add(params, 'pointSize',     1,     6,    0.1  ).name('agent size');
     fVis.addColor(params, 'color1').name('color 1');
     fVis.addColor(params, 'color2').name('color 2');
-    fVis.addColor(params, 'chaosColor').name('chaos color');
-    fVis.add(params, 'chaosColorFraction', 0, 1, 0.01).name('chaos color %');
     fVis.addColor(params, 'idleColor').name('idle color');
     fVis.add(params, 'idleColorFraction', 0, 1, 0.01).name('idle color %');
     const brightnessCtrl = fVis.add(params, 'brightness', 0.01, 0.5, 0.005).name('brightness');
@@ -174,7 +172,6 @@ export function initGUI({
 
     // ── Avoidance map ─────────────────────────────────────────────────────────
     const fAvoid = gui.addFolder('Avoidance map');
-    fAvoid.add(params, 'chaosAvoidMapThreshold', 0, 1, 0.01).name('chaos threshold (hide above)');
     fAvoid.add(params, 'avoidForceStr', 0, 5, 0.05).name('avoid force');
     fAvoid.add(params, 'avoidMapScale', 0.05, 1.0, 0.01).name('scale').onChange(() => updateAvoidMapOverlay());
     fAvoid.add(params, 'avoidMapInvert').name('invert colors');
@@ -222,7 +219,6 @@ export function initGUI({
     const dbgRoll      = fDebug.add(swarmDebug, 'roll',      0, 1).name('avg roll').disable();
     const dbgTemp      = fDebug.add(swarmDebug, 'temp',      0, 1).name('avg temp').disable();
     const dbgCoherence = fDebug.add(swarmDebug, 'coherence', 0, 1).name('avg coherence').disable();
-    const dbgChaos     = fDebug.add(swarmDebug, 'chaos',     0, 1).name('chaos (0=armonia)').disable();
 
     // ── Tilt gizmo ────────────────────────────────────────────────────────────
     let gizmoCtx   = null;
@@ -342,7 +338,6 @@ export function initGUI({
         dbgRoll,
         dbgTemp,
         dbgCoherence,
-        dbgChaos,
         golEnabledCtrl,
         agentCountCtrl,
         autoScaleCtrl,

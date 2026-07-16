@@ -50,11 +50,11 @@ struct SoloRenderParams {
     champions:            u32,
     championSize:         f32,
     color2Mix:            f32,
-    avoidMapSampleChaos:  f32,
-    chaosColorR:          f32,
-    chaosColorG:          f32,
-    chaosColorB:          f32,
-    chaosColorFraction:   f32,
+    _reserved0:           f32,
+    _reserved1:           f32,
+    _reserved2:           f32,
+    _reserved3:           f32,
+    _reserved4:           f32,
     idleColorR:           f32,
     idleColorG:           f32,
     idleColorB:           f32,
@@ -147,7 +147,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     if (!inSpectatorRange && params.avoidMapSampleColor != 0u
             && params.hasAvoidMap != 0u) {
-        let sampleProb = 0.30 + params.avoidMapSampleChaos * 0.70;
+        let sampleProb = 0.30;
         if (hash(agentId ^ 0xdeadbeefu) < sampleProb) {
             let s = avoidMapColorAt(agent.pos);
             if (s.a > 0.5) { defaultColor = s.rgb; }
@@ -155,11 +155,6 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
 
     var color = select(defaultColor, slotColor, slotIsActive);
-
-    let chaosThreshold = params.chaosColorFraction * params.avoidMapSampleChaos;
-    if (hash(agentId ^ 0xbad1deau) < chaosThreshold) {
-        color = vec3f(params.chaosColorR, params.chaosColorG, params.chaosColorB);
-    }
 
     if (hash(agentId ^ 0xd1e0c01au) < params.idleColorFraction) {
         color = vec3f(params.idleColorR, params.idleColorG, params.idleColorB);

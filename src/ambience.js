@@ -5,8 +5,6 @@
 import * as Tone from 'tone';
 import { blinker, BLINKER_TYPES } from './synth.js';
 
-const RAMP = 2.0; // seconds for smooth parameter transitions
-
 let _apiBase = '';
 let _started = false;
 let _gen     = 0; // increment to cancel stale fetch callbacks
@@ -51,11 +49,8 @@ async function _buildChain() {
     _chainReady = true;
 }
 
-// TC = exponential time constant for fade in/out
-// 0.7s at chaos=1 (urgent fade), 2.5s at chaos=0 (gentle fade)
-function _fadeTC(chaos) {
-    return Math.max(0.7, 2.5 - Math.max(0, Math.min(1, chaos)) * 1.8);
-}
+// Exponential time constant for fade in/out (seconds).
+const FADE_TC = 2.5;
 
 // ── Track fetch → play → loop ─────────────────────────────────────────────────
 
@@ -82,7 +77,7 @@ async function _fetchAndPlay(gen, fadeIn) {
 
         if (fadeIn) {
             const t  = Tone.now();
-            const TC = _fadeTC(0);
+            const TC = FADE_TC;
             _fadeGain.gain.cancelScheduledValues(t);
             _fadeGain.gain.setValueAtTime(0, t);
             _fadeGain.gain.setTargetAtTime(1, t, TC);
@@ -107,38 +102,16 @@ export function start() {
     _fetchAndPlay(++_gen, true);
 }
 
-// Fade out and stop. chaos controls the fade duration.
-export function stop(chaos = 0) {
+// Fade out and stop.
+export function stop() {
     _started = false;
     ++_gen; // cancel any in-flight fetch
     if (!_chainReady) return;
     const t  = Tone.now();
-    const TC = _fadeTC(chaos);
+    const TC = FADE_TC;
     _fadeGain.gain.cancelScheduledValues(t);
     _fadeGain.gain.setTargetAtTime(0, t, TC);
     setTimeout(() => { if (_player?.state === 'started') _player.stop(); }, TC * 3.5 * 1000);
-}
-
-// Chaos-driven degradation — call every ~200ms from the render loop.
-export function setChaos(chaos) {
-    if (!_chainReady) return;
-    const c  = Math.max(0, Math.min(1, chaos));
-    const t  = Tone.now();
-    const TC = RAMP / 3;
-
-    function smooth(signal, value) {
-        signal.cancelScheduledValues(t);
-        signal.setTargetAtTime(value, t, TC);
-    }
-
-    smooth(_filter.frequency, 4000 - c * 3600); // 4000 Hz → 400 Hz
-    smooth(_reverb.wet,       0.15 + c * 0.70); // 0.15 → 0.85
-    smooth(_noiseGain.gain,   c * 0.04);         // static noise 0 → 0.04
-    smooth(_vol.volume,       -3 - c * 12);      // -3 dB → -15 dB
-
-    _dist.distortion         = c * 0.65;
-    _tremolo.depth.value     = c * 0.85;
-    _tremolo.frequency.value = 2 + c * 6; // 2 Hz → 8 Hz dropout
 }
 
 // Independent bus volume (dB). Matches the GUI ch2 slider.

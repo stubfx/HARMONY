@@ -19,7 +19,6 @@ const spectatorId = isBot
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const auraEl          = document.querySelector('#aura');
-const chaosVignetteEl = document.querySelector('#chaos-vignette');
 const noteCanvasEl    = document.getElementById('note-canvas');
 
 // ── Socket.IO ─────────────────────────────────────────────────────────────────
@@ -203,7 +202,6 @@ function _setContNote(noteIdx) {
     if (noteIdx !== _activeNoteIdx) {
         _contOsc.frequency.setTargetAtTime(KEYS[noteIdx].freq, t, 0.04);
         _activeNoteIdx = noteIdx;
-        _motionChaos = Math.min(1, _motionChaos + 0.05);
         _sinePulse = 1;
         _poolShake = 1;
         clearTimeout(_noteDebounceTimer);
@@ -221,17 +219,6 @@ function _silenceContNote() {
     _contGainNode.gain.setTargetAtTime(0, _audioCtx.currentTime, 0.12);
     _activeNoteIdx = -1;
     sendEvent('note-off', {});
-}
-
-// ── Chaos vignette ────────────────────────────────────────────────────────────
-let _motionChaos = 0;
-const MOTION_DECAY_RATE = 0.5; // full chaos → zero in ~2 s of stillness
-
-function _applyChaosVisuals() {
-    if (!chaosVignetteEl) return;
-    const v = _motionChaos.toFixed(3);
-    if (chaosVignetteEl.style.opacity === v) return;
-    chaosVignetteEl.style.opacity = v;
 }
 
 // ── Smoke ─────────────────────────────────────────────────────────────────────
@@ -463,8 +450,6 @@ function _initNoteCanvas() {
     (function loop(ts) {
         requestAnimationFrame(loop);
         const dt = _lastChaosT > 0 ? (ts - _lastChaosT) / 1000 : 0;
-        _motionChaos = Math.max(0, _motionChaos - MOTION_DECAY_RATE * dt);
-        _applyChaosVisuals();
         _adaptPoolMax(dt);
         _lastChaosT = ts;
 
@@ -479,7 +464,7 @@ function _initNoteCanvas() {
 
     // ── Bot autopilot ─────────────────────────────────────────────────────────
     // A fake finger wanders on a per-tile Lissajous curve, driving the exact same
-    // path a real pointermove takes so smoke, aura, chaos and server events match.
+    // path a real pointermove takes so smoke, aura and server events match.
     if (isBot) {
         const i  = parseInt(urlParams.get('i') ?? '0', 10) || 0;
         const fx = 0.11 + (i % 5) * 0.017;          // horizontal wander frequency (Hz)

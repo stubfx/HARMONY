@@ -1,24 +1,45 @@
 // ── Procedural synthwave — collective-state-driven generative audio ───────────
-// Layers driven by collective state (chaos 0=harmony 1=chaos, coherence, temp, wind):
-//   drone  : sub-bass pedal A1 — always present, quieter at peak chaos
-//   noise  : pink noise bandpass — loud at chaos, silent at harmony
-//   pad    : PolySynth sawtooth chord + LFO filter sweep — emerges below chaos 0.6
+// Layers driven by collective state (coherence, temp, wind) and an energy level:
+//   drone  : sub-bass pedal A1 — always present
+//   pad    : PolySynth sawtooth chord + LFO filter sweep
 //              LFO frequency ← coherence (0.05–0.8 Hz)
 //              LFO amplitude ← wind magnitude (deeper with physical movement)
-//   arp    : random minor-scale melody + delay — revealed below chaos 0.35
+//   arp    : random minor-scale melody + delay
 //              BPM ← temperature (80–140)
+//
+// Energy (0 = ambient bed, 1 = post-drop energetic) scales pad/arp gain, pad
+// filter brightness and transport BPM. The generative "drop" (playRiser →
+// triggerImpact) ramps energy to 1 to lock in the elevated body.
 
 import * as Tone from 'tone';
 
 const RAMP   = 2.0;  // seconds for smooth parameter transitions
 const SILENT = -60;  // dB floor (avoids -Infinity in ramps)
 
+// ── Layer levels & energy scaling ──────────────────────────────────────────────
+const PAD_GAIN_BASE    = 0.55; // pad linear gain at energy 0
+const PAD_GAIN_ENERGY  = 0.35; // added to pad gain at full energy
+const ARP_GAIN_BASE    = 0.40; // arp linear gain at energy 0
+const ARP_GAIN_ENERGY  = 0.40; // added to arp gain at full energy
+const PAD_FILTER_BASE  = 4000; // pad lowpass cutoff (Hz) at energy 0
+const PAD_FILTER_ENERGY = 7000; // added to cutoff at full energy
+const BPM_MIN          = 80;   // transport BPM at temp 0
+const BPM_TEMP_RANGE   = 60;   // BPM added across the temperature range
+const BPM_ENERGY_BOOST = 40;   // BPM added at full energy
+
 // A natural minor scale across 2 octaves for arp randomisation
 const ARP_POOL = ['A3','B3','C4','D4','E4','F4','G4','A4','B4','C5','E5','G5'];
 
 let _ready = false;
-let _noiseGain, _padVol, _padFilter, _padLFO, _droneVol, _arpVol, _arpSeq;
+let _padVol, _padFilter, _padLFO, _droneVol, _arpVol, _arpSeq;
 let _synthBus = null;  // top-level synth bus volume
+
+// Energy: 0 = ambient bed, 1 = post-drop energetic. Ramped by setSynthEnergy().
+let _energy = 0;
+let _energyTimer = null;
+
+// Last collective state, re-applied whenever energy changes between 200 ms ticks.
+let _lastCoh = 0.5, _lastBiasX = 0, _lastBiasY = 0, _lastTemp = 0.5;
 
 // Influence pool: remote note presses bias the arp toward pressed pitches
 const _influenceNotes      = [];
@@ -45,15 +66,6 @@ export async function startSynth() {
     _droneVol.connect(master);
     await droneReverb.ready;
     drone.triggerAttack('A1');
-
-    // ── Noise — interference at high chaos ────────────────────────────────────
-    const noiseFilt = new Tone.Filter({ frequency: 900, type: 'bandpass', Q: 1.5 });
-    _noiseGain      = new Tone.Gain(0.25);
-    const noise     = new Tone.Noise('pink');
-    noise.connect(noiseFilt);
-    noiseFilt.connect(_noiseGain);
-    _noiseGain.connect(master);
-    noise.start();
 
     // ── Pad — fatsawtooth chord with LFO filter sweep ────────────────────────
     const reverb   = new Tone.Reverb({ decay: 15, wet: 0.88 });
@@ -120,23 +132,32 @@ export async function startSynth() {
     _ready = true;
 }
 
-// chaos     : 0 = harmony, 1 = chaos
 // coherence : 0 = scattered, 1 = converged
 // biasX/Y   : collective tilt (wind direction), nominally 0–1 centered at 0
 // temp      : collective temperature 0–1
 let _droneOnly = false;
 
-// When true, only the drone plays — noise/pad/arp are silenced.
+// When true, only the drone plays — pad/arp are silenced.
 // Call setSynthDroneOnly(false) to restore all layers.
 export function setSynthDroneOnly(enabled) {
     _droneOnly = enabled;
 }
 
-export function setSynthState(chaos, coherence = 0.5, biasX = 0, biasY = 0, temp = 0.5) {
+export function setSynthState(coherence = 0.5, biasX = 0, biasY = 0, temp = 0.5) {
+    _lastCoh   = coherence;
+    _lastBiasX = biasX;
+    _lastBiasY = biasY;
+    _lastTemp  = temp;
+    _applyState();
+}
+
+// Applies the stored collective state and current energy to the live nodes.
+// Re-called on each energy ramp step so BPM/gain track energy between ticks.
+function _applyState() {
     if (!_ready) return;
-    const c   = Math.max(0, Math.min(1, chaos));
-    const coh = Math.max(0, Math.min(1, coherence));
-    const tmp = Math.max(0, Math.min(1, temp));
+    const coh = Math.max(0, Math.min(1, _lastCoh));
+    const tmp = Math.max(0, Math.min(1, _lastTemp));
+    const e   = Math.max(0, Math.min(1, _energy));
     const t   = Tone.now();
     const TC  = RAMP / 3;  // exponential time constant (~95% after RAMP seconds)
 
@@ -147,32 +168,46 @@ export function setSynthState(chaos, coherence = 0.5, biasX = 0, biasY = 0, temp
         param.setTargetAtTime(value, t, TC);
     }
 
-    // Drone — always audible, slightly quieter at peak chaos
-    smoothTo(_droneVol.volume, -18 - c * 6);
+    // Drone — always audible
+    smoothTo(_droneVol.volume, -18);
 
     if (_droneOnly) return; // PHASE 1: solo drone, gli altri layer restano silenziosi
 
-    // Noise — fades out as harmony approaches
-    smoothTo(_noiseGain.gain, Math.max(1e-4, c * 0.25));
+    // Pad — louder and brighter with energy
+    const padGain = PAD_GAIN_BASE + e * PAD_GAIN_ENERGY;
+    smoothTo(_padVol.volume, Tone.gainToDb(padGain));
+    smoothTo(_padFilter.frequency, PAD_FILTER_BASE + e * PAD_FILTER_ENERGY);
 
-    // Pad — emerges below chaos 0.6, filter opens further at harmony
-    const padGain = c < 0.6 ? Math.pow(1 - c / 0.6, 1.5) * 0.55 : 0;
-    smoothTo(_padVol.volume, padGain > 0 ? Math.max(SILENT, Tone.gainToDb(padGain)) : SILENT);
-    smoothTo(_padFilter.frequency, 300 + (1 - c) * 9000);
+    // LFO frequency ← coherence: converged crowd sweeps the filter faster
+    _padLFO.frequency.value = 0.05 + coh * 0.75;
 
-    // LFO frequency ← (1-chaos): fast at harmony (2 Hz), near-still at full chaos (0.05 Hz)
-    _padLFO.frequency.value = 0.05 + (1 - c) * 2.0;
+    // LFO amplitude ← wind magnitude: physical tilt deepens the sweep
+    const windMag = Math.min(1, Math.sqrt(_lastBiasX * _lastBiasX + _lastBiasY * _lastBiasY) / Math.SQRT2);
+    _padLFO.amplitude.value = 0.3 + windMag * 0.7;
 
-    // LFO amplitude ← wind magnitude + chaos: tilt deepens sweep, chaos suppresses it
-    const windMag = Math.min(1, Math.sqrt(biasX * biasX + biasY * biasY) / Math.SQRT2);
-    _padLFO.amplitude.value = (1 - c * 0.7) * (0.3 + windMag * 0.7);
+    // Arp — louder with energy
+    const arpGain = ARP_GAIN_BASE + e * ARP_GAIN_ENERGY;
+    smoothTo(_arpVol.volume, Tone.gainToDb(arpGain));
 
-    // Arp — only below chaos 0.35
-    const arpGain = c < 0.35 ? Math.pow(1 - c / 0.35, 2) * 0.4 : 0;
-    smoothTo(_arpVol.volume, arpGain > 0 ? Math.max(SILENT, Tone.gainToDb(arpGain)) : SILENT);
+    // Arp tempo ← temperature (+ energy boost): higher = faster arpeggiation
+    Tone.getTransport().bpm.value = BPM_MIN + tmp * BPM_TEMP_RANGE + e * BPM_ENERGY_BOOST;
+}
 
-    // Arp tempo ← temperature: higher temp = faster arpeggiation (80–140 BPM)
-    Tone.getTransport().bpm.value = 80 + tmp * 60;
+// Ramp the energy level toward `e` over `rampSec`, re-applying state each step so
+// BPM and layer gains glide smoothly rather than jumping on the next 200 ms tick.
+export function setSynthEnergy(e, rampSec = 1.5) {
+    const target = Math.max(0, Math.min(1, e));
+    if (_energyTimer) { clearInterval(_energyTimer); _energyTimer = null; }
+    const start   = _energy;
+    const stepMs  = 50;
+    const steps   = Math.max(1, Math.round((rampSec * 1000) / stepMs));
+    let   n       = 0;
+    _energyTimer = setInterval(() => {
+        n++;
+        _energy = start + (target - start) * Math.min(1, n / steps);
+        _applyState();
+        if (n >= steps) { _energy = target; clearInterval(_energyTimer); _energyTimer = null; }
+    }, stepMs);
 }
 
 // Called from sim.js on each remote 'note' event.
@@ -238,4 +273,89 @@ export async function blinker(type = 'sonar') {
 }
 
 export const BLINKER_TYPES = Object.keys(BLINKER_PRESETS);
+
+// ── Generative "drop" — riser build-up + impact ───────────────────────────────
+// playRiser() is a rising build voice; triggerImpact() resolves it into a body
+// hit and locks in the energetic state via setSynthEnergy(1). Both are one-shot,
+// auto-disposing voices modelled on blinker(); story.js fires them around the
+// PHASE 3 red reveal so the color lands like an EDM drop.
+
+const RISER_NOISE_PEAK = 0.35; // band-passed noise gain at the top of the build
+const RISER_TONE_PEAK  = 0.30; // sweeping tone gain at the top of the build
+const RISER_DUCK_DB    = -12;  // synth bus duck at the height of the build (contrast)
+
+// A build voice: band-passed white noise + a saw tone whose pitch and filter
+// cutoff sweep upward while the volume swells over `durationMs`. Auto-disposes.
+export async function playRiser(durationMs = 4000) {
+    await Tone.start();
+    const dur = durationMs / 1000;
+    const t   = Tone.now();
+
+    // Band-passed white noise sweeping up
+    const noise     = new Tone.Noise('white');
+    const noiseBP   = new Tone.Filter({ type: 'bandpass', Q: 2, frequency: 400 });
+    const noiseGain = new Tone.Gain(0.0001);
+    noise.connect(noiseBP); noiseBP.connect(noiseGain); noiseGain.toDestination();
+    noise.start(t);
+    noiseBP.frequency.setValueAtTime(400, t);
+    noiseBP.frequency.exponentialRampToValueAtTime(6000, t + dur);
+    noiseGain.gain.setValueAtTime(0.0001, t);
+    noiseGain.gain.exponentialRampToValueAtTime(RISER_NOISE_PEAK, t + dur);
+
+    // Saw tone whose pitch and filter cutoff sweep upward
+    const tone     = new Tone.Oscillator({ type: 'sawtooth', frequency: 110 });
+    const toneFilt = new Tone.Filter({ type: 'lowpass', frequency: 400 });
+    const toneGain = new Tone.Gain(0.0001);
+    tone.connect(toneFilt); toneFilt.connect(toneGain); toneGain.toDestination();
+    tone.start(t);
+    tone.frequency.setValueAtTime(110, t);
+    tone.frequency.exponentialRampToValueAtTime(880, t + dur);
+    toneFilt.frequency.setValueAtTime(400, t);
+    toneFilt.frequency.exponentialRampToValueAtTime(8000, t + dur);
+    toneGain.gain.setValueAtTime(0.0001, t);
+    toneGain.gain.exponentialRampToValueAtTime(RISER_TONE_PEAK, t + dur);
+
+    // Duck the generative bed during the build for contrast; triggerImpact restores it.
+    if (_synthBus) {
+        _synthBus.volume.cancelScheduledValues(t);
+        _synthBus.volume.setValueAtTime(_synthBus.volume.value, t);
+        _synthBus.volume.linearRampToValueAtTime(RISER_DUCK_DB, t + dur * 0.85);
+    }
+
+    noise.stop(t + dur);
+    tone.stop(t + dur);
+    setTimeout(() => {
+        noise.dispose(); noiseBP.dispose(); noiseGain.dispose();
+        tone.dispose();  toneFilt.dispose(); toneGain.dispose();
+    }, durationMs + 300);
+}
+
+// The impact at the end of the riser: a deep sub boom + a bright transient, then
+// setSynthEnergy(1) to lock in the energetic body and restore the ducked bed.
+export async function triggerImpact() {
+    await Tone.start();
+    const t = Tone.now();
+
+    // Deep sub "boom" — low sine with a fast attack and pitch drop
+    const boom = new Tone.Synth({
+        oscillator: { type: 'sine' },
+        envelope:   { attack: 0.005, decay: 0.6, sustain: 0, release: 0.3 },
+        volume:     -4,
+    }).toDestination();
+    boom.frequency.setValueAtTime(90, t);
+    boom.frequency.exponentialRampToValueAtTime(40, t + 0.5);
+    boom.triggerAttackRelease(90, 0.7, t);
+    setTimeout(() => boom.dispose(), 1500);
+
+    // Bright transient
+    blinker('blip');
+
+    // Restore the ducked bed and lock in the energetic body.
+    if (_synthBus) {
+        _synthBus.volume.cancelScheduledValues(t);
+        _synthBus.volume.setValueAtTime(_synthBus.volume.value, t);
+        _synthBus.volume.linearRampToValueAtTime(0, t + 0.3);
+    }
+    setSynthEnergy(1, 1.2);
+}
 

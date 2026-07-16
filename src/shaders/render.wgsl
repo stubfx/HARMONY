@@ -39,11 +39,11 @@
 //   [144] champions            u32   (every Nth agent is a champion; 0 = off — mirrors the shadow pass)
 //   [148] championSize         f32   (point size for a FREE champion; ignored while homing)
 //   [152] color2Mix            f32   (0–1 audio-driven lean of the base palette toward color2)
-//   [156] avoidMapSampleChaos f32   (chaos 0–1 drives avoidmap sample probability: 0.30 + (1-chaos)*0.70)
-//   [160] chaosColorR          f32   (chaos override color R)
-//   [164] chaosColorG          f32   (chaos override color G)
-//   [168] chaosColorB          f32   (chaos override color B)
-//   [172] chaosColorFraction   f32   (max fraction of all agents that use chaosColor at chaos=1)
+//   [156] _reserved0           f32   (was avoidMapSampleChaos)
+//   [160] _reserved1           f32   (was chaosColorR)
+//   [164] _reserved2           f32   (was chaosColorG)
+//   [168] _reserved3           f32   (was chaosColorB)
+//   [172] _reserved4           f32   (was chaosColorFraction)
 //   [176] idleColorR           f32   (idle override color R — active when no spectators connected)
 //   [180] idleColorG           f32
 //   [184] idleColorB           f32
@@ -93,11 +93,11 @@ struct SoloRenderParams {
     champions:            u32,
     championSize:         f32,
     color2Mix:            f32,
-    avoidMapSampleChaos:  f32,
-    chaosColorR:          f32,
-    chaosColorG:          f32,
-    chaosColorB:          f32,
-    chaosColorFraction:   f32,
+    _reserved0:           f32,
+    _reserved1:           f32,
+    _reserved2:           f32,
+    _reserved3:           f32,
+    _reserved4:           f32,
     idleColorR:           f32,
     idleColorG:           f32,
     idleColorB:           f32,

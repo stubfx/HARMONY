@@ -53,7 +53,7 @@
 //   [184] golEnabled           u32
 //   [188] golStrength          f32
 //   [192] releaseBurstSpeed    f32   (initial speed of the fireworks scatter when a joystick is released; 0 = off)
-//   [196] chaos                f32
+//   [196] _reservedChaos       f32
 //   [200] randomTeleportChance f32   (per-frame probability [0–1] that any agent teleports to a random canvas position)
 //   [204] chladniActive        u32
 //   [208] chladniM             f32
@@ -114,7 +114,7 @@ struct SoloParams {
     golEnabled:           u32,   // 1 = particles are attracted to Game-of-Life live cells
     golStrength:          f32,   // attraction strength toward live cells
     releaseBurstSpeed:    f32,   // fireworks scatter speed on joystick release (0 = disabled)
-    chaos:                f32,   // 0 = armonia (no noise), 1 = max random noise (from collective rotation)
+    _reservedChaos:       f32,   // reserved (formerly chaos); kept to preserve buffer layout
     randomTeleportChance: f32,   // per-frame probability that any agent jumps to a random canvas position
     chladniActive:        u32,   // 1 = blend a Chladni perturbation into the direction formula
     chladniM:             f32,   // Chladni mode M
@@ -213,28 +213,10 @@ fn avoidMapStrAt(canvasPx: vec2<f32>) -> f32 {
 
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { return 0.0; }
 
-    let mx = i32(dims.x) - 1;
-    let my = i32(dims.y) - 1;
     let cx = i32(clamp(uv.x, 0.0, 1.0) * f32(dims.x - 1u));
     let cy = i32(clamp(uv.y, 0.0, 1.0) * f32(dims.y - 1u));
 
-    // Chaos-driven blur: 9-tap sparse Gaussian kernel, radius = chaos × 8 texels.
-    // At chaos=0 all offsets are 0 → all taps hit the same texel, no blur.
-    // At chaos=1 samples spread ±8 texels on axes, ±6 on diagonals.
-    let br = params.chaos * 8.0;
-    let ra = i32(round(br));          // axis offset
-    let rd = i32(round(br * 0.707));  // diagonal offset ≈ br / √2
-
-    let r = (textureLoad(avoidMapTex, vec2<u32>(u32(clamp(cx,      0, mx)), u32(clamp(cy,      0, my))), 0u).r * 4.0
-           + textureLoad(avoidMapTex, vec2<u32>(u32(clamp(cx + ra, 0, mx)), u32(clamp(cy,      0, my))), 0u).r * 2.0
-           + textureLoad(avoidMapTex, vec2<u32>(u32(clamp(cx - ra, 0, mx)), u32(clamp(cy,      0, my))), 0u).r * 2.0
-           + textureLoad(avoidMapTex, vec2<u32>(u32(clamp(cx,      0, mx)), u32(clamp(cy + ra, 0, my))), 0u).r * 2.0
-           + textureLoad(avoidMapTex, vec2<u32>(u32(clamp(cx,      0, mx)), u32(clamp(cy - ra, 0, my))), 0u).r * 2.0
-           + textureLoad(avoidMapTex, vec2<u32>(u32(clamp(cx + rd, 0, mx)), u32(clamp(cy + rd, 0, my))), 0u).r * 1.0
-           + textureLoad(avoidMapTex, vec2<u32>(u32(clamp(cx - rd, 0, mx)), u32(clamp(cy + rd, 0, my))), 0u).r * 1.0
-           + textureLoad(avoidMapTex, vec2<u32>(u32(clamp(cx + rd, 0, mx)), u32(clamp(cy - rd, 0, my))), 0u).r * 1.0
-           + textureLoad(avoidMapTex, vec2<u32>(u32(clamp(cx - rd, 0, mx)), u32(clamp(cy - rd, 0, my))), 0u).r * 1.0
-           ) / 16.0;
+    let r = textureLoad(avoidMapTex, vec2<u32>(u32(cx), u32(cy)), 0u).r;
 
     return select(r, 1.0 - r, params.avoidMapInvert != 0u);
 }
@@ -289,13 +271,10 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     {
         // ── Free agent: formula steering + wind ───────────────────────────────
-        // chaos=1 → freeFactor=0 → agents ignore formula/wind and go straight.
-        // chaos=0 → freeFactor=1 → normal steering.
-        let freeFactor = 1.0 - params.chaos;
         if (params.followFormula != 0u) {
-            vel = mix(vel, desired * (params.stepLen * weight), params.turnRate * freeFactor);
+            vel = mix(vel, desired * (params.stepLen * weight), params.turnRate);
         }
-        vel += wind * params.dt * 60.0 * freeFactor;
+        vel += wind * params.dt * 60.0;
 
         // ── Game of Life attraction ────────────────────────────────────────────
         // Steer up the gradient of the live-cell grid, so the swarm gathers on and

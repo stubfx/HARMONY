@@ -78,11 +78,3 @@ html, body {
     pointer-events: auto;
     mix-blend-mode: screen;
 }
-
-#chaos-vignette {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: radial-gradient(ellipse at center, transparent 20%, rgba(183,28,28,0.65) 100%);
-    opacity: 0;
-}

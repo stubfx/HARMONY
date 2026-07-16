@@ -44,6 +44,10 @@ import { PHASE, RESEED } from './constants.js';
 
 const log = (msg) => console.log(`[story] ${msg}`);
 
+// PHASE 3 riser build-up length (ms). The generative drop's impact and the red
+// colour reveal both fire when this timer elapses, so they land perfectly synced.
+const RISER_MS = 4000;
+
 export const STORY = [
 
     // ── PHASE 1 — CONNECTION ──────────────────────────────────────────────────
@@ -163,7 +167,8 @@ export const STORY = [
 
     // ── PHASE 3 ───────────────────────────────────────────────────────────────
     // NORMAL color → HARMONY text immediately → 10s timer → harmony images → audio4.
-    // After audio4 ends: 5s silence → color → PHASE 4.
+    // After audio4 ends: a RISER_MS build-up (riser) resolves into a synced drop —
+    // impact + red colour reveal fire together → PHASE 4.
     // File: simAss/narrator/audio4.mp3
     {
         id: PHASE.P3,
@@ -180,12 +185,14 @@ export const STORY = [
                 sim.setParam('dotRespawnChance', 0.002);
                 this._audio = sim.playNarratorAudio('audio4.mp3');
                 this._audio.addEventListener('ended', () => {
-                    log('audio4 terminato. attesa 5s → colori → PHASE 4.');
-                    this._colorTimer = setTimeout(() => {
-                        log('5s scaduti — color1=#ff0000 color2=#ff0000. avanzamento a PHASE 4.');
+                    log(`audio4 terminato. riser ${Math.round(RISER_MS / 1000)}s → drop → PHASE 4.`);
+                    sim.playRiser(RISER_MS);
+                    this._riserTimer = setTimeout(() => {
+                        log('drop — impact + color1=#ff0000 color2=#ff0000. avanzamento a PHASE 4.');
+                        sim.triggerImpact();
                         sim.freezeParams({ color1: '#ff0000', color2: '#ff0000' });
                         sim.next();
-                    }, 5_000);
+                    }, RISER_MS);
                 }, { once: true });
             }, 10_000);
         },
@@ -193,7 +200,7 @@ export const STORY = [
             log('uscita PHASE 3.');
             clearTimeout(this._textTimer);
             clearTimeout(this._respawnTimer);
-            clearTimeout(this._colorTimer);
+            clearTimeout(this._riserTimer);
             // Harmony images stay enabled from here on (intentionally not disabled).
             sim.thawParams();
             this._audio?.pause();
