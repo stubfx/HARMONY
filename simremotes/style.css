@@ -43,3 +43,72 @@ html, body {
     padding: 2rem;
     text-align: center;
 }
+
+#dashboard {
+    position: fixed;
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 14px;
+    background: rgba(20, 20, 20, 0.85);
+    border: 1px solid #333;
+    border-radius: 10px;
+    backdrop-filter: blur(4px);
+    font: 12px/1 system-ui, sans-serif;
+    color: #ddd;
+}
+
+.dash-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.dash-title {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #888;
+    font-size: 10px;
+}
+
+.dash-btn {
+    min-width: 30px;
+    height: 30px;
+    padding: 0 8px;
+    background: #2a2a2a;
+    color: #eee;
+    border: 1px solid #444;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.dash-btn:hover   { background: #3a3a3a; }
+.dash-btn:active  { background: #4a4a4a; }
+.dash-auto        { text-transform: uppercase; letter-spacing: 0.06em; font-size: 10px; }
+
+.dash-readout {
+    min-width: 34px;
+    text-align: center;
+    font: 13px/1 monospace;
+    color: #fff;
+}
+
+.dash-swatch {
+    display: inline-block;
+    width: 26px;
+    height: 20px;
+    border: 1px solid #555;
+    border-radius: 4px;
+}
+
+.dash-swatch.auto {
+    background:
+        linear-gradient(45deg, #333 25%, transparent 25%, transparent 75%, #333 75%) 0 0 / 10px 10px,
+        #1a1a1a;
+}

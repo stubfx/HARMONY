@@ -275,6 +275,11 @@ function _tickSmoke(ctx2d, w, h) {
 // Guard: called once from the join handler, safe against duplicate invocations.
 let _noteCanvasInit = false;
 
+// Bot sync overrides, set by the simremotes dashboard via postMessage. null =
+// autonomous wander on that axis; a value locks it. note: 0–8, hue: 0–270.
+let _botCmdNote = null;
+let _botCmdHue  = null;
+
 function _initNoteCanvas() {
     if (_noteCanvasInit || !noteCanvasEl) return;
     _noteCanvasInit = true;
@@ -489,14 +494,21 @@ function _initNoteCanvas() {
             requestAnimationFrame(botLoop);
             const w = noteCanvasEl.width, h = noteCanvasEl.height;
             if (w === 0 || h === 0) return;
-            if (((ts + liftOffset) % LIFT_PERIOD) < LIFT_DUR) {
+            // When the dashboard has synced this bot, hold a steady finger (no lift)
+            // so the note/colour stays locked; otherwise phrase with periodic lifts.
+            const synced = _botCmdNote !== null || _botCmdHue !== null;
+            if (!synced && ((ts + liftOffset) % LIFT_PERIOD) < LIFT_DUR) {
                 if (_touching) { _touching = false; _silenceContNote(); }
                 return;
             }
             const t = ts / 1000;
             _touching = true;
-            _touchX = (Math.sin(t * Math.PI * 2 * fx + px) + 1) / 2 * w;
-            _touchY = (Math.sin(t * Math.PI * 2 * fy + py) + 1) / 2 * h;
+            _touchX = _botCmdNote !== null
+                ? (_botCmdNote + 0.5) / KEYS.length * w
+                : (Math.sin(t * Math.PI * 2 * fx + px) + 1) / 2 * w;
+            _touchY = _botCmdHue !== null
+                ? Math.max(0, Math.min(1, _botCmdHue / 270)) * h
+                : (Math.sin(t * Math.PI * 2 * fy + py) + 1) / 2 * h;
             _setContNote(_noteIdx(_touchX));
             _applyColor(_touchY);
         })(0);
@@ -526,6 +538,17 @@ _initNoteCanvas();
 if (isBot) {
     _tapHint?.classList.add('hidden');
     try { _startContOsc(); } catch { /* suspended context is expected without a gesture */ }
+    // Parent (simremotes dashboard) → bot commands: lock this tile's finger to a
+    // fixed note (X) and/or colour hue (Y), or release back to autonomous wandering.
+    window.addEventListener('message', (e) => {
+        if (e.origin !== window.location.origin) return;
+        const d = e.data;
+        if (!d || d.type !== 'bot-cmd') return;
+        if ('note' in d) _botCmdNote = d.note;   // 0–8, or null to release
+        if ('hue'  in d) _botCmdHue  = d.hue;     // 0–270, or null to release
+    });
+    // Tell the dashboard we're ready so it can push the current sync state.
+    try { window.parent?.postMessage({ type: 'bot-ready' }, window.location.origin); } catch { /* not framed */ }
 }
 document.addEventListener('pointerdown', () => {
     _silentAudioKick();
