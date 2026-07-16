@@ -2209,7 +2209,10 @@ loadAvoidMap(`${_apiBase}/simAss-static/full_square.png`);
             });
             uiQr.style.display = 'block';
             uiQr.style.cursor  = 'pointer';
-            uiQr.addEventListener('click', () => window.open(sessionUrl, '_blank'));
+            // The scannable bitmap still encodes sessionUrl (real single remote);
+            // clicking it instead opens the synthetic-crowd load test page.
+            uiQr.addEventListener('click', () =>
+                window.open(`${window.location.origin}/simremotes/?s=${sessionId}`, '_blank'));
         }
 
         // ── Large QR bitmap — pre-rendered via generateQR(), stored for later activation.

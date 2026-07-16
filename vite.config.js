@@ -15,6 +15,7 @@ export default defineConfig({
             input: {
                 main:   path.resolve(__dirname, 'index.html'),
                 remote: path.resolve(__dirname, 'remote/index.html'),
+                simremotes: path.resolve(__dirname, 'simremotes/index.html'),
                 admin:  path.resolve(__dirname, 'admin/index.html'),
                 wavegen: path.resolve(__dirname, 'wavegen/index.html'),
                 life:    path.resolve(__dirname, 'life/index.html'),

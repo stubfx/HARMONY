@@ -4,12 +4,18 @@ import { io as ioConnect } from 'socket.io-client';
 // ── Session ───────────────────────────────────────────────────────────────────
 const urlParams   = new URLSearchParams(window.location.search);
 const room        = urlParams.get('s');
+const isBot       = urlParams.get('bot') === '1';
 
-const spectatorId = sessionStorage.getItem('spectator-id') ?? (() => {
-    const id = crypto.randomUUID();
-    sessionStorage.setItem('spectator-id', id);
-    return id;
-})();
+// sessionStorage is shared across all same-origin iframes in one tab, so bots
+// must mint a fresh id — otherwise the server collapses every tile into one
+// spectator. Real remotes keep the stable per-tab id.
+const spectatorId = isBot
+    ? crypto.randomUUID()
+    : (sessionStorage.getItem('spectator-id') ?? (() => {
+        const id = crypto.randomUUID();
+        sessionStorage.setItem('spectator-id', id);
+        return id;
+    })());
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const auraEl          = document.querySelector('#aura');
@@ -465,6 +471,36 @@ function _initNoteCanvas() {
         }
         _tickSmoke(ctx2d, noteCanvasEl.width, noteCanvasEl.height);
     })(0);
+
+    // ── Bot autopilot ─────────────────────────────────────────────────────────
+    // A fake finger wanders on a per-tile Lissajous curve, driving the exact same
+    // path a real pointermove takes so smoke, aura, chaos and server events match.
+    if (isBot) {
+        const i  = parseInt(urlParams.get('i') ?? '0', 10) || 0;
+        const fx = 0.11 + (i % 5) * 0.017;          // horizontal wander frequency (Hz)
+        const fy = 0.07 + (i % 3) * 0.023;          // vertical wander frequency (Hz)
+        const px = (i * 1.3) % (Math.PI * 2);       // phase offsets so tiles differ
+        const py = (i * 2.1) % (Math.PI * 2);
+        const LIFT_PERIOD = 4000 + (i % 5) * 600;   // "lift the finger" cadence (ms)
+        const LIFT_DUR    = 500;
+        const liftOffset  = (i * 700) % LIFT_PERIOD;
+
+        (function botLoop(ts) {
+            requestAnimationFrame(botLoop);
+            const w = noteCanvasEl.width, h = noteCanvasEl.height;
+            if (w === 0 || h === 0) return;
+            if (((ts + liftOffset) % LIFT_PERIOD) < LIFT_DUR) {
+                if (_touching) { _touching = false; _silenceContNote(); }
+                return;
+            }
+            const t = ts / 1000;
+            _touching = true;
+            _touchX = (Math.sin(t * Math.PI * 2 * fx + px) + 1) / 2 * w;
+            _touchY = (Math.sin(t * Math.PI * 2 * fy + py) + 1) / 2 * h;
+            _setContNote(_noteIdx(_touchX));
+            _applyColor(_touchY);
+        })(0);
+    }
 }
 
 // ── Story step socket handler ─────────────────────────────────────────────────
@@ -484,6 +520,13 @@ socket.on('story-step', ({ step } = {}) => {
 // AudioContext requires a user gesture, so the oscillator is deferred.
 const _tapHint = document.querySelector('#tap-hint');
 _initNoteCanvas();
+// Bots have no human to tap: start the oscillator now so notes emit. The
+// AudioContext is created but stays suspended (no user gesture), so the tiles
+// drive events while staying silent.
+if (isBot) {
+    _tapHint?.classList.add('hidden');
+    try { _startContOsc(); } catch { /* suspended context is expected without a gesture */ }
+}
 document.addEventListener('pointerdown', () => {
     _silentAudioKick();
     _startContOsc();
