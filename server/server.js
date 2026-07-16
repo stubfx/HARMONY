@@ -38,7 +38,6 @@ const CONFIG_PASS = (process.env.PASSWORD ?? '').trim();
 const N8N_SECRET  = process.env.N8N_SECRET ?? '';
 
 if (!ADMIN_PASS)  console.warn('[server] ADMIN_PASSWORD not set — /admin will be inaccessible');
-if (!N8N_SECRET)  console.warn('[server] N8N_SECRET not set — /spectator-push is unauthenticated');
 
 const ORIGINS = [
     'https://thesis.lucamolluso.com',
