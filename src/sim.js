@@ -2073,6 +2073,12 @@ loadAvoidMap(`${_apiBase}/simAss-static/full_square.png`);
         if (event.type === 'note-off') {
             _activeNotesBySpectator.delete(event.spectatorId);
         }
+        if (event.type === 'blip') {
+            const slot = activeSlots.find(s => s.spectatorId === event.spectatorId);
+            if (slot) { triggerReleaseBurst(slot); uploadSpectatorSlots(); }
+            blinker('blip');
+            burstBrightness = BURST_BRIGHTNESS;
+        }
         if (event.type === 'pulse-tap') {
             pulseEnergy = Math.min(pulseEnergy + PULSE_INCREMENT, PULSE_MAX);
         }

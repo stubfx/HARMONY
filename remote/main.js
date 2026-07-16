@@ -282,6 +282,54 @@ function _initNoteCanvas() {
     let _touching = false, _touchX = 0, _touchY = 0;
     let _lastSentHue = -1;
 
+    // ── Blip target ─────────────────────────────────────────────────────────
+    // A small circle that pops up at a random interval; tapping it fires a blip
+    // on the big screen. Only appears during interactive phases (step >= 1).
+    const BLIP_MIN_MS = 30000, BLIP_MAX_MS = 60000, BLIP_LIFETIME_MS = 8000;
+    let _blip = null;       // { x, y, r, born } | null — the live target
+    let _blipPop = null;    // { x, y, r, t } | null — the tap-burst animation
+    let _blipTimer = null;
+
+    function _scheduleBlip() {
+        clearTimeout(_blipTimer);
+        _blipTimer = setTimeout(_spawnBlip, BLIP_MIN_MS + Math.random() * (BLIP_MAX_MS - BLIP_MIN_MS));
+    }
+
+    function _spawnBlip() {
+        if (_currentStep < 1) { _scheduleBlip(); return; } // never on the intro screen
+        const w = noteCanvasEl.width, h = noteCanvasEl.height;
+        const r = Math.max(26, Math.min(w, h) * 0.09);
+        const margin = 2 * r; // keep dot + pop ring on-canvas
+        const x = margin + Math.random() * Math.max(1, w - 2 * margin);
+        const y = margin + Math.random() * Math.max(1, h - 2 * margin);
+        _blip = { x, y, r, born: performance.now() };
+    }
+
+    function _blipHit(px, py) {
+        if (!_blip) return false;
+        const dx = px - _blip.x, dy = py - _blip.y;
+        return dx * dx + dy * dy <= _blip.r * _blip.r;
+    }
+
+    function _flashAura() {
+        if (!auraEl) return;
+        auraEl.style.transition = 'background 0s, opacity 0.05s ease';
+        auraEl.style.opacity = '0.6';
+        setTimeout(() => {
+            auraEl.style.transition = 'background 0.6s ease, opacity 0.5s ease';
+            auraEl.style.opacity = '1';
+        }, 80);
+    }
+
+    function _popBlip() {
+        if (!_blip) return;
+        _blipPop = { x: _blip.x, y: _blip.y, r: _blip.r, t: 0 };
+        _flashAura();
+        sendEvent('blip', { color: pushedColor });
+        _blip = null;
+        _scheduleBlip();
+    }
+
     function _cf(x, y) {
         const w = noteCanvasEl.width, h = noteCanvasEl.height;
         const dx = (x / w - 0.5) * 2, dy = (y / h - 0.5) * 2;
@@ -304,6 +352,7 @@ function _initNoteCanvas() {
 
     noteCanvasEl.addEventListener('pointerdown', (e) => {
         e.preventDefault();
+        if (_blipHit(e.offsetX, e.offsetY)) { _popBlip(); return; } // tap the target, not a note
         noteCanvasEl.setPointerCapture(e.pointerId);
         _touching = true;
         _touchX = e.offsetX; _touchY = e.offsetY;
@@ -460,6 +509,47 @@ function _initNoteCanvas() {
             _lastSpawn = ts;
         }
         _tickSmoke(ctx2d, noteCanvasEl.width, noteCanvasEl.height);
+
+        // ── Blip target + tap-burst ─────────────────────────────────────────
+        if (_blip) {
+            if (ts - _blip.born > BLIP_LIFETIME_MS) {
+                _blip = null;               // ignored — auto-expire and reschedule
+                _scheduleBlip();
+            } else {
+                const col   = _currentStep >= 2 ? pushedColor : '#ffffff';
+                const r     = _blip.r * (1 + 0.15 * Math.sin(ts * 0.006)); // attention pulse
+                ctx2d.save();
+                ctx2d.globalAlpha = 0.55;
+                ctx2d.fillStyle   = col;
+                ctx2d.beginPath();
+                ctx2d.arc(_blip.x, _blip.y, r * 0.45, 0, Math.PI * 2);
+                ctx2d.fill();
+                ctx2d.globalAlpha = 0.9;
+                ctx2d.strokeStyle = col;
+                ctx2d.lineWidth   = 3;
+                ctx2d.beginPath();
+                ctx2d.arc(_blip.x, _blip.y, r, 0, Math.PI * 2);
+                ctx2d.stroke();
+                ctx2d.restore();
+            }
+        }
+        if (_blipPop) {
+            _blipPop.t += dt;
+            const k = _blipPop.t / 0.4; // ~0.4 s pop
+            if (k >= 1) {
+                _blipPop = null;
+            } else {
+                const col = _currentStep >= 2 ? pushedColor : '#ffffff';
+                ctx2d.save();
+                ctx2d.globalAlpha = (1 - k) * 0.9;
+                ctx2d.strokeStyle = col;
+                ctx2d.lineWidth   = 1 + 4 * (1 - k);
+                ctx2d.beginPath();
+                ctx2d.arc(_blipPop.x, _blipPop.y, _blipPop.r * (1 + 1.5 * k), 0, Math.PI * 2); // r → 2.5r
+                ctx2d.stroke();
+                ctx2d.restore();
+            }
+        }
     })(0);
 
     // ── Bot autopilot ─────────────────────────────────────────────────────────
@@ -479,6 +569,16 @@ function _initNoteCanvas() {
             requestAnimationFrame(botLoop);
             const w = noteCanvasEl.width, h = noteCanvasEl.height;
             if (w === 0 || h === 0) return;
+            // Break off the wander to chase a blip target, then resume next frame.
+            if (_blip) {
+                _touching = true;
+                _touchX += (_blip.x - _touchX) * 0.15;
+                _touchY += (_blip.y - _touchY) * 0.15;
+                _setContNote(_noteIdx(_touchX));
+                _applyColor(_touchY);
+                if (_blipHit(_touchX, _touchY)) _popBlip();
+                return;
+            }
             // When the dashboard has synced this bot, hold a steady finger (no lift)
             // so the note/colour stays locked; otherwise phrase with periodic lifts.
             const synced = _botCmdNote !== null || _botCmdHue !== null;
@@ -498,6 +598,9 @@ function _initNoteCanvas() {
             _applyColor(_touchY);
         })(0);
     }
+
+    // Start the blip cycle — shared by real phones and bots.
+    _scheduleBlip();
 }
 
 // ── Story step socket handler ─────────────────────────────────────────────────
