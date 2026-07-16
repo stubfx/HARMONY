@@ -128,7 +128,6 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let color1 = vec3f(params.color1R, params.color1G, params.color1B);
     let color2 = vec3f(params.color2R, params.color2G, params.color2B);
 
-    let isHoming = params.hasImage != 0u && agent.primed > 0.5;
     var defaultColor = select(color1, color2, (agentId % 2u) == 1u);
     defaultColor = mix(defaultColor, color2, clamp(params.color2Mix, 0.0, 1.0));
 
@@ -147,7 +146,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
 
     if (!inSpectatorRange && params.avoidMapSampleColor != 0u
-            && params.hasAvoidMap != 0u && !isHoming) {
+            && params.hasAvoidMap != 0u) {
         let sampleProb = 0.30 + params.avoidMapSampleChaos * 0.70;
         if (hash(agentId ^ 0xdeadbeefu) < sampleProb) {
             let s = avoidMapColorAt(agent.pos);

@@ -16,8 +16,6 @@ import fadeWGSL         from './shaders/fade.wgsl?raw';
 import blitWGSL         from './shaders/blit.wgsl?raw';
 import downsampleWGSL   from './shaders/downsample.wgsl?raw';
 import windVisWGSL      from './shaders/wind-vis.wgsl?raw';
-import imageDebugWGSL   from './shaders/image-debug.wgsl?raw';
-import agentShadowWGSL  from './shaders/agentShadow.wgsl?raw';
 import colorPrepassWGSL from './shaders/colorPrepass.wgsl?raw';
 import champLinesWGSL   from './shaders/champLines.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
@@ -73,20 +71,12 @@ const params = {
     glareEnabled:    false,   // additive bloom/glare pass over the final blit
     glareIntensity:  0.15,    // composite strength (0 = off, 1 = full)
     glareThreshold:  0.6,     // luminance threshold — only pixels above this feed into the bloom
-    // Magnet
-    traceEnabled:   false, // master on/off for trace image homing (image stays loaded)
-    debugHoming:    false, // render homing agents bright white regardless of image/chaos
-    magnetStr:      30.0, // homing speed: px/frame agents move toward their home position
-    alphaThreshold: 0.1,  // min image alpha to trigger homing (0–1)
-    blackThreshold: 0.05, // luminance below which pixels are treated as transparent
-    vignetteEdge:   0.08, // edge fade width in UV units (0 = none, 0.5 = half image)
-    imageSize:      0.316, // user content size as fraction of min(traceW, traceH)
-    imageX:         0.5,  // user content center X in screen-space 0–1
-    imageY:         0.5,  // user content center Y in screen-space 0–1
-    showImage:    false,
-    // Trace canvas
-    traceScale:   1.0,   // trace canvas resolution relative to main canvas (perf control)
-    // QR placement on trace canvas
+    // Text avoid-map placement (particles are repelled by the text glyphs)
+    imageX:         0.5,  // text center X in screen-space 0–1
+    imageY:         0.5,  // text center Y in screen-space 0–1
+    // Text/QR avoid-map canvas resolution relative to main canvas (perf control)
+    traceScale:   1.0,
+    // QR placement
     qrSize:       0.25,   // QR size as fraction of min(traceW, traceH)
     qrMargin:     0.02,  // uniform margin from the aligned edge, as fraction of min(traceW, traceH)
     qrAlignX:     'center', // 'left' | 'center' | 'right'
@@ -97,54 +87,33 @@ const params = {
     contamMouse:   false, // treat mouse cursor as a contamination point
     contamPush:    false, // push free agents outward from the eraser circle
     contamRadius:  150,   // radius of each contamination circle, in canvas pixels
-    // Agent shadow
-    agentShadowStr:    0.10, // peak opacity of each homing-agent shadow splat (0–1)
-    agentShadowRadius: 10,   // splat half-radius in canvas pixels
-    // Champions — every Nth agent (agentId % champions == 0) drops a constant shadow
-    // splat under itself even when free. 1 = every agent, 2 = one in two…
+    // Champions — every Nth agent (agentId % champions == 0) renders larger and is
+    // linked by the champion-lines overlay. 1 = every agent, 2 = one in two…
     championsEnabled:       true,  // master on/off for the whole champions feature
-    championShadowEnabled:  false, // shadow splat under free champions (separate from homing-agent shadows)
     champions:         1000,
-    // Champion point size — applied ONLY while a champion is free (not homing);
-    // homing champions render at the normal agent size like everyone else.
-    championSize:      15,
+    championSize:      15,   // point size for a champion agent
     champLinesAlpha:   0.02,
     // Game of Life mode — toggle
     golEnabled:      false,
     golStrength:     0.5,  // attraction of particles toward live cells
     golStepInterval: 4,    // frames between Game-of-Life generations (higher = slower)
     golSpark:        0.001, // random life injection per generation (0 = pure Conway; prevents freezing)
-    // Homing behaviour
-    homingChance:    0.2, // per-frame probability [0–1] that a newly-eligible agent commits to homing
-    homingInfluence: 1.0, // max homing blend weight at dist=0; falls to 0 at dist=canvasW
-    // Homing proximity fade
-    homingProximityRange: 300, // canvas px — distance over which homing agents fade in
-    homingMinAlpha:       0.1, // minimum alpha for a homing agent at max distance (0–1)
     // Avoidance
-    avoidForceStr:        1.0,  // multiplier on image-trace avoidance forces
+    avoidForceStr:        1.0,  // multiplier on avoidance-map deflection forces
     avoidMapScale:        1.0,  // avoidance map coverage as fraction of canvas (1.0 = full)
     chaosAvoidMapThreshold: 0.6, // above this smoothChaos, avoidMap is suppressed visually
     avoidMapInvert:  false, // true = read the map as 1 - r, so light areas become non-avoid and dark areas become the avoid signal
-    avoidMapSampleColor: true,  // true = non-homing particles take their base color from the avoid map sample at their position
+    avoidMapSampleColor: true,  // true = particles take their base color from the avoid map sample at their position
     avoidMapFixedColor:  true,  // true (paired with sampleColor) = use the sampled pixel exactly
-    avoidMapBlackCutoff: 0.05,  // luminance floor for the color sample: pixels below this are skipped (particle keeps base color) — mirrors trace blackThreshold
+    avoidMapBlackCutoff: 0.05,  // luminance floor for the color sample: pixels below this are skipped (particle keeps base color)
     showAvoidMapImage: false, // debug: overlay avoidmap image on canvas
     qrOverlay:       false, // true = QR on a 2D overlay canvas; agents freed from QR area
-    // Primed-spot probe (free agents only)
-    probeLen:          15.0, // probe cast distance in canvas pixels
-    probeForceStr:     150.0, // steering force multiplier when probe hits a primed pixel
-    respawnOnCollide:  false, // teleport to a random edge position instead of steering on probe hit
-    probeSensorAngle:  0.785, // half-angle between left/right Physarum sensors (radians; π/4 ≈ 45°)
-    // Caption
-    captionSize:   0.035, // font size as fraction of min(canvas width, canvas height)
-    // Font — Google Fonts family used for trace/caption text, loaded at runtime
+    // Font — Google Fonts family used for the text avoid map, loaded at runtime
     // (nothing installed on the host machine). Empty string = system sans-serif.
     fontFamily:    'Bellefair',
     // Export ('s' screenshot) — both off by default
     exportTransparent: false, // make the black background transparent (alpha = brightness)
     exportCMYK:        false, // convert to CMYK and save as TIFF instead of PNG
-    // Auto-clear
-    clearDelay:    0,     // seconds before auto-clearing user trace content (0 = disabled)
     // DOT mode
     dotCenterRadius:     50,   // px — agents within this radius of centre are candidates for respawn (0 = disabled)
     dotRespawnChance:    0.01, // per-frame probability that a centre-zone agent is respawned to an edge
@@ -383,13 +352,6 @@ function updateMonitor(fps) {
     if (monAgents) monAgents.textContent = `${params.agentCount / 1_000_000 | 0}M agents`;
 }
 
-/// ── Image region ──────────────────────────────────────────────────────────────
-// The trace canvas always maps 1:1 to the full screen. Shaders receive the
-// full-screen rect so agents can home to any bright pixel anywhere on screen.
-function getImageRegion() {
-    return { x0: 0, y0: 0, x1: canvas.width, y1: canvas.height };
-}
-
 // ── WebGPU init ───────────────────────────────────────────────────────────────
 if (!navigator.gpu) { showError('WebGPU not supported in this browser.'); throw new Error(); }
 const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
@@ -447,9 +409,6 @@ const downsampleUB = device.createBuffer({
     size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 const windVisUB = device.createBuffer({
-    size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-});
-const imageDebugUB = device.createBuffer({
     size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 // Game of Life step uniform: seed, spark, pad, pad (16 bytes)
@@ -722,8 +681,6 @@ device.queue.writeTexture(
 );
 const placeholderTexView = placeholderTex.createView();
 
-const imageSampler = screenSmp;  // same settings — reuse
-
 // ── Avoidance map state ───────────────────────────────────────────────────────
 let avoidMapTex     = null;
 let avoidMapTexView = null;
@@ -889,44 +846,6 @@ const downsamplePipe = device.createRenderPipeline({
     primitive: { topology: 'triangle-list' },
 });
 
-// Agent shadow: per-homing-agent soft dark splat blended onto offscreen texture
-const agentShadowUB = device.createBuffer({
-    size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-});
-const agentShadowMod  = device.createShaderModule({ code: agentShadowWGSL });
-const agentShadowPipe = device.createRenderPipeline({
-    layout: 'auto',
-    vertex:   { module: agentShadowMod, entryPoint: 'vs' },
-    fragment: {
-        module: agentShadowMod, entryPoint: 'fs',
-        targets: [{
-            format: 'rgba16float',
-            blend: {
-                color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-                alpha: { srcFactor: 'one',        dstFactor: 'one-minus-src-alpha', operation: 'add' },
-            },
-        }],
-    },
-    primitive: { topology: 'triangle-list' },
-});
-const agentShadowDensityPipe = device.createRenderPipeline({
-    layout: 'auto',
-    vertex:   { module: agentShadowMod, entryPoint: 'vs' },
-    fragment: {
-        module: agentShadowMod, entryPoint: 'fs_density',
-        targets: [{
-            format: 'rgba8unorm',
-            blend: {
-                color: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
-                alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
-            },
-        }],
-    },
-    primitive: { topology: 'triangle-list' },
-});
-let agentShadowBG        = null;
-let agentShadowDensityBG = null;
-
 // ── Champion Lines — LINE_STRIP overlay connecting champion agents ─────────────
 const champLinesUB  = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
 const champLinesMod = device.createShaderModule({ code: champLinesWGSL });
@@ -963,31 +882,11 @@ const golStepPipe = device.createRenderPipeline({
 });
 let golStepBG = null;
 
-// Image debug: centered 1/4-screen quad, 50% opacity grayscale
-const imageDebugMod = device.createShaderModule({ code: imageDebugWGSL });
-const imageDebugPipe = device.createRenderPipeline({
-    layout: 'auto',
-    vertex:   { module: imageDebugMod, entryPoint: 'vs' },
-    fragment: {
-        module: imageDebugMod, entryPoint: 'fs',
-        targets: [{
-            format: canvasFormat,
-            blend: {
-                color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-                alpha: { srcFactor: 'one',        dstFactor: 'one-minus-src-alpha', operation: 'add' },
-            },
-        }],
-    },
-    primitive: { topology: 'triangle-list' },
-});
-
 
 // ── Offscreen texture (rebuilt on resize) ─────────────────────────────────────
 let offscreenTex       = null;
 let offscreenView      = null;
 let blitBG             = null;
-let shadowDensityTex   = null;
-let shadowDensityView  = null;
 let golStateTex        = null;
 let golStateView       = null;
 let golScratchTex      = null;
@@ -1046,14 +945,6 @@ function rebuildOffscreen() {
         usage:  GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     });
     offscreenView = offscreenTex.createView();
-
-    if (shadowDensityTex) shadowDensityTex.destroy();
-    shadowDensityTex = device.createTexture({
-        size:   [canvas.width, canvas.height],
-        format: 'rgba8unorm',
-        usage:  GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    });
-    shadowDensityView = shadowDensityTex.createView();
 
     golW = GOL_W;
     golH = Math.max(1, Math.round(GOL_W * canvas.height / canvas.width));
@@ -1152,9 +1043,7 @@ function applyResize({ skipSeed = false } = {}) {
     setSize();
     rebuildOffscreen();
     rebuildSimBG();
-    renderTraceCanvas();
-    rebuildAgentShadowBG();
-    rebuildAgentShadowDensityBG();
+    updateQROverlay();
     if (skipSeed) return;
     if (_preshowActive) {
         const prevLit = _preshowLitCount;
@@ -1166,41 +1055,18 @@ function applyResize({ skipSeed = false } = {}) {
 }
 window.addEventListener('resize', applyResize);
 
-// ── Trace layer state ─────────────────────────────────────────────────────────
-// The trace layer is a single GPU texture that is the composite of:
-//   - an optional loaded image (imageBitmap, stored for re-compositing)
-//   - optional text drawn on top (from #trace-text-input)
-// Both are rendered onto traceCanvas (a 2D offscreen canvas) and uploaded as
-// one rgba8unorm texture. Changing either source re-runs renderTraceCanvas().
-let hasImage      = false;
-let imageTex      = null;
-let imageTexView  = null;
-let imageDebugBG  = null;
-let imageNaturalW = 1;
-let imageNaturalH = 1;
-let imageBitmap   = null;   // retained ImageBitmap so text changes can re-composite
-let traceCanvas   = null;   // offscreen 2D canvas used for compositing
-
 // ── Animated image state ──────────────────────────────────────────────────────
-let gifFrames        = null;   // ImageBitmap[] | null — trace GIF frames
-let gifDurations     = null;   // number[]      | null — per-frame delay (ms)
-let gifFrameIdx      = 0;
-let gifNextFrameAt   = 0;      // performance.now() timestamp for next advance
-
-let avoidGifFrames    = null;  // same for avoidance map
+let avoidGifFrames    = null;  // avoidance-map GIF frames
 let avoidGifDurations = null;
 let avoidGifFrameIdx  = 0;
 let avoidGifNextFrameAt = 0;
 
-// Rebuilds particle render bind group — called after pipeline creation, on image change,
-// and on avoid-map change (avoid map at binding 5 feeds the optional per-particle color sampling).
+// Rebuilds particle render bind group — called after pipeline creation and on
+// avoid-map change (the color prepass reads the avoid map for per-particle color).
 function rebuildRenderBG() {
-    const texView = (hasImage && imageTexView) ? imageTexView : placeholderTexView;
     const entries = [
         { binding: 0, resource: { buffer: renderUB } },
         { binding: 1, resource: { buffer: agentBuf } },
-        { binding: 2, resource: imageSampler },
-        { binding: 3, resource: texView },
         { binding: 4, resource: { buffer: colorBuf } },
     ];
     renderBG       = device.createBindGroup({ layout: renderPipe.getBindGroupLayout(0),       entries });
@@ -1222,42 +1088,6 @@ function rebuildColorPrepassBG() {
     });
 }
 rebuildRenderBG();
-rebuildAgentShadowBG();
-rebuildAgentShadowDensityBG();
-
-function rebuildImageDebugBG() {
-    if (!hasImage || !imageTexView) { imageDebugBG = null; return; }
-    imageDebugBG = device.createBindGroup({
-        layout: imageDebugPipe.getBindGroupLayout(0),
-        entries: [
-            { binding: 0, resource: { buffer: imageDebugUB } },
-            { binding: 1, resource: screenSmp },
-            { binding: 2, resource: imageTexView },
-        ],
-    });
-}
-
-function rebuildAgentShadowBG() {
-    agentShadowBG = device.createBindGroup({
-        layout: agentShadowPipe.getBindGroupLayout(0),
-        entries: [
-            { binding: 0, resource: { buffer: agentShadowUB } },
-            { binding: 1, resource: { buffer: agentBuf } },
-            { binding: 2, resource: { buffer: contamUB } },
-        ],
-    });
-}
-
-function rebuildAgentShadowDensityBG() {
-    agentShadowDensityBG = device.createBindGroup({
-        layout: agentShadowDensityPipe.getBindGroupLayout(0),
-        entries: [
-            { binding: 0, resource: { buffer: agentShadowUB } },
-            { binding: 1, resource: { buffer: agentBuf } },
-            { binding: 2, resource: { buffer: contamUB } },
-        ],
-    });
-}
 
 function rebuildGolBG() {
     if (!golStateView) return;
@@ -1353,20 +1183,6 @@ function updateQROverlay() {
     rebuildRenderBG();
 }
 
-// ── Trace canvas compositor ───────────────────────────────────────────────────
-// The trace canvas is always full-screen (scaled by traceScale for performance).
-// Each element is composited at its own (x, y, size) in screen-space 0–1 coords:
-//
-//   Layer 0 — QR code:      drawn at (qrX, qrY), sized by qrSize.
-//                            Only drawn when qrStatus === 'SHOW' and qrBitmap exists.
-//   Layer 1 — user image:   drawn at (imageX, imageY), sized by imageSize.
-//   Layer 2 — user text:    drawn at (imageX, imageY) over the image, or as multi-
-//                            line standalone text when no image is present.
-//
-// The resulting texture covers the full screen, so getImageRegion() returns the
-// full-screen rect and agents can home to any bright pixel on screen.
-let captionText = ''; // story caption — drawn at bottom of trace canvas like subtitle
-
 // ── Google Fonts loader ─────────────────────────────────────────────────────
 // Loads a typeface straight from Google Fonts at runtime (CSS link + the CSS
 // Font Loading API), so the machine running the simulation needs nothing
@@ -1402,7 +1218,7 @@ function parseFontSpec(raw) {
 let _fontLinkEl = null;
 async function loadFontSpec(raw) {
     const parsed = parseFontSpec(raw);
-    if (!parsed) { params.fontFamily = ''; renderTraceCanvas(); return; }
+    if (!parsed) { params.fontFamily = ''; renderTextAvoidMap(); return; }
     const { href, family } = parsed;
     if (!_fontLinkEl) {
         _fontLinkEl = document.createElement('link');
@@ -1429,122 +1245,6 @@ async function loadFontSpec(raw) {
     }
     params.fontFamily = family;
     renderTextAvoidMap();
-    renderTraceCanvas();
-}
-
-function renderTraceCanvas() {
-    if (!device) return;
-
-    const hasCaption = captionText.length > 0;
-    const hasUserContent = !!imageBitmap || hasCaption;
-    // When qrOverlay is on the QR lives on the 2D overlay canvas, not the trace.
-    const showQR = !params.qrOverlay && simState.qrStatus === 'SHOW' && !!qrBitmap;
-
-    // Nothing at all — tear down and return to formula-only mode
-    if (!showQR && !hasUserContent) {
-        hasImage      = false;
-        imageTexView  = null;
-        imageNaturalW = 1;
-        imageNaturalH = 1;
-        if (imageTex) { imageTex.destroy(); imageTex = null; }
-        imageDebugBG  = null;
-        rebuildSimBG();
-        rebuildRenderBG();
-        rebuildImageDebugBG();
-        rebuildAgentShadowBG();
-        rebuildAgentShadowDensityBG();
-        updateQROverlay();
-        return;
-    }
-
-    // ── 1. Canvas dimensions — always screen-proportioned, scaled for performance ─
-    const MAX_DIM = device.limits.maxTextureDimension2D;
-    const tcW = Math.min(Math.max(1, Math.round(canvas.width  * params.traceScale)), MAX_DIM);
-    const tcH = Math.min(Math.max(1, Math.round(canvas.height * params.traceScale)), MAX_DIM);
-    const minDim = Math.min(tcW, tcH);
-    // Google-font family (loaded at runtime) with a system fallback baked in.
-    const fontStack = params.fontFamily ? `"${params.fontFamily}", sans-serif` : 'sans-serif';
-
-    // ── 2. Paint layers ───────────────────────────────────────────────────────
-    if (!traceCanvas) traceCanvas = document.createElement('canvas');
-    traceCanvas.width  = tcW;
-    traceCanvas.height = tcH;
-    const ctx = traceCanvas.getContext('2d');
-    ctx.clearRect(0, 0, tcW, tcH);
-
-    // Layer 0: user image — cover-fit to fill the full trace canvas
-    if (imageBitmap) {
-        const imgAspect    = imageBitmap.width / imageBitmap.height;
-        const canvasAspect = tcW / tcH;
-        let sx, sy, sw, sh;
-        if (imgAspect > canvasAspect) {
-            sh = imageBitmap.height;
-            sw = sh * canvasAspect;
-            sx = (imageBitmap.width - sw) / 2;
-            sy = 0;
-        } else {
-            sw = imageBitmap.width;
-            sh = sw / canvasAspect;
-            sx = 0;
-            sy = (imageBitmap.height - sh) / 2;
-        }
-        ctx.drawImage(imageBitmap, sx, sy, sw, sh, 0, 0, tcW, tcH);
-    }
-
-    // Caption layer: word-wrapped text anchored to the bottom center, subtitle-sized
-    if (hasCaption) {
-        ctx.fillStyle    = 'white';
-        ctx.textAlign    = 'center';
-        ctx.textBaseline = 'alphabetic';
-        const fontSize = Math.round(minDim * params.captionSize);
-        ctx.font = `bold ${fontSize}px ${fontStack}`;
-        const maxW  = tcW * 0.80;
-        const words = captionText.split(/\s+/);
-        const lines = [];
-        let cur = '';
-        for (const w of words) {
-            const test = cur ? `${cur} ${w}` : w;
-            if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = w; }
-            else cur = test;
-        }
-        if (cur) lines.push(cur);
-        const lineH      = Math.round(fontSize * 1.35);
-        const bottomY    = tcH - Math.round(minDim * 0.05);
-        const startY     = bottomY - (lines.length - 1) * lineH;
-        lines.forEach((ln, i) => ctx.fillText(ln, tcW / 2, startY + i * lineH));
-    }
-
-    // Topmost layer: QR — always drawn last so it is never obscured by user content
-    if (showQR) {
-        const size   = params.qrSize   * minDim;
-        const margin = params.qrMargin * minDim + size / 2;
-        const cx = params.qrAlignX === 'left'   ? margin
-                 : params.qrAlignX === 'right'  ? tcW - margin
-                 :                                tcW / 2;
-        const cy = params.qrAlignY === 'top'    ? margin
-                 : params.qrAlignY === 'bottom' ? tcH - margin
-                 :                                tcH / 2;
-        ctx.drawImage(qrBitmap, cx - size / 2, cy - size / 2, size, size);
-    }
-
-    // ── 3. Upload composite to GPU ────────────────────────────────────────────
-    imageNaturalW = tcW;
-    imageNaturalH = tcH;
-    if (imageTex) imageTex.destroy();
-    imageTex = device.createTexture({
-        size:   [tcW, tcH],
-        format: 'rgba8unorm',
-        usage:  GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-    });
-    device.queue.copyExternalImageToTexture({ source: traceCanvas }, { texture: imageTex }, [tcW, tcH]);
-    imageTexView = imageTex.createView();
-    hasImage     = true;
-    rebuildSimBG();
-    rebuildRenderBG();
-    rebuildImageDebugBG();
-    rebuildAgentShadowBG();
-    rebuildAgentShadowDensityBG();
-    updateQROverlay();
 }
 
 // ── Text avoid map ────────────────────────────────────────────────────────────
@@ -1556,8 +1256,8 @@ function renderTextAvoidMap() {
     if (!device) return;
     const text = document.querySelector('#trace-text-input')?.value.trim() ?? '';
 
-    // No text, or an image is loaded — teardown inline (no clearAvoidMap call to avoid cycles)
-    if (!text || imageBitmap) {
+    // No text — teardown inline (no clearAvoidMap call to avoid cycles)
+    if (!text) {
         if (_textOwnedAvoidMap) {
             _textOwnedAvoidMap = false;
             clearAvoidGif();
@@ -1668,85 +1368,28 @@ async function decodeAnimatedImage(blob) {
     finally { decoder?.close(); }
 }
 
-function clearGif() {
-    if (gifFrames) gifFrames.forEach(b => b.close());
-    gifFrames = null; gifDurations = null; gifFrameIdx = 0; gifNextFrameAt = 0;
-}
-
 function clearAvoidGif() {
     if (avoidGifFrames) avoidGifFrames.forEach(b => b.close());
     avoidGifFrames = null; avoidGifDurations = null; avoidGifFrameIdx = 0; avoidGifNextFrameAt = 0;
 }
 
-async function loadMagnetImage(file) {
-    clearGif();
-    const anim = await decodeAnimatedImage(file);
-    if (anim) {
-        gifFrames = anim.frames; gifDurations = anim.durations;
-        gifFrameIdx = 0; gifNextFrameAt = performance.now() + gifDurations[0];
-        imageBitmap = gifFrames[0];
-    } else {
-        imageBitmap = await createImageBitmap(file, { colorSpaceConversion: 'none' });
-    }
-    renderTextAvoidMap(); // suppress text avoidmap while image is shown
-    renderTraceCanvas();
-    
-}
-
-async function loadTraceImageFromUrl(url, fetchOptions = {}) {
-    try {
-        const res = await fetch(url, fetchOptions);
-        if (!res.ok) { console.warn('[traceImage] HTTP', res.status, url); return; }
-        const blob = await res.blob();
-        clearGif();
-        const anim = await decodeAnimatedImage(blob);
-        if (anim) {
-            gifFrames = anim.frames; gifDurations = anim.durations;
-            gifFrameIdx = 0; gifNextFrameAt = performance.now() + gifDurations[0];
-            imageBitmap = gifFrames[0];
-        } else {
-            imageBitmap = await createImageBitmap(blob, { colorSpaceConversion: 'none' });
-        }
-        renderTextAvoidMap(); // suppress text avoidmap while image is shown
-        renderTraceCanvas();
-        
-    } catch (err) {
-        console.warn('[traceImage] failed to load:', url, err.message);
-    }
-}
-
-function clearMagnetImage() {
-    clearGif();
-    imageBitmap = null;
-    clearTimeout(autoClearTimer);
-    autoClearTimer = null;
-    renderTextAvoidMap(); // reapply text avoidmap now that image is gone
-    renderTraceCanvas();
-}
-
 function clearTraceText() {
     const input = document.querySelector('#trace-text-input');
     if (input) input.value = '';
-    captionText = '';
-    clearTimeout(autoClearTimer);
-    autoClearTimer = null;
     renderTextAvoidMap();
-    renderTraceCanvas();
 }
 
-// Restore the session QR as the active trace image.
+// Restore the session QR as the active display.
 // Called when all spectators leave or the inactivity timeout fires.
 // No-op if QR is already showing or hasn't been generated yet.
 function restoreQR() {
     if (simState.qrStatus === 'SHOW' || !qrBitmap) return;
     const input = document.querySelector('#trace-text-input');
     if (input) input.value = '';
-    clearTimeout(autoClearTimer);
-    autoClearTimer = null;
     renderTextAvoidMap(); // clears text-owned avoidmap since input is now empty
     simState.qrStatus = 'SHOW';
     updateStateDisplay();
-    renderTraceCanvas();
+    updateQROverlay();
     pickRandomFormulas();
 }
 
@@ -1771,18 +1414,14 @@ let windVisBG   = null;
 
 function rebuildSimBG() {
     if (!simPipe) return;
-    const texView           = (hasImage    && imageTexView)    ? imageTexView    : placeholderTexView;
     const avoidMapView      = (hasAvoidMap && avoidMapTexView) ? avoidMapTexView : placeholderTexView;
-    const shadowDensityRes  = shadowDensityView ?? placeholderTexView;
     simBG = device.createBindGroup({
         layout: simPipe.getBindGroupLayout(0),
         entries: [
             { binding: 0, resource: { buffer: soloUB } },
             { binding: 1, resource: { buffer: agentBuf } },
-            { binding: 2, resource: texView },
             { binding: 3, resource: { buffer: contamUB } },
             { binding: 4, resource: avoidMapView },
-            { binding: 5, resource: shadowDensityRes },
             { binding: 6, resource: { buffer: spectatorSlotsBuf } },
             { binding: 7, resource: golStateView ?? placeholderTexView },
         ],
@@ -2428,8 +2067,7 @@ loadAvoidMap(`${_apiBase}/simAss-static/full_square.png`);
         if (event.type === 'text' && event.data?.text) {
             const input = document.querySelector('#trace-text-input');
             if (input) input.value = event.data.text;
-            renderTraceCanvas();
-            
+            renderTextAvoidMap();
         }
     });
 
@@ -2465,8 +2103,8 @@ function _startVoteTimer(status) {
 // Only numeric/boolean keys present in the payload are applied;
 // if formulas are included they re-trigger pipeline compilation.
 function applySimParams(data) {
-    const { dir, wind, restart, clearTrace, showQR, traceText, clearText, traceImage, status, avoidMap,
-            step, stepStatus, optionA, optionB, caption, preshow,
+    const { dir, wind, restart, clearTrace, showQR, traceText, clearText, status, avoidMap,
+            step, stepStatus, optionA, optionB, preshow,
             audio, audioFormat, audiobg, audiobgFormat, audiobgLoop, mode, colorMode, ...rest } = data;
 
     if (audio    !== undefined) playAudio(audio    || null, audioFormat)                              .catch(e => console.warn('[audio]',    e));
@@ -2510,39 +2148,27 @@ function applySimParams(data) {
     if (avoidMap === null)    clearAvoidMap();
     else if (typeof avoidMap === 'string') loadAvoidMap(avoidMap);
     if (clearTrace) {
-        clearGif();
-        imageBitmap = null;
-        captionText = '';
-        clearTimeout(autoClearTimer);
-        autoClearTimer = null;
         const clearInput = document.querySelector('#trace-text-input');
         if (clearInput) clearInput.value = '';
         simState.qrStatus = 'HIDE';
         updateStateDisplay();
         renderTextAvoidMap();
-        renderTraceCanvas();
+        updateQROverlay();
     }
-    if (caption !== undefined) { captionText = caption || ''; renderTraceCanvas(); }
     if (showQR === true)  restoreQR();
     if (showQR === false) {
         simState.qrStatus = 'HIDE';
         updateStateDisplay();
-        renderTraceCanvas();
+        updateQROverlay();
     }
-    if (typeof traceImage === 'string') loadTraceImageFromUrl(traceImage);
     if (clearText)            clearTraceText();
     if (traceText !== undefined) {
         const input = document.querySelector('#trace-text-input');
         if (input) input.value = traceText || '';
-        clearTimeout(autoClearTimer);
-        autoClearTimer = null;
         renderTextAvoidMap();
-        renderTraceCanvas();
-        if (traceText) scheduleAutoClear();
     }
     const changed = (k) => k in rest && rest[k] !== params[k];
-    const needsRetrace = ['traceScale','qrSize','qrMargin','qrAlignX','qrAlignY',
-                          'imageX','imageY','imageSize'].some(changed);
+    const needsRetrace = ['traceScale','imageX','imageY'].some(changed);
     const needsQRReseed = !params.qrOverlay &&
         ['qrAlignX','qrAlignY','qrSize','qrMargin'].some(changed);
     const needsQRRegen  = ['qrQuietZone','qrInvert'].some(changed);
@@ -2555,9 +2181,9 @@ function applySimParams(data) {
     if ('duckLevel'  in rest) setDuckLevel(params.duckLevel);
     if (needsReseed)  seedAgents();
     if (needsRebuild) applyResize();
-    if (needsRetrace) renderTraceCanvas();
+    if (needsRetrace) renderTextAvoidMap();
     if (needsQRReseed) seedAgents();
-    if (needsQRRegen)  generateQR().then(renderTraceCanvas);
+    if (needsQRRegen)  generateQR().then(updateQROverlay);
     gui.controllersRecursive().forEach(c => c.updateDisplay());
     if (dir !== undefined || wind !== undefined) {
         const newDir  = dir  ?? dirInput.value;
@@ -2582,8 +2208,8 @@ function applySimParams(data) {
     storyEngine,
     seedAgents,
     seedGoL, setSize, rebuildOffscreen, rebuildGridTex, applyResize,
-    renderTraceCanvas, generateQR, loadFontSpec,
-    clearMagnetImage, clearTraceText, clearAvoidMap,
+    generateQR, loadFontSpec, renderTextAvoidMap, updateQROverlay,
+    clearTraceText, clearAvoidMap,
     updateAvoidMapOverlay: _updateAvoidMapOverlay,
 }));
 
@@ -2596,7 +2222,7 @@ storyEngine.onGoto = (i) => {
 };
 
 stateCtrl.onChange(v => setStatus(v));
-qrStateCtrl.onChange(() => { updateStateDisplay(); renderTraceCanvas(); });
+qrStateCtrl.onChange(() => { updateStateDisplay(); updateQROverlay(); });
 
 window.addEventListener('keydown', e => {
     if (e.key === 'Control') toggleGUI();
@@ -2687,14 +2313,6 @@ document.addEventListener('pointerdown', async () => {
     _syncAudioBanner();
     storyEngine.start();
 }, { once: true });
-
-// ── File input for trace image ────────────────────────────────────────────────
-
-document.querySelector('#image-input').addEventListener('change', e => {
-    const file = e.target.files[0];
-    if (file) loadMagnetImage(file);
-    e.target.value = '';
-});
 
 // ── Avoidance map overlay ─────────────────────────────────────────────────────
 function _updateAvoidMapOverlay() {
@@ -2792,14 +2410,13 @@ document.querySelector('#avoid-map-input').addEventListener('change', e => {
 });
 
 // ── Trace text input ──────────────────────────────────────────────────────────
-// Debounced: re-composites and uploads the trace texture 300 ms after the user
-// stops typing. The text is drawn as white glyphs on top of any loaded image.
+// Debounced: re-renders the text avoid map 300 ms after the user stops typing.
+// The text is drawn as white glyphs the particles are repelled by.
 let traceTextTimer = null;
 document.querySelector('#trace-text-input').addEventListener('input', () => {
     clearTimeout(traceTextTimer);
     traceTextTimer = setTimeout(() => {
         renderTextAvoidMap();
-        
     }, 300);
 });
 
@@ -2893,7 +2510,6 @@ function writeSoloUB(dt, time) {
     const ab = _soloAB;
     const u  = _soloU;
     const f  = _soloF;
-    const { x0, y0, x1, y1 } = getImageRegion();
     u[0] = params.agentCount;
     f[1] = canvas.width;
     f[2] = canvas.height;
@@ -2906,31 +2522,31 @@ function writeSoloUB(dt, time) {
     f[7] = params.turnRate * coherenceMult;  // coherence scales how sharply agents follow the formula
     f[8] = params.maxSpeed;
     f[9] = params.minSpeed;
-    u[10] = (hasImage && params.traceEnabled) ? 1 : 0;
-    f[11] = params.magnetStr;
-    f[12] = x0;
-    f[13] = y0;
-    f[14] = x1;
-    f[15] = y1;
+    u[10] = 0;   // retired: trace homing
+    f[11] = 0;
+    f[12] = 0;
+    f[13] = 0;
+    f[14] = 0;
+    f[15] = 0;
     u[16] = (!isIdle && (isDot || params.followFormula)) ? 1 : 0;
-    f[17] = params.alphaThreshold;
-    f[18] = params.blackThreshold;
+    f[17] = 0;
+    f[18] = 0;
     const isQR = simState.qrStatus === 'SHOW';
-    f[19] = isQR ? 0 : params.vignetteEdge;
+    f[19] = 0;
     f[20] = 0;  // tilt bias removed
     f[21] = 0;
     f[22] = params.avoidForceStr;
-    u[23] = isQR ? 1 : 0;  // qrMode — rect-based homing when QR is active
+    u[23] = isQR ? 1 : 0;  // qrMode — QR respawn rect active
     const avoidMapActive = hasAvoidMap && smoothChaos <= params.chaosAvoidMapThreshold;
     u[24] = avoidMapActive ? 1 : 0;
     f[25] = params.avoidMapScale;
     u[26] = params.bounceEdges ? 1 : 0;
-    f[27] = params.probeLen;
-    f[28] = params.probeForceStr;
-    u[29] = params.respawnOnCollide ? 1 : 0;
-    f[30] = params.probeSensorAngle;
-    f[31] = params.homingChance;
-    f[32] = params.homingInfluence;
+    f[27] = 0;   // retired: shadow probe
+    f[28] = 0;
+    u[29] = 0;
+    f[30] = 0;
+    f[31] = 0;   // retired: homing
+    f[32] = 0;
     u[33] = activeSlots.length;
     f[34] = Math.min(params.spectatorSpawnChance * activeSlots.length * params.spectatorSpawnMultiplier, 1.0);
     f[35] = params.spectatorAgentShare / 100.0;
@@ -3005,7 +2621,6 @@ function writeRenderUB() {
     const _c1g = c1[1] + (0.25 - c1[1]) * _cw;
     const _c1b = c1[2] + (0.0  - c1[2]) * _cw;
 
-    const { x0, y0, x1, y1 } = getImageRegion();
     u[0] = params.agentCount;
     f[1] = canvas.width;
     f[2] = canvas.height;
@@ -3014,11 +2629,11 @@ function writeRenderUB() {
     f[5] = _c1g;
     f[6] = _c1b;
     f[7] = params.maxSpeed;
-    u[8]  = (hasImage && params.traceEnabled) ? 1 : 0;
-    f[9]  = x0;
-    f[10] = y0;
-    f[11] = x1;
-    f[12] = y1;
+    u[8]  = 0;   // retired: trace homing
+    f[9]  = 0;
+    f[10] = 0;
+    f[11] = 0;
+    f[12] = 0;
     f[13] = c2[0];
     f[14] = c2[1];
     f[15] = c2[2];
@@ -3027,12 +2642,12 @@ function writeRenderUB() {
     // former resting level as a fixed scale so the at-rest look is unchanged; brightness,
     // burst and pulse stay in the same balance they had before.
     f[16] = (params.brightness + burstBrightness + pulseEnergy) * REST_BRIGHTNESS;
-    f[17] = params.alphaThreshold;
-    f[18] = params.blackThreshold;
-    f[19] = simState.qrStatus === 'SHOW' ? 0 : params.vignetteEdge;
+    f[17] = 0;
+    f[18] = 0;
+    f[19] = 0;
     u[20] = simState.qrStatus === 'SHOW' ? 1 : 0;
-    f[21] = params.homingProximityRange;
-    f[22] = params.homingMinAlpha;
+    f[21] = 0;   // retired: homing proximity
+    f[22] = 0;
     u[23] = activeSlots.length;
     u[24] = params.additiveBlend ? 1 : 0;
     f[25] = params.spectatorAgentShare / 100.0;
@@ -3078,7 +2693,7 @@ function writeRenderUB() {
     f[45] = ic[1];
     f[46] = ic[2];
     f[47] = activeSlots.length === 0 ? params.idleColorFraction : 0.0;
-    u[48] = params.debugHoming ? 1 : 0;
+    u[48] = 0;   // retired: debug homing
     device.queue.writeBuffer(renderUB, 0, ab);
 }
 
@@ -3117,29 +2732,6 @@ function writeWindVisUB(time, gridW) {
     device.queue.writeBuffer(windVisUB, 0, _windVisAB);
 }
 
-function writeAgentShadowUB() {
-    _shadowF[0] = canvas.width;
-    _shadowF[1] = canvas.height;
-    _shadowF[2] = params.agentShadowRadius;
-    _shadowF[3] = params.agentShadowStr;
-    _shadowU[4] = (hasImage && params.traceEnabled) ? 1 : 0;
-    _shadowF[5] = params.homingProximityRange;
-    _shadowF[6] = params.homingMinAlpha;
-    _shadowU[7] = params.championsEnabled ? params.champions : 0;
-    device.queue.writeBuffer(agentShadowUB, 0, _shadowAB);
-}
-
-function writeImageDebugUB() {
-    const { x0, y0, x1, y1 } = getImageRegion();
-    _imgDbgF[0] = canvas.width;
-    _imgDbgF[1] = canvas.height;
-    _imgDbgF[2] = x0;
-    _imgDbgF[3] = y0;
-    _imgDbgF[4] = x1;
-    _imgDbgF[5] = y1;
-    device.queue.writeBuffer(imageDebugUB, 0, _imgDbgAB);
-}
-
 // Writes ContamParams (176 bytes) — header + up to 10 vec4 points.
 // Points array is sparse: only active entries (count) are used by the shader.
 // For now, slot 0 = mouse cursor when on-canvas; extend here to add more sources.
@@ -3174,9 +2766,7 @@ const _fadeAB  = new ArrayBuffer(16);  const _fadeF  = new Float32Array(_fadeAB)
 const _blitAB  = new ArrayBuffer(32);  const _blitF  = new Float32Array(_blitAB); const _blitU  = new Uint32Array(_blitAB);
 const _downsampleAB = new ArrayBuffer(16); const _downsampleF = new Float32Array(_downsampleAB);
 const _contamAB= new ArrayBuffer(176); const _contamU= new Uint32Array(_contamAB); const _contamF= new Float32Array(_contamAB);
-const _shadowAB= new ArrayBuffer(32);  const _shadowF= new Float32Array(_shadowAB); const _shadowU= new Uint32Array(_shadowAB);
 const _golAB   = new ArrayBuffer(16);  const _golU   = new Uint32Array(_golAB);   const _golF   = new Float32Array(_golAB);
-const _imgDbgAB= new ArrayBuffer(32);  const _imgDbgF= new Float32Array(_imgDbgAB);
 const _windVisAB=new ArrayBuffer(32);  const _windVisF=new Float32Array(_windVisAB); const _windVisU=new Uint32Array(_windVisAB);
 
 // ── Screenshot capture ───────────────────────────────────────────────────────
@@ -3418,15 +3008,9 @@ function frame(ts) {
         if (dirty) uploadSpectatorSlots();
     }
 
-    // ── Advance animated GIF frames ───────────────────────────────────────────
+    // ── Advance animated GIF frames (avoidance map) ───────────────────────────
     {
         const perfNow = performance.now();
-        if (gifFrames && perfNow >= gifNextFrameAt) {
-            gifFrameIdx    = (gifFrameIdx + 1) % gifFrames.length;
-            gifNextFrameAt = perfNow + gifDurations[gifFrameIdx];
-            imageBitmap    = gifFrames[gifFrameIdx];
-            renderTraceCanvas();
-        }
         if (avoidGifFrames && avoidMapTex && perfNow >= avoidGifNextFrameAt) {
             avoidGifFrameIdx    = (avoidGifFrameIdx + 1) % avoidGifFrames.length;
             avoidGifNextFrameAt = perfNow + avoidGifDurations[avoidGifFrameIdx];
@@ -3444,7 +3028,6 @@ function frame(ts) {
     writeFadeUB();
     writeBlitUB();
     writeContamUB();
-    writeAgentShadowUB();
 
     const enc = device.createCommandEncoder();
 
@@ -3493,22 +3076,6 @@ function frame(ts) {
         cp2.end();
     }
 
-    // Shadow density pass: clear to black, render bright additive splats per homing agent.
-    // Result is read by compute.wgsl binding 5 on the *next* frame (same-frame read is fine
-    // because the density pass runs after compute, and compute runs first next frame).
-    if (hasImage && agentShadowDensityBG && shadowDensityView) {
-        const dp = enc.beginRenderPass({
-            colorAttachments: [{
-                view: shadowDensityView,
-                loadOp: 'clear', clearValue: { r: 0, g: 0, b: 0, a: 0 }, storeOp: 'store',
-            }],
-        });
-        dp.setPipeline(agentShadowDensityPipe);
-        dp.setBindGroup(0, agentShadowDensityBG);
-        dp.draw(params.agentCount * 6);
-        dp.end();
-    }
-
     // Pixel-grid mode renders particles snapped-to-cell directly into the small
     // gridTex; non-pixel mode draws full-resolution particles into offscreenTex
     // as before. Both targets are rgba16float so the pipelines work on either.
@@ -3524,13 +3091,6 @@ function frame(ts) {
     rp.setPipeline(params.additiveBlend ? fadePipeAdditive : fadePipe);
     rp.setBindGroup(0, params.additiveBlend ? fadeBGAdditive : fadeBG);
     rp.draw(3);
-    // Agent shadow is a soft splat — incoherent with chunky cells, skip in pixel mode.
-    // Runs when an image is loaded (homing shadows) or champions are active (constant shadows).
-    if ((hasImage || (params.championsEnabled && params.champions > 0 && params.championShadowEnabled)) && agentShadowBG && !usingPixel) {
-        rp.setPipeline(agentShadowPipe);
-        rp.setBindGroup(0, agentShadowBG);
-        rp.draw(params.agentCount * 6);
-    }
     if (renderBG) {
         rp.setPipeline(params.additiveBlend ? renderPipe : renderPipeNormal);
         rp.setBindGroup(0, params.additiveBlend ? renderBG : renderBGNormal);
@@ -3604,12 +3164,6 @@ function frame(ts) {
         bp.setPipeline(windVisPipe);
         bp.setBindGroup(0, windVisBG);
         bp.draw(visGridW * visGridH * 6);
-    }
-    if (params.showImage && hasImage && imageDebugBG) {
-        writeImageDebugUB();
-        bp.setPipeline(imageDebugPipe);
-        bp.setBindGroup(0, imageDebugBG);
-        bp.draw(6);   // 2-triangle quad covering the image region
     }
     bp.end();
 

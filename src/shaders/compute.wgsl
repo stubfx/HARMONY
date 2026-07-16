@@ -170,10 +170,8 @@ struct ContamParams {
 
 @group(0) @binding(0) var<uniform>             params:           SoloParams;
 @group(0) @binding(1) var<storage, read_write> agents:           array<Agent>;
-@group(0) @binding(2) var                      imageTex:         texture_2d<f32>;
 @group(0) @binding(3) var<uniform>             contam:           ContamParams;
 @group(0) @binding(4) var                      avoidMapTex:      texture_2d<f32>;
-@group(0) @binding(5) var                      shadowDensityTex: texture_2d<f32>;
 @group(0) @binding(6) var<storage, read>       spectatorSlots:   array<SpectatorSlot, 16>;
 @group(0) @binding(7) var                      golTex:           texture_2d<f32>;
 
@@ -196,27 +194,6 @@ fn hash(n: u32) -> f32 {
     x = x * 0x45d9f3bu;
     x = x ^ (x >> 16u);
     return f32(x) * (1.0 / 4294967296.0);
-}
-
-// Sample effective image alpha at a canvas-pixel position.
-// Applies black cutoff (luminance) and rectangular edge fade.
-// Returns 0 if outside the image rect or below cutoffs.
-fn imgAlphaAt(canvasPx: vec2<f32>, texDims: vec2<u32>) -> f32 {
-    let uv = vec2<f32>(
-        (canvasPx.x - params.imgX0) / (params.imgX1 - params.imgX0),
-        (canvasPx.y - params.imgY0) / (params.imgY1 - params.imgY0),
-    );
-    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { return 0.0; }
-    let tx  = u32(clamp(uv.x, 0.0, 1.0) * f32(texDims.x - 1u));
-    let ty  = u32(clamp(uv.y, 0.0, 1.0) * f32(texDims.y - 1u));
-    let px  = textureLoad(imageTex, vec2<u32>(tx, ty), 0u);
-    // Black cutoff: pixels below this luminance are fully transparent
-    let luma = dot(px.rgb, vec3<f32>(0.299, 0.587, 0.114));
-    if (luma < params.blackThreshold) { return 0.0; }
-    // Rectangular edge fade
-    let distEdge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
-    let vig = smoothstep(0.0, max(params.vignetteEdge, 0.0001), distEdge);
-    return px.a * vig;
 }
 
 // Sample avoidance map strength at a canvas-pixel position.
@@ -262,32 +239,12 @@ fn avoidMapStrAt(canvasPx: vec2<f32>) -> f32 {
     return select(r, 1.0 - r, params.avoidMapInvert != 0u);
 }
 
-// Sample shadow density at a canvas-pixel position.
-// Returns luminance [0, 1] of the shadow density texture — cleared to black each
-// frame and filled additively by the shadow density pass. 0 = no shadow, 1 = saturated
-// overlap of many homing agents. Used by the probe to scale avoidance force.
-fn shadowDensityAt(canvasPx: vec2<f32>) -> f32 {
-    let dims = textureDimensions(shadowDensityTex, 0u);
-    let tx   = u32(clamp(canvasPx.x / params.canvasW, 0.0, 1.0) * f32(dims.x - 1u));
-    let ty   = u32(clamp(canvasPx.y / params.canvasH, 0.0, 1.0) * f32(dims.y - 1u));
-    let px   = textureLoad(shadowDensityTex, vec2<u32>(tx, ty), 0u);
-    return dot(px.rgb, vec3<f32>(0.299, 0.587, 0.114));
-}
-
 // Sample the Game-of-Life grid at a canvas-pixel position. Returns 1 = live, 0 = dead.
 fn golAliveAt(canvasPx: vec2<f32>) -> f32 {
     let dims = textureDimensions(golTex, 0u);
     let tx   = u32(clamp(canvasPx.x / params.canvasW, 0.0, 1.0) * f32(dims.x - 1u));
     let ty   = u32(clamp(canvasPx.y / params.canvasH, 0.0, 1.0) * f32(dims.y - 1u));
     return textureLoad(golTex, vec2<u32>(tx, ty), 0u).r;
-}
-
-// Returns true when pt falls inside any active contamination circle.
-fn isContaminated(pt: vec2<f32>) -> bool {
-    for (var k = 0u; k < contam.count; k++) {
-        if (length(pt - contam.points[k].xy) <= contam.radius) { return true; }
-    }
-    return false;
 }
 
 @compute @workgroup_size(64)
@@ -297,7 +254,6 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     var pos    = agents[i].pos;
     var vel    = agents[i].vel;
-    let home   = agents[i].home;
     var weight = agents[i].weight;
 
     let x   = pos.x;
@@ -331,71 +287,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     var wind = vec2<f32>(cos(windAngle), sin(windAngle)) * params.windStr
              + vec2<f32>(params.windBiasX, params.windBiasY);
 
-    // ── Trace layer: image-alpha-driven homing ─────────────────────────────────
-    // homeInImg true  → agent drives toward its fixed home position (homing mode)
-    // homeInImg false → agent follows formula/wind (free mode)
-    var homeInImg = false;
-    var posAlpha  = 0.0;
-    var texDims   = vec2<u32>(1u, 1u);
-
-    if (params.hasImage != 0u) {
-        texDims = textureDimensions(imageTex, 0u);
-        var homeAlpha   = imgAlphaAt(home, texDims);
-        var rawPosAlpha = imgAlphaAt(pos,  texDims);
-
-        // Contamination — clean-only erase within circles.
-        // Opaque pixels (>= threshold) → alpha zeroed. Transparent pixels unchanged.
-        if (contam.count > 0u) {
-            if (isContaminated(home)) {
-                homeAlpha = select(homeAlpha, 0.0, homeAlpha >= params.alphaThreshold);
-            }
-            if (isContaminated(pos)) {
-                rawPosAlpha = select(rawPosAlpha, 0.0, rawPosAlpha >= params.alphaThreshold);
-            }
-        }
-
-        // Probabilistic homing gate: per-frame probability scaled by (1 - chaos).
-        // At chaos=0 (armonia): wasHoming agents always stay, new agents get homingChance.
-        // At chaos=1 (max caos): no agent homes — probability collapses to 0.
-        let homeQualifies = homeAlpha >= params.alphaThreshold;
-        let wasHoming     = agents[i].primed > 0.5;
-        if (homeQualifies) {
-            let rng        = hash(i ^ (u32(params.time * 73.0) + 5u));
-            let baseChance = select(params.homingChance, 1.0, wasHoming);
-            homeInImg      = rng < baseChance * (1.0 - params.chaos);
-        }
-        posAlpha = rawPosAlpha;
-    }
-
-    let imgCentre = vec2<f32>(
-        (params.imgX0 + params.imgX1) * 0.5,
-        (params.imgY0 + params.imgY1) * 0.5,
-    );
-
-    if (homeInImg) {
-        // ── Homing agent ───────────────────────────────────────────────────────
-        // Formula + wind still apply, but are blended against the homing direction.
-        // Blend weight falls linearly with distance: at dist=0 → homingInfluence,
-        // at dist=canvasW → 0 (pure free forces). No obstacle avoidance while homing.
-        let toHome = home - pos;
-        let dist   = length(toHome);
-
-        var freeVel = vel;
-        if (params.followFormula != 0u) {
-            freeVel = mix(freeVel, desired * (params.stepLen * weight), params.turnRate);
-        }
-        freeVel += wind * params.dt * 60.0;
-
-        // Speed capped at magnetStr; also capped at dist so the agent can't overshoot.
-        // Using dist/dist (not normalize) to avoid division by zero at dist ≈ 0.
-        var homingVel = vec2<f32>(0.0, 0.0);
-        if (dist > 0.001) {
-            homingVel = (toHome / dist) * min(dist, params.magnetStr);
-        }
-
-        let blendT = clamp(1.0 - dist / params.canvasW, 0.0, 1.0) * params.homingInfluence;
-        vel = mix(freeVel, homingVel, blendT);
-    } else {
+    {
         // ── Free agent: formula steering + wind ───────────────────────────────
         // chaos=1 → freeFactor=0 → agents ignore formula/wind and go straight.
         // chaos=0 → freeFactor=1 → normal steering.
@@ -421,63 +313,6 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             }
         }
 
-        // ── Image trace avoidance ──────────────────────────────────────────────
-        // Replaces the old push-from-centre with content-aware deflection:
-        //
-        //   Case A — already inside opaque area (posAlpha > 0):
-        //     Compute local alpha gradient via 4-sample central differences.
-        //     Push along −∇α (toward lower alpha = toward the nearest boundary gap).
-        //     Fallback to rect-centre push only when gradient is zero (flat uniform fill).
-        //
-        //   Case B — transparent now but heading into opacity (posAlpha = 0):
-        //     Gradient from current pos reveals nearby boundary direction.
-        //     Lookahead confirms opacity at next few steps.
-        //     Remove the inward velocity component — agent slides along the edge.
-        //
-        // Gradient epsilon: 4 canvas pixels — coarse enough to span sub-pixel
-        // boundaries, fine enough not to smear across separate regions.
-        if (params.hasImage != 0u) {
-            let EPS = 4.0;
-            let gx = imgAlphaAt(vec2<f32>(pos.x + EPS, pos.y), texDims)
-                   - imgAlphaAt(vec2<f32>(pos.x - EPS, pos.y), texDims);
-            let gy = imgAlphaAt(vec2<f32>(pos.x, pos.y + EPS), texDims)
-                   - imgAlphaAt(vec2<f32>(pos.x, pos.y - EPS), texDims);
-            let grad    = vec2<f32>(gx, gy);
-            let gradLen = length(grad);
-
-            if (posAlpha > 0.0) {
-                // Case A: inside opaque — push toward lower alpha
-                if (gradLen > 0.001) {
-                    vel += -normalize(grad) * params.maxSpeed * posAlpha * params.dt * 60.0
-                         * params.avoidForceStr;
-                } else {
-                    // Zero gradient (flat uniform fill) — fall back to rect-centre push
-                    let away = pos - imgCentre;
-                    if (length(away) > 0.001) {
-                        vel += normalize(away) * params.maxSpeed * posAlpha * params.dt * 60.0
-                             * params.avoidForceStr;
-                    }
-                }
-            } else if (gradLen > 0.001) {
-                // Case B: transparent but near a boundary — check if heading in
-                let velLen = length(vel);
-                if (velLen > 0.001) {
-                    let gradDir     = normalize(grad);
-                    let inwardSpeed = dot(gradDir, vel);
-                    if (inwardSpeed > 0.0) {
-                        // Lookahead: confirm opacity several steps ahead
-                        let futurePos = pos + normalize(vel) * (params.stepLen * 4.0);
-                        let lookAlpha = imgAlphaAt(futurePos, texDims);
-                        if (lookAlpha > params.alphaThreshold) {
-                            // Remove the inward velocity component proportionally
-                            let strength = smoothstep(params.alphaThreshold, 1.0, lookAlpha);
-                            vel -= gradDir * inwardSpeed * strength * params.avoidForceStr;
-                        }
-                    }
-                }
-            }
-        }
-
         // ── Contamination circle avoidance ─────────────────────────────────────
         // Soft outward push within 1.5× contamination radius for all free agents.
         // Linear falloff: full force at circle centre, zero at the influence edge.
@@ -496,56 +331,10 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             }
         }
 
-        // ── Shadow density probe (3-sensor Physarum) ─────────────────────────
-        // Left, center, right sensors cast at probeSensorAngle from forward direction.
-        // Agent steers laterally away from the denser side (dR - dL).
-        // Uses 3 texture samples; no gradient needed.
-        if (params.hasImage != 0u && params.probeForceStr > 0.001 && params.probeLen > 0.1) {
-            let velLen = length(vel);
-            if (velLen > 0.001) {
-                let fwdDir   = normalize(vel);
-                let cosA     = cos(params.probeSensorAngle);
-                let sinA     = sin(params.probeSensorAngle);
-                let leftDir  = vec2f( fwdDir.x*cosA - fwdDir.y*sinA,  fwdDir.x*sinA + fwdDir.y*cosA);
-                let rightDir = vec2f( fwdDir.x*cosA + fwdDir.y*sinA, -fwdDir.x*sinA + fwdDir.y*cosA);
-                let dC = shadowDensityAt(pos + fwdDir   * params.probeLen);
-                let dL = shadowDensityAt(pos + leftDir  * params.probeLen);
-                let dR = shadowDensityAt(pos + rightDir * params.probeLen);
-                let maxDensity = max(dC, max(dL, dR));
-                if (maxDensity > 0.005) {
-                    if (params.respawnOnCollide != 0u && maxDensity > 0.3) {
-                        let rng   = hash(i ^ (u32(params.time * 137.0) + 1u));
-                        let perim = 2.0 * (params.canvasW + params.canvasH);
-                        let t     = rng * perim;
-                        var cp    = vec2<f32>(0.0, 0.0);
-                        if (t < params.canvasW) {
-                            cp = vec2<f32>(t, 0.0);
-                        } else if (t < params.canvasW + params.canvasH) {
-                            cp = vec2<f32>(params.canvasW, t - params.canvasW);
-                        } else if (t < 2.0 * params.canvasW + params.canvasH) {
-                            cp = vec2<f32>(t - params.canvasW - params.canvasH, params.canvasH);
-                        } else {
-                            cp = vec2<f32>(0.0, t - 2.0 * params.canvasW - params.canvasH);
-                        }
-                        agents[i].pos    = cp;
-                        agents[i].vel    = vec2<f32>(0.0, 0.0);
-                        agents[i].primed = 0.0;
-                        return;
-                    } else {
-                        // Perpendicular turn: positive = left. Turn away from denser side.
-                        let perpDir = vec2f(-fwdDir.y, fwdDir.x);
-                        let steer   = (dR - dL) * params.maxSpeed * params.probeForceStr
-                                    * maxDensity * params.dt * 60.0;
-                        vel += perpDir * steer;
-                    }
-                }
-            }
-        }
-
         // ── Avoidance map ──────────────────────────────────────────────────────
-        // Grayscale mask (white = repel, black = pass). Gradient-based deflection
-        // mirrors the image-trace avoidance: agents push toward lower values and
-        // are deflected at edges. Uses the same avoidForceStr multiplier.
+        // Grayscale mask (white = repel, black = pass). Gradient-based deflection:
+        // agents push toward lower values and are deflected at edges, scaled by
+        // avoidForceStr.
         if (params.hasAvoidMap != 0u) {
             let EPS    = 4.0;
             let mapStr = avoidMapStrAt(pos);
@@ -590,8 +379,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     let spd = length(vel);
     if (spd > params.maxSpeed) { vel = vel * (params.maxSpeed / spd); }
-    // minSpeed only enforced for free agents — homing agents must be able to rest at home.
-    if (!homeInImg && spd < params.minSpeed && spd > 0.00001) { vel = vel * (params.minSpeed / spd); }
+    if (spd < params.minSpeed && spd > 0.00001) { vel = vel * (params.minSpeed / spd); }
 
     var np = pos + vel * params.dt * 60.0;
     if (params.bounceEdges != 0u) {
@@ -634,7 +422,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
 
     // Frame A: select agent for respawn — flag it, stay invisible at current pos.
-    if (params.dotMode != 0u && params.dotCenterRadius > 0.0 && !homeInImg) {
+    if (params.dotMode != 0u && params.dotCenterRadius > 0.0) {
         let cx = params.canvasW * 0.5;
         let cy = params.canvasH * 0.5;
         if (length(np - vec2<f32>(cx, cy)) < params.dotCenterRadius) {
@@ -647,7 +435,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
 
     // QR respawn: free agents inside the QR rect are stochastically scattered to edges.
-    if (params.qrMode != 0u && params.respawnOnQR != 0u && !homeInImg) {
+    if (params.qrMode != 0u && params.respawnOnQR != 0u) {
         if (np.x >= params.qrX0 && np.x <= params.qrX1 &&
             np.y >= params.qrY0 && np.y <= params.qrY1) {
             let rng_ = hash(i ^ (u32(params.time * 173.0) + 91u));
@@ -674,8 +462,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
 
     // Spawner-teleport: move a fraction of the spectator's partition to the joystick spawner each frame.
-    // Primed (homing) agents are never interrupted — they must finish homing.
-    if (!homeInImg && params.spectatorCount > 0u && i < u32(f32(params.agentCount) * params.spectatorAgentShare)) {
+    if (params.spectatorCount > 0u && i < u32(f32(params.agentCount) * params.spectatorAgentShare)) {
         let slot = spectatorSlots[i % params.spectatorCount];
         if (slot.isActive != 0u) {
             if (slot.burst != 0u && params.releaseBurstSpeed > 0.0) {
@@ -750,5 +537,5 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     agents[i].pos    = np;
     agents[i].vel    = vel;
     agents[i].weight = weight;
-    agents[i].primed = select(0.0, 1.0, homeInImg);
+    agents[i].primed = 0.0;
 }

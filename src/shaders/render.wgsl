@@ -118,19 +118,13 @@ struct Agent {
 
 @group(0) @binding(0) var<uniform>       params:    SoloRenderParams;
 @group(0) @binding(1) var<storage, read> agents:    array<Agent>;
-@group(0) @binding(2) var                imgSmp:    sampler;
-@group(0) @binding(3) var                imgTex:    texture_2d<f32>;
 @group(0) @binding(4) var<storage, read> colorBuf:  array<u32>;
 
 struct VsOut {
     @builtin(position) pos:        vec4<f32>,
     @location(0)       color:      vec3<f32>,
-    @location(1)       agentPos:   vec2<f32>,
-    @location(2)       bright:     f32,
-    @location(3)       homeUV:     vec2<f32>,
-    @location(4)       primed:     f32,
-    @location(5)       proximityT: f32,
-    @location(6)       quadUV:     vec2<f32>,  // local quad position (-0.5..0.5) for circle mask
+    @location(1)       bright:     f32,
+    @location(2)       quadUV:     vec2<f32>,  // local quad position (-0.5..0.5) for circle mask
 }
 
 
@@ -147,7 +141,7 @@ struct VsOut {
 
     // Dormant agents (preshow weight = 0) are clipped off-screen.
     if (agent.weight < 0.001) {
-        return VsOut(vec4<f32>(10.0, 10.0, 0.0, 1.0), vec3<f32>(0.0), vec2<f32>(0.0), 0.0, vec2<f32>(0.0), 0.0, 0.0, vec2<f32>(0.0));
+        return VsOut(vec4<f32>(10.0, 10.0, 0.0, 1.0), vec3<f32>(0.0), 0.0, vec2<f32>(0.0));
     }
 
     var ndc:  vec2<f32>;
@@ -168,11 +162,8 @@ struct VsOut {
              agent.pos.x / params.canvasW * 2.0 - 1.0,
             -(agent.pos.y / params.canvasH * 2.0 - 1.0),
         );
-        // Champions render larger, but ONLY while free — a homing champion falls
-        // back to the normal agent size like everyone else.
         let isChampion = params.champions != 0u && (agentId % params.champions) == 0u;
-        let homingNow  = params.hasImage != 0u && agent.primed > 0.5;
-        let sz = select(params.pointSize, params.championSize, isChampion && !homingNow);
+        let sz = select(params.pointSize, params.championSize, isChampion);
         half = vec2<f32>(sz / params.canvasW, sz / params.canvasH);
     }
     let finalNdc = ndc + corners[corner] * half * 2.0;
@@ -180,20 +171,7 @@ struct VsOut {
     // Color was pre-computed once per agent by the colorPrepass compute shader.
     let color = unpack4x8unorm(colorBuf[agentId]).rgb;
 
-    let isHoming = params.hasImage != 0u && agent.primed > 0.5;
-
-    let homeUV = vec2<f32>(
-        (agent.home.x - params.imgX0) / (params.imgX1 - params.imgX0),
-        (agent.home.y - params.imgY0) / (params.imgY1 - params.imgY0),
-    );
-
-    // Proximity factor: 1.0 when agent is at its home pixel, homingMinAlpha when
-    // at or beyond homingProximityRange. Only meaningful for homing agents.
-    let distToHome = length(agent.pos - agent.home);
-    let rawT       = 1.0 - clamp(distToHome / max(params.homingProximityRange, 1.0), 0.0, 1.0);
-    let proximityT = mix(params.homingMinAlpha, 1.0, rawT);
-
-    return VsOut(vec4<f32>(finalNdc, 0.0, 1.0), color, agent.pos, agent.weight, homeUV, agent.primed, proximityT, corners[corner]);
+    return VsOut(vec4<f32>(finalNdc, 0.0, 1.0), color, agent.weight, corners[corner]);
 }
 
 @fragment fn fs(in: VsOut) -> @location(0) vec4<f32> {
@@ -201,38 +179,6 @@ struct VsOut {
     // quadUV is in [-0.5, 0.5]; length() ranges 0 (centre) to ~0.707 (corner).
     // The circle is inscribed in the quad — anything beyond radius 0.5 is clipped.
     let circleAlpha = 1.0 - smoothstep(0.2, 0.5, length(in.quadUV));
-
-    // Debug mode: homing agents (primed=1) render bright white regardless of image/chaos state.
-    if (params.debugHoming != 0u && in.primed > 0.5) {
-        let b = params.blendAmount * circleAlpha;
-        return vec4<f32>(b, b, b, b);
-    }
-
-    // agent.primed is written by the compute shader each frame (1.0 = homing, 0.0 = free).
-    // Using it as the sole gate guarantees render, shadow, and compute always agree —
-    // no independent texture re-sampling means no bilinear/nearest-neighbour mismatch.
-    if (params.hasImage != 0u && in.primed > 0.5) {
-        let uv = clamp(in.homeUV, vec2<f32>(0.0), vec2<f32>(1.0));
-
-        // Sample image for actual RGB colour. QR mode uses nearest-neighbour to keep
-        // module boundaries crisp; non-QR uses bilinear for smooth colour blending.
-        var imgSample: vec4<f32>;
-        if (params.qrMode != 0u) {
-            let tdims = textureDimensions(imgTex);
-            let tx    = u32(uv.x * f32(tdims.x - 1u));
-            let ty    = u32(uv.y * f32(tdims.y - 1u));
-            imgSample = textureLoad(imgTex, vec2<u32>(tx, ty), 0);
-        } else {
-            imgSample = textureSampleLevel(imgTex, imgSmp, uv, 0.0);
-        }
-
-        let distEdge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
-        let vig      = select(smoothstep(0.0, max(params.vignetteEdge, 0.0001), distEdge), 1.0, params.qrMode != 0u);
-        let a        = imgSample.a * vig * in.proximityT * circleAlpha;
-        let b = params.blendAmount * in.bright;
-        if (params.additiveBlend == 0u) { return vec4<f32>(imgSample.rgb * a * b, a * b); }
-        return vec4<f32>(imgSample.rgb * b, a * b);
-    }
     let b = params.blendAmount * in.bright * circleAlpha;
     return vec4<f32>(in.color * b, params.brightness * b);
 }

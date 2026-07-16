@@ -18,10 +18,10 @@ export function initGUI({
     rebuildOffscreen,
     rebuildGridTex,
     applyResize,
-    renderTraceCanvas,
     loadFontSpec,
     generateQR,
-    clearMagnetImage,
+    renderTextAvoidMap,
+    updateQROverlay,
     clearTraceText,
     clearAvoidMap,
     updateAvoidMapOverlay,
@@ -99,7 +99,7 @@ export function initGUI({
     // ── Visual ────────────────────────────────────────────────────────────────
     const fVis = gui.addFolder('Visual');
     const renderScaleCtrl = fVis.add(params, 'renderScale', 0.1, 1.0, 0.05).name('render scale').onChange(applyResize);
-    fVis.add(params, 'traceScale', 0.1, 1.0, 0.05).name('trace res').onChange(renderTraceCanvas);
+    fVis.add(params, 'traceScale', 0.1, 1.0, 0.05).name('avoid-map res').onChange(renderTextAvoidMap);
     fVis.add(params, 'trailEnabled').name('trail on');
     fVis.add(params, 'trailDecay',    0.005, 0.4,  0.005).name('trail decay');
     fVis.add(params, 'bgBlackCutoff', 0,     0.05, 0.001).name('black cutoff');
@@ -129,56 +129,30 @@ export function initGUI({
     fExport.add(params, 'exportCMYK').name('CMYK (TIFF)');
     fExport.close();
 
-    // ── Trace ─────────────────────────────────────────────────────────────────
-    const fMagnet = gui.addFolder('Trace');
-    fMagnet.add(params, 'traceEnabled').name('enabled');
-    fMagnet.add(params, 'debugHoming').name('debug homing (white)');
-    fMagnet.add(params, 'magnetStr',      0, 50,   0.1  ).name('homing speed');
-    fMagnet.add(params, 'alphaThreshold', 0,  1,   0.01 ).name('alpha threshold');
-    fMagnet.add(params, 'blackThreshold', 0,  0.5, 0.005).name('black cutoff');
-    fMagnet.add(params, 'vignetteEdge',   0,  0.5, 0.005).name('edge fade');
-    fMagnet.add(params, 'avoidForceStr',  0,  5,   0.05 ).name('avoid force');
-    fMagnet.add(params, 'showImage').name('show image');
-    fMagnet.add(params, 'captionSize', 0.02, 0.15, 0.005).name('caption size').onChange(renderTraceCanvas);
+    // ── Text ──────────────────────────────────────────────────────────────────
+    // Particles are repelled by white text glyphs rendered into the avoid map.
+    const fText = gui.addFolder('Text');
     // Font presets — selecting one fills the #font-input and loads it from Google Fonts.
     const FONT_PRESETS = [
         'Bellefair', 'Inter', 'Roboto', 'Montserrat', 'Oswald', 'Bebas Neue', 'Anton',
         'Archivo Black', 'Playfair Display', 'Lora', 'Space Mono', 'Spline Sans Mono',
     ];
-    fMagnet.add({ preset: params.fontFamily }, 'preset', FONT_PRESETS).name('font preset').onChange(v => {
+    fText.add({ preset: params.fontFamily }, 'preset', FONT_PRESETS).name('font preset').onChange(v => {
         const fi = document.querySelector('#font-input');
         if (fi) fi.value = v;
         loadFontSpec(v);
     });
-    fMagnet.add(params, 'clearDelay', 0, 120, 5).name('auto clear (s)');
-    fMagnet.add({ load: () => document.querySelector('#image-input').click() }, 'load').name('Load image…');
-    fMagnet.add({ clear: clearMagnetImage }, 'clear').name('Clear image');
-    fMagnet.add({ clear: clearTraceText },   'clear').name('Clear text');
-
-    // ── Homing ────────────────────────────────────────────────────────────────
-    const fHoming = gui.addFolder('Homing');
-    fHoming.add(params, 'homingChance',         0, 1,    0.01).name('homing chance');
-    fHoming.add(params, 'homingInfluence',      0, 1,    0.01).name('homing influence');
-    fHoming.add(params, 'agentShadowStr',       0, 1,    0.005).name('shadow strength');
-    fHoming.add(params, 'agentShadowRadius',    0, 300,  0.5  ).name('shadow radius');
-    fHoming.add(params, 'homingProximityRange', 0, 2000, 10   ).name('proximity range (px)');
-    fHoming.add(params, 'homingMinAlpha',       0, 1,    0.01 ).name('proximity min alpha');
+    fText.add({ clear: clearTraceText }, 'clear').name('Clear text');
+    fText.add(params, 'imageX', 0, 1, 0.01).name('text X').onChange(renderTextAvoidMap);
+    fText.add(params, 'imageY', 0, 1, 0.01).name('text Y').onChange(renderTextAvoidMap);
 
     // ── Champions ───────────────────────────────────────────────────────────────
     const fChampions = gui.addFolder('Champions');
     fChampions.add(params, 'championsEnabled').name('enabled');
     fChampions.add(params, 'champions',            1, 1500, 1   ).name('1 in N');
-    fChampions.add(params, 'championSize',         0.1, 40, 0.1 ).name('size (free)');
+    fChampions.add(params, 'championSize',         0.1, 40, 0.1 ).name('size');
     fChampions.add(params, 'champLinesAlpha',      0, 1,    0.01).name('lines alpha');
-    fChampions.add(params, 'championShadowEnabled').name('shadow');
     fChampions.close();
-
-    // ── Probe ─────────────────────────────────────────────────────────────────
-    const fProbe = gui.addFolder('Probe');
-    fProbe.add(params, 'probeLen',         5, 300,               1   ).name('probe distance');
-    fProbe.add(params, 'probeForceStr',    0, 200,               1   ).name('probe force');
-    fProbe.add(params, 'probeSensorAngle', 0.05, Math.PI * 0.75, 0.01).name('probe sensor angle');
-    fProbe.add(params, 'respawnOnCollide').name('respawn on collide');
 
     // ── Eraser ────────────────────────────────────────────────────────────────
     const fEraser = gui.addFolder('Eraser');
@@ -188,22 +162,20 @@ export function initGUI({
 
     // ── QR & Layout ───────────────────────────────────────────────────────────
     const fContent = gui.addFolder('QR & Layout');
-    fContent.add(params, 'qrOverlay').name('QR overlay').onChange(renderTraceCanvas);
+    fContent.add(params, 'qrOverlay').name('QR overlay').onChange(updateQROverlay);
     fContent.add(params, 'respawnOnQR').name('respawn on QR');
     fContent.add(params, 'qrRespawnChance', 0, 0.1, 0.001).name('QR respawn chance');
-    fContent.add(params, 'qrSize',      0.05, 0.5,  0.01).name('QR size').onChange(renderTraceCanvas);
-    fContent.add(params, 'qrMargin',    0,    0.1,  0.005).name('QR margin').onChange(renderTraceCanvas);
-    fContent.add(params, 'qrAlignX',    ['left', 'center', 'right']).name('QR align H').onChange(renderTraceCanvas);
-    fContent.add(params, 'qrAlignY',    ['top',  'center', 'bottom']).name('QR align V').onChange(renderTraceCanvas);
-    fContent.add(params, 'qrQuietZone', 0, 8, 1).name('QR quiet zone').onChange(() => generateQR().then(renderTraceCanvas));
-    fContent.add(params, 'qrInvert').name('QR invert colors').onChange(() => generateQR().then(renderTraceCanvas));
-    fContent.add(params, 'imageSize', 0.05, 1.0, 0.01).name('content size').onChange(renderTraceCanvas);
-    fContent.add(params, 'imageX',    0,    1,   0.01).name('content X').onChange(renderTraceCanvas);
-    fContent.add(params, 'imageY',    0,    1,   0.01).name('content Y').onChange(renderTraceCanvas);
+    fContent.add(params, 'qrSize',      0.05, 0.5,  0.01).name('QR size').onChange(updateQROverlay);
+    fContent.add(params, 'qrMargin',    0,    0.1,  0.005).name('QR margin').onChange(updateQROverlay);
+    fContent.add(params, 'qrAlignX',    ['left', 'center', 'right']).name('QR align H').onChange(updateQROverlay);
+    fContent.add(params, 'qrAlignY',    ['top',  'center', 'bottom']).name('QR align V').onChange(updateQROverlay);
+    fContent.add(params, 'qrQuietZone', 0, 8, 1).name('QR quiet zone').onChange(() => generateQR().then(updateQROverlay));
+    fContent.add(params, 'qrInvert').name('QR invert colors').onChange(() => generateQR().then(updateQROverlay));
 
     // ── Avoidance map ─────────────────────────────────────────────────────────
     const fAvoid = gui.addFolder('Avoidance map');
     fAvoid.add(params, 'chaosAvoidMapThreshold', 0, 1, 0.01).name('chaos threshold (hide above)');
+    fAvoid.add(params, 'avoidForceStr', 0, 5, 0.05).name('avoid force');
     fAvoid.add(params, 'avoidMapScale', 0.05, 1.0, 0.01).name('scale').onChange(() => updateAvoidMapOverlay());
     fAvoid.add(params, 'avoidMapInvert').name('invert colors');
     fAvoid.add(params, 'avoidMapSampleColor').name('sample color');
