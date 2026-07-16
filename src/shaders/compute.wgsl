@@ -694,35 +694,34 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
 
     // Random global teleport: any agent has a per-frame chance to jump to a random position.
-    // If the avoidMap is active and the candidate lands in an avoid zone, respawn on a
-    // random canvas edge instead so agents never materialise inside forbidden areas.
-    // Sets weight=0 so the agent is invisible this frame; fade-in starts next frame.
+    // When the avoidMap is active the blip must land ON its white content — the sampled
+    // avoid score (red channel) must clear a small threshold. Try a few random points and
+    // take the first that hits a white dot; if none do, cancel the teleport this frame so
+    // blips don't scatter over empty space. Sets weight=0 so fade-in starts next frame.
     var justTeleported = false;
     if (params.randomTeleportChance > 0.0) {
         let tRng = hash(i ^ (u32(params.time * 1013.0) + 29u));
         if (tRng < params.randomTeleportChance) {
-            let rx = hash(i ^ (u32(params.time * 997.0)  + 3u));
-            let ry = hash(i ^ (u32(params.time * 971.0)  + 11u));
-            var candidate = vec2f(rx * params.canvasW, ry * params.canvasH);
-
-            if (params.hasAvoidMap != 0u && avoidMapStrAt(candidate) > 0.05) {
-                let er    = hash(i ^ (u32(params.time * 887.0) + 37u));
-                let perim = 2.0 * (params.canvasW + params.canvasH);
-                let et    = er * perim;
-                if (et < params.canvasW) {
-                    candidate = vec2<f32>(et, 0.0);
-                } else if (et < params.canvasW + params.canvasH) {
-                    candidate = vec2<f32>(params.canvasW, et - params.canvasW);
-                } else if (et < 2.0 * params.canvasW + params.canvasH) {
-                    candidate = vec2<f32>(et - params.canvasW - params.canvasH, params.canvasH);
-                } else {
-                    candidate = vec2<f32>(0.0, et - 2.0 * params.canvasW - params.canvasH);
+            var candidate = vec2f(0.0, 0.0);
+            var placed    = false;
+            if (params.hasAvoidMap != 0u) {
+                for (var k: u32 = 0u; k < 8u; k = k + 1u) {
+                    let rx = hash(i ^ (u32(params.time * 997.0) + 3u  + k * 101u));
+                    let ry = hash(i ^ (u32(params.time * 971.0) + 11u + k * 149u));
+                    let c  = vec2f(rx * params.canvasW, ry * params.canvasH);
+                    if (avoidMapStrAt(c) > 0.05) { candidate = c; placed = true; break; }
                 }
+            } else {
+                let rx = hash(i ^ (u32(params.time * 997.0) + 3u));
+                let ry = hash(i ^ (u32(params.time * 971.0) + 11u));
+                candidate = vec2f(rx * params.canvasW, ry * params.canvasH);
+                placed    = true;
             }
-
-            np             = candidate;
-            weight         = 0.0;
-            justTeleported = true;
+            if (placed) {
+                np             = candidate;
+                weight         = 0.0;
+                justTeleported = true;
+            }
         }
     }
 

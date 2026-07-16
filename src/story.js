@@ -170,8 +170,10 @@ export const STORY = [
         enter(sim) {
             sim.setColorMode('NORMAL');
             sim.setParam('champLinesAlpha', 0.02);
-            sim.setTraceText('HARMONY');
-            log('PHASE 3. testo HARMONY attivo. immagini e audio tra 10s.');
+            // HARMONY text fades in only after a 7–10s timer, like the harmony images.
+            const textDelay = 7000 + Math.random() * 3000;
+            this._textTimer = setTimeout(() => sim.setTraceText('HARMONY'), textDelay);
+            log(`PHASE 3. testo HARMONY tra ${Math.round(textDelay / 1000)}s. immagini e audio tra 10s.`);
             this._respawnTimer = setTimeout(() => {
                 log('10s scaduti — immagini harmony abilitate. dotRespawnChance abilitato (0.002). audio4 in partenza.');
                 sim.enableHarmonyImages();
@@ -189,6 +191,7 @@ export const STORY = [
         },
         exit(sim) {
             log('uscita PHASE 3.');
+            clearTimeout(this._textTimer);
             clearTimeout(this._respawnTimer);
             clearTimeout(this._colorTimer);
             // Harmony images stay enabled from here on (intentionally not disabled).
