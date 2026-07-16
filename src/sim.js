@@ -632,11 +632,6 @@ const simFacade = {
         if (_harmonyActive) clearAvoidMap();
     },
 
-    // Let the crowd's note sum cycle the direction formula (Chladni mode). Off
-    // by default so the direction holds the DOT spiral through the early phases.
-    enableFormulaCycle()  { _dirCycleEnabled = true;  },
-    disableFormulaCycle() { _dirCycleEnabled = false; },
-
     setTraceText(text) {
         const input = document.querySelector('#trace-text-input');
         if (input) { input.value = text; renderTextAvoidMap(); }
@@ -1939,7 +1934,6 @@ const _activeNotesBySpectator = new Map(); // spectatorId → noteIndex (0–8)
 let _noteFormulaTimer  = null;
 let _pendingFormulas   = null;        // latest { dir, wind } requested while throttled
 let _lastFormulaApplyT = 0;           // timestamp of the last applied formula change
-let _dirCycleEnabled   = false;       // direction stays the DOT spiral until the HARMONY reveal turns cycling on
 const _FORMULA_LEAD_MS      = 200;    // small settle delay before the first change after idle
 const _FORMULA_MIN_INTERVAL = 5000;   // movement formulas change at most once every 5 s
 
@@ -2159,20 +2153,12 @@ function _recalcNoteFormulas() {
         return;
     }
 
-    // Chladni mode updates via uniform — no shader recompile needed.
+    // Chladni mode: the note sum drives the Chladni field via a uniform (no
+    // shader recompile) and it blends into the direction. Wind is disabled while
+    // any spectator is connected (see the wind uniform), so there's nothing to
+    // cycle here — the field itself morphs with the crowd's note sum.
     if (activeSlots.length > 0) {
         _chladniSum = sum;
-        // Still recompile for the wind formula change (wind is not uniform-driven).
-        const newWind = WIND_FORMULAS[sum % WIND_FORMULAS.length];
-        if (windInput) windInput.value = newWind;
-        // Direction holds the DOT spiral until the HARMONY reveal; after that the
-        // note sum cycles it like wind, so it no longer sticks for the whole story.
-        let newDir = dirInput?.value || DEFAULT_DIR;
-        if (_dirCycleEnabled) {
-            newDir = DIR_FORMULAS[sum % DIR_FORMULAS.length];
-            if (dirInput) dirInput.value = newDir;
-        }
-        _scheduleFormulas(newDir, newWind);
         return;
     }
 
@@ -2883,7 +2869,10 @@ function writeSoloUB(dt, time) {
     f[5] = time;
     const isIdle = simState.status === 'FREEROAM';
     const isDot  = simState.status === 'DOT';
-    f[6] = isIdle ? 0.0 : (isDot || params.windEnabled ? params.windStr : 0.0);
+    // Wind is disabled while any spectator is connected (the Chladni field is
+    // active then) so it doesn't fight the standing-wave pattern.
+    const chladniOn = _preConnectionFormulas !== null;
+    f[6] = (isIdle || chladniOn) ? 0.0 : (isDot || params.windEnabled ? params.windStr : 0.0);
     f[7] = params.turnRate * coherenceMult;  // coherence scales how sharply agents follow the formula
     f[8] = params.maxSpeed;
     f[9] = params.minSpeed;
