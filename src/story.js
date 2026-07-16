@@ -1,16 +1,11 @@
 import { PHASE, RESEED } from './constants.js';
 
-// ─── Narrator Audio Map ──────────────────────────────────────────────────────
-// All files live in simAss/narrator/. Replace any file to swap the narration.
-//
-//   audio1.mp3  →  PHASE 1 — starts immediately; stops on first connection
-//   audio2.mp3  →  PHASE 1 — starts on first connection; 10s later → PHASE 2
-//   audio3.mp3  →  PHASE 2 — starts immediately on enter
-//   audio4.mp3  →  PHASE 3 & 4 — give a color to the note
-//
-// PHASES 5, 7 and 8 no longer use recorded narration: the simulation "speaks" its
-// own phase number as a short binary tone sequence (sim.speakPhase). PHASE 6 has
-// no audio (director's note: "no commentary needed").
+// ─── Phase audio ─────────────────────────────────────────────────────────────
+// No phase uses recorded narration any more. Every phase announces itself by
+// having the simulation "speak" its own phase number as a short binary tone
+// sequence (sim.speakPhase(this.id)) at the point its narration used to start.
+// PHASE 6 stays silent (director's note: "no commentary needed").
+// (sim.playNarratorAudio is still available as a primitive but is now unused.)
 
 // ─── Note on hardcoded parameters ────────────────────────────────────────────
 // All timers, thresholds and filenames are intentionally hardcoded in this file.
@@ -47,28 +42,22 @@ const log = (msg) => console.log(`[story] ${msg}`);
 // colour reveal both fire when this timer elapses, so they land perfectly synced.
 const RISER_MS = 4000;
 
-// How long the narration-free phases (5, 7) hold on screen before auto-advancing.
-// They no longer wait on an audio 'ended' event; the binary phase cue plays near
-// the start of this window. Matches PHASE 6's silent hold.
+// How long a narration-free phase holds after its binary cue before it acts
+// (advances, or — where a phase used to wait on an audio 'ended' event — proceeds
+// to its next step). The cue plays near the start of this window. Matches PHASE 6's
+// silent hold.
 const PHASE_CUE_HOLD_MS = 5000;
 
 export const STORY = [
 
     // ── PHASE 1 — CONNECTION ──────────────────────────────────────────────────
-    // audio1 starts immediately on enter.
-    // Spectator joins are ignored visually during audio1 (queued).
-    // audio1 ends → if queued users exist, activate their chunks and start audio2;
-    //               otherwise wait for the first user normally.
-    // audio2 ends → immediate sim.next() (HARMONY text + 10s wait in PHASE 2).
+    // Binary cue 1 plays immediately on enter. Each spectator that joins lights up
+    // their chunk. The first connection starts a PHASE_CUE_HOLD_MS hold → PHASE 2.
     {
         id: PHASE.P1,
         enter(sim) {
-            this._audio2Started = false;
-            this._audio1Playing = true;
-            this._pendingJoins  = 0;
-
             sim.setSynthEnergy(0, 0); // calm bed — reset any post-drop energy on restart
-            log('PHASE 1 — fade out, tutto nero. audio1 in partenza.');
+            log('PHASE 1 — fade out, tutto nero. cue binario 1.');
             sim.clearAvoidMap();
             sim.setColorMode('GRAYSCALE');
             sim.freezeParams({ spectatorSpawnChance: 0, randomTeleportChance: 0, dotRespawnChance: 0, spawnFadeRate: 0 });
@@ -77,44 +66,22 @@ export const STORY = [
             sim.setParam('limitAtCenterRadius', 100);
             sim.suppressImages();
             sim.dormantSeed();
-            this._audio = sim.playNarratorAudio('audio1.mp3');
-            this._audio.addEventListener('ended', () => {
-                this._audio1Playing = false;
-                log('audio1 terminato.');
-                if (this._pendingJoins > 0) {
-                    log(this._pendingJoins + ' utenti in attesa — attivazione chunk e avvio audio2.');
-                    for (let i = 0; i < this._pendingJoins; i++) sim.activateChunk(1);
-                    this._startAudio2(sim);
-                }
-            }, { once: true });
-        },
-        _startAudio2(sim) {
-            if (this._audio2Started) return;
-            this._audio2Started = true;
-            log('audio2 in partenza.');
-            this._audio = sim.playNarratorAudio('audio2.mp3');
-            this._audio.addEventListener('ended', () => {
-                log('audio2 terminato — avanzamento immediato a PHASE 2.');
-                sim.next();
-            }, { once: true });
+            sim.speakPhase(this.id);
         },
         onSpectatorJoined(sim, userCount) {
             log('utente connesso — totale: ' + userCount);
-            if (this._audio1Playing) {
-                this._pendingJoins++;
-                log('audio1 in corso — join ignorato graficamente (pending: ' + this._pendingJoins + ').');
-                return;
-            }
             sim.activateChunk(1);
             if (userCount === 1) {
-                log('primo utente — avvio audio2.');
-                this._startAudio2(sim);
+                log(`primo utente — hold ${Math.round(PHASE_CUE_HOLD_MS / 1000)}s → PHASE 2.`);
+                this._timer = setTimeout(() => {
+                    log('hold scaduto — avanzamento a PHASE 2.');
+                    sim.next();
+                }, PHASE_CUE_HOLD_MS);
             }
         },
         exit(sim) {
             log('uscita PHASE 1 — formule aggiornate, respawn random già attivo.');
-            this._audio?.pause();
-            this._audio = null;
+            clearTimeout(this._timer);
             sim.restoreImages();
             sim.thawParams();
             sim.setFormulas(
@@ -125,10 +92,10 @@ export const STORY = [
     },
 
     // ── PHASE 2 — THE NOTE ────────────────────────────────────────────────────
-    // Enters immediately from PHASE 1. Waits 10s, then audio3.
-    // Notes are ignored until audio3 finishes (prevents notes sent during audio2
-    // or audio3 from triggering the timer early).
-    // First note after audio3 → wind on → 20s timer → sim.next().
+    // Enters immediately from PHASE 1. Waits 10s, then binary cue 2.
+    // Notes are ignored until PHASE_CUE_HOLD_MS after the cue (prevents notes sent
+    // during the intro from triggering the timer early).
+    // First note after that → wind on → 20s timer → sim.next().
     {
         id: PHASE.P2,
         _noteTimerStarted: false,
@@ -143,14 +110,14 @@ export const STORY = [
             sim.startBlinkersLoop();
             sim.enableFullSynth();
             sim.setSynthEnergy(0, 0); // calm bed — reset any post-drop energy on restart
-            log('PHASE 2 — nota. note disabilitate fino a fine audio3. audio3 parte tra 10s.');
-            setTimeout(() => {
-                log('10s scaduti — audio3 in partenza.');
-                this._audio = sim.playNarratorAudio('audio3.mp3');
-                this._audio.addEventListener('ended', () => {
-                    log('audio3 terminato — note abilitate.');
+            log('PHASE 2 — nota. note disabilitate fino a fine cue. cue binario 2 tra 10s.');
+            this._cueTimer = setTimeout(() => {
+                log('10s scaduti — cue binario 2.');
+                sim.speakPhase(this.id);
+                this._enableTimer = setTimeout(() => {
+                    log('cue terminato — note abilitate.');
                     this._notesEnabled = true;
-                }, { once: true });
+                }, PHASE_CUE_HOLD_MS);
             }, 10_000);
         },
         onNote(sim, noteIndex) {
@@ -165,17 +132,16 @@ export const STORY = [
         },
         exit(sim) {
             log('uscita PHASE 2.');
+            clearTimeout(this._cueTimer);
+            clearTimeout(this._enableTimer);
             sim.thawParams();
-            this._audio?.pause();
-            this._audio = null;
         },
     },
 
     // ── PHASE 3 ───────────────────────────────────────────────────────────────
-    // NORMAL color → HARMONY text immediately → 10s timer → harmony images → audio4.
-    // After audio4 ends: a RISER_MS build-up (riser) resolves into a synced drop —
-    // impact + red colour reveal fire together → PHASE 4.
-    // File: simAss/narrator/audio4.mp3
+    // NORMAL color → HARMONY text immediately → 10s timer → harmony images → binary cue 3.
+    // After a PHASE_CUE_HOLD_MS hold: a RISER_MS build-up (riser) resolves into a
+    // synced drop — impact + red colour reveal fire together → PHASE 4.
     {
         id: PHASE.P3,
         enter(sim) {
@@ -184,14 +150,14 @@ export const STORY = [
             // HARMONY text fades in only after a 7–10s timer, like the harmony images.
             const textDelay = 7000 + Math.random() * 3000;
             this._textTimer = setTimeout(() => sim.setTraceText('HARMONY'), textDelay);
-            log(`PHASE 3. testo HARMONY tra ${Math.round(textDelay / 1000)}s. immagini e audio tra 10s.`);
+            log(`PHASE 3. testo HARMONY tra ${Math.round(textDelay / 1000)}s. immagini e cue tra 10s.`);
             this._respawnTimer = setTimeout(() => {
-                log('10s scaduti — immagini harmony abilitate. dotRespawnChance abilitato (0.002). audio4 in partenza.');
+                log('10s scaduti — immagini harmony abilitate. dotRespawnChance abilitato (0.002). cue binario 3.');
                 sim.enableHarmonyImages();
                 sim.setParam('dotRespawnChance', 0.002);
-                this._audio = sim.playNarratorAudio('audio4.mp3');
-                this._audio.addEventListener('ended', () => {
-                    log(`audio4 terminato. riser ${Math.round(RISER_MS / 1000)}s → drop → PHASE 4.`);
+                sim.speakPhase(this.id);
+                this._cueHoldTimer = setTimeout(() => {
+                    log(`cue terminato. riser ${Math.round(RISER_MS / 1000)}s → drop → PHASE 4.`);
                     sim.playRiser(RISER_MS);
                     this._riserTimer = setTimeout(() => {
                         log('drop — impact + color1=#ff0000 color2=#ff0000. avanzamento a PHASE 4.');
@@ -199,42 +165,38 @@ export const STORY = [
                         sim.freezeParams({ color1: '#ff0000', color2: '#ff0000' });
                         sim.next();
                     }, RISER_MS);
-                }, { once: true });
+                }, PHASE_CUE_HOLD_MS);
             }, 10_000);
         },
         exit(sim) {
             log('uscita PHASE 3.');
             clearTimeout(this._textTimer);
             clearTimeout(this._respawnTimer);
+            clearTimeout(this._cueHoldTimer);
             clearTimeout(this._riserTimer);
             // Harmony images stay enabled from here on (intentionally not disabled).
             sim.thawParams();
-            this._audio?.pause();
-            this._audio = null;
         },
     },
 
     // ── PHASE 4 — IMAGE: HEART ────────────────────────────────────────────────
     // TODO: implement image appearance logic (how the image fades/arrives on screen).
-    // Narrator speaks after silence; advances when audio ends.
-    // File: simAss/narrator/audio4.mp3
+    // No narration — the sim speaks its phase number as a binary cue, then the
+    // phase holds for PHASE_CUE_HOLD_MS before auto-advancing.
     {
         id: PHASE.P4,
         enter(sim) {
-            // Hold 5s after the drop so its energetic body is audible before audio4
-            // narration ducks the bed, then start audio4.
-            log('PHASE 4 — cuore. audio4 tra 5s (il drop resta udibile prima del ducking).');
+            log(`PHASE 4 — cuore. cue binario ${this.id}. avanzamento tra ${Math.round(PHASE_CUE_HOLD_MS / 1000)}s.`);
             // TODO: load heart image into avoidmap
-            this._audioTimer = setTimeout(() => {
-                log('5s scaduti — audio4 in partenza.');
-                this._audio = sim.playNarratorAudio('audio4.mp3', { autoNext: true });
-            }, 5_000);
+            sim.speakPhase(this.id);
+            this._timer = setTimeout(() => {
+                log('hold scaduto — avanzamento a PHASE 5.');
+                sim.next();
+            }, PHASE_CUE_HOLD_MS);
         },
         exit(sim) {
             log('uscita PHASE 4.');
-            clearTimeout(this._audioTimer);
-            this._audio?.pause();
-            this._audio = null;
+            clearTimeout(this._timer);
         },
     },
 
