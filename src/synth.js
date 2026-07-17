@@ -31,13 +31,51 @@ const BPM_MIN          = 80;   // transport BPM at temp 0
 const BPM_TEMP_RANGE   = 60;   // BPM added across the temperature range
 const BPM_ENERGY_BOOST = 40;   // BPM added at full energy
 
-// A natural minor scale across 2 octaves for arp randomisation
+// A natural minor scale across 2 octaves for arp randomisation (default / no shape)
 const ARP_POOL = ['A3','B3','C4','D4','E4','F4','G4','A4','B4','C5','E5','G5'];
 
+// ── Shape personality system ───────────────────────────────────────────────────
+// Each shape shown as an avoidmap gets its own sonic character: a distinct arp
+// mode, pad chord voicing, LFO rate, and a short entry blinker. Personalities
+// are keyed by shape name (static images) or 'h0'–'h4' (harmony sum % 5).
+const _SHAPE_POOLS = {
+    pentatonic:  ['A3','C4','D4','E4','G4','A4','C5','D5','E5','G5'],
+    dorian:      ['A3','B3','C4','D4','E4','F#4','G4','A4','B4','C5'],
+    phrygian:    ['A3','Bb3','C4','D4','E4','F4','G4','A4','Bb4','C5'],
+    lydian:      ['A3','B3','C#4','D#4','E4','F#4','G#4','A4','B4','C5'],
+    mixolydian:  ['A3','B3','C#4','D4','E4','F#4','G4','A4','B4','C5'],
+    wholetone:   ['A3','B3','C#4','D#4','F4','G4','A4','B4','C#5','D#5'],
+};
+const _SHAPE_CHORDS = {
+    pentatonic:  ['A2','D3','G3','A3','D4','G4'],
+    dorian:      ['A2','C3','E3','F#3','A3','C4'],
+    phrygian:    ['A2','Bb2','E3','G3','A3','C4'],
+    lydian:      ['A2','E3','B3','D#4','G#4','B4'],
+    mixolydian:  ['A2','C#3','E3','G3','A3','C#4'],
+    wholetone:   ['A2','B2','C#3','D#3','F3','G3'],
+    default:     ['A2','E3','A3','C4','E4','G4'],
+};
+// Named presets for static shapes + 5 harmony archetypes (sum % 5)
+const _SHAPE_PRESETS = {
+    circle:      { pool: 'pentatonic', chord: 'pentatonic', lfoHz: 0.12, blinker: 'sonar'   },
+    full_square: { pool: 'wholetone',  chord: 'wholetone',  lfoHz: 0.06, blinker: 'deep'    },
+    aant_logo:   { pool: 'dorian',     chord: 'dorian',     lfoHz: 0.28, blinker: 'ghost'   },
+    h0:          { pool: 'lydian',     chord: 'lydian',     lfoHz: 0.22, blinker: 'blip'    },
+    h1:          { pool: 'dorian',     chord: 'dorian',     lfoHz: 0.18, blinker: 'sonar'   },
+    h2:          { pool: 'phrygian',   chord: 'phrygian',   lfoHz: 0.32, blinker: 'ghost'   },
+    h3:          { pool: 'mixolydian', chord: 'mixolydian', lfoHz: 0.10, blinker: 'deep'    },
+    h4:          { pool: 'pentatonic', chord: 'pentatonic', lfoHz: 0.16, blinker: 'sputnik' },
+};
+
 let _ready = false;
+let _pad = null;  // lifted to module scope for chord re-voicing in setShapePersonality
 let _padVol, _padFilter, _padLFO, _droneVol, _arpVol, _arpSeq;
 let _kickVol, _kickLoop, _bassVol, _bassLoop;   // post-drop rhythm section
 let _synthBus = null;  // top-level synth bus volume
+
+// Shape personality state — null means "use defaults / let collective state drive"
+let _activeArpPool = null;  // overrides ARP_POOL while a shape is showing
+let _shapeLfoHz    = null;  // overrides coherence-driven LFO frequency while a shape is showing
 
 // Energy: 0 = ambient bed, 1 = post-drop energetic. Ramped by setSynthEnergy().
 let _energy = 0;
@@ -83,18 +121,18 @@ export async function startSynth() {
     _padLFO.connect(_padFilter.frequency);
     _padLFO.start();
 
-    const pad = new Tone.PolySynth(Tone.Synth, {
+    _pad = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
         envelope:   { attack: 4.0, decay: 2.0, sustain: 0.65, release: 8 },
         volume:     -12,
     });
-    pad.connect(_padFilter);
+    _pad.connect(_padFilter);
     _padFilter.connect(chorus);
     chorus.connect(reverb);
     reverb.connect(_padVol);
     _padVol.connect(master);
     await reverb.ready;
-    pad.triggerAttack(['A2', 'E3', 'A3', 'C4', 'E4', 'G4']);
+    _pad.triggerAttack(['A2', 'E3', 'A3', 'C4', 'E4', 'G4']);
 
     // ── Arp — random notes from A minor scale ─────────────────────────────────
     const arpDelay  = new Tone.FeedbackDelay({ delayTime: '8n', feedback: 0.5, wet: 0.6 });
@@ -118,11 +156,12 @@ export async function startSynth() {
             while (_influenceNotes.length && now - _influenceNotes[0].ts > _INFLUENCE_WINDOW_MS) {
                 _influenceNotes.shift();
             }
+            const pool = _activeArpPool ?? ARP_POOL;
             let note;
             if (_influenceNotes.length > 0 && Math.random() < _INFLUENCE_BLEND) {
                 note = _influenceNotes[Math.floor(Math.random() * _influenceNotes.length)].note;
             } else {
-                note = ARP_POOL[Math.floor(Math.random() * ARP_POOL.length)];
+                note = pool[Math.floor(Math.random() * pool.length)];
             }
             arpSynth.triggerAttackRelease(note, '16n', time);
         },
@@ -216,8 +255,8 @@ function _applyState() {
     smoothTo(_padVol.volume, Tone.gainToDb(padGain));
     smoothTo(_padFilter.frequency, PAD_FILTER_BASE + e * PAD_FILTER_ENERGY);
 
-    // LFO frequency ← coherence: converged crowd sweeps the filter faster
-    _padLFO.frequency.value = 0.05 + coh * 0.75;
+    // LFO frequency ← coherence (bypassed while a shape personality overrides it)
+    if (_shapeLfoHz === null) _padLFO.frequency.value = 0.05 + coh * 0.75;
 
     // LFO amplitude ← wind magnitude: physical tilt deepens the sweep
     const windMag = Math.min(1, Math.sqrt(_lastBiasX * _lastBiasX + _lastBiasY * _lastBiasY) / Math.SQRT2);
@@ -278,6 +317,46 @@ export function addArpInfluence(freq) {
 
 export function setSynthBusVolume(db) {
     if (_synthBus) _synthBus.volume.value = db;
+}
+
+// ── Shape personality ──────────────────────────────────────────────────────────
+// Call when an avoidmap image appears on screen. `key` is the shape filename
+// (without extension) for static assets, or 'h0'–'h4' for harmony images.
+// Swaps the arp mode, re-voices the pad chord (via its natural 4 s attack /
+// 8 s release crossfade), locks the LFO to the shape's rate, and plays a short
+// entry blinker so each shape has an immediately audible personality.
+export function setShapePersonality(key) {
+    if (!_ready) return;
+    const preset = _SHAPE_PRESETS[key];
+    if (!preset) return;
+
+    _activeArpPool = _SHAPE_POOLS[preset.pool] ?? ARP_POOL;
+    _shapeLfoHz    = preset.lfoHz;
+    _padLFO.frequency.rampTo(preset.lfoHz, 2);
+
+    // Re-voice the pad: let the old chord fade out naturally over 3 s, then
+    // attack the new voicing — the 4 s attack makes the morph smooth and slow.
+    if (_pad) {
+        const t = Tone.now();
+        _pad.releaseAll(t + 3);
+        _pad.triggerAttack(_SHAPE_CHORDS[preset.chord] ?? _SHAPE_CHORDS.default, t + 2.5);
+    }
+
+    blinker(preset.blinker);
+}
+
+// Call when the avoidmap is cleared. Restores all shape overrides to defaults.
+export function clearShapePersonality() {
+    if (!_ready) return;
+    _activeArpPool = null;
+    _shapeLfoHz    = null;
+    // Restore default pad chord — same crossfade mechanic as setShapePersonality
+    if (_pad) {
+        const t = Tone.now();
+        _pad.releaseAll(t + 3);
+        _pad.triggerAttack(_SHAPE_CHORDS.default, t + 2.5);
+    }
+    // LFO rate will be restored to coherence-driven value on the next _applyState tick
 }
 
 export function stopSynth() {

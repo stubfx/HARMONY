@@ -21,7 +21,7 @@ import champLinesWGSL   from './shaders/champLines.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
 import bloomWGSL        from './shaders/bloom.wgsl?raw';
 import glareWGSL        from './shaders/glare.wgsl?raw';
-import { startSynth, setSynthState, setSynthDroneOnly, setSynthBusVolume, setSynthEnergy, addArpInfluence, blinker, BLINKER_TYPES, playRiser, triggerImpact, speakBinary } from './synth.js';
+import { startSynth, setSynthState, setSynthDroneOnly, setSynthBusVolume, setSynthEnergy, addArpInfluence, blinker, BLINKER_TYPES, playRiser, triggerImpact, speakBinary, setShapePersonality, clearShapePersonality } from './synth.js';
 import * as ambience from './ambience.js';
 import { StoryEngine } from './storyEngine.js';
 import { STORY }       from './story.js';
@@ -633,8 +633,11 @@ const simFacade = {
         if (input) { input.value = text; renderTextAvoidMap(); }
     },
 
-    loadStaticAvoidMap(filename) { loadAvoidMap(`${_apiBase}/simAss-static/${filename}`); },
-    clearAvoidMap() { clearAvoidMap(); },
+    loadStaticAvoidMap(filename) {
+        loadAvoidMap(`${_apiBase}/simAss-static/${filename}`);
+        setShapePersonality(filename.replace(/\.[^.]+$/, '')); // key = filename without extension
+    },
+    clearAvoidMap() { clearAvoidMap(); clearShapePersonality(); },
 
     // Set direction and wind formulas (WGSL expressions). Fire-and-forget async.
     setFormulas(dir, wind) { applyFormulas(dir, wind); },
@@ -1803,6 +1806,7 @@ async function _enterHarmony(sum) {
     }
     if (_harmonyImagesEnabled && _currentHarmonyKey === sum) { // guard: sum or flag may have changed while awaiting
         await loadAvoidMap(new Blob([cached.bytes], { type: cached.mime }));
+        setShapePersonality('h' + (sum % 5));
         _startHarmonyHold();
     }
 
@@ -1817,6 +1821,7 @@ function _exitHarmony() {
     _harmonyCooldownUntil = Date.now() + _HARMONY_COOLDOWN_MIN
         + Math.random() * (_HARMONY_COOLDOWN_MAX - _HARMONY_COOLDOWN_MIN);
     if (_harmonyImagesEnabled) clearAvoidMap();
+    clearShapePersonality();
 }
 
 // Load (or reload) the image for the currently-active harmony sum.
