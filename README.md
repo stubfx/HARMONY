@@ -171,6 +171,43 @@ The coherence multiplier is applied to `turnRate` in JavaScript before writing t
 
 ---
 
+## Runtime Environment & GPU Longevity
+
+> **Target runtime: dedicated hardware with a real, native GPU. This will _never_ run in WSL2 in production.**
+>
+> **Note for future maintainers (and AI agents):** WSL2 is only ever used as a
+> development-convenience machine. Its GPU passthrough (D3D12 → Vulkan) stack is
+> flaky and is **not representative** of how the exhibit runs. Do not design fixes,
+> workarounds, or performance assumptions around WSL2 quirks. The installation
+> machine is dedicated hardware running a native browser against a native GPU.
+
+The simulation is a long-running kiosk: it renders continuously for hours (or days)
+at ~60 fps, one `device.queue.submit()` per frame. On some GPU stacks this slowly
+leaks OS resources — most visibly, on Vulkan backends, semaphore file descriptors
+(`vkGetSemaphoreFdKHR` eventually fails with `VK_ERROR_INITIALIZATION_FAILED` and
+the WebGPU device is lost). These FDs are held by the browser's **shared GPU
+process**, which survives a page reload — so a bare `location.reload()` does not
+reclaim them; only tearing down the GPU device (or restarting the browser process)
+does.
+
+**Mitigation (in `src/sim.js`):**
+
+- **`device.lost` handler** — reactive: if the device is ever lost, reload the page
+  after a short delay to obtain a fresh device.
+- **Hourly `hardReset()`** — proactive: once an hour, stop the render loop,
+  `ctx.unconfigure()`, `device.destroy()` (spec-guaranteed to destroy every buffer
+  and texture the device owns, giving the driver a deterministic chance to release
+  the FDs), then reload. **Deferred while the room is occupied** (`activeSlots`
+  non-empty) so a live show is never interrupted — it retries every 60 s until the
+  room empties.
+
+On dedicated hardware this leak may not appear at all; the hourly reset is cheap
+insurance for an unattended installation. If a device-loss ever recurs on the real
+machine despite the teardown, the reliable escalation is restarting the **browser
+process** (a kiosk wrapper) rather than the tab.
+
+---
+
 ## Story System
 
 A client-side story engine (`src/story.js` + `src/storyEngine.js`) runs autonomously inside the browser.

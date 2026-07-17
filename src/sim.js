@@ -373,6 +373,30 @@ device.lost.then(({ reason, message }) => {
     setTimeout(() => location.reload(), 3000);
 });
 
+// Proactive reload every hour to prevent Vulkan semaphore FD exhaustion
+// (vkGetSemaphoreFdKHR fails after thousands of queue.submit() calls).
+// A bare location.reload() is NOT enough: the leaked FDs live in Chrome's
+// shared GPU process, which survives a page reload. Explicitly destroying the
+// device tears down every buffer/texture it owns and gives Dawn a deterministic
+// chance to release the FDs before we reload.
+// Deferred until the room is empty so a live show is never interrupted.
+function hardReset() {
+    deviceLost = true;                      // stop the RAF loop from issuing more GPU work
+    try { ctx.unconfigure(); } catch {}
+    try { device.destroy(); } catch {}
+    // Let the GPU process actually reclaim the resources before tearing down the page.
+    setTimeout(() => location.reload(), 500);
+}
+(function scheduleHardReset() {
+    setTimeout(() => {
+        function reloadWhenIdle() {
+            if (activeSlots.length === 0) { hardReset(); return; }
+            setTimeout(reloadWhenIdle, 60_000);
+        }
+        reloadWhenIdle();
+    }, 3600 * 1000);
+})();
+
 const canvasFormat = navigator.gpu.getPreferredCanvasFormat();
 const ctx = canvas.getContext('webgpu');
 ctx.configure({
