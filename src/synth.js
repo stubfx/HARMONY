@@ -1,19 +1,22 @@
 // ── Procedural synthwave — collective-state-driven generative audio ───────────
 // Layers driven by collective state (coherence, temp, wind) and an energy level:
-//   drone  : sub-bass pedal A1 — always present
-//   pad    : PolySynth sawtooth chord + LFO filter sweep
-//              LFO frequency ← coherence (0.05–0.8 Hz)
-//              LFO amplitude ← wind magnitude (deeper with physical movement)
-//   arp    : random minor-scale melody + delay
-//              BPM ← temperature (80–140)
-//   bass   : pulsing sub-bass, post-drop — louder on colder crowd colors
-//   kick   : four-on-the-floor, post-drop — fades in with crowd frenzy (low coherence)
+//   drone      : sub-bass pedal A1 — always present
+//   colorFilter: master low-pass whose cutoff tracks temperature (cold=dark, warm=open)
+//   colorOsc   : reverb-soaked sine that glides from C2 (cold) to A2 (warm)
+//   pad        : PolySynth fatsawtooth chord + LFO filter sweep
+//                  LFO frequency ← coherence (0.05–0.8 Hz)
+//                  LFO amplitude ← wind magnitude (deeper with physical movement)
+//   arp        : random minor-scale melody + delay
+//                  BPM ← temperature (80–140)
+//   bass       : pulsing sub-bass, post-drop — only when colors are cold (cold > 0.45)
+//   kick       : four-on-the-floor, post-drop — only when crowd is frenetic (frenzy > 0.55)
 //
 // Energy (0 = ambient bed, 1 = post-drop energetic) scales pad/arp gain, pad
 // filter brightness and transport BPM, and gates the bass+kick rhythm section.
 // The generative "drop" (playRiser → triggerImpact) ramps energy to 1 to lock in
-// the elevated body. Within that body, the crowd average shapes the rhythm mix:
-// colder colors → more bass; a more scattered/frenetic crowd → more kick.
+// the elevated body. Within that body the crowd average shapes everything: the
+// master filter and color oscillator pitch respond to temperature continuously,
+// while bass/kick are emergent — they only appear when the room truly earns them.
 
 import * as Tone from 'tone';
 
@@ -71,6 +74,8 @@ let _ready = false;
 let _pad = null;  // lifted to module scope for chord re-voicing in setShapePersonality
 let _padVol, _padFilter, _padLFO, _droneVol, _arpVol, _arpSeq;
 let _kickVol, _kickLoop, _bassVol, _bassLoop;   // post-drop rhythm section
+let _colorFilter = null;  // master low-pass whose cutoff tracks crowd color temperature
+let _colorOsc    = null;  // reverb-soaked sine gliding C2 (cold) → A2 (warm)
 let _synthBus = null;  // top-level synth bus volume
 
 // Shape personality state — null means "use defaults / let collective state drive"
@@ -93,8 +98,25 @@ export async function startSynth() {
     if (_ready) return;
     await Tone.start();
 
-    _synthBus   = new Tone.Volume(0).toDestination();
-    const master = new Tone.Gain(0.75).connect(_synthBus);
+    _synthBus    = new Tone.Volume(0).toDestination();
+    // Color filter sits between master and the output bus; its cutoff tracks the
+    // crowd's average color temperature — cold colors darken the whole mix, warm
+    // colors open it up. Starts at neutral (4 kHz) and is driven by _applyState.
+    _colorFilter = new Tone.Filter({ type: 'lowpass', frequency: 4000, rolloff: -12 });
+    _colorFilter.connect(_synthBus);
+    const master = new Tone.Gain(0.75).connect(_colorFilter);
+
+    // Color oscillator — a very soft, heavily reverb-soaked sine that glides in
+    // pitch with temperature: C2 (65 Hz) when the crowd is cold, A2 (110 Hz) warm.
+    // Barely audible, more felt than heard — gives each color temperature a "voice".
+    const colorRev = new Tone.Reverb({ decay: 12, wet: 0.95 });
+    _colorOsc = new Tone.Oscillator({ type: 'sine', frequency: 65 });
+    const colorOscVol = new Tone.Volume(-32);
+    _colorOsc.connect(colorRev);
+    colorRev.connect(colorOscVol);
+    colorOscVol.connect(master);
+    await colorRev.ready;
+    _colorOsc.start();
 
     // ── Drone — sub-bass pedal A1, always on ─────────────────────────────────
     const droneReverb = new Tone.Reverb({ decay: 10, wet: 0.6 });
@@ -248,6 +270,12 @@ function _applyState() {
     // Drone — always audible
     smoothTo(_droneVol.volume, -18);
 
+    // Color modulation — driven even in droneOnly mode so the room always breathes
+    // with color. Filter: 1.2 kHz (cold/dark) → 12 kHz (warm/bright), gentle -12 rolloff.
+    // Color oscillator: C2 (65 Hz) cold → A2 (110 Hz) warm — one consonant 5th glide.
+    if (_colorFilter) _colorFilter.frequency.rampTo(1200 + tmp * 10800, 3);
+    if (_colorOsc)    _colorOsc.frequency.rampTo(65 * Math.pow(110 / 65, tmp), 4);
+
     if (_droneOnly) return; // PHASE 1: solo drone, gli altri layer restano silenziosi
 
     // Pad — louder and brighter with energy
@@ -275,13 +303,18 @@ function _applyState() {
     const cold   = 1 - tmp;   // 0 warm … 1 cold
     const frenzy = 1 - coh;   // 0 ordered/calm … 1 scattered/frenetic
 
-    // Bass: present across the body, louder on colder colors (0.25× warm → 0.80× cold).
-    const bassGain = e * (0.25 + 0.55 * cold);
-    smoothTo(_bassVol.volume, e > 0.001 ? Tone.gainToDb(bassGain) : SILENT);
+    // Bass — only emerges when colors are genuinely cold (dead zone 0–0.45).
+    // Smooth ramp above the threshold so it feels like something waking up, not a switch.
+    const bassLevel = Math.max(0, (cold - 0.45) / 0.55);   // 0 at warm → 1 at fully cold
+    const bassGain  = e * 0.8 * bassLevel;
+    smoothTo(_bassVol.volume, (e > 0.001 && bassLevel > 0.01) ? Tone.gainToDb(bassGain) : SILENT);
 
-    // Kick: silent on a calm/ordered crowd, fading in with frenzy up to ~0.85×.
-    const kickGain = e * 0.85 * frenzy;
-    smoothTo(_kickVol.volume, (e > 0.001 && frenzy > 0.03) ? Tone.gainToDb(kickGain) : SILENT);
+    // Kick — only emerges when the crowd is genuinely frenetic (dead zone 0–0.55).
+    // The wide dead zone keeps it absent during typical play and reserves it for
+    // peak chaos so it never feels like a constant disco beat.
+    const kickLevel = Math.max(0, (frenzy - 0.55) / 0.45); // 0 at calm → 1 at full frenzy
+    const kickGain  = e * 0.85 * kickLevel;
+    smoothTo(_kickVol.volume, (e > 0.001 && kickLevel > 0.01) ? Tone.gainToDb(kickGain) : SILENT);
 
     // Arp tempo ← temperature (+ energy boost): higher = faster arpeggiation
     Tone.getTransport().bpm.value = BPM_MIN + tmp * BPM_TEMP_RANGE + e * BPM_ENERGY_BOOST;
@@ -364,6 +397,7 @@ export function stopSynth() {
     _arpSeq?.stop();
     _kickLoop?.stop();
     _bassLoop?.stop();
+    _colorOsc?.stop();
     Tone.getTransport().stop();
     Tone.getDestination().volume.setTargetAtTime(SILENT, Tone.now(), 0.5);
     setTimeout(() => {
@@ -411,59 +445,67 @@ export async function blinker(type = 'sonar') {
 export const BLINKER_TYPES = Object.keys(BLINKER_PRESETS);
 
 // ── Generative "drop" — riser build-up + impact ───────────────────────────────
-// playRiser() is a rising build voice; triggerImpact() resolves it into a body
-// hit and locks in the energetic state via setSynthEnergy(1). Both are one-shot,
-// auto-disposing voices modelled on blinker(); story.js fires them around the
-// PHASE 3 red reveal so the color lands like an EDM drop.
+// playRiser() is an organic harmonic build — staggered sine voices that swell and
+// rise in pitch together, fitting the particle simulation's ambient aesthetic.
+// triggerImpact() resolves it: sub boom + blinker + energy lock.
+// story.js fires them at the PHASE 3 red reveal.
 
-const RISER_NOISE_PEAK = 0.35; // band-passed noise gain at the top of the build
-const RISER_TONE_PEAK  = 0.30; // sweeping tone gain at the top of the build
-const RISER_DUCK_DB    = -12;  // synth bus duck at the height of the build (contrast)
-
-// A build voice: band-passed white noise + a saw tone whose pitch and filter
-// cutoff sweep upward while the volume swells over `durationMs`. Auto-disposes.
+// A build voice: four staggered sine harmonics rising in pitch + a barely-audible
+// pink noise undertow. No sawtooth, no band-swept white noise — feels organic
+// rather than "EDM spiky". Auto-disposes after durationMs + tail.
 export async function playRiser(durationMs = 4000) {
     await Tone.start();
     const dur = durationMs / 1000;
     const t   = Tone.now();
 
-    // Band-passed white noise sweeping up
-    const noise     = new Tone.Noise('white');
-    const noiseBP   = new Tone.Filter({ type: 'bandpass', Q: 2, frequency: 400 });
+    const rev = new Tone.Reverb({ decay: 8, wet: 0.92 });
+    rev.toDestination();
+    await rev.ready;
+
+    // Choir of A-minor harmonics — each entry delayed and rising from its start
+    // pitch to a 5th or 4th above. The stagger creates a choir-like unfurl.
+    const voices = [
+        { f0: 110, f1: 165, peak: 0.10, delay: 0.0 },  // A2 → E3
+        { f0: 165, f1: 220, peak: 0.08, delay: 0.6 },  // E3 → A3
+        { f0: 220, f1: 294, peak: 0.06, delay: 1.2 },  // A3 → D4
+        { f0: 277, f1: 370, peak: 0.04, delay: 1.8 },  // C#4 → F#4 (tension)
+    ];
+    const nodes = voices.map(({ f0, f1, peak, delay }) => {
+        const osc  = new Tone.Oscillator({ type: 'sine', frequency: f0 });
+        const gain = new Tone.Gain(0.0001);
+        osc.connect(gain); gain.connect(rev);
+        osc.start(t + delay);
+        osc.frequency.setValueAtTime(f0, t + delay);
+        osc.frequency.linearRampToValueAtTime(f1, t + dur);
+        gain.gain.setValueAtTime(0.0001, t + delay);
+        gain.gain.linearRampToValueAtTime(peak, t + dur - 0.3);
+        gain.gain.linearRampToValueAtTime(peak * 0.5, t + dur);
+        osc.stop(t + dur + 0.5);
+        return { osc, gain };
+    });
+
+    // Pink noise undertow — filtered low, very quiet, just adds body
+    const noise     = new Tone.Noise('pink');
+    const noiseLPF  = new Tone.Filter({ type: 'lowpass', frequency: 500 });
     const noiseGain = new Tone.Gain(0.0001);
-    noise.connect(noiseBP); noiseBP.connect(noiseGain); noiseGain.toDestination();
+    noise.connect(noiseLPF); noiseLPF.connect(noiseGain); noiseGain.connect(rev);
     noise.start(t);
-    noiseBP.frequency.setValueAtTime(400, t);
-    noiseBP.frequency.exponentialRampToValueAtTime(6000, t + dur);
     noiseGain.gain.setValueAtTime(0.0001, t);
-    noiseGain.gain.exponentialRampToValueAtTime(RISER_NOISE_PEAK, t + dur);
+    noiseGain.gain.linearRampToValueAtTime(0.02, t + dur);
+    noise.stop(t + dur);
 
-    // Saw tone whose pitch and filter cutoff sweep upward
-    const tone     = new Tone.Oscillator({ type: 'sawtooth', frequency: 110 });
-    const toneFilt = new Tone.Filter({ type: 'lowpass', frequency: 400 });
-    const toneGain = new Tone.Gain(0.0001);
-    tone.connect(toneFilt); toneFilt.connect(toneGain); toneGain.toDestination();
-    tone.start(t);
-    tone.frequency.setValueAtTime(110, t);
-    tone.frequency.exponentialRampToValueAtTime(880, t + dur);
-    toneFilt.frequency.setValueAtTime(400, t);
-    toneFilt.frequency.exponentialRampToValueAtTime(8000, t + dur);
-    toneGain.gain.setValueAtTime(0.0001, t);
-    toneGain.gain.exponentialRampToValueAtTime(RISER_TONE_PEAK, t + dur);
-
-    // Duck the generative bed during the build for contrast; triggerImpact restores it.
+    // Gentle bed duck — less aggressive than before (-6 vs -12 dB)
     if (_synthBus) {
         _synthBus.volume.cancelScheduledValues(t);
         _synthBus.volume.setValueAtTime(_synthBus.volume.value, t);
-        _synthBus.volume.linearRampToValueAtTime(RISER_DUCK_DB, t + dur * 0.85);
+        _synthBus.volume.linearRampToValueAtTime(-6, t + dur * 0.85);
     }
 
-    noise.stop(t + dur);
-    tone.stop(t + dur);
     setTimeout(() => {
-        noise.dispose(); noiseBP.dispose(); noiseGain.dispose();
-        tone.dispose();  toneFilt.dispose(); toneGain.dispose();
-    }, durationMs + 300);
+        rev.dispose();
+        nodes.forEach(({ osc, gain }) => { osc.dispose(); gain.dispose(); });
+        noise.dispose(); noiseLPF.dispose(); noiseGain.dispose();
+    }, durationMs + 3000);
 }
 
 // The impact at the end of the riser: a deep sub boom + a bright transient, then
