@@ -628,6 +628,11 @@ const simFacade = {
         if (_harmonyActive) clearAvoidMap();
     },
 
+    // When set, _exitHarmony() loads this static image instead of clearing the
+    // avoidmap — keeps e.g. the AANT logo visible whenever no harmony image is shown.
+    setHarmonyFallback(filename) { _harmonyFallback = filename; },
+    clearHarmonyFallback()       { _harmonyFallback = null; },
+
     setTraceText(text) {
         const input = document.querySelector('#trace-text-input');
         if (input) { input.value = text; renderTextAvoidMap(); }
@@ -654,7 +659,7 @@ const simFacade = {
 
     // Generative "drop" — the PHASE 3 red reveal build-up and impact.
     // playRiser starts the build; triggerImpact resolves it and adds a visual punch.
-    playRiser(durationMs) { playRiser(durationMs); },
+    playRiser(durationMs, variant) { playRiser(durationMs, variant); },
     triggerImpact() {
         triggerImpact();
         burstBrightness = BURST_BRIGHTNESS;
@@ -1658,11 +1663,12 @@ const _FORMULA_MIN_INTERVAL = 5000;   // movement formulas change at most once e
 let _harmonyActive        = false;
 let _harmonyImagesEnabled = false;  // when false, harmony images are suppressed (enabled per-phase)
 let _currentHarmonyKey    = -1;     // active sum value, -1 = no harmony
+let _harmonyFallback      = null;   // static filename loaded when a harmony image exits (e.g. 'aant_logo.png')
 const _harmonyFetching    = new Set(); // sums currently being fetched
 let _harmonyHeld          = false;  // pins the shown image so it can't flash away on rapid note changes
 let _harmonyHoldTimer     = null;
-const _HARMONY_HOLD_MIN   = 3000;   // once an image is shown, keep it 3–10 s even as notes change
-const _HARMONY_HOLD_MAX   = 10000;
+const _HARMONY_HOLD_MIN   = 6000;   // once an image is shown, keep it 6–20 s even as notes change
+const _HARMONY_HOLD_MAX   = 20000;
 let _harmonyCooldownUntil = 0;      // after an image disappears, block a new one until this time
 const _HARMONY_COOLDOWN_MIN = 15000; // 15–20 s quiet gap between images
 const _HARMONY_COOLDOWN_MAX = 20000;
@@ -1820,8 +1826,18 @@ function _exitHarmony() {
     // Image just disappeared: enforce a 15–20 s quiet gap before the next one.
     _harmonyCooldownUntil = Date.now() + _HARMONY_COOLDOWN_MIN
         + Math.random() * (_HARMONY_COOLDOWN_MAX - _HARMONY_COOLDOWN_MIN);
-    if (_harmonyImagesEnabled) clearAvoidMap();
-    clearShapePersonality();
+    if (_harmonyImagesEnabled) {
+        if (_harmonyFallback) {
+            // Load the fallback static image (e.g. aant_logo) instead of going blank.
+            loadAvoidMap(`${_apiBase}/simAss-static/${_harmonyFallback}`);
+            setShapePersonality(_harmonyFallback.replace(/\.[^.]+$/, ''));
+        } else {
+            clearAvoidMap();
+            clearShapePersonality();
+        }
+    } else {
+        clearShapePersonality();
+    }
 }
 
 // Load (or reload) the image for the currently-active harmony sum.

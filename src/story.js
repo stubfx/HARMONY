@@ -1,4 +1,4 @@
-import { PHASE, RESEED } from './constants.js';
+import { PHASE } from './constants.js';
 
 // ─── Phase audio ─────────────────────────────────────────────────────────────
 // No phase uses recorded narration any more. Every phase announces itself by
@@ -44,8 +44,8 @@ const RISER_MS = 4000;
 
 // Total play window for PHASE 3 (ms). Harmony + colors are shown for this long
 // so users can play out before the drop advances the story. The riser fires at
-// PHASE3_PLAY_MS − RISER_MS so the drop lands exactly at the 1-minute mark.
-const PHASE3_PLAY_MS = 60_000;
+// PHASE3_PLAY_MS − RISER_MS so the drop lands exactly at the 2-minute mark.
+const PHASE3_PLAY_MS = 120_000;
 
 // How long a narration-free phase holds after its binary cue before it acts
 // (advances, or — where a phase used to wait on an audio 'ended' event — proceeds
@@ -77,11 +77,14 @@ export const STORY = [
             log('utente connesso — totale: ' + userCount);
             sim.activateChunk(1);
             if (userCount === 1) {
-                log(`primo utente — hold ${Math.round(PHASE_CUE_HOLD_MS / 1000)}s → PHASE 2.`);
+                // Start both ambient blinkers and user blip events immediately so
+                // the room feels alive during the 40 s hold before the story moves.
+                sim.startBlinkersLoop();
+                log('primo utente — blip avviati. hold 40s → PHASE 2.');
                 this._timer = setTimeout(() => {
-                    log('hold scaduto — avanzamento a PHASE 2.');
+                    log('hold 40s scaduto — avanzamento a PHASE 2.');
                     sim.next();
-                }, PHASE_CUE_HOLD_MS);
+                }, 40_000);
             }
         },
         exit(sim) {
@@ -270,20 +273,54 @@ export const STORY = [
     },
 
     // ── PHASE 8 — CLOSING ─────────────────────────────────────────────────────
-    // Last step — no next(). No narration; the sim speaks its phase number as a
-    // binary cue over the closing.
-    // The AANT logo replaces the HARMONY text as the avoid map: harmony images are
-    // disabled first so a note change can't overwrite it, the text input is cleared,
-    // then the static logo is loaded (it owns the avoid map and won't be cleared).
+    // AANT logo shown as default avoidmap; harmony images stay enabled so note
+    // combinations can pop images over the logo. When an image exits, the fallback
+    // restores aant_logo automatically (via _exitHarmony → setHarmonyFallback).
+    // Binary cue 8, then PHASE_CUE_HOLD_MS hold → PHASE 9 (ambient finale).
     {
         id: PHASE.P8,
         enter(sim) {
-            log('PHASE 8 — chiusura. logo AANT come avoid map. cue binario 8. fine storia.');
-            sim.disableHarmonyImages();
+            log('PHASE 8 — chiusura. logo AANT + immagini harmony abilitate. cue binario 8. → PHASE 9 tra 5s.');
             sim.setTraceText('');
+            sim.enableHarmonyImages();
+            sim.setHarmonyFallback('aant_logo.png');
             sim.loadStaticAvoidMap('aant_logo.png');
             sim.speakPhase(this.id);
+            this._timer = setTimeout(() => {
+                log('hold PHASE 8 scaduto — avanzamento a PHASE 9.');
+                sim.next();
+            }, PHASE_CUE_HOLD_MS);
         },
-        exit(sim) {},
+        exit(sim) {
+            log('uscita PHASE 8.');
+            clearTimeout(this._timer);
+            // Fallback stays active into PHASE 9 — cleared only when PHASE 9 exits (restart).
+        },
+    },
+
+    // ── PHASE 9 — AMBIENT FINALE ──────────────────────────────────────────────
+    // True final step — no next(). Inherits harmony images + aant_logo fallback
+    // from PHASE 8. A random riser plays every ~40 s (36–44 s, ±4 s jitter),
+    // each time picking a random variant so successive risers sound distinct.
+    {
+        id: PHASE.P9,
+        enter(sim) {
+            log('PHASE 9 — finale ambientale. riser ogni ~40s. nessun avanzamento.');
+            this._scheduleRiser(sim);
+        },
+        _scheduleRiser(sim) {
+            const ms = 36_000 + Math.random() * 8_000;  // 36–44 s
+            this._riserTimer = setTimeout(() => {
+                const dur = 3500 + Math.random() * 1500; // 3.5–5 s
+                log(`PHASE 9 — riser variante casuale (${(dur / 1000).toFixed(1)}s).`);
+                sim.playRiser(dur);                       // no variant arg → random pick
+                this._scheduleRiser(sim);                 // reschedule
+            }, ms);
+        },
+        exit(sim) {
+            log('uscita PHASE 9 (restart).');
+            clearTimeout(this._riserTimer);
+            sim.clearHarmonyFallback();
+        },
     },
 ];

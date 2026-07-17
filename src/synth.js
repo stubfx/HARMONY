@@ -444,17 +444,53 @@ export async function blinker(type = 'sonar') {
 
 export const BLINKER_TYPES = Object.keys(BLINKER_PRESETS);
 
-// ── Generative "drop" — riser build-up + impact ───────────────────────────────
-// playRiser() is an organic harmonic build — staggered sine voices that swell and
-// rise in pitch together, fitting the particle simulation's ambient aesthetic.
-// triggerImpact() resolves it: sub boom + blinker + energy lock.
-// story.js fires them at the PHASE 3 red reveal.
+// ── Generative riser — variant-parameterized harmonic build ───────────────────
+// playRiser(durationMs, variant?) builds organic tension: staggered sine choir
+// whose voices rise in pitch over the duration, plus an optional noise undertow.
+// Called with no variant it picks randomly from RISER_VARIANTS — each call in
+// PHASE 9's loop sounds distinct. PHASE 3 uses the default (warm).
+// triggerImpact() resolves the PHASE 3 drop.
 
-// A build voice: four staggered sine harmonics rising in pitch + a barely-audible
-// pink noise undertow. No sawtooth, no band-swept white noise — feels organic
-// rather than "EDM spiky". Auto-disposes after durationMs + tail.
-export async function playRiser(durationMs = 4000) {
+// Each voice is defined as ratios relative to the variant's rootHz so the same
+// shape plays at any pitch. sr = start ratio, er = end ratio (both × rootHz).
+const RISER_VARIANTS = [
+    // warm — A2 root, A minor harmonics, the default — familiar and building
+    { rootHz: 110, voices: [
+        { sr: 1.000, er: 1.500, peak: 0.10, delay: 0.0 },
+        { sr: 1.500, er: 2.000, peak: 0.08, delay: 0.6 },
+        { sr: 2.000, er: 2.667, peak: 0.06, delay: 1.2 },
+        { sr: 2.518, er: 3.364, peak: 0.04, delay: 1.8 },
+    ], noise: 'pink', noiseLevel: 0.020, duckDb: -6 },
+
+    // sparse — E2 root, 3 open-fifth voices, no noise — spacious and slow
+    { rootHz: 82, voices: [
+        { sr: 1.000, er: 1.500, peak: 0.09, delay: 0.0 },
+        { sr: 1.500, er: 2.000, peak: 0.07, delay: 0.8 },
+        { sr: 2.000, er: 3.000, peak: 0.05, delay: 1.6 },
+    ], noise: null, noiseLevel: 0, duckDb: -4 },
+
+    // tense — D2 root, dissonant intervals (m2, tritone) — unsettling, searching
+    { rootHz: 73, voices: [
+        { sr: 1.000, er: 1.125, peak: 0.08, delay: 0.0 },
+        { sr: 1.125, er: 1.414, peak: 0.07, delay: 0.5 },
+        { sr: 1.414, er: 2.000, peak: 0.06, delay: 1.0 },
+        { sr: 2.000, er: 2.828, peak: 0.04, delay: 1.5 },
+    ], noise: 'pink', noiseLevel: 0.025, duckDb: -8 },
+
+    // high — A3 root (octave above warm), airy and bright — like light opening
+    { rootHz: 220, voices: [
+        { sr: 1.000, er: 1.333, peak: 0.08, delay: 0.0 },
+        { sr: 1.333, er: 1.500, peak: 0.06, delay: 0.7 },
+        { sr: 1.500, er: 2.000, peak: 0.05, delay: 1.4 },
+        { sr: 2.000, er: 2.500, peak: 0.03, delay: 2.0 },
+    ], noise: 'pink', noiseLevel: 0.015, duckDb: -5 },
+];
+
+// A build voice: staggered sine harmonics rising in pitch + optional noise undertow.
+// Pass a variant object to specify character; omit to pick randomly.
+export async function playRiser(durationMs = 4000, variant) {
     await Tone.start();
+    const v   = variant ?? RISER_VARIANTS[Math.floor(Math.random() * RISER_VARIANTS.length)];
     const dur = durationMs / 1000;
     const t   = Tone.now();
 
@@ -462,15 +498,9 @@ export async function playRiser(durationMs = 4000) {
     rev.toDestination();
     await rev.ready;
 
-    // Choir of A-minor harmonics — each entry delayed and rising from its start
-    // pitch to a 5th or 4th above. The stagger creates a choir-like unfurl.
-    const voices = [
-        { f0: 110, f1: 165, peak: 0.10, delay: 0.0 },  // A2 → E3
-        { f0: 165, f1: 220, peak: 0.08, delay: 0.6 },  // E3 → A3
-        { f0: 220, f1: 294, peak: 0.06, delay: 1.2 },  // A3 → D4
-        { f0: 277, f1: 370, peak: 0.04, delay: 1.8 },  // C#4 → F#4 (tension)
-    ];
-    const nodes = voices.map(({ f0, f1, peak, delay }) => {
+    const nodes = v.voices.map(({ sr, er, peak, delay }) => {
+        const f0   = v.rootHz * sr;
+        const f1   = v.rootHz * er;
         const osc  = new Tone.Oscillator({ type: 'sine', frequency: f0 });
         const gain = new Tone.Gain(0.0001);
         osc.connect(gain); gain.connect(rev);
@@ -484,27 +514,29 @@ export async function playRiser(durationMs = 4000) {
         return { osc, gain };
     });
 
-    // Pink noise undertow — filtered low, very quiet, just adds body
-    const noise     = new Tone.Noise('pink');
-    const noiseLPF  = new Tone.Filter({ type: 'lowpass', frequency: 500 });
-    const noiseGain = new Tone.Gain(0.0001);
-    noise.connect(noiseLPF); noiseLPF.connect(noiseGain); noiseGain.connect(rev);
-    noise.start(t);
-    noiseGain.gain.setValueAtTime(0.0001, t);
-    noiseGain.gain.linearRampToValueAtTime(0.02, t + dur);
-    noise.stop(t + dur);
+    let noiseNodes = null;
+    if (v.noise && v.noiseLevel > 0) {
+        const noise     = new Tone.Noise(v.noise);
+        const noiseLPF  = new Tone.Filter({ type: 'lowpass', frequency: 500 });
+        const noiseGain = new Tone.Gain(0.0001);
+        noise.connect(noiseLPF); noiseLPF.connect(noiseGain); noiseGain.connect(rev);
+        noise.start(t);
+        noiseGain.gain.setValueAtTime(0.0001, t);
+        noiseGain.gain.linearRampToValueAtTime(v.noiseLevel, t + dur);
+        noise.stop(t + dur);
+        noiseNodes = { noise, noiseLPF, noiseGain };
+    }
 
-    // Gentle bed duck — less aggressive than before (-6 vs -12 dB)
     if (_synthBus) {
         _synthBus.volume.cancelScheduledValues(t);
         _synthBus.volume.setValueAtTime(_synthBus.volume.value, t);
-        _synthBus.volume.linearRampToValueAtTime(-6, t + dur * 0.85);
+        _synthBus.volume.linearRampToValueAtTime(v.duckDb, t + dur * 0.85);
     }
 
     setTimeout(() => {
         rev.dispose();
         nodes.forEach(({ osc, gain }) => { osc.dispose(); gain.dispose(); });
-        noise.dispose(); noiseLPF.dispose(); noiseGain.dispose();
+        if (noiseNodes) { noiseNodes.noise.dispose(); noiseNodes.noiseLPF.dispose(); noiseNodes.noiseGain.dispose(); }
     }, durationMs + 3000);
 }
 
