@@ -613,7 +613,17 @@ const simFacade = {
 
     setParam(key, val) { params[key] = val; },
     setStatus(s) { setStatus(s); },
-    setColorMode(mode) { simState.colorMode = mode; updateStateDisplay(); colorModeCtrl?.updateDisplay(); },
+    setColorMode(mode) {
+        simState.colorMode = mode;
+        if (mode === 'NORMAL') {
+            _targetColorBlend = 1.0;
+        } else {
+            _targetColorBlend = 0.0;
+            smoothColorBlend  = 0.0;
+        }
+        updateStateDisplay();
+        colorModeCtrl?.updateDisplay();
+    },
 
     suppressImages()  { _avoidMapSuppressed = true;  },
     restoreImages()   { _avoidMapSuppressed = false; },
@@ -2558,6 +2568,9 @@ let collectiveCoherence = 0.5; // target coherence [0=chaos … 1=order] (from t
 
 let smoothTemp        = 0.5;
 let smoothCoherence   = 0.5;
+let smoothColorBlend  = 0.0;  // actual value sent to the shader each frame
+let _targetColorBlend = 0.0;  // 0 = gray, 1 = color
+const COLOR_BLEND_TC  = 2.0;  // EMA time constant in seconds (~6 s to reach 95%)
 let _lastSynthTick    = 0;    // throttle: call setSynthState at most every 200ms
 
 // ── Join burst state ──────────────────────────────────────────────────────────
@@ -2580,6 +2593,8 @@ function writeSoloUB(dt, time) {
     const a = Math.exp(-dt / 0.8);
     smoothTemp      = smoothTemp      * a + collectiveTemp      * (1 - a);
     smoothCoherence = smoothCoherence * a + collectiveCoherence * (1 - a);
+    const colorA    = Math.exp(-dt / COLOR_BLEND_TC);
+    smoothColorBlend = smoothColorBlend * colorA + _targetColorBlend * (1 - colorA);
 
     // Decay join brightness pulse exponentially each frame
     burstBrightness *= BURST_DECAY;
@@ -2785,9 +2800,8 @@ function writeBlitUB() {
     _blitF[2] = params.toneWhite;
     _blitF[3] = params.toneGamma;
     _blitF[4] = params.shadowBoost;
-    _blitU[5] = simState.colorMode === 'GRAYSCALE'          ? 1
-              : simState.colorMode === 'GRAYSCALE_INVERTED' ? 2
-              : 0;
+    _blitF[5] = smoothColorBlend;
+    _blitU[6] = simState.colorMode === 'GRAYSCALE_INVERTED' ? 1 : 0;
     device.queue.writeBuffer(blitUB, 0, _blitAB);
 }
 
