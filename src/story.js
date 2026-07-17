@@ -312,14 +312,21 @@ export const STORY = [
             const ms = 36_000 + Math.random() * 8_000;  // 36–44 s
             this._riserTimer = setTimeout(() => {
                 const dur = 3500 + Math.random() * 1500; // 3.5–5 s
-                log(`PHASE 9 — riser variante casuale (${(dur / 1000).toFixed(1)}s).`);
-                sim.playRiser(dur);                       // no variant arg → random pick
-                this._scheduleRiser(sim);                 // reschedule
+                log(`PHASE 9 — freeroam + riser variante casuale (${(dur / 1000).toFixed(1)}s).`);
+                sim.setStatus('FREEROAM');
+                sim.playRiser(dur);
+                this._restoreTimer = setTimeout(() => {
+                    sim.setStatus('NORMAL');
+                    log('PHASE 9 — riser terminato, ritorno a NORMAL.');
+                }, dur);
+                this._scheduleRiser(sim);
             }, ms);
         },
         exit(sim) {
             log('uscita PHASE 9 (restart).');
             clearTimeout(this._riserTimer);
+            clearTimeout(this._restoreTimer);
+            sim.setStatus('NORMAL');
             sim.clearHarmonyFallback();
         },
     },

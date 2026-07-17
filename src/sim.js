@@ -612,6 +612,7 @@ const simFacade = {
     next: () => storyEngine.next(),
 
     setParam(key, val) { params[key] = val; },
+    setStatus(s) { setStatus(s); },
     setColorMode(mode) { simState.colorMode = mode; updateStateDisplay(); colorModeCtrl?.updateDisplay(); },
 
     suppressImages()  { _avoidMapSuppressed = true;  },
