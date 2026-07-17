@@ -42,6 +42,11 @@ const log = (msg) => console.log(`[story] ${msg}`);
 // colour reveal both fire when this timer elapses, so they land perfectly synced.
 const RISER_MS = 4000;
 
+// Total play window for PHASE 3 (ms). Harmony + colors are shown for this long
+// so users can play out before the drop advances the story. The riser fires at
+// PHASE3_PLAY_MS − RISER_MS so the drop lands exactly at the 1-minute mark.
+const PHASE3_PLAY_MS = 60_000;
+
 // How long a narration-free phase holds after its binary cue before it acts
 // (advances, or — where a phase used to wait on an audio 'ended' event — proceeds
 // to its next step). The cue plays near the start of this window. Matches PHASE 6's
@@ -139,41 +144,44 @@ export const STORY = [
     },
 
     // ── PHASE 3 ───────────────────────────────────────────────────────────────
-    // NORMAL color → HARMONY text immediately → 10s timer → harmony images → binary cue 3.
-    // After a PHASE_CUE_HOLD_MS hold: a RISER_MS build-up (riser) resolves into a
-    // synced drop — impact + red colour reveal fire together → PHASE 4.
+    // Colors revealed + HARMONY text immediately → 10s → harmony images + binary
+    // cue 3. Users play freely for the rest of the PHASE3_PLAY_MS window (1 min
+    // from enter). Riser fires at minute − RISER_MS so the drop lands exactly at
+    // 60 s → red reveal + PHASE 4.
     {
         id: PHASE.P3,
         enter(sim) {
             sim.setColorMode('NORMAL');
             sim.setParam('champLinesAlpha', 0.02);
-            // HARMONY text fades in only after a 7–10s timer, like the harmony images.
             const textDelay = 7000 + Math.random() * 3000;
             this._textTimer = setTimeout(() => sim.setTraceText('HARMONY'), textDelay);
-            log(`PHASE 3. testo HARMONY tra ${Math.round(textDelay / 1000)}s. immagini e cue tra 10s.`);
-            this._respawnTimer = setTimeout(() => {
+            log(`PHASE 3. testo HARMONY tra ${Math.round(textDelay / 1000)}s. immagini e cue tra 10s. riser tra ${Math.round((PHASE3_PLAY_MS - RISER_MS) / 1000)}s. drop a ${Math.round(PHASE3_PLAY_MS / 1000)}s.`);
+            // At 10 s: open harmony images and speak cue 3
+            this._cueTimer = setTimeout(() => {
                 log('10s scaduti — immagini harmony abilitate. dotRespawnChance abilitato (0.002). cue binario 3.');
                 sim.enableHarmonyImages();
                 sim.setParam('dotRespawnChance', 0.002);
                 sim.speakPhase(this.id);
-                this._cueHoldTimer = setTimeout(() => {
-                    log(`cue terminato. riser ${Math.round(RISER_MS / 1000)}s → drop → PHASE 4.`);
-                    sim.playRiser(RISER_MS);
-                    this._riserTimer = setTimeout(() => {
-                        log('drop — impact + color1=#ff0000 color2=#ff0000. avanzamento a PHASE 4.');
-                        sim.triggerImpact();
-                        sim.freezeParams({ color1: '#ff0000', color2: '#ff0000' });
-                        sim.next();
-                    }, RISER_MS);
-                }, PHASE_CUE_HOLD_MS);
             }, 10_000);
+            // At 60 s − RISER_MS: start the riser
+            this._riserTimer = setTimeout(() => {
+                log(`riser ${Math.round(RISER_MS / 1000)}s avviato.`);
+                sim.playRiser(RISER_MS);
+            }, PHASE3_PLAY_MS - RISER_MS);
+            // At 60 s: drop → red reveal → PHASE 4
+            this._dropTimer = setTimeout(() => {
+                log('drop — impact + color1=#ff0000 color2=#ff0000. avanzamento a PHASE 4.');
+                sim.triggerImpact();
+                sim.freezeParams({ color1: '#ff0000', color2: '#ff0000' });
+                sim.next();
+            }, PHASE3_PLAY_MS);
         },
         exit(sim) {
             log('uscita PHASE 3.');
             clearTimeout(this._textTimer);
-            clearTimeout(this._respawnTimer);
-            clearTimeout(this._cueHoldTimer);
+            clearTimeout(this._cueTimer);
             clearTimeout(this._riserTimer);
+            clearTimeout(this._dropTimer);
             // Harmony images stay enabled from here on (intentionally not disabled).
             sim.thawParams();
         },
