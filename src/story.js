@@ -320,6 +320,7 @@ export const STORY = [
                 sim.playRiser(dur);
                 this._restoreTimer = setTimeout(() => {
                     sim.setStatus('NORMAL');
+                    sim.resolveRiser();
                     log('PHASE 9 — riser terminato, ritorno a NORMAL.');
                 }, dur);
                 this._scheduleRiser(sim);

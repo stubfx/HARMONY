@@ -21,7 +21,7 @@ import champLinesWGSL   from './shaders/champLines.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
 import bloomWGSL        from './shaders/bloom.wgsl?raw';
 import glareWGSL        from './shaders/glare.wgsl?raw';
-import { startSynth, setSynthState, setSynthDroneOnly, setSynthBusVolume, setSynthEnergy, addArpInfluence, blinker, BLINKER_TYPES, playRiser, triggerImpact, speakBinary, setShapePersonality, clearShapePersonality } from './synth.js';
+import { startSynth, setSynthState, setSynthDroneOnly, setSynthBusVolume, setSynthEnergy, addArpInfluence, blinker, BLINKER_TYPES, playRiser, triggerImpact, resolveRiser, speakBinary, setShapePersonality, clearShapePersonality } from './synth.js';
 import * as ambience from './ambience.js';
 import { StoryEngine } from './storyEngine.js';
 import { STORY }       from './story.js';
@@ -673,7 +673,9 @@ const simFacade = {
 
     // Generative "drop" — the PHASE 3 red reveal build-up and impact.
     // playRiser starts the build; triggerImpact resolves it and adds a visual punch.
+    // resolveRiser() is the lighter resolution for PHASE 9 and harmony risers.
     playRiser(durationMs, variant) { playRiser(durationMs, variant); },
+    resolveRiser() { resolveRiser(); },
     triggerImpact() {
         triggerImpact();
         burstBrightness = BURST_BRIGHTNESS;
@@ -1677,6 +1679,7 @@ const _FORMULA_MIN_INTERVAL = 5000;   // movement formulas change at most once e
 let _harmonyActive        = false;
 let _harmonyImagesEnabled = false;  // when false, harmony images are suppressed (enabled per-phase)
 let _currentHarmonyKey    = -1;     // active sum value, -1 = no harmony
+let _harmonyImageShown    = false;  // true only after loadAvoidMap completes; gates the exit cooldown
 let _harmonyFallback      = null;   // static filename loaded when a harmony image exits (e.g. 'aant_logo.png')
 let _harmonyRiserResetFn  = null;   // called when a harmony riser fires so PHASE 9 can reset its own timer
 const _harmonyFetching    = new Set(); // sums currently being fetched
@@ -1811,18 +1814,27 @@ async function _enterHarmony(sum) {
     if (_harmonyActive && _currentHarmonyKey === sum) return;
     _harmonyActive     = true;
     _currentHarmonyKey = sum;
+    _harmonyImageShown = false;
 
     // Fetch/cache the image. Happens concurrently with the upcoming riser so the
     // reveal lands as soon as the riser finishes, even if the fetch takes a moment.
     let cached = await _harmonyDbRead(sum);
     if (!cached) {
-        if (_harmonyFetching.has(sum)) return; // fetch already in flight for this sum
+        if (_harmonyFetching.has(sum)) {
+            // Another call is already fetching this sum. Reset state and bail —
+            // the in-flight call will complete and load the image when done.
+            _harmonyActive     = false;
+            _currentHarmonyKey = -1;
+            return;
+        }
         _harmonyFetching.add(sum);
         try {
             cached = await _fetchIdleImageBytes();
             await _harmonyDbWrite(sum, cached.bytes, cached.mime);
         } catch (e) {
             console.warn('[harmony] enter sum', sum, 'failed:', e.message);
+            _harmonyActive     = false;
+            _currentHarmonyKey = -1;
             return;
         } finally {
             _harmonyFetching.delete(sum);
@@ -1843,7 +1855,9 @@ async function _enterHarmony(sum) {
     if (!_harmonyImagesEnabled || _currentHarmonyKey !== sum) return;
 
     await loadAvoidMap(new Blob([cached.bytes], { type: cached.mime }));
-    setShapePersonality('h' + (sum % 5));
+    _harmonyImageShown = true;
+    resolveRiser();                        // beat + bus restore at the reveal moment
+    setShapePersonality('h' + (sum % 5)); // personality blinker fires right after blip
     _startHarmonyHold();
 }
 
@@ -1852,9 +1866,13 @@ function _exitHarmony() {
     if (!_harmonyActive) return;
     _harmonyActive     = false;
     _currentHarmonyKey = -1;
-    // Image just disappeared: enforce a 15–20 s quiet gap before the next one.
-    _harmonyCooldownUntil = Date.now() + _HARMONY_COOLDOWN_MIN
-        + Math.random() * (_HARMONY_COOLDOWN_MAX - _HARMONY_COOLDOWN_MIN);
+    // Only enforce a quiet gap when an image was actually shown; releasing notes
+    // during the riser (before the image appeared) should not impose a cooldown.
+    if (_harmonyImageShown) {
+        _harmonyCooldownUntil = Date.now() + _HARMONY_COOLDOWN_MIN
+            + Math.random() * (_HARMONY_COOLDOWN_MAX - _HARMONY_COOLDOWN_MIN);
+        _harmonyImageShown = false;
+    }
     if (_harmonyImagesEnabled) {
         if (_harmonyFallback) {
             // Load the fallback static image (e.g. aant_logo) instead of going blank.
@@ -1881,6 +1899,7 @@ async function _loadCurrentHarmonyImage() {
     }
     if (_harmonyActive && _harmonyImagesEnabled && _currentHarmonyKey === sum) {
         await loadAvoidMap(new Blob([cached.bytes], { type: cached.mime }));
+        _harmonyImageShown = true;
         _startHarmonyHold();
     }
 }

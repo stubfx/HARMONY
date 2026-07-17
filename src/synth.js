@@ -540,6 +540,18 @@ export async function playRiser(durationMs = 4000, variant) {
     }, durationMs + 3000);
 }
 
+// Restore the ducked synth bus and fire a short beat at the end of any riser
+// that is not followed by triggerImpact (i.e. PHASE 9 and harmony risers).
+export function resolveRiser() {
+    blinker('blip');
+    if (_synthBus) {
+        const t = Tone.now();
+        _synthBus.volume.cancelScheduledValues(t);
+        _synthBus.volume.setValueAtTime(_synthBus.volume.value, t);
+        _synthBus.volume.linearRampToValueAtTime(0, t + 0.3);
+    }
+}
+
 // The impact at the end of the riser: a deep sub boom + a bright transient, then
 // setSynthEnergy(1) to lock in the energetic body and restore the ducked bed.
 export async function triggerImpact() {
