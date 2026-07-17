@@ -516,17 +516,21 @@ function _initNoteCanvas() {
                 _blip = null;               // ignored — auto-expire and reschedule
                 _scheduleBlip();
             } else {
-                const col   = _currentStep >= 2 ? pushedColor : '#ffffff';
-                const r     = _blip.r * (1 + 0.15 * Math.sin(ts * 0.006)); // attention pulse
+                // Neutral white, never the pushed color: the canvas is screen-blended,
+                // so a colored dot over a same-hue aura washes out. White always lifts.
+                const pulse = 0.5 + 0.5 * Math.sin(ts * 0.005);            // 0..1, gentle
+                const r     = _blip.r * (1 + 0.08 * Math.sin(ts * 0.006)); // subtle breathe
                 ctx2d.save();
-                ctx2d.globalAlpha = 0.55;
-                ctx2d.fillStyle   = col;
+                ctx2d.fillStyle   = '#ffffff';
+                ctx2d.strokeStyle = '#ffffff';
+                // Faint core
+                ctx2d.globalAlpha = 0.10 + 0.05 * pulse;
                 ctx2d.beginPath();
-                ctx2d.arc(_blip.x, _blip.y, r * 0.45, 0, Math.PI * 2);
+                ctx2d.arc(_blip.x, _blip.y, r * 0.5, 0, Math.PI * 2);
                 ctx2d.fill();
-                ctx2d.globalAlpha = 0.9;
-                ctx2d.strokeStyle = col;
-                ctx2d.lineWidth   = 3;
+                // Thin, delicate ring
+                ctx2d.globalAlpha = 0.30 + 0.15 * pulse;
+                ctx2d.lineWidth   = 1.5;
                 ctx2d.beginPath();
                 ctx2d.arc(_blip.x, _blip.y, r, 0, Math.PI * 2);
                 ctx2d.stroke();
@@ -539,11 +543,10 @@ function _initNoteCanvas() {
             if (k >= 1) {
                 _blipPop = null;
             } else {
-                const col = _currentStep >= 2 ? pushedColor : '#ffffff';
                 ctx2d.save();
-                ctx2d.globalAlpha = (1 - k) * 0.9;
-                ctx2d.strokeStyle = col;
-                ctx2d.lineWidth   = 1 + 4 * (1 - k);
+                ctx2d.globalAlpha = (1 - k) * 0.6;   // softer than before
+                ctx2d.strokeStyle = '#ffffff';       // match the delicate white target
+                ctx2d.lineWidth   = 1 + 3 * (1 - k);
                 ctx2d.beginPath();
                 ctx2d.arc(_blipPop.x, _blipPop.y, _blipPop.r * (1 + 1.5 * k), 0, Math.PI * 2); // r → 2.5r
                 ctx2d.stroke();
