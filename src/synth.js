@@ -6,10 +6,14 @@
 //              LFO amplitude ← wind magnitude (deeper with physical movement)
 //   arp    : random minor-scale melody + delay
 //              BPM ← temperature (80–140)
+//   bass   : pulsing sub-bass, post-drop — louder on colder crowd colors
+//   kick   : four-on-the-floor, post-drop — fades in with crowd frenzy (low coherence)
 //
 // Energy (0 = ambient bed, 1 = post-drop energetic) scales pad/arp gain, pad
-// filter brightness and transport BPM. The generative "drop" (playRiser →
-// triggerImpact) ramps energy to 1 to lock in the elevated body.
+// filter brightness and transport BPM, and gates the bass+kick rhythm section.
+// The generative "drop" (playRiser → triggerImpact) ramps energy to 1 to lock in
+// the elevated body. Within that body, the crowd average shapes the rhythm mix:
+// colder colors → more bass; a more scattered/frenetic crowd → more kick.
 
 import * as Tone from 'tone';
 
@@ -32,7 +36,7 @@ const ARP_POOL = ['A3','B3','C4','D4','E4','F4','G4','A4','B4','C5','E5','G5'];
 
 let _ready = false;
 let _padVol, _padFilter, _padLFO, _droneVol, _arpVol, _arpSeq;
-let _bassVol, _bassLoop;   // post-drop rhythm layer
+let _kickVol, _kickLoop, _bassVol, _bassLoop;   // post-drop rhythm section
 let _synthBus = null;  // top-level synth bus volume
 
 // Energy: 0 = ambient bed, 1 = post-drop energetic. Ramped by setSynthEnergy().
@@ -126,7 +130,23 @@ export async function startSynth() {
         '8n',
     );
 
-    // ── Bass — rounded sub-bass on quarter notes, gated by energy (silent until the drop) ─
+    // ── Kick — four-on-the-floor pulse, faded in by crowd frenzy (see _applyState) ─
+    const kickReverb = new Tone.Reverb({ decay: 1.5, wet: 0.12 });
+    _kickVol = new Tone.Volume(SILENT);
+    const kick = new Tone.MembraneSynth({
+        pitchDecay: 0.045,
+        octaves:    5,
+        oscillator: { type: 'sine' },
+        envelope:   { attack: 0.001, decay: 0.35, sustain: 0, release: 0.2 },
+        volume:     -4,
+    });
+    kick.connect(kickReverb);
+    kickReverb.connect(_kickVol);
+    _kickVol.connect(master);
+    await kickReverb.ready;
+    _kickLoop = new Tone.Loop((time) => { kick.triggerAttackRelease('C1', '8n', time); }, '4n');
+
+    // ── Bass — rounded sub-bass on quarter notes, swelled by colder colors (see _applyState) ─
     _bassVol = new Tone.Volume(SILENT);
     const bassFilter = new Tone.Filter({ frequency: 220, type: 'lowpass', rolloff: -24 });
     const bass = new Tone.Synth({
@@ -143,6 +163,7 @@ export async function startSynth() {
 
     Tone.getTransport().bpm.value = 110;
     _arpSeq.start(0);
+    _kickLoop.start(0);
     _bassLoop.start(0);
     Tone.getTransport().start();
 
@@ -206,10 +227,22 @@ function _applyState() {
     const arpGain = ARP_GAIN_BASE + e * ARP_GAIN_ENERGY;
     smoothTo(_arpVol.volume, Tone.gainToDb(arpGain));
 
-    // Bass — the post-drop rhythm. Silent at rest (energy 0), it fades in with
-    // energy so the environment shifts from the drop on — kept low so it grounds
-    // the body without driving it.
-    smoothTo(_bassVol.volume, e > 0.001 ? Tone.gainToDb(e * 0.35) : SILENT);
+    // ── Rhythm section — only in the post-drop body (scaled by energy) ───────────
+    // Two crowd-average signals shape the mix so it breathes with the room:
+    //   • colder average color (low temp) swells the grounded sub-bass
+    //   • a more scattered / frenetic crowd (low coherence) fades in the kick
+    // The kick being frenzy-gated keeps it from feeling like a constant disco beat:
+    // it only drives when the crowd itself is agitated.
+    const cold   = 1 - tmp;   // 0 warm … 1 cold
+    const frenzy = 1 - coh;   // 0 ordered/calm … 1 scattered/frenetic
+
+    // Bass: present across the body, louder on colder colors (0.25× warm → 0.80× cold).
+    const bassGain = e * (0.25 + 0.55 * cold);
+    smoothTo(_bassVol.volume, e > 0.001 ? Tone.gainToDb(bassGain) : SILENT);
+
+    // Kick: silent on a calm/ordered crowd, fading in with frenzy up to ~0.85×.
+    const kickGain = e * 0.85 * frenzy;
+    smoothTo(_kickVol.volume, (e > 0.001 && frenzy > 0.03) ? Tone.gainToDb(kickGain) : SILENT);
 
     // Arp tempo ← temperature (+ energy boost): higher = faster arpeggiation
     Tone.getTransport().bpm.value = BPM_MIN + tmp * BPM_TEMP_RANGE + e * BPM_ENERGY_BOOST;
@@ -250,6 +283,7 @@ export function setSynthBusVolume(db) {
 export function stopSynth() {
     if (!_ready) return;
     _arpSeq?.stop();
+    _kickLoop?.stop();
     _bassLoop?.stop();
     Tone.getTransport().stop();
     Tone.getDestination().volume.setTargetAtTime(SILENT, Tone.now(), 0.5);
