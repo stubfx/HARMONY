@@ -300,12 +300,15 @@ export const STORY = [
 
     // ── PHASE 9 — AMBIENT FINALE ──────────────────────────────────────────────
     // True final step — no next(). Inherits harmony images + aant_logo fallback
-    // from PHASE 8. A random riser plays every ~40 s (36–44 s, ±4 s jitter),
-    // each time picking a random variant so successive risers sound distinct.
+    // from PHASE 8. A random riser plays every ~40 s (36–44 s jitter), each time
+    // picking a random variant. When a harmony combination is hit, _enterHarmony
+    // plays its own riser and calls back here to reset the P9 timer so they never
+    // fire simultaneously.
     {
         id: PHASE.P9,
         enter(sim) {
             log('PHASE 9 — finale ambientale. riser ogni ~40s. nessun avanzamento.');
+            sim.setHarmonyRiserResetCallback(() => this._rescheduleRiser(sim));
             this._scheduleRiser(sim);
         },
         _scheduleRiser(sim) {
@@ -322,11 +325,19 @@ export const STORY = [
                 this._scheduleRiser(sim);
             }, ms);
         },
+        // Called by the harmony reset callback — clears the pending timer and
+        // starts a fresh 36–44 s countdown so the next P9 riser doesn't overlap
+        // with the harmony riser that just fired.
+        _rescheduleRiser(sim) {
+            clearTimeout(this._riserTimer);
+            this._scheduleRiser(sim);
+        },
         exit(sim) {
             log('uscita PHASE 9 (restart).');
             clearTimeout(this._riserTimer);
             clearTimeout(this._restoreTimer);
             sim.setStatus('NORMAL');
+            sim.setHarmonyRiserResetCallback(null);
             sim.clearHarmonyFallback();
         },
     },

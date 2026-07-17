@@ -633,6 +633,9 @@ const simFacade = {
     // avoidmap — keeps e.g. the AANT logo visible whenever no harmony image is shown.
     setHarmonyFallback(filename) { _harmonyFallback = filename; },
     clearHarmonyFallback()       { _harmonyFallback = null; },
+    // Register a callback that fires whenever a harmony riser starts, so external
+    // phases (e.g. PHASE 9) can reset their own riser timers to avoid overlaps.
+    setHarmonyRiserResetCallback(fn) { _harmonyRiserResetFn = fn; },
 
     setTraceText(text) {
         const input = document.querySelector('#trace-text-input');
@@ -1665,6 +1668,7 @@ let _harmonyActive        = false;
 let _harmonyImagesEnabled = false;  // when false, harmony images are suppressed (enabled per-phase)
 let _currentHarmonyKey    = -1;     // active sum value, -1 = no harmony
 let _harmonyFallback      = null;   // static filename loaded when a harmony image exits (e.g. 'aant_logo.png')
+let _harmonyRiserResetFn  = null;   // called when a harmony riser fires so PHASE 9 can reset its own timer
 const _harmonyFetching    = new Set(); // sums currently being fetched
 let _harmonyHeld          = false;  // pins the shown image so it can't flash away on rapid note changes
 let _harmonyHoldTimer     = null;
@@ -1797,6 +1801,9 @@ async function _enterHarmony(sum) {
     if (_harmonyActive && _currentHarmonyKey === sum) return;
     _harmonyActive     = true;
     _currentHarmonyKey = sum;
+
+    // Fetch/cache the image. Happens concurrently with the upcoming riser so the
+    // reveal lands as soon as the riser finishes, even if the fetch takes a moment.
     let cached = await _harmonyDbRead(sum);
     if (!cached) {
         if (_harmonyFetching.has(sum)) return; // fetch already in flight for this sum
@@ -1811,12 +1818,23 @@ async function _enterHarmony(sum) {
             _harmonyFetching.delete(sum);
         }
     }
-    if (_harmonyImagesEnabled && _currentHarmonyKey === sum) { // guard: sum or flag may have changed while awaiting
-        await loadAvoidMap(new Blob([cached.bytes], { type: cached.mime }));
-        setShapePersonality('h' + (sum % 5));
-        _startHarmonyHold();
-    }
 
+    // Guard: sum or flag may have changed while awaiting the fetch
+    if (!_harmonyImagesEnabled || _currentHarmonyKey !== sum) return;
+
+    // Play a riser to announce the combination, then reveal the image at the peak.
+    // Reset any external riser timer (e.g. PHASE 9) to avoid simultaneous risers.
+    const riserDur = 3500 + Math.random() * 1500; // 3.5–5 s, same range as PHASE 9
+    if (_harmonyRiserResetFn) _harmonyRiserResetFn();
+    playRiser(riserDur);
+    await new Promise(r => setTimeout(r, riserDur));
+
+    // Guard again — user may have changed notes during the riser
+    if (!_harmonyImagesEnabled || _currentHarmonyKey !== sum) return;
+
+    await loadAvoidMap(new Blob([cached.bytes], { type: cached.mime }));
+    setShapePersonality('h' + (sum % 5));
+    _startHarmonyHold();
 }
 
 
