@@ -30,6 +30,34 @@
             </div>
         </header>
         <div id="audio-warning" class="hidden">⚠ audio locked — sim needs a user interaction before it can play sound</div>
+
+        <!-- A. Status header (live mirror) -->
+        <section id="status-header">
+            <div id="phase-line">
+                <span id="phase-code">—</span>
+                <span id="phase-label"></span>
+                <span id="phase-count"></span>
+            </div>
+            <div id="status-chips"></div>
+            <div id="status-meta">
+                <span class="meta-label">spectators online</span>
+                <span id="spectator-count">—</span>
+            </div>
+            <div id="vote-panel" class="hidden">
+                <div class="vote-tally">
+                    <div class="vote-side vote-a">
+                        <span class="vote-opt" id="vote-a-label">A</span>
+                        <span class="vote-num" id="vote-a-num">0</span>
+                    </div>
+                    <div class="vote-countdown"><span id="vote-time">—</span><span class="vote-time-unit">s</span></div>
+                    <div class="vote-side vote-b">
+                        <span class="vote-opt" id="vote-b-label">B</span>
+                        <span class="vote-num" id="vote-b-num">0</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <main id="controls"></main>
     </div>
 

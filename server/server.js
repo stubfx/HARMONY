@@ -80,6 +80,7 @@ function getOrCreateRoom(roomId) {
             votes:        new Map(), // socketId  → choice string (one vote per spectator)
             audioLocked:  null,      // null = unknown; true/false reported by sim
             storyStep:    -1,        // current story step index; -1 = not started
+            simState:     null,      // last full state snapshot from the sim (for admin mirror)
         });
     }
     return rooms.get(roomId);
@@ -186,6 +187,14 @@ io.on('connection', (socket) => {
         io.to(`${assignedRoom}:admin`).emit('audio-state', { locked: room.audioLocked });
     });
 
+    // Sim reports a full live-state snapshot so the admin panel can mirror it.
+    socket.on('sim-state', (data) => {
+        const room = assignedRoom ? rooms.get(assignedRoom) : null;
+        if (!room?.hostSockets.has(socket.id)) return;
+        room.simState = data;
+        io.to(`${assignedRoom}:admin`).emit('sim-state', data);
+    });
+
 
     // ── Admin controller ──────────────────────────────────────────────────────
     let adminAuthorized = false;
@@ -207,6 +216,7 @@ io.on('connection', (socket) => {
         const existingRoom = rooms.get(targetRoom);
         socket.emit('spectator-count', { count: existingRoom?.connections.size ?? 0 });
         if (existingRoom?.audioLocked != null) socket.emit('audio-state', { locked: existingRoom.audioLocked });
+        if (existingRoom?.simState) socket.emit('sim-state', existingRoom.simState);
         console.log('[socket] admin registered  room:', targetRoom);
     });
 

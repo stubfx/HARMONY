@@ -1611,6 +1611,7 @@ function updateStateDisplay() {
     colorModeCtrl?.updateDisplay();
     stateCtrl?.updateDisplay();
     qrStateCtrl?.updateDisplay();
+    emitSimState();
 }
 
 let freeroamTimer = null;
@@ -2228,12 +2229,42 @@ function _startVoteTimer(status) {
     }
 }
 
+// ── Live-state mirror for the admin panel ─────────────────────────────────────
+// A full snapshot of the sim's authoritative state. The admin reflects this
+// verbatim, so every operator-visible field lives here in one place.
+function _simStatePayload() {
+    return {
+        phaseIndex: storyEngine.index,
+        phaseId:    storyEngine.stepId,
+        phaseLabel: storyEngine.current?.label ?? null,
+        phaseCount: storyEngine.length,
+        mode:       simState.mode,
+        status:     simState.status,
+        colorMode:  simState.colorMode,
+        stepStatus: simState.stepStatus,
+        qrStatus:   simState.qrStatus,
+        qrAlignX:   params.qrAlignX,
+        qrAlignY:   params.qrAlignY,
+        optionA:    simState.optionA,
+        optionB:    simState.optionB,
+        votesA:     simState.votesA,
+        votesB:     simState.votesB,
+        voteEndTime: simState.voteEndTime,
+        audioLocked: isAudioLocked(),
+    };
+}
+
+function emitSimState() {
+    if (socket?.connected) socket.emit('sim-state', _simStatePayload());
+}
+
 // Merge server-provided params into the live simulation.
 // Only numeric/boolean keys present in the payload are applied;
 // if formulas are included they re-trigger pipeline compilation.
 function applySimParams(data) {
     const { dir, wind, restart, clearTrace, showQR, traceText, clearText, status, avoidMap,
             step, stepStatus, optionA, optionB, preshow,
+            gotoPhase, storyNext, storyPrev, storyStart, capture,
             audio, audioFormat, audiobg, audiobgFormat, audiobgLoop, mode, colorMode, ...rest } = data;
 
     if (audio    !== undefined) playAudio(audio    || null, audioFormat)                              .catch(e => console.warn('[audio]',    e));
@@ -2260,7 +2291,7 @@ function applySimParams(data) {
         _startVoteTimer(simState.stepStatus);
         socket.emit('remote-ui', _remoteUiPayload());
     }
-    if (mode === 'SHOWCASE') {
+    if (mode === 'SHOWCASE' || mode === 'STORY') {
         simState.mode = mode;
         updateStateDisplay();
     }
@@ -2271,6 +2302,13 @@ function applySimParams(data) {
     if (status === 'NORMAL' || status === 'FREEROAM' || status === 'DOT') {
         setStatus(status);
     }
+    // Story navigation — operator override. Mirrors the engine calls the GUI uses;
+    // onGoto emits story-step + sim-state, so the admin gets immediate confirmation.
+    if (typeof gotoPhase === 'number') storyEngine.goto(gotoPhase);
+    if (storyNext  === true) storyEngine.next();
+    if (storyPrev  === true) storyEngine.goto(storyEngine.index - 1);
+    if (storyStart === true) storyEngine.start();
+    if (capture    === true) _captureRequested = true;
     if (preshow === true)  storyEngine.start();
     if (preshow === false) simFacade.reseed();
     if (restart)              seedAgents();
@@ -2348,7 +2386,13 @@ autoScaleCtrl.updateDisplay();
 storyEngine.onGoto = (i) => {
     storyPhaseCtrl.updateDisplay();
     socket?.emit('story-step', { step: i });
+    emitSimState();
 };
+
+// Keep the admin's vote countdown fresh and re-hydrate it if it (re)connects
+// mid-show. The state snapshot is cheap and the transport drops it when no admin
+// is listening, so a steady 1 s cadence is fine.
+setInterval(emitSimState, 1000);
 
 stateCtrl.onChange(v => setStatus(v));
 qrStateCtrl.onChange(() => { updateStateDisplay(); updateQROverlay(); });

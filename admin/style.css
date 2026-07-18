@@ -84,6 +84,7 @@ html, body {
     position: sticky;
     top: 0;
     z-index: 40;
+    min-height: 46px;
     background: #09090b;
     border-bottom: 1px solid #1c1c1e;
     padding: 14px 16px;
@@ -120,7 +121,7 @@ html, body {
 }
 
 #controls {
-    padding: 20px 16px env(safe-area-inset-bottom, 32px);
+    padding: 16px 16px env(safe-area-inset-bottom, 32px);
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -129,27 +130,121 @@ html, body {
     width: 100%;
 }
 
-/* ── Spectator count ────────────────────────────────────────────────────────── */
-.stat-block {
-    background: #18181b;
-    border: 1px solid #27272a;
-    border-radius: 14px;
-    padding: 16px 20px;
+/* ── A. Status header (live mirror) ─────────────────────────────────────────── */
+#status-header {
+    position: sticky;
+    top: 46px;
+    z-index: 39;
+    background: #09090b;
+    border-bottom: 1px solid #1c1c1e;
+    padding: 14px 16px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 480px;
+    margin: 0 auto;
+    width: 100%;
+}
+#phase-line {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+#phase-code {
+    font-size: 1.5rem;
+    color: #4ade80;
+    letter-spacing: 0.04em;
+}
+#phase-label {
+    font-size: 1.1rem;
+    color: #e4e4e7;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+#phase-count {
+    margin-left: auto;
+    font-size: 0.8rem;
+    color: #52525b;
+}
+
+/* Status chips */
+#status-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.chip {
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 5px 9px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+}
+.chip-ok    { background: #0f2417; color: #4ade80; border-color: #14532d; }
+.chip-cyan  { background: #0c2430; color: #7dd3fc; border-color: #155e75; }
+.chip-amber { background: #2b1c02; color: #fcd34d; border-color: #78530a; }
+.chip-muted { background: #18181b; color: #71717a; border-color: #27272a; }
+
+#status-meta {
     display: flex;
     align-items: center;
     justify-content: space-between;
 }
-.stat-label {
-    font-size: 0.72rem;
+.meta-label {
+    font-size: 0.68rem;
     color: #52525b;
     letter-spacing: 0.12em;
     text-transform: uppercase;
 }
-.stat-count {
-    font-size: 1.6rem;
+#spectator-count {
+    font-size: 1.1rem;
     color: #e4e4e7;
-    letter-spacing: -0.02em;
 }
+
+/* Vote sub-panel in the header */
+#vote-panel {
+    background: #18181b;
+    border: 1px solid #78530a;
+    border-radius: 12px;
+    padding: 12px;
+}
+.vote-tally {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+.vote-side {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    flex: 1;
+    min-width: 0;
+}
+.vote-opt {
+    font-size: 0.68rem;
+    color: #a1a1aa;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vote-num  { font-size: 1.6rem; color: #e4e4e7; }
+.vote-a .vote-num { color: #7dd3fc; }
+.vote-b .vote-num { color: #fcd34d; }
+.vote-countdown {
+    display: flex;
+    align-items: baseline;
+    gap: 1px;
+    color: #fcd34d;
+}
+.vote-countdown #vote-time { font-size: 1.4rem; }
+.vote-time-unit { font-size: 0.7rem; color: #78530a; }
 
 /* ── Section label ──────────────────────────────────────────────────────────── */
 .section-label {
@@ -307,3 +402,166 @@ input[type="range"]::-moz-range-thumb {
 }
 .btn-preset:active { background: #27272a; color: #e4e4e7; }
 .btn-preset.active { background: #27272a; color: #e4e4e7; border-color: #52525b; }
+
+/* ── B. Phase navigator ─────────────────────────────────────────────────────── */
+.transport-row {
+    display: flex;
+    gap: 8px;
+}
+.transport-btn {
+    flex: 1;
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 12px;
+    padding: 16px 8px;
+    font-family: inherit;
+    font-size: 0.82rem;
+    color: #a1a1aa;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+}
+.transport-btn:active { background: #27272a; color: #e4e4e7; }
+.transport-restart { color: #7dd3fc; border-color: #1e3a5f; }
+
+.phase-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+.phase-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    aspect-ratio: 1.35;
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+    padding: 4px;
+}
+.phase-cell:active { background: #27272a; }
+.phase-cell.active {
+    background: #0f2417;
+    border-color: #4ade80;
+    box-shadow: inset 0 0 0 1px #4ade80;
+}
+.phase-cell-code {
+    font-size: 0.95rem;
+    color: #e4e4e7;
+    letter-spacing: 0.04em;
+}
+.phase-cell.active .phase-cell-code { color: #4ade80; }
+.phase-cell-label {
+    font-size: 0.5rem;
+    color: #52525b;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-align: center;
+    line-height: 1.1;
+}
+
+/* ── C. Spectator step-modes ────────────────────────────────────────────────── */
+.chip-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+}
+.chip-btn {
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 10px;
+    padding: 14px 4px;
+    font-family: inherit;
+    font-size: 0.66rem;
+    color: #71717a;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+}
+.chip-btn:active { background: #27272a; color: #a1a1aa; }
+.chip-btn.active {
+    background: #27272a;
+    color: #e4e4e7;
+    border-color: #52525b;
+}
+
+/* Vote option inputs */
+.vote-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: #18181b;
+    border: 1px solid #78530a;
+    border-radius: 12px;
+    padding: 12px;
+}
+.btn-vote { background: #2b1c02; color: #fcd34d; border: 1px solid #78530a; }
+
+/* ── F. Emergency extras ────────────────────────────────────────────────────── */
+.btn-shot { background: #0f172a; color: #7dd3fc; border: 1px solid #1e3a5f; }
+
+/* ── Text inputs ────────────────────────────────────────────────────────────── */
+.text-input-wrap { flex: 1; min-width: 0; }
+.text-input {
+    width: 100%;
+    background: #09090b;
+    border: 1px solid #3f3f46;
+    border-radius: 10px;
+    padding: 14px 12px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    color: #e4e4e7;
+    outline: none;
+    -webkit-appearance: none;
+}
+.text-input:focus { border-color: #71717a; }
+.text-row { display: flex; gap: 8px; align-items: stretch; }
+.btn-small {
+    background: #27272a;
+    border: 1px solid #3f3f46;
+    border-radius: 10px;
+    padding: 0 18px;
+    font-family: inherit;
+    font-size: 0.75rem;
+    color: #a1a1aa;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+.btn-small:active { background: #3f3f46; color: #e4e4e7; }
+
+/* ── G. Advanced (collapsed) ────────────────────────────────────────────────── */
+.advanced {
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 14px;
+    overflow: hidden;
+}
+.advanced summary {
+    padding: 18px 16px;
+    font-size: 0.66rem;
+    color: #52525b;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    cursor: pointer;
+    list-style: none;
+    -webkit-tap-highlight-color: transparent;
+}
+.advanced summary::-webkit-details-marker { display: none; }
+.advanced summary::after { content: ' ▾'; color: #3f3f46; }
+.advanced[open] summary::after { content: ' ▴'; }
+.advanced-inner {
+    padding: 0 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}

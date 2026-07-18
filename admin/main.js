@@ -1,6 +1,8 @@
 // ─── Admin control page ──────────────────────────────────────────────────────
-// Safety-net panel for a show operator: mode, step status, QR, audio mute,
-// spectator count, heartbeat trigger, formula presets, agent speed.
+// Phone-first live show-driver for the HARMONY sim. Mirrors the sim's true state
+// (phase / mode / status / colorMode / stepStatus / qr / votes) and drives the
+// story engine, spectator step-modes, voting, QR, color/status, plus guarded
+// emergency controls and a collapsed advanced-tuning area.
 // URL: /admin/?s=<session-id>
 
 import './style.css';
@@ -20,6 +22,19 @@ const sessionLabel  = document.querySelector('#session-label');
 const controlsEl    = document.querySelector('#controls');
 const audioWarning  = document.querySelector('#audio-warning');
 
+// Status-header refs (live mirror)
+const phaseCodeEl   = document.querySelector('#phase-code');
+const phaseLabelEl  = document.querySelector('#phase-label');
+const phaseCountEl  = document.querySelector('#phase-count');
+const chipsEl       = document.querySelector('#status-chips');
+const spectatorEl   = document.querySelector('#spectator-count');
+const votePanelEl   = document.querySelector('#vote-panel');
+const voteALabelEl  = document.querySelector('#vote-a-label');
+const voteBLabelEl  = document.querySelector('#vote-b-label');
+const voteANumEl    = document.querySelector('#vote-a-num');
+const voteBNumEl    = document.querySelector('#vote-b-num');
+const voteTimeEl    = document.querySelector('#vote-time');
+
 const socketUrl = import.meta.env.DEV
     ? `http://localhost:${import.meta.env.VITE_SERVER_PORT ?? 3000}`
     : (import.meta.env.VITE_SOCKET_URL || '/');
@@ -30,6 +45,9 @@ const _authBase = import.meta.env.DEV
 
 let socket     = null;
 let adminToken = sessionStorage.getItem('admin-token');
+
+// Latest sim-state snapshot — the single source of truth for every highlight.
+let _state = null;
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 authForm?.addEventListener('submit', async (e) => {
@@ -73,10 +91,14 @@ function connectSocket() {
         connDot?.classList.remove('connected');
     });
     socket.on('spectator-count', ({ count }) => {
-        if (_spectatorCountEl) _spectatorCountEl.textContent = count;
+        if (spectatorEl) spectatorEl.textContent = count;
     });
     socket.on('audio-state', ({ locked }) => {
         audioWarning?.classList.toggle('hidden', !locked);
+    });
+    socket.on('sim-state', (state) => {
+        _state = state;
+        renderMirror(state);
     });
     socket.on('disconnect',    () => connDot?.classList.remove('connected'));
     socket.on('connect_error', () => connDot?.classList.remove('connected'));
@@ -116,8 +138,41 @@ const PRESETS = [
     { label: 'radial pulse', dir: 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI', wind: 'sin(x * 0.004 - y * 0.003 + t * 0.4) * TWO_PI' },
 ];
 
-// ── Spectator count display ref ───────────────────────────────────────────────
-let _spectatorCountEl = null;
+// ── Phase catalogue (index → code/label) — filled from the first sim-state ─────
+const PHASES = [
+    { code: 'P1', label: 'CONNECTION' },
+    { code: 'P2', label: 'THE NOTE' },
+    { code: 'P3', label: 'HARMONY' },
+    { code: 'P4', label: 'HEART' },
+    { code: 'P5', label: 'STORM' },
+    { code: 'P6', label: 'BIG BANG' },
+    { code: 'P7', label: 'TEXT' },
+    { code: 'P8', label: 'CLOSING' },
+    { code: 'P9', label: 'AMBIENT FINALE' },
+];
+
+const STEP_MODES = ['HARMONY', 'IDLE', 'DRAW', 'VOTE', 'PULSE', 'TEXT', 'RAISE', 'WAVE'];
+
+// Chip color classes per state field. Value → semantic class.
+const CHIP_TONE = {
+    mode:      { STORY: 'ok',   SHOWCASE: 'cyan' },
+    status:    { NORMAL: 'ok',  FREEROAM: 'amber', DOT: 'cyan' },
+    colorMode: { NORMAL: 'ok',  GRAYSCALE: 'muted', GRAYSCALE_INVERTED: 'muted' },
+    stepStatus:{ VOTE: 'amber' },
+    qrStatus:  { SHOW: 'cyan',  HIDE: 'muted' },
+};
+
+// ── Highlight registry ────────────────────────────────────────────────────────
+// name → { key: sim-state field, buttons: Map(value → element) }
+const groups  = {};
+let qrCells   = [];          // QR position grid cells (dataset.x / dataset.y)
+let voteInputsWrap = null;   // vote option inputs, revealed when VOTE is picked
+
+function registerGroup(name, key) {
+    const g = { key, buttons: new Map() };
+    groups[name] = g;
+    return g;
+}
 
 // ── Build UI ──────────────────────────────────────────────────────────────────
 function showAdmin() {
@@ -131,114 +186,181 @@ function showAdmin() {
 function buildUI() {
     controlsEl.innerHTML = '';
 
-    // ── Spectator count ───────────────────────────────────────────────────────
-    const statEl = document.createElement('div');
-    statEl.className = 'stat-block';
-    const statLabel = document.createElement('span');
-    statLabel.className = 'stat-label';
-    statLabel.textContent = 'spectators online';
-    const statCount = document.createElement('span');
-    statCount.className = 'stat-count';
-    statCount.textContent = '—';
-    statEl.appendChild(statLabel);
-    statEl.appendChild(statCount);
-    controlsEl.appendChild(statEl);
-    _spectatorCountEl = statCount;
+    buildPhaseNavigator();   // B
+    buildStepModes();        // C
+    buildQR();               // D
+    buildGlobalVisual();     // E
+    buildEmergency();        // F
+    buildAdvanced();         // G
+}
 
-    // ── Restart + full reset ──────────────────────────────────────────────────
-    const actionRow = document.createElement('div');
-    actionRow.className = 'btn-row';
+// ── B. Phase navigator ─────────────────────────────────────────────────────────
+function buildPhaseNavigator() {
+    controlsEl.appendChild(mkLabel('Phase navigator'));
 
-    const restartBtn = document.createElement('button');
-    restartBtn.className   = 'btn-big btn-reset';
-    restartBtn.textContent = '↺  restart agents';
-    restartBtn.addEventListener('click', () => {
-        if (window.confirm('Restart all agents?')) send({ restart: true });
+    // Transport row
+    const transport = document.createElement('div');
+    transport.className = 'transport-row';
+    transport.appendChild(mkTransportBtn('← prev',        () => send({ storyPrev: true })));
+    transport.appendChild(mkTransportBtn('next →',        () => send({ storyNext: true })));
+    transport.appendChild(mkTransportBtn('↺ restart',     () => send({ mode: 'STORY', storyStart: true }), 'restart'));
+    controlsEl.appendChild(transport);
+
+    // 3×3 phase grid
+    const grid = document.createElement('div');
+    grid.className = 'phase-grid';
+    const g = registerGroup('phase', 'phaseIndex');
+    PHASES.forEach(({ code, label }, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'phase-cell';
+        btn.innerHTML = `<span class="phase-cell-code">${code}</span><span class="phase-cell-label">${label}</span>`;
+        btn.addEventListener('click', () => send({ gotoPhase: i }));
+        g.buttons.set(i, btn);
+        grid.appendChild(btn);
     });
+    controlsEl.appendChild(grid);
 
-    const fullResetBtn = document.createElement('button');
-    fullResetBtn.className   = 'btn-big btn-danger';
-    fullResetBtn.textContent = '⊘  full reset';
-    fullResetBtn.addEventListener('click', () => {
-        if (!window.confirm('Full reset: restart agents + clear trace + hide QR?')) return;
-        send({ restart: true, clearTrace: true, showQR: false, caption: '' });
+    // STORY ⇄ SHOWCASE toggle
+    controlsEl.appendChild(mkStateBtnGroup('mode', 'mode', [
+        { label: 'STORY',    value: 'STORY',    params: { mode: 'STORY', storyStart: true } },
+        { label: 'SHOWCASE', value: 'SHOWCASE', params: { mode: 'SHOWCASE' } },
+    ]));
+}
+
+// ── C. Spectator step-modes ──────────────────────────────────────────────────
+function buildStepModes() {
+    controlsEl.appendChild(mkLabel('Spectator step-mode'));
+
+    const g = registerGroup('stepStatus', 'stepStatus');
+    const grid = document.createElement('div');
+    grid.className = 'chip-grid';
+    STEP_MODES.forEach((mode) => {
+        const btn = document.createElement('button');
+        btn.className   = 'chip-btn';
+        btn.textContent = mode;
+        btn.addEventListener('click', () => {
+            if (mode === 'VOTE') { toggleVoteInputs(true); return; }
+            toggleVoteInputs(false);
+            send({ stepStatus: mode });
+        });
+        g.buttons.set(mode, btn);
+        grid.appendChild(btn);
     });
+    controlsEl.appendChild(grid);
 
-    actionRow.appendChild(restartBtn);
-    actionRow.appendChild(fullResetBtn);
-    controlsEl.appendChild(actionRow);
+    // Vote sub-panel (option inputs + start) — hidden until VOTE is chosen.
+    voteInputsWrap = document.createElement('div');
+    voteInputsWrap.className = 'vote-inputs hidden';
+    const inA = mkTextInput('option A');
+    const inB = mkTextInput('option B');
+    voteInputsWrap.appendChild(inA.wrap);
+    voteInputsWrap.appendChild(inB.wrap);
+    const startVote = document.createElement('button');
+    startVote.className   = 'btn-big btn-vote';
+    startVote.textContent = '▶  start vote';
+    startVote.addEventListener('click', () => {
+        send({ stepStatus: 'VOTE', optionA: inA.input.value.trim() || 'A', optionB: inB.input.value.trim() || 'B' });
+    });
+    voteInputsWrap.appendChild(startVote);
+    controlsEl.appendChild(voteInputsWrap);
+}
 
-    // ── Mode ──────────────────────────────────────────────────────────────────
-    controlsEl.appendChild(mkLabel('Mode'));
-    controlsEl.appendChild(mkBtnGroup([
-        { label: 'SHOWCASE', action: () => send({ mode: 'SHOWCASE' }) },
+function toggleVoteInputs(show) {
+    voteInputsWrap?.classList.toggle('hidden', !show);
+}
+
+// ── D. QR ────────────────────────────────────────────────────────────────────
+function buildQR() {
+    controlsEl.appendChild(mkLabel('QR code'));
+    controlsEl.appendChild(mkStateBtnGroup('qr', 'qrStatus', [
+        { label: 'show', value: 'SHOW', params: { showQR: true } },
+        { label: 'hide', value: 'HIDE', params: { showQR: false } },
     ]));
 
-    // ── QR code ───────────────────────────────────────────────────────────────
-    controlsEl.appendChild(mkLabel('QR code'));
-    const qrRow = document.createElement('div');
-    qrRow.className = 'btn-row';
-
-    const showQRBtn = document.createElement('button');
-    showQRBtn.className   = 'btn-big btn-qr-on';
-    showQRBtn.textContent = '⬜  show qr';
-    showQRBtn.addEventListener('click', () => send({ showQR: true }));
-
-    const hideQRBtn = document.createElement('button');
-    hideQRBtn.className   = 'btn-big btn-qr-off';
-    hideQRBtn.textContent = '⬛  hide qr';
-    hideQRBtn.addEventListener('click', () => send({ showQR: false }));
-
-    qrRow.appendChild(showQRBtn);
-    qrRow.appendChild(hideQRBtn);
-    controlsEl.appendChild(qrRow);
-
-    // ── QR location ───────────────────────────────────────────────────────────
     controlsEl.appendChild(mkLabel('QR location'));
-    const qrGrid = document.createElement('div');
-    qrGrid.className = 'qr-grid';
+    const grid = document.createElement('div');
+    grid.className = 'qr-grid';
+    qrCells = [];
     const positions = [
-        { x: 'left',   y: 'top'    },
-        { x: 'center', y: 'top'    },
-        { x: 'right',  y: 'top'    },
-        { x: 'left',   y: 'center' },
-        { x: 'center', y: 'center' },
-        { x: 'right',  y: 'center' },
-        { x: 'left',   y: 'bottom' },
-        { x: 'center', y: 'bottom' },
-        { x: 'right',  y: 'bottom' },
+        { x: 'left', y: 'top' },    { x: 'center', y: 'top' },    { x: 'right', y: 'top' },
+        { x: 'left', y: 'center' }, { x: 'center', y: 'center' }, { x: 'right', y: 'center' },
+        { x: 'left', y: 'bottom' }, { x: 'center', y: 'bottom' }, { x: 'right', y: 'bottom' },
     ];
-    let activeQRCell = null;
     positions.forEach(({ x, y }) => {
         const cell = document.createElement('button');
         cell.className = 'qr-cell';
-        if (x === 'center' && y === 'center') { cell.classList.add('active'); activeQRCell = cell; }
-        cell.addEventListener('click', () => {
-            if (activeQRCell) activeQRCell.classList.remove('active');
-            cell.classList.add('active');
-            activeQRCell = cell;
-            send({ qrAlignX: x, qrAlignY: y });
-        });
-        qrGrid.appendChild(cell);
+        cell.dataset.x = x;
+        cell.dataset.y = y;
+        cell.addEventListener('click', () => send({ qrAlignX: x, qrAlignY: y }));
+        qrCells.push(cell);
+        grid.appendChild(cell);
     });
-    controlsEl.appendChild(qrGrid);
+    controlsEl.appendChild(grid);
+}
 
-    // ── Clear trace ───────────────────────────────────────────────────────────
-    const clearBtn = document.createElement('button');
-    clearBtn.className   = 'btn-big btn-clear';
-    clearBtn.textContent = '✕  clear trace';
-    clearBtn.addEventListener('click', () => send({ clearTrace: true, caption: '' }));
-    controlsEl.appendChild(clearBtn);
+// ── E. Global visual ─────────────────────────────────────────────────────────
+function buildGlobalVisual() {
+    controlsEl.appendChild(mkLabel('Color mode'));
+    controlsEl.appendChild(mkStateBtnGroup('colorMode', 'colorMode', [
+        { label: 'NORMAL',    value: 'NORMAL',             params: { colorMode: 'NORMAL' } },
+        { label: 'GRAY',      value: 'GRAYSCALE',          params: { colorMode: 'GRAYSCALE' } },
+        { label: 'GRAY INV',  value: 'GRAYSCALE_INVERTED', params: { colorMode: 'GRAYSCALE_INVERTED' } },
+    ]));
 
-    // ── Speed ─────────────────────────────────────────────────────────────────
-    controlsEl.appendChild(mkLabel('Motion'));
-    const motionBlock = document.createElement('div');
-    motionBlock.className = 'ctrl-block';
-    motionBlock.appendChild(mkSlider('Speed', 'stepLen', 2.0, 0.1, 8, 0.1));
-    controlsEl.appendChild(motionBlock);
+    controlsEl.appendChild(mkLabel('Status'));
+    controlsEl.appendChild(mkStateBtnGroup('status', 'status', [
+        { label: 'NORMAL',   value: 'NORMAL',   params: { status: 'NORMAL' } },
+        { label: 'FREEROAM', value: 'FREEROAM', params: { status: 'FREEROAM' } },
+        { label: 'DOT',      value: 'DOT',      params: { status: 'DOT' } },
+    ]));
+}
 
-    // ── Formula presets ───────────────────────────────────────────────────────
-    controlsEl.appendChild(mkLabel('Formula presets'));
+// ── F. Emergency / utility ───────────────────────────────────────────────────
+function buildEmergency() {
+    controlsEl.appendChild(mkLabel('Emergency / utility'));
+
+    const row = document.createElement('div');
+    row.className = 'btn-row';
+    row.appendChild(mkGuardBtn('↺  restart', 'btn-reset', 'Restart all agents?', { restart: true }));
+    row.appendChild(mkGuardBtn('⊘  full reset', 'btn-danger', 'Full reset: restart agents + clear trace + hide QR?',
+        { restart: true, clearTrace: true, showQR: false, caption: '' }));
+    controlsEl.appendChild(row);
+
+    const row2 = document.createElement('div');
+    row2.className = 'btn-row';
+    row2.appendChild(mkGuardBtn('✕  clear trace', 'btn-clear', 'Clear the trace?', { clearTrace: true, caption: '' }));
+
+    const shotBtn = document.createElement('button');
+    shotBtn.className   = 'btn-big btn-shot';
+    shotBtn.textContent = '⎙  screenshot';
+    shotBtn.addEventListener('click', () => send({ capture: true }));
+    row2.appendChild(shotBtn);
+    controlsEl.appendChild(row2);
+}
+
+// ── G. Advanced (collapsed) ──────────────────────────────────────────────────
+function buildAdvanced() {
+    const details = document.createElement('details');
+    details.className = 'advanced';
+    const summary = document.createElement('summary');
+    summary.textContent = 'advanced tuning';
+    details.appendChild(summary);
+
+    const inner = document.createElement('div');
+    inner.className = 'advanced-inner';
+
+    // Live tuning sliders
+    const sliders = document.createElement('div');
+    sliders.className = 'ctrl-block';
+    sliders.appendChild(mkSlider('Brightness', 'brightness', 0.06, 0.005, 1.5, 0.005));
+    sliders.appendChild(mkSlider('Speed',      'stepLen',    2.0,  0.1,   8,   0.1));
+    sliders.appendChild(mkSlider('Trail decay','trailDecay', 0.02, 0.001, 0.2, 0.001));
+    sliders.appendChild(mkSlider('Point size', 'pointSize',  3.5,  0.5,   12,  0.1));
+    sliders.appendChild(mkSlider('Audio duck', 'duckLevel',  0.15, 0,     1,   0.01));
+    inner.appendChild(sliders);
+
+    // Formula presets
+    inner.appendChild(mkLabel('Formula presets'));
     const grid = document.createElement('div');
     grid.className = 'preset-grid';
     let activePresetBtn = null;
@@ -254,7 +376,101 @@ function buildUI() {
         });
         grid.appendChild(btn);
     });
-    controlsEl.appendChild(grid);
+    inner.appendChild(grid);
+
+    // Trace text
+    inner.appendChild(mkLabel('Trace text'));
+    const textRow = document.createElement('div');
+    textRow.className = 'text-row';
+    const textIn = mkTextInput('trace text…');
+    const textBtn = document.createElement('button');
+    textBtn.className   = 'btn-small';
+    textBtn.textContent = 'set';
+    textBtn.addEventListener('click', () => send({ traceText: textIn.input.value }));
+    textRow.appendChild(textIn.wrap);
+    textRow.appendChild(textBtn);
+    inner.appendChild(textRow);
+
+    details.appendChild(inner);
+    controlsEl.appendChild(details);
+}
+
+// ── Live mirror rendering ────────────────────────────────────────────────────
+function renderMirror(state) {
+    if (!state) return;
+
+    // Phase line
+    const i    = state.phaseIndex;
+    const meta = PHASES[i];
+    if (phaseCodeEl)  phaseCodeEl.textContent  = state.phaseId || meta?.code || '—';
+    if (phaseLabelEl) phaseLabelEl.textContent = state.phaseLabel || meta?.label || '';
+    if (phaseCountEl) phaseCountEl.textContent = (i >= 0 && state.phaseCount) ? `${i + 1}/${state.phaseCount}` : '';
+
+    // Chips
+    renderChips(state);
+
+    // Audio warning
+    audioWarning?.classList.toggle('hidden', !state.audioLocked);
+
+    // Vote panel
+    renderVote(state);
+
+    // Button highlights
+    syncHighlights(state);
+    syncQRGrid(state);
+}
+
+function renderChips(state) {
+    if (!chipsEl) return;
+    const fields = [
+        ['mode',       state.mode],
+        ['status',     state.status],
+        ['colorMode',  state.colorMode],
+        ['stepStatus', state.stepStatus],
+        ['qrStatus',   state.qrStatus],
+    ];
+    chipsEl.innerHTML = '';
+    for (const [key, value] of fields) {
+        if (value == null) continue;
+        const chip = document.createElement('span');
+        const tone = CHIP_TONE[key]?.[value] ?? 'muted';
+        chip.className   = `chip chip-${tone}`;
+        chip.textContent = value;
+        chipsEl.appendChild(chip);
+    }
+}
+
+function renderVote(state) {
+    const isVote = state.stepStatus === 'VOTE';
+    votePanelEl?.classList.toggle('hidden', !isVote);
+    if (!isVote) return;
+    if (voteALabelEl) voteALabelEl.textContent = state.optionA || 'A';
+    if (voteBLabelEl) voteBLabelEl.textContent = state.optionB || 'B';
+    if (voteANumEl)   voteANumEl.textContent   = state.votesA ?? 0;
+    if (voteBNumEl)   voteBNumEl.textContent   = state.votesB ?? 0;
+    if (voteTimeEl) {
+        const remaining = state.voteEndTime
+            ? Math.max(0, Math.ceil((state.voteEndTime - Date.now()) / 1000))
+            : null;
+        voteTimeEl.textContent = remaining == null ? '—' : remaining;
+    }
+}
+
+function syncHighlights(state) {
+    for (const name in groups) {
+        const { key, buttons } = groups[name];
+        const active = state[key];
+        for (const [value, btn] of buttons) {
+            btn.classList.toggle('active', String(value) === String(active));
+        }
+    }
+}
+
+function syncQRGrid(state) {
+    for (const cell of qrCells) {
+        const on = cell.dataset.x === state.qrAlignX && cell.dataset.y === state.qrAlignY;
+        cell.classList.toggle('active', on);
+    }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -265,23 +481,47 @@ function mkLabel(text) {
     return el;
 }
 
-function mkBtnGroup(options) {
+// Button group whose active highlight is driven by a sim-state field.
+function mkStateBtnGroup(groupName, stateKey, options) {
+    const g = registerGroup(groupName, stateKey);
     const group = document.createElement('div');
     group.className = 'btn-group';
-    let activeBtn = null;
-    options.forEach(({ label, action }) => {
+    options.forEach(({ label, value, params }) => {
         const btn = document.createElement('button');
         btn.className   = 'btn-group-btn';
         btn.textContent = label;
-        btn.addEventListener('click', () => {
-            if (activeBtn) activeBtn.classList.remove('active');
-            btn.classList.add('active');
-            activeBtn = btn;
-            action();
-        });
+        btn.addEventListener('click', () => send(params));
+        g.buttons.set(value, btn);
         group.appendChild(btn);
     });
     return group;
+}
+
+function mkTransportBtn(label, action, extra) {
+    const btn = document.createElement('button');
+    btn.className   = `transport-btn${extra ? ' transport-' + extra : ''}`;
+    btn.textContent = label;
+    btn.addEventListener('click', action);
+    return btn;
+}
+
+function mkGuardBtn(label, cls, confirmMsg, params) {
+    const btn = document.createElement('button');
+    btn.className   = `btn-big ${cls}`;
+    btn.textContent = label;
+    btn.addEventListener('click', () => { if (window.confirm(confirmMsg)) send(params); });
+    return btn;
+}
+
+function mkTextInput(placeholder) {
+    const wrap = document.createElement('div');
+    wrap.className = 'text-input-wrap';
+    const input = document.createElement('input');
+    input.type        = 'text';
+    input.placeholder = placeholder;
+    input.className   = 'text-input';
+    wrap.appendChild(input);
+    return { wrap, input };
 }
 
 function mkSlider(label, key, def, min, max, step) {
@@ -316,6 +556,9 @@ function mkSlider(label, key, def, min, max, step) {
     wrap.appendChild(input);
     return wrap;
 }
+
+// Keep the vote countdown ticking between sim-state snapshots.
+setInterval(() => { if (_state?.stepStatus === 'VOTE') renderVote(_state); }, 1000);
 
 // Bootstrap — all let/const declarations above must be initialized before this runs.
 let _uiBuilt = false;

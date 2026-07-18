@@ -60,6 +60,7 @@ export const STORY = [
     // their chunk. The first connection starts a PHASE_CUE_HOLD_MS hold → PHASE 2.
     {
         id: PHASE.P1,
+        label: 'CONNECTION',
         enter(sim) {
             sim.setSynthEnergy(0, 0); // calm bed — reset any post-drop energy on restart
             log('PHASE 1 — fade out, tutto nero. cue binario 1.');
@@ -106,6 +107,7 @@ export const STORY = [
     // First note after that → wind on → 20s timer → sim.next().
     {
         id: PHASE.P2,
+        label: 'THE NOTE',
         _noteTimerStarted: false,
         _notesEnabled: false,
         enter(sim) {
@@ -153,6 +155,7 @@ export const STORY = [
     // 60 s → red reveal + PHASE 4.
     {
         id: PHASE.P3,
+        label: 'HARMONY',
         enter(sim) {
             sim.setColorMode('NORMAL');
             sim.setParam('champLinesAlpha', 0.02);
@@ -196,6 +199,7 @@ export const STORY = [
     // phase holds for PHASE_CUE_HOLD_MS before auto-advancing.
     {
         id: PHASE.P4,
+        label: 'HEART',
         enter(sim) {
             log(`PHASE 4 — cuore. cue binario ${this.id}. avanzamento tra ${Math.round(PHASE_CUE_HOLD_MS / 1000)}s.`);
             // TODO: load heart image into avoidmap
@@ -217,6 +221,7 @@ export const STORY = [
     // phase holds for PHASE_CUE_HOLD_MS before auto-advancing.
     {
         id: PHASE.P5,
+        label: 'STORM',
         enter(sim) {
             log(`PHASE 5 — tempesta. cue binario ${this.id}. avanzamento tra ${Math.round(PHASE_CUE_HOLD_MS / 1000)}s.`);
             // TODO: load storm image into avoidmap
@@ -238,6 +243,7 @@ export const STORY = [
     // Shown for 5 seconds, then cuts to black and auto-advances.
     {
         id: PHASE.P6,
+        label: 'BIG BANG',
         enter(sim) {
             log('PHASE 6 — bigbang. timer 5s avviato (no audio).');
             // TODO: load big bang image into avoidmap
@@ -258,6 +264,7 @@ export const STORY = [
     // phase holds for PHASE_CUE_HOLD_MS before auto-advancing.
     {
         id: PHASE.P7,
+        label: 'TEXT',
         enter(sim) {
             log(`PHASE 7 — testo. cue binario ${this.id}. avanzamento tra ${Math.round(PHASE_CUE_HOLD_MS / 1000)}s.`);
             sim.speakPhase(this.id);
@@ -279,6 +286,7 @@ export const STORY = [
     // Binary cue 8, then PHASE_CUE_HOLD_MS hold → PHASE 9 (ambient finale).
     {
         id: PHASE.P8,
+        label: 'CLOSING',
         enter(sim) {
             log('PHASE 8 — chiusura. logo AANT + immagini harmony abilitate. cue binario 8. → PHASE 9 tra 5s.');
             sim.setTraceText('');
@@ -306,6 +314,7 @@ export const STORY = [
     // fire simultaneously.
     {
         id: PHASE.P9,
+        label: 'AMBIENT FINALE',
         enter(sim) {
             log('PHASE 9 — finale ambientale. riser ogni ~40s. nessun avanzamento.');
             sim.setHarmonyRiserResetCallback(() => this._rescheduleRiser(sim));
