@@ -118,7 +118,7 @@ fn avoidMapColorAt(canvasPx: vec2<f32>) -> vec4<f32> {
     return vec4<f32>(rgb, valid);
 }
 
-@compute @workgroup_size(64)
+@compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let i = gid.x;
     if (i >= params.agentCount) { return; }

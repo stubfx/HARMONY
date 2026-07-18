@@ -389,14 +389,6 @@ device.lost.then(({ reason, message }) => {
     setTimeout(() => location.reload(), 3000);
 });
 
-// TEMP DIAGNOSTIC (remove once the color-reveal freeze is classified): the browser
-// chrome paints document.title independently of the WebGPU canvas, so it keeps
-// updating even while the RAF loop is starved. During a freeze — title stops
-// ticking => main thread is blocked (CPU); title keeps ticking while the canvas is
-// frozen => GPU hang.
-let __hbN = 0;
-setInterval(() => { document.title = 'hb ' + (__hbN++); }, 500);
-
 // Proactive reload every hour to prevent Vulkan semaphore FD exhaustion
 // (vkGetSemaphoreFdKHR fails after thousands of queue.submit() calls).
 // A bare location.reload() is NOT enough: the leaked FDs live in Chrome's
@@ -3222,7 +3214,7 @@ function frame(ts) {
         const cp = enc.beginComputePass();
         cp.setPipeline(simPipe);
         cp.setBindGroup(0, simBG);
-        cp.dispatchWorkgroups(Math.ceil(params.agentCount / 64));
+        cp.dispatchWorkgroups(Math.ceil(params.agentCount / 256));
         cp.end();
     }
 
@@ -3231,7 +3223,7 @@ function frame(ts) {
         const cp2 = enc.beginComputePass();
         cp2.setPipeline(colorPrepassPipe);
         cp2.setBindGroup(0, colorPrepassBG);
-        cp2.dispatchWorkgroups(Math.ceil(params.agentCount / 64));
+        cp2.dispatchWorkgroups(Math.ceil(params.agentCount / 256));
         cp2.end();
     }
 

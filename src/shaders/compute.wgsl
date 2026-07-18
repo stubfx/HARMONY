@@ -228,7 +228,7 @@ fn golAliveAt(canvasPx: vec2<f32>) -> f32 {
     return textureLoad(golTex, vec2<u32>(tx, ty), 0u).r;
 }
 
-@compute @workgroup_size(64)
+@compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let i = gid.x;
     if (i >= params.agentCount) { return; }
@@ -259,12 +259,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         let chAngle  = chladniDirAngle(x, y, cx, cy, params.chladniM, params.chladniN, params.chladniSym);
         let freeVec  = vec2f(cos(freeAngle), sin(freeAngle));
         let chVec    = vec2f(cos(chAngle),   sin(chAngle));
-        let mixed    = mix(freeVec, chVec, params.chladniBlend);
-        // Opposing free/chladni directions can cancel to a near-zero vector;
-        // normalizing that yields NaN, which corrupts positions and can hang the
-        // rasterizer. Fall back to the (unit-length) free direction instead.
-        let mixedLen = length(mixed);
-        let blended  = select(freeVec, mixed / mixedLen, mixedLen > 1e-6);
+        let blended  = normalize(mix(freeVec, chVec, params.chladniBlend));
         dirAngle     = atan2(blended.y, blended.x);
     }
     let desired  = vec2<f32>(cos(dirAngle), sin(dirAngle));
