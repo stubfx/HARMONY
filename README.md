@@ -130,10 +130,10 @@ The server maintains a per-room user table. Every 300 ms it averages all active 
 
 | Field | Source | Effect in simulation | Effect in synth |
 |-------|--------|----------------------|-----------------|
-| `avgTemp` | touch Y position | speed-color hue: blue (top/cold) → amber (bottom/warm), 65% blend | arp BPM (80–140) |
-| `avgCoherence` | touch X position | turnRate multiplier: 0.08× (left/chaos) → 3.0× (right/order) | — |
-| `avgChaos` | device motion magnitude | **received but not applied automatically** — `collectiveChaos` is not driven by this value; chaos is manual only. To re-enable: `collectiveChaos = avgChaos ?? 0` | all synth layers + radio chain; pad LFO frequency (0.05→2 Hz as chaos→0) |
-| `userCount` | active connections | chaos reset when all leave | synth at chaos=1 when empty; simAss music fades in on first join, out on last leave |
+| `avgTemp` | touch Y position | speed-color hue: blue (top/cold) → amber (bottom/warm), 65% blend | arp BPM (80–140) + master color filter/osc pitch |
+| `avgCoherence` | touch X position | turnRate multiplier: 0.08× (left/chaos) → 3.0× (right/order) | pad LFO rate (0.05–0.8 Hz); kick gate (frenzy = 1 − coherence) |
+| `avgChaos` | device motion magnitude | **received but not applied automatically** — `collectiveChaos` is not driven by this value; chaos is manual only. To re-enable: `collectiveChaos = avgChaos ?? 0` | — (dormant — device motion is no longer sent by the remote; see [Audio System](#audio-system)) |
+| `userCount` | active connections | QR trace restores when all leave | `simAss` music fades in on first join, out on last leave |
 
 All collective values are smoothed with an exponential moving average (~0.8 s time constant) in the simulation before being written to the GPU, preventing jarring jumps when spectators join or leave.
 
@@ -699,48 +699,55 @@ caddy run
 
 > **This section covers audio on the *simulation display* (the host / projection machine).** Each spectator's phone runs its own separate, independent note synth — see [Sound on the phone](#sound-on-the-phone) under Remote Spectator Interactions.
 
-Two independent channels mix into the Web Audio destination simultaneously.
+Three independent audio graphs reach the Web Audio destination on the host:
+
+1. **Tone.js procedural synth** (`src/synth.js`) — the generative bed, always running once audio is unlocked.
+2. **Ambient radio chain** (`src/ambience.js`) — streamed `simAss` music + random blinkers, gated on spectator presence.
+3. **Sample playback & analysis** (`src/audio.js`) — pushed voiceover/background tracks and optional mic, feeding the per-frame brightness value.
 
 ### Channel 1 — Tone.js generative synth (`src/synth.js`)
 
-Four procedural layers driven entirely by the collective spectator state (updated every 200 ms). Always active once the page is tapped.
+Layers sum into a master `Gain(0.75)` → `_colorFilter` (a master lowpass) → `_synthBus` (`Volume` → destination). The mix is shaped by two inputs: **collective state** (coherence, temperature, wind bias) pushed every 200 ms via `setSynthState()`, and a global **energy** level (0 = ambient bed → 1 = post-drop body) ramped by `setSynthEnergy()`.
 
 | Layer | Sound | Driver |
 |-------|-------|--------|
-| Drone | Sine sub-bass A1 — always on | chaos → volume (-18 to -24 dB) |
-| Noise | Pink noise bandpass 900 Hz | chaos → gain (silent at harmony) |
-| Pad | Sawtooth [A2 E3 A3 C4 E4 G4] + reverb/chorus | chaos → filter cutoff + volume; tilt → LFO amplitude |
-| Arp | A minor scale, Tone.Sequence + delay | chaos → volume; temperature → BPM (80–140) |
+| Color filter | master lowpass over the whole mix | temperature → cutoff 1.2 kHz (cold) → 12 kHz (warm) |
+| Color osc | reverb-soaked sine, felt more than heard | temperature → pitch C2 (cold) → A2 (warm) |
+| Drone | sine sub-bass A1 — always on | fixed (−18 dB) |
+| Pad | fatsawtooth chord [A2 E3 A3 C4 E4 G4] + chorus/reverb + LFO filter sweep | energy → gain + filter cutoff; coherence → LFO rate (0.05–0.8 Hz); wind magnitude → LFO depth |
+| Arp | random A-minor melody, `Tone.Sequence` + delay | energy → gain; temperature (+ energy) → BPM (80–140+) |
+| Bass | rounded sub-bass, quarter notes | post-drop only — emerges as colors turn cold (cold > 0.45), scaled by energy |
+| Kick | four-on-the-floor | post-drop only — emerges as the crowd turns frenetic (frenzy = 1 − coherence > 0.55), scaled by energy |
 
-The **pad LFO** (filter sweep) speed is driven by `(1 − chaos)`: nearly still at full chaos, oscillating at ~2 Hz when the room converges to harmony.
+Energy scales pad/arp gain, pad brightness and transport BPM, and gates the bass + kick rhythm section; the generative "drop" (`playRiser()` → `triggerImpact()`) ramps it to 1. Bass and kick are emergent — they only appear when the room's average color/coherence earns them, so it never reads as a constant beat.
 
-Independent volume control: **ch1: synth vol** slider in the GUI Audio folder (−30 to +6 dB).
+**Generative one-shots** (also in `src/synth.js`):
+- `playRiser(ms)` — a staggered sine-harmonic build + optional pink/white-noise undertow; ducks `_synthBus` as it rises.
+- `triggerImpact()` — the drop: a deep sub boom + bright transient, then locks energy to 1.
+- `resolveRiser()` — restores the ducked bus and fires a closing blip (for risers not followed by an impact).
+- `speakBinary(n)` — the sim "speaks" a phase number as a single gliding binary sine cue (replaces recorded narration in the later phases).
+- `blinker(type)` — short reverb-soaked tonal pings (sonar / sputnik / deep / blip / ghost).
+- `setShapePersonality(key)` — when an avoidmap image appears, swaps the arp pool, re-voices the pad chord, locks the LFO rate and fires an entry blinker so each shape has its own sonic character.
 
-### Channel 2 — simAss radio chain
+Independent volume: **ch1: synth vol** slider in the GUI Audio folder (`setSynthBusVolume`, −30 to +6 dB).
 
-Activated when the **first spectator joins**; fades out when the **last spectator leaves**. Silence when the room is empty (only the Tone.js synth plays).
+### Channel 2 — ambient radio chain (`src/ambience.js`)
 
-Signal path: `Tone.Player → lowpass filter → distortion → tremolo → reverb → chaos vol → fade gain → music bus → destination` — plus a white noise layer (bandpass at 2 kHz) mixed into the same fade gain.
+Streamed `simAss` music. Started by the story (`ambience.start()`), faded out via `ambience.stop()` when the last spectator leaves. Fixed signal path:
 
-All parameters are driven by `chaos` in real time via `setIdleChaos()`, called every 200 ms alongside `setSynthState()`:
+`Tone.Player → lowpass 4 kHz → distortion → tremolo → reverb (wet 0.15) → Volume (−3 dB) → fade gain → bus → destination`
 
-| Parameter | At chaos = 0 (harmony) | At chaos = 1 (full chaos) |
-|-----------|------------------------|--------------------------|
-| Lowpass cutoff | 4000 Hz | 400 Hz (very muffled) |
-| Reverb wet | 0.15 | 0.85 (washed out) |
-| Distortion | 0 | 0.65 (clipping) |
-| Tremolo depth | 0 | 0.85 (heavy dropout) |
-| Tremolo rate | 2 Hz | 8 Hz |
-| Static noise gain | 0 | 0.04 (subtle) |
-| Volume | −3 dB | −15 dB |
+- The distortion and tremolo nodes exist but sit at 0 (no longer chaos-modulated). A parallel white-noise → bandpass 2 kHz → gain layer is wired into the same fade gain, but its gain is held at 0 (present, not currently driven).
+- **Fade in/out:** through `_fadeGain` using `setTargetAtTime` (exponential), time constant 2.5 s.
+- **Track chaining:** each MP3 plays once; `_player.onstop` fetches and starts the next track from `/simAss-audio`. A generation counter cancels stale callbacks after a stop.
+- **Assets:** `simAss/music/` — up to 10 MP3 files (1-day lifespan); the server serves at random and tops up in the background.
+- **Blinkers:** `startBlinkersLoop()` fires a random blinker every 0.2–8 s (shared with the synth's `blinker()`).
 
-**Fade behaviour:** both music and noise fade together through `_idleFadeGain`. Fade uses `setTargetAtTime` (exponential curve). Time constant: 0.7 s at chaos=1, 2.5 s at chaos=0 — total fade duration ≈ TC × 3.5 s.
+Independent volume: **ch2: music vol** slider in the GUI Audio folder (`setVolume`, −30 to +6 dB).
 
-**Track chaining:** each audio file plays once (no loop). `onstop` immediately fetches and starts the next track from `/simAss-audio`. Generation counter `_idleAudioGen` prevents stale callbacks after a spectator leaves mid-fade.
+### Sample playback & analysis (`src/audio.js`)
 
-**Asset source:** `simAss/music/` — up to 10 MP3 files (1-day lifespan). The server picks at random and auto-generates new ones in the background when below the cap.
-
-Independent volume control: **ch2: music vol** slider in the GUI Audio folder (−30 to +6 dB).
+Raw Web Audio (not Tone.js). Base64 tracks pushed through `sim-params` play here: a one-shot **voiceover** (`audio` key → `playAudio`) and a looping **background** (`audiobg` key → `playAudioBg`); an optional **mic** source (`startMic`) can feed the same path. All sources run through a shared analyser whose smoothed per-frame RMS is returned by `getVolume()` and read by the sim each frame. While a voiceover plays, the background ducks to `duckLevel` (default 0.15 — GUI "duck level" / `setDuckLevel`) and restores when it ends. `isAudioLocked()` / `unlockAudio()` gate the `AudioContext` behind the browser autoplay policy, and the sim relays lock state to the admin panel via the `audio-state` event.
 
 ---
 
