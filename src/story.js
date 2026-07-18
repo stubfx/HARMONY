@@ -76,14 +76,19 @@ export const STORY = [
         },
         onSpectatorJoined(sim, userCount) {
             log('utente connesso — totale: ' + userCount);
-            sim.activateChunk(1);
+            // Each user lights up 5% of the field. At the 20th user the field is
+            // full (20 × 5% = 100%), so from there activate everything that remains.
+            if (userCount >= 20) sim.activateChunk(1);
+            else                 sim.activateChunk(0.05);
             if (userCount === 1) {
                 // Start both ambient blinkers and user blip events immediately so
                 // the room feels alive during the 40 s hold before the story moves.
                 sim.startBlinkersLoop();
                 log('primo utente — blip avviati. hold 40s → PHASE 2.');
                 this._timer = setTimeout(() => {
-                    log('hold 40s scaduto — avanzamento a PHASE 2.');
+                    log('hold 40s scaduto — accensione completa + avanzamento a PHASE 2.');
+                    // Countdown over: light up any agents not yet activated.
+                    sim.activateChunk(1);
                     sim.next();
                 }, 40_000);
             }
