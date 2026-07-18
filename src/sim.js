@@ -155,6 +155,7 @@ const params = {
 // ?n=<n>           — override the starting agent count (still adjustable in the GUI)
 // ?pixelGrid=true  — start with the chunky low-res pixel-grid mode enabled
 // ?r=<0-1>         — initial render scale (clamped to 0.1–1.0)
+// ?b=<n>           — per-particle brightness/alpha (e.g. 0.01, 0.06, 1.4)
 // ?autoscale=true  — enable adaptive quality (reduces renderScale / agentCount to hold 60 fps)
 const _urlParams     = new URLSearchParams(location.search);
 const _forcedSession = _urlParams.get('s') || null;
@@ -171,6 +172,11 @@ const _forcedSession = _urlParams.get('s') || null;
     // resolution: initial render scale, 0–1 (clamped to the slider's 0.1–1.0 range).
     const r = parseFloat(_urlParams.get('r') ?? '');
     if (Number.isFinite(r)) params.renderScale = Math.max(0.1, Math.min(1.0, r));
+}
+{
+    // brightness: per-particle alpha (e.g. 0.01, 0.06, 1.4).
+    const b = parseFloat(_urlParams.get('b') ?? '');
+    if (Number.isFinite(b) && b > 0) params.brightness = b;
 }
 {
     const v = _urlParams.get('autoscale');
