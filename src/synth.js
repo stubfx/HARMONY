@@ -72,6 +72,7 @@ const _SHAPE_PRESETS = {
 
 let _ready = false;
 let _pad = null;  // lifted to module scope for chord re-voicing in setShapePersonality
+let _lastPadRevoiceT = 0;  // last time the pad chord was re-voiced — throttles rapid image loads
 let _padVol, _padFilter, _padLFO, _droneVol, _arpVol, _arpSeq;
 let _kickVol, _kickLoop, _bassVol, _bassLoop;   // post-drop rhythm section
 let _colorFilter = null;  // master low-pass whose cutoff tracks crowd color temperature
@@ -148,6 +149,7 @@ export async function startSynth() {
         envelope:   { attack: 4.0, decay: 2.0, sustain: 0.65, release: 8 },
         volume:     -12,
     });
+    _pad.maxPolyphony = 48;  // headroom above default 32 for legitimate chord crossfades
     _pad.connect(_padFilter);
     _padFilter.connect(chorus);
     chorus.connect(reverb);
@@ -367,12 +369,18 @@ export function setShapePersonality(key) {
     _shapeLfoHz    = preset.lfoHz;
     _padLFO.frequency.rampTo(preset.lfoHz, 2);
 
-    // Re-voice the pad: let the old chord fade out naturally over 3 s, then
-    // attack the new voicing — the 4 s attack makes the morph smooth and slow.
+    // Re-voice the pad: release the old chord immediately and swell the new
+    // voicing in over its 4 s attack — the release tail crossfades against it.
+    // Throttled so rapid image loads coalesce and never overflow the voice pool;
+    // the arp pool, LFO, and blinker below stay outside the guard so each image
+    // keeps its own audible identity.
     if (_pad) {
-        const t = Tone.now();
-        _pad.releaseAll(t + 3);
-        _pad.triggerAttack(_SHAPE_CHORDS[preset.chord] ?? _SHAPE_CHORDS.default, t + 2.5);
+        const now = Tone.now();
+        if (now - _lastPadRevoiceT >= 2.5) {
+            _lastPadRevoiceT = now;
+            _pad.releaseAll(now);
+            _pad.triggerAttack(_SHAPE_CHORDS[preset.chord] ?? _SHAPE_CHORDS.default, now);
+        }
     }
 
     blinker(preset.blinker);
@@ -383,11 +391,14 @@ export function clearShapePersonality() {
     if (!_ready) return;
     _activeArpPool = null;
     _shapeLfoHz    = null;
-    // Restore default pad chord — same crossfade mechanic as setShapePersonality
+    // Restore default pad chord — same throttled immediate-release crossfade as setShapePersonality
     if (_pad) {
-        const t = Tone.now();
-        _pad.releaseAll(t + 3);
-        _pad.triggerAttack(_SHAPE_CHORDS.default, t + 2.5);
+        const now = Tone.now();
+        if (now - _lastPadRevoiceT >= 2.5) {
+            _lastPadRevoiceT = now;
+            _pad.releaseAll(now);
+            _pad.triggerAttack(_SHAPE_CHORDS.default, now);
+        }
     }
     // LFO rate will be restored to coherence-driven value on the next _applyState tick
 }
