@@ -66,11 +66,9 @@ struct SoloRenderParams {
 }
 
 struct Agent {
-    pos:    vec2<f32>,
-    vel:    vec2<f32>,
-    home:   vec2<f32>,
-    weight: f32,
-    primed: f32,
+    pos: vec2<f32>,   // offset 0
+    vel: u32,         // offset 8  — pack2x16float(vel)
+    wp:  u32,         // offset 12 — pack2x16float(vec2(weight, primed))
 }
 
 // Only colorR/G/B + isActive are read here; the rest is padding to match the
@@ -120,7 +118,7 @@ fn avoidMapColorAt(canvasPx: vec2<f32>) -> vec4<f32> {
     return vec4<f32>(rgb, valid);
 }
 
-@compute @workgroup_size(64)
+@compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let i = gid.x;
     if (i >= params.agentCount) { return; }

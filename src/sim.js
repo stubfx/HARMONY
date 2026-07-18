@@ -362,9 +362,18 @@ const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-perf
 if (!adapter)       { showError('No WebGPU adapter found.'); throw new Error(); }
 const device = await adapter.requestDevice({
     requiredLimits: {
-        maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
-        maxBufferSize:               adapter.limits.maxBufferSize,
+        maxStorageBufferBindingSize:      adapter.limits.maxStorageBufferBindingSize,
+        maxBufferSize:                    adapter.limits.maxBufferSize,
+        maxComputeWorkgroupsPerDimension: adapter.limits.maxComputeWorkgroupsPerDimension,
     },
+});
+// One-time report of the true device ceilings — the real agent cap on this GPU is
+// derived from these, not the WebGPU spec defaults (65535 wg/dim, 128 MiB buffer).
+console.log('[WebGPU limits]', {
+    maxStorageBufferBindingSize:      adapter.limits.maxStorageBufferBindingSize,
+    maxBufferSize:                    adapter.limits.maxBufferSize,
+    maxComputeWorkgroupsPerDimension: adapter.limits.maxComputeWorkgroupsPerDimension,
+    maxComputeInvocationsPerWorkgroup: adapter.limits.maxComputeInvocationsPerWorkgroup,
 });
 device.addEventListener('uncapturederror', e => {
     console.error('[WebGPU uncaptured error]', e.error.message);
@@ -413,7 +422,8 @@ ctx.configure({
 
 // ── Persistent GPU buffers ────────────────────────────────────────────────────
 const agentBuf = device.createBuffer({
-    size: MAX_AGENTS * 32,    // [pos.xy, vel.xy, home.xy, weight, primed] = 8 × f32 = 32 bytes
+    // 16 bytes/agent: [pos.x f32, pos.y f32, vel u32 (pack2x16float), wp u32 (weight+primed)]
+    size: MAX_AGENTS * 16,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 // One packed rgba8unorm u32 per agent — written by colorPrepass, read by render vertex shader.
@@ -452,24 +462,28 @@ const spectatorSlotsBuf = device.createBuffer({
     size: 704, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 
+// Pack two f32 values as IEEE-754 binary16 halves into one u32 (low 16 = x, high 16 = y),
+// matching WGSL pack2x16float. setFloat16 gives spec-correct round-to-nearest-even; the sim
+// already hard-requires WebGPU, which implies a browser new enough to have it (Chrome ≥129).
+const _halfDV = new DataView(new ArrayBuffer(4));
+function packHalf2(x, y) {
+    _halfDV.setFloat16(0, x, true);
+    _halfDV.setFloat16(2, y, true);
+    return _halfDV.getUint32(0, true);
+}
+
 function seedAgents({ mode = RESEED.NORMAL } = {}) {
     const fadeInPhase2 = mode === RESEED.FADE_FROM_EDGES;
     const count = params.agentCount;
-    const data  = new Float32Array(count * 8);   // 8 floats × 4 bytes = 32 bytes/agent
+    const buf   = new ArrayBuffer(count * 16);   // [pos.x f32, pos.y f32, vel u32, wp u32]
+    const f32   = new Float32Array(buf);
+    const u32   = new Uint32Array(buf);
     const TAU   = Math.PI * 2;
-
-    // Divide the canvas into a grid — one cell per agent — aspect-ratio aware.
-    // Each agent's home is the centre of its assigned cell.
-    const aspect = canvas.width / canvas.height;
-    const gridW  = Math.ceil(Math.sqrt(count * aspect));
-    const gridH  = Math.ceil(count / gridW);
-    const cellW  = canvas.width  / gridW;
-    const cellH  = canvas.height / gridH;
 
     const perim = 2 * (canvas.width + canvas.height);
 
     for (let i = 0; i < count; i++) {
-        const b  = i * 8;
+        const w  = i * 4;
         const a  = Math.random() * TAU;
         const s  = 0.5 + Math.random() * 1.5;
 
@@ -487,19 +501,13 @@ function seedAgents({ mode = RESEED.NORMAL } = {}) {
             sy = Math.random() * canvas.height;
         }
 
-        data[b]     = sx;
-        data[b + 1] = sy;
-        data[b + 2] = Math.cos(a) * s;               // vel.x
-        data[b + 3] = Math.sin(a) * s;               // vel.y
-        // Home: jittered within this agent's assigned grid cell.
-        const col  = i % gridW;
-        const row  = Math.floor(i / gridW);
-        data[b + 4] = (col + Math.random()) * cellW;
-        data[b + 5] = (row + Math.random()) * cellH;
-        data[b + 6] = fadeInPhase2 ? 0.0 : Math.max(0.05, 1.0 + (Math.random() * 2 - 1) * params.weightSpread);
-        data[b + 7] = 0;                             // primed — compute writes this each frame
+        const weight = fadeInPhase2 ? 0.0 : Math.max(0.05, 1.0 + (Math.random() * 2 - 1) * params.weightSpread);
+        f32[w]     = sx;
+        f32[w + 1] = sy;
+        u32[w + 2] = packHalf2(Math.cos(a) * s, Math.sin(a) * s);   // vel
+        u32[w + 3] = packHalf2(weight, 0.0);                        // weight + primed
     }
-    device.queue.writeBuffer(agentBuf, 0, data);
+    device.queue.writeBuffer(agentBuf, 0, buf);
 }
 seedAgents({ mode: RESEED.FADE_FROM_EDGES });
 
@@ -510,21 +518,19 @@ function _rawTeleport(x, y, fraction = 0.1) {
     const chunkSize = Math.max(1, Math.ceil(count * fraction));
     const start     = Math.floor(Math.random() * (count - chunkSize));
     const TAU       = Math.PI * 2;
-    const data      = new Float32Array(chunkSize * 8);
+    const buf = new ArrayBuffer(chunkSize * 16);
+    const f32 = new Float32Array(buf);
+    const u32 = new Uint32Array(buf);
     for (let i = 0; i < chunkSize; i++) {
-        const b = i * 8;
+        const w = i * 4;
         const a = Math.random() * TAU;
         const s = 0.5 + Math.random() * 1.5;
-        data[b]     = x;
-        data[b + 1] = y;
-        data[b + 2] = Math.cos(a) * s;
-        data[b + 3] = Math.sin(a) * s;
-        data[b + 4] = x;    // home
-        data[b + 5] = y;
-        data[b + 6] = 1.0;  // weight — full, no fade
-        data[b + 7] = 0;
+        f32[w]     = x;
+        f32[w + 1] = y;
+        u32[w + 2] = packHalf2(Math.cos(a) * s, Math.sin(a) * s);
+        u32[w + 3] = packHalf2(1.0, 0.0);   // weight — full, no fade
     }
-    device.queue.writeBuffer(agentBuf, start * 32, data);
+    device.queue.writeBuffer(agentBuf, start * 16, buf);
 }
 
 // ── Story facade & engine ────────────────────────────────────────────────────
@@ -536,29 +542,22 @@ const simFacade = {
         _preshowActive   = true;
         _preshowLitCount = 0;
         const count  = params.agentCount;
-        const data   = new Float32Array(count * 8);
+        const buf = new ArrayBuffer(count * 16);
+        const f32 = new Float32Array(buf);
+        const u32 = new Uint32Array(buf);
         const TAU    = Math.PI * 2;
-        const aspect = canvas.width / canvas.height;
-        const gridW  = Math.ceil(Math.sqrt(count * aspect));
-        const gridH  = Math.ceil(count / gridW);
-        const cellW  = canvas.width  / gridW;
-        const cellH  = canvas.height / gridH;
         _preshowWeights = new Float32Array(count);
         for (let i = 0; i < count; i++) {
-            const b = i * 8;
+            const w = i * 4;
             const a = Math.random() * TAU;
             const s = 0.5 + Math.random() * 1.5;
-            data[b]     = Math.random() * canvas.width;
-            data[b + 1] = Math.random() * canvas.height;
-            data[b + 2] = Math.cos(a) * s;
-            data[b + 3] = Math.sin(a) * s;
-            data[b + 4] = (i % gridW + Math.random()) * cellW;
-            data[b + 5] = (Math.floor(i / gridW) + Math.random()) * cellH;
+            f32[w]     = Math.random() * canvas.width;
+            f32[w + 1] = Math.random() * canvas.height;
+            u32[w + 2] = packHalf2(Math.cos(a) * s, Math.sin(a) * s);
             _preshowWeights[i] = Math.max(0.05, 1.0 + (Math.random() * 2 - 1) * params.weightSpread);
-            data[b + 6] = 0.0; // weight = 0 → invisible
-            data[b + 7] = 0.0;
+            u32[w + 3] = packHalf2(0.0, 0.0);   // weight = 0 → invisible
         }
-        device.queue.writeBuffer(agentBuf, 0, data);
+        device.queue.writeBuffer(agentBuf, 0, buf);
     },
 
     // Activate the next `fraction` of dormant agents, spawning from canvas center.
@@ -571,22 +570,20 @@ const simFacade = {
         const cx  = canvas.width  / 2;
         const cy  = canvas.height / 2;
         const TAU = Math.PI * 2;
-        const data = new Float32Array((end - start) * 8);
+        const buf = new ArrayBuffer((end - start) * 16);
+        const f32 = new Float32Array(buf);
+        const u32 = new Uint32Array(buf);
         const burstSpeed = params.releaseBurstSpeed || 30;
         for (let i = 0; i < end - start; i++) {
-            const b = i * 8;
+            const w = i * 4;
             const angle = Math.random() * TAU;
             const va    = Math.random() * TAU;
-            data[b]     = cx + Math.cos(angle) * (Math.random() * 8);
-            data[b + 1] = cy + Math.sin(angle) * (Math.random() * 8);
-            data[b + 2] = Math.cos(va) * burstSpeed;
-            data[b + 3] = Math.sin(va) * burstSpeed;
-            data[b + 4] = cx;
-            data[b + 5] = cy;
-            data[b + 6] = _preshowWeights[start + i];
-            data[b + 7] = 0.0;
+            f32[w]     = cx + Math.cos(angle) * (Math.random() * 8);
+            f32[w + 1] = cy + Math.sin(angle) * (Math.random() * 8);
+            u32[w + 2] = packHalf2(Math.cos(va) * burstSpeed, Math.sin(va) * burstSpeed);
+            u32[w + 3] = packHalf2(_preshowWeights[start + i], 0.0);
         }
-        device.queue.writeBuffer(agentBuf, start * 32, data);
+        device.queue.writeBuffer(agentBuf, start * 16, buf);
         _preshowLitCount = end;
     },
 
@@ -3217,7 +3214,7 @@ function frame(ts) {
         const cp = enc.beginComputePass();
         cp.setPipeline(simPipe);
         cp.setBindGroup(0, simBG);
-        cp.dispatchWorkgroups(Math.ceil(params.agentCount / 64));
+        cp.dispatchWorkgroups(Math.ceil(params.agentCount / 256));
         cp.end();
     }
 
@@ -3226,7 +3223,7 @@ function frame(ts) {
         const cp2 = enc.beginComputePass();
         cp2.setPipeline(colorPrepassPipe);
         cp2.setBindGroup(0, colorPrepassBG);
-        cp2.dispatchWorkgroups(Math.ceil(params.agentCount / 64));
+        cp2.dispatchWorkgroups(Math.ceil(params.agentCount / 256));
         cp2.end();
     }
 

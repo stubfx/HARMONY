@@ -18,11 +18,9 @@ struct ChampLinesParams {
 }
 
 struct Agent {
-    pos:    vec2<f32>,
-    vel:    vec2<f32>,
-    home:   vec2<f32>,
-    weight: f32,
-    primed: f32,
+    pos: vec2<f32>,   // offset 0
+    vel: u32,         // offset 8  — pack2x16float(vel)
+    wp:  u32,         // offset 12 — pack2x16float(vec2(weight, primed))
 }
 
 @group(0) @binding(0) var<uniform>       p:      ChampLinesParams;

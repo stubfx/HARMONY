@@ -109,11 +109,9 @@ struct SoloRenderParams {
 }
 
 struct Agent {
-    pos:    vec2<f32>,
-    vel:    vec2<f32>,
-    home:   vec2<f32>,
-    weight: f32,
-    primed: f32,   // written by compute each frame: 1.0 = homing, 0.0 = free
+    pos: vec2<f32>,   // offset 0
+    vel: u32,         // offset 8  — pack2x16float(vel)
+    wp:  u32,         // offset 12 — pack2x16float(vec2(weight, primed))
 }
 
 @group(0) @binding(0) var<uniform>       params:    SoloRenderParams;
@@ -138,9 +136,10 @@ struct VsOut {
     );
 
     let agent    = agents[agentId];
+    let weight   = unpack2x16float(agent.wp).x;
 
     // Dormant agents (preshow weight = 0) are clipped off-screen.
-    if (agent.weight < 0.001) {
+    if (weight < 0.001) {
         return VsOut(vec4<f32>(10.0, 10.0, 0.0, 1.0), vec3<f32>(0.0), 0.0, vec2<f32>(0.0));
     }
 
@@ -171,7 +170,7 @@ struct VsOut {
     // Color was pre-computed once per agent by the colorPrepass compute shader.
     let color = unpack4x8unorm(colorBuf[agentId]).rgb;
 
-    return VsOut(vec4<f32>(finalNdc, 0.0, 1.0), color, agent.weight, corners[corner]);
+    return VsOut(vec4<f32>(finalNdc, 0.0, 1.0), color, weight, corners[corner]);
 }
 
 @fragment fn fs(in: VsOut) -> @location(0) vec4<f32> {

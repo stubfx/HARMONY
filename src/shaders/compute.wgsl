@@ -144,11 +144,9 @@ struct SpectatorSlot {
 }
 
 struct Agent {
-    pos:    vec2<f32>,
-    vel:    vec2<f32>,
-    home:   vec2<f32>,
-    weight: f32,
-    primed: f32,   // 1.0 = homing (home pixel passes threshold), 0.0 = free; written each frame
+    pos: vec2<f32>,   // offset 0  — full f32 precision
+    vel: u32,         // offset 8  — pack2x16float(vel)
+    wp:  u32,         // offset 12 — pack2x16float(vec2(weight, primed)); primed is write-only
 }
 
 // ── Contamination — up to 10 circular eraser zones ───────────────────────────
@@ -230,14 +228,14 @@ fn golAliveAt(canvasPx: vec2<f32>) -> f32 {
     return textureLoad(golTex, vec2<u32>(tx, ty), 0u).r;
 }
 
-@compute @workgroup_size(64)
+@compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let i = gid.x;
     if (i >= params.agentCount) { return; }
 
     var pos    = agents[i].pos;
-    var vel    = agents[i].vel;
-    var weight = agents[i].weight;
+    var vel    = unpack2x16float(agents[i].vel);
+    var weight = unpack2x16float(agents[i].wp).x;
 
     let x   = pos.x;
     let y   = pos.y;
@@ -394,10 +392,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         } else {
             ep = vec2<f32>(0.0, t_ - 2.0 * params.canvasW - params.canvasH);
         }
-        agents[i].pos    = ep;
-        agents[i].vel    = vec2<f32>(0.0, 0.0);
-        agents[i].primed = 0.0;
-        agents[i].weight = 0.0;
+        agents[i].pos = ep;
+        agents[i].vel = pack2x16float(vec2<f32>(0.0, 0.0));
+        agents[i].wp  = pack2x16float(vec2<f32>(0.0, 0.0));
         return;
     }
 
@@ -408,7 +405,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         if (length(np - vec2<f32>(cx, cy)) < params.dotCenterRadius) {
             let rng_ = hash(i ^ (u32(params.time * 137.0) + 53u));
             if (rng_ < params.dotRespawnChance) {
-                agents[i].weight = -1.0;
+                agents[i].wp = pack2x16float(vec2<f32>(-1.0, 0.0));
                 return;
             }
         }
@@ -433,9 +430,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                 } else {
                     ep = vec2<f32>(0.0, t_ - 2.0 * params.canvasW - params.canvasH);
                 }
-                agents[i].pos    = ep;
-                agents[i].vel    = vec2<f32>(0.0, 0.0);
-                agents[i].primed = 0.0;
+                agents[i].pos = ep;
+                agents[i].vel = pack2x16float(vec2<f32>(0.0, 0.0));
+                agents[i].wp  = pack2x16float(vec2<f32>(weight, 0.0));
                 return;
             }
         }
@@ -527,8 +524,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         }
     }
 
-    agents[i].pos    = np;
-    agents[i].vel    = vel;
-    agents[i].weight = weight;
-    agents[i].primed = 0.0;
+    agents[i].pos = np;
+    agents[i].vel = pack2x16float(vel);
+    agents[i].wp  = pack2x16float(vec2<f32>(weight, 0.0));
 }
