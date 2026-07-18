@@ -157,6 +157,7 @@ const params = {
 // ?r=<0-1>         — initial render scale (clamped to 0.1–1.0)
 // ?b=<n>           — per-particle brightness/alpha (e.g. 0.01, 0.06, 1.4)
 // ?autoscale=true  — enable adaptive quality (reduces renderScale / agentCount to hold 60 fps)
+// ?hideGUI=true    — hard-disable the HUD/GUI (toggle key inert; stays hidden regardless of ?gui)
 const _urlParams     = new URLSearchParams(location.search);
 const _forcedSession = _urlParams.get('s') || null;
 {

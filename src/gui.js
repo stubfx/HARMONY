@@ -27,17 +27,23 @@ export function initGUI({
     updateAvoidMapOverlay,
 }) {
     // ── HUD visibility ────────────────────────────────────────────────────────
-    let guiVisible = new URLSearchParams(location.search).get('gui') === 'true';
+    // ?hideGUI=true hard-disables the GUI: it stays hidden and the toggle key is
+    // inert, regardless of ?gui or any keypress.
+    const _guiParams = new URLSearchParams(location.search);
+    const guiLocked  = _guiParams.get('hideGUI') === 'true' || _guiParams.get('hideGUI') === '1';
+    let guiVisible   = !guiLocked && _guiParams.get('gui') === 'true';
     const uiEl      = document.querySelector('#ui');
     const monitorEl = document.querySelector('#monitor');
 
     function applyGUIVisibility() {
-        uiEl.style.display           = guiVisible ? 'flex' : 'none';
-        monitorEl.style.display      = guiVisible ? 'flex' : 'none';
-        gui.domElement.style.display = guiVisible ? ''     : 'none';
+        const show = guiVisible && !guiLocked;
+        uiEl.style.display           = show ? 'flex' : 'none';
+        monitorEl.style.display      = show ? 'flex' : 'none';
+        gui.domElement.style.display = show ? ''     : 'none';
     }
 
     function toggleGUI() {
+        if (guiLocked) return;
         guiVisible = !guiVisible;
         applyGUIVisibility();
     }
