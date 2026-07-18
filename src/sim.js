@@ -1678,16 +1678,20 @@ const _FORMULA_LEAD_MS      = 200;    // small settle delay before the first cha
 const _FORMULA_MIN_INTERVAL = 5000;   // movement formulas change at most once every 5 s
 
 // ── Harmony state ─────────────────────────────────────────────────────────────
-// The cache key is the raw note sum — each unique note combination gets its own
-// persistent avoidMap image. Images are stored in IndexedDB (binary, no size limit)
-// and fetched on demand; no speculative prefetch.
+// The cache key is the note sum bucketed into a small fixed set (see
+// _HARMONY_IMAGE_KEYS): the same combination bucket maps to the same image within
+// a session, and the number of images ever fetched/stored is capped. An unbounded
+// key (raw sum) fills IndexedDB at show scale — the silent per-write quota failure
+// then makes every read miss and re-fetch, a /simAss-image storm. Images are
+// stored in IndexedDB (binary) and fetched on demand; no speculative prefetch.
+const _HARMONY_IMAGE_KEYS = 6;      // number of distinct harmony image buckets per session
 let _harmonyActive        = false;
 let _harmonyImagesEnabled = false;  // when false, harmony images are suppressed (enabled per-phase)
-let _currentHarmonyKey    = -1;     // active sum value, -1 = no harmony
+let _currentHarmonyKey    = -1;     // active bucketed key (0.._HARMONY_IMAGE_KEYS-1), -1 = no harmony
 let _harmonyImageShown    = false;  // true only after loadAvoidMap completes; gates the exit cooldown
 let _harmonyFallback      = null;   // static filename loaded when a harmony image exits (e.g. 'aant_logo.png')
 let _harmonyRiserResetFn  = null;   // called when a harmony riser fires so PHASE 9 can reset its own timer
-const _harmonyFetching    = new Set(); // sums currently being fetched
+const _harmonyFetching    = new Set(); // bucketed keys currently being fetched
 let _harmonyHeld          = false;  // pins the shown image so it can't flash away on rapid note changes
 let _harmonyHoldTimer     = null;
 const _HARMONY_HOLD_MIN   = 6000;   // once an image is shown, keep it 6–20 s even as notes change
@@ -1809,45 +1813,49 @@ function _evalHarmony() {
     if (wantHarmony) {
         if (_harmonyActive) return;                     // one already showing/loading
         if (Date.now() < _harmonyCooldownUntil) return; // still in the quiet gap
-        _enterHarmony(sum);
+        // Bucket the (multiple-of-4) sum into a small fixed key space so at most
+        // _HARMONY_IMAGE_KEYS images are ever fetched/cached per session. Dividing
+        // by 4 first spreads the qualifying sums across all buckets.
+        const key = Math.floor(sum / 4) % _HARMONY_IMAGE_KEYS;
+        _enterHarmony(key, sum);
     } else if (_harmonyActive) {
         _exitHarmony();
     }
 }
 
-async function _enterHarmony(sum) {
-    if (_harmonyActive && _currentHarmonyKey === sum) return;
+async function _enterHarmony(key, sum) {
+    if (_harmonyActive && _currentHarmonyKey === key) return;
     _harmonyActive     = true;
-    _currentHarmonyKey = sum;
+    _currentHarmonyKey = key;
     _harmonyImageShown = false;
 
     // Fetch/cache the image. Happens concurrently with the upcoming riser so the
     // reveal lands as soon as the riser finishes, even if the fetch takes a moment.
-    let cached = await _harmonyDbRead(sum);
+    let cached = await _harmonyDbRead(key);
     if (!cached) {
-        if (_harmonyFetching.has(sum)) {
-            // Another call is already fetching this sum. Reset state and bail —
+        if (_harmonyFetching.has(key)) {
+            // Another call is already fetching this bucket. Reset state and bail —
             // the in-flight call will complete and load the image when done.
             _harmonyActive     = false;
             _currentHarmonyKey = -1;
             return;
         }
-        _harmonyFetching.add(sum);
+        _harmonyFetching.add(key);
         try {
             cached = await _fetchIdleImageBytes();
-            await _harmonyDbWrite(sum, cached.bytes, cached.mime);
+            await _harmonyDbWrite(key, cached.bytes, cached.mime);
         } catch (e) {
-            console.warn('[harmony] enter sum', sum, 'failed:', e.message);
+            console.warn('[harmony] enter key', key, 'failed:', e.message);
             _harmonyActive     = false;
             _currentHarmonyKey = -1;
             return;
         } finally {
-            _harmonyFetching.delete(sum);
+            _harmonyFetching.delete(key);
         }
     }
 
-    // Guard: sum or flag may have changed while awaiting the fetch
-    if (!_harmonyImagesEnabled || _currentHarmonyKey !== sum) return;
+    // Guard: key or flag may have changed while awaiting the fetch
+    if (!_harmonyImagesEnabled || _currentHarmonyKey !== key) return;
 
     // Play a riser to announce the combination, then reveal the image at the peak.
     // Reset any external riser timer (e.g. PHASE 9) to avoid simultaneous risers.
@@ -1857,12 +1865,12 @@ async function _enterHarmony(sum) {
     await new Promise(r => setTimeout(r, riserDur));
 
     // Guard again — user may have changed notes during the riser
-    if (!_harmonyImagesEnabled || _currentHarmonyKey !== sum) return;
+    if (!_harmonyImagesEnabled || _currentHarmonyKey !== key) return;
 
     await loadAvoidMap(new Blob([cached.bytes], { type: cached.mime }));
     _harmonyImageShown = true;
     resolveRiser();                        // beat + bus restore at the reveal moment
-    setShapePersonality('h' + (sum % 5)); // personality blinker fires right after blip
+    setShapePersonality('h' + (sum % 5)); // personality keyed on the raw note sum
     _startHarmonyHold();
 }
 
@@ -1895,14 +1903,14 @@ function _exitHarmony() {
 // Load (or reload) the image for the currently-active harmony sum.
 // Called when _harmonyImagesEnabled flips to true while harmony is already active.
 async function _loadCurrentHarmonyImage() {
-    const sum = _currentHarmonyKey;
-    if (sum < 0) return;
-    let cached = await _harmonyDbRead(sum);
+    const key = _currentHarmonyKey;
+    if (key < 0) return;
+    let cached = await _harmonyDbRead(key);
     if (!cached) {
         try { cached = await _fetchIdleImageBytes(); }
         catch (e) { console.warn('[harmony] image reload failed:', e.message); return; }
     }
-    if (_harmonyActive && _harmonyImagesEnabled && _currentHarmonyKey === sum) {
+    if (_harmonyActive && _harmonyImagesEnabled && _currentHarmonyKey === key) {
         await loadAvoidMap(new Blob([cached.bytes], { type: cached.mime }));
         _harmonyImageShown = true;
         _startHarmonyHold();
