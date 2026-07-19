@@ -1662,6 +1662,7 @@ let _preshowLitCount    = 0;
 let _preshowWeights     = null; // Float32Array(agentCount) of original weights
 let _preshowSavedParams = null; // spawn params saved on enter, restored on exit
 let _avoidMapSuppressed = false; // when true, loadAvoidMap is a no-op
+const _decodedImageCache = new Map(); // URL → Promise<{frames,durations}> — see _cachedDecode
 
 // GUI handles — assigned by initGUI() at the bottom of this file.
 let stateCtrl     = null;
@@ -2548,10 +2549,8 @@ function _syncAudioBanner() {
 }
 
 // ── Static image cache ────────────────────────────────────────────────────────
-// Declared here (before the auto-resume block) so _cachedDecode is never called
-// with _decodedImageCache in TDZ during the phase-replay loop.
-const _decodedImageCache = new Map(); // URL → Promise<{frames, durations}>
-
+// _decodedImageCache is declared near _avoidMapSuppressed (before any loadAvoidMap call).
+// _cachedDecode is a hoisted function so it can live here, close to loadAvoidMap.
 function _cachedDecode(url) {
     if (!_decodedImageCache.has(url)) {
         const p = fetch(url).then(r => r.blob()).then(b => _predecodeBitmap(b)).then(decoded => {
