@@ -2547,6 +2547,22 @@ function _syncAudioBanner() {
     _audioBanner?.classList.toggle('unlocked', isAudioReady());
 }
 
+// ── Static image cache ────────────────────────────────────────────────────────
+// Declared here (before the auto-resume block) so _cachedDecode is never called
+// with _decodedImageCache in TDZ during the phase-replay loop.
+const _decodedImageCache = new Map(); // URL → Promise<{frames, durations}>
+
+function _cachedDecode(url) {
+    if (!_decodedImageCache.has(url)) {
+        const p = fetch(url).then(r => r.blob()).then(b => _predecodeBitmap(b)).then(decoded => {
+            if (decoded.durations !== null) _decodedImageCache.delete(url); // don't cache animated GIFs
+            return decoded;
+        });
+        _decodedImageCache.set(url, p);
+    }
+    return _decodedImageCache.get(url);
+}
+
 const _validSavedPhase = Number.isFinite(_savedPhase) && _savedPhase >= 1 && _savedPhase <= 9;
 
 if (_validSavedPhase) {
@@ -2581,23 +2597,6 @@ function _updateAvoidMapOverlay() {
     ctx2.globalAlpha = 0.5;
     ctx2.drawImage(_avoidMapBitmap, (W - dw) / 2, (H - dh) / 2, dw, dh);
     _avoidMapOverlayEl.style.opacity = '1';
-}
-
-// ── Static image cache ────────────────────────────────────────────────────────
-// Keyed by URL string. Animated GIFs are evicted after first decode so their
-// frames are never re-used after clearAvoidGif() closes them.
-// ImageBitmap is safe to reuse: copyExternalImageToTexture does not consume it.
-const _decodedImageCache = new Map(); // URL → Promise<{frames, durations}>
-
-function _cachedDecode(url) {
-    if (!_decodedImageCache.has(url)) {
-        const p = fetch(url).then(r => r.blob()).then(b => _predecodeBitmap(b)).then(decoded => {
-            if (decoded.durations !== null) _decodedImageCache.delete(url); // don't cache animated GIFs
-            return decoded;
-        });
-        _decodedImageCache.set(url, p);
-    }
-    return _decodedImageCache.get(url);
 }
 
 // ── Avoidance map upload ──────────────────────────────────────────────────────
