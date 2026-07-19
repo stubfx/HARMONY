@@ -43,7 +43,9 @@ socket.on('host-reconnected', () => {
     socket.emit('join-session', { room, spectatorId });
 });
 
-// note-debounce obsoleted by burst model — ignored if server still sends it
+socket.on('note-debounce', ({ ms } = {}) => {
+    _noteDebounceMs = ms ?? 0;
+});
 
 socket.on('peer-joined', () => {
     if (!auraEl) return;
@@ -189,14 +191,10 @@ function _silentAudioKick() {
     _silentKickEl.play().catch(() => {});
 }
 
+let _noteDebounceMs    = 0;
+let _noteDebounceTimer = null;
 let _sinePulse         = 0;
 let _poolShake         = 0; // set to 1 on each note change, decays in _tickPool
-
-// ── Charge / burst / cooldown state ──────────────────────────────────────────
-let _chargeStart  = 0;     // performance.now() at touch-down
-let _chargeLevel  = 0;     // 0–1, locked in at release; drives cooldown duration
-let _coolingDown  = false;
-let _cooldownEnd  = 0;     // absolute ms timestamp when cooldown expires
 
 function _setContNote(noteIdx) {
     if (!_emitSound || !_contOscReady) return;
@@ -206,31 +204,21 @@ function _setContNote(noteIdx) {
         _activeNoteIdx = noteIdx;
         _sinePulse = 1;
         _poolShake = 1;
+        clearTimeout(_noteDebounceTimer);
+        _noteDebounceTimer = setTimeout(() => {
+            sendEvent('note', { index: noteIdx, freq: KEYS[noteIdx].freq, color: KEYS[noteIdx].color });
+        }, _noteDebounceMs);
     }
-    // Quieter during charge — burst carries the message
-    _contGainNode.gain.setTargetAtTime(0.12, t, 0.05);
+    _contGainNode.gain.setTargetAtTime(0.25, t, 0.05);
 }
 
 function _silenceContNote() {
-    if (!_contOscReady) return;
+    if (!_emitSound || !_contOscReady) return;
+    clearTimeout(_noteDebounceTimer);
+    _noteDebounceTimer = null;
     _contGainNode.gain.setTargetAtTime(0, _audioCtx.currentTime, 0.12);
     _activeNoteIdx = -1;
-}
-
-// Short percussive pluck on burst release — triangle osc, quick decay.
-function _playBurstPluck(freq, charge) {
-    const ctx  = _ensureAudioCtx();
-    const osc  = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.value = freq;
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    const t = ctx.currentTime;
-    gain.gain.setValueAtTime(0.28 + charge * 0.25, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25 + charge * 0.45);
-    osc.start(t);
-    osc.stop(t + 0.8);
+    sendEvent('note-off', {});
 }
 
 // ── Smoke ─────────────────────────────────────────────────────────────────────
@@ -364,12 +352,12 @@ function _initNoteCanvas() {
 
     noteCanvasEl.addEventListener('pointerdown', (e) => {
         e.preventDefault();
-        if (_blipHit(e.offsetX, e.offsetY)) { _popBlip(); return; }
+        if (_blipHit(e.offsetX, e.offsetY)) { _popBlip(); return; } // tap the target, not a note
         noteCanvasEl.setPointerCapture(e.pointerId);
-        _touching    = true;
-        _touchX      = e.offsetX;
-        _touchY      = e.offsetY;
-        _chargeStart = performance.now();
+        _touching = true;
+        _touchX = e.offsetX; _touchY = e.offsetY;
+        // Safari may re-suspend or interrupt the AudioContext after interruptions
+        // (calls, Siri). Resume here on user gesture without risking autoplay block.
         if (_audioCtx && _audioCtx.state !== 'running') _audioCtx.resume();
         _setContNote(_noteIdx(_touchX));
         _applyColor(_touchY);
@@ -382,24 +370,7 @@ function _initNoteCanvas() {
         _applyColor(_touchY);
     });
 
-    function _fireBurst() {
-        if (!_touching) return;
-        _touching = false;
-        const holdMs = performance.now() - _chargeStart;
-        if (holdMs >= 200 && _activeNoteIdx >= 0 && !_coolingDown) {
-            _chargeLevel = Math.min(1, (holdMs - 200) / 1800);
-            const key = KEYS[_activeNoteIdx];
-            if (_emitSound) _playBurstPluck(key.freq, _chargeLevel);
-            sendEvent('note-burst', { index: _activeNoteIdx, freq: key.freq, color: pushedColor, charge: _chargeLevel });
-            const coolMs = 500 + _chargeLevel * 2000;
-            _coolingDown = true;
-            _cooldownEnd = performance.now() + coolMs;
-            setTimeout(() => { _coolingDown = false; }, coolMs);
-        }
-        _silenceContNote();
-    }
-
-    noteCanvasEl.addEventListener('pointerup',     _fireBurst);
+    noteCanvasEl.addEventListener('pointerup',     () => { _touching = false; _silenceContNote(); });
     noteCanvasEl.addEventListener('pointercancel', () => { _touching = false; _silenceContNote(); });
 
     let _lastSpawn  = 0;
@@ -531,51 +502,13 @@ function _initNoteCanvas() {
         _adaptPoolMax(dt);
         _lastChaosT = ts;
 
-        const w = noteCanvasEl.width, h = noteCanvasEl.height;
-        ctx2d.clearRect(0, 0, w, h);
+        ctx2d.clearRect(0, 0, noteCanvasEl.width, noteCanvasEl.height);
 
         if (_touching && ts - _lastSpawn > 25) {
             _spawnSmoke(_touchX, _touchY, _cf(_touchX, _touchY));
             _lastSpawn = ts;
         }
-        _tickSmoke(ctx2d, w, h);
-
-        // ── Charge arc — radial fill around finger ──────────────────────────
-        if (_touching && !_coolingDown) {
-            const holdMs        = performance.now() - _chargeStart;
-            const chargeProgress = Math.min(1, Math.max(0, (holdMs - 50) / 1950));
-            if (chargeProgress > 0) {
-                ctx2d.save();
-                ctx2d.strokeStyle = _currentStep >= 2 ? pushedColor : '#ffffff';
-                ctx2d.lineWidth   = 3.5;
-                ctx2d.globalAlpha = 0.55 + chargeProgress * 0.4;
-                ctx2d.beginPath();
-                ctx2d.arc(_touchX, _touchY, 44, -Math.PI / 2, -Math.PI / 2 + chargeProgress * Math.PI * 2);
-                ctx2d.stroke();
-                ctx2d.restore();
-            }
-        }
-
-        // ── Cooldown — dim overlay + depleting perimeter arc ────────────────
-        if (_coolingDown) {
-            const remaining = Math.max(0, _cooldownEnd - performance.now());
-            const total     = 500 + _chargeLevel * 2000;
-            const frac      = remaining / total;
-            // Dim the whole canvas
-            ctx2d.save();
-            ctx2d.fillStyle   = '#000000';
-            ctx2d.globalAlpha = 0.32;
-            ctx2d.fillRect(0, 0, w, h);
-            // Thin perimeter arc depleting clockwise
-            ctx2d.strokeStyle = '#ffffff';
-            ctx2d.lineWidth   = 2;
-            ctx2d.globalAlpha = 0.35;
-            const cr = Math.min(w, h) / 2 - 10;
-            ctx2d.beginPath();
-            ctx2d.arc(w / 2, h / 2, cr, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
-            ctx2d.stroke();
-            ctx2d.restore();
-        }
+        _tickSmoke(ctx2d, noteCanvasEl.width, noteCanvasEl.height);
 
         // ── Blip target + tap-burst ─────────────────────────────────────────
         if (_blip) {
@@ -653,15 +586,7 @@ function _initNoteCanvas() {
             // so the note/colour stays locked; otherwise phrase with periodic lifts.
             const synced = _botCmdNote !== null || _botCmdHue !== null;
             if (!synced && ((ts + liftOffset) % LIFT_PERIOD) < LIFT_DUR) {
-                if (_touching) {
-                    _touching = false;
-                    if (_activeNoteIdx >= 0 && _emitSound) {
-                        const key = KEYS[_activeNoteIdx];
-                        const charge = 0.4 + Math.random() * 0.5;
-                        sendEvent('note-burst', { index: _activeNoteIdx, freq: key.freq, color: pushedColor, charge });
-                    }
-                    _silenceContNote();
-                }
+                if (_touching) { _touching = false; _silenceContNote(); }
                 return;
             }
             const t = ts / 1000;
