@@ -599,6 +599,7 @@ function _initNoteCanvas() {
             }
             pushedColor = bubble.color;
             sendEvent('chirp', { index: bubble.noteIdx, freq: bubble.freq, color: bubble.color });
+            _replaceBubble(_bubbles.indexOf(bubble));
             setTimeout(_botChirp, delay);
         }
         setTimeout(_botChirp, Math.random() * 3000);
