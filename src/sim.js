@@ -1993,6 +1993,34 @@ let socket;
 const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
 ambience.init(_apiBase);
 loadAvoidMap(`${_apiBase}/simAss-static/full_square.png`);
+
+// ── Collective swarm state (written by 'collective-state' socket events) ───────
+// Smoothed each frame via exponential moving average to avoid jarring jumps.
+// Declared here (before the socket block) so the handler never hits TDZ.
+let collectiveTemp      = 0.5; // target temperature [0=cold … 1=warm] (from touch Y)
+let collectiveCoherence = 0.5; // target coherence [0=chaos … 1=order] (from touch X)
+
+let smoothTemp        = 0.5;
+let smoothCoherence   = 0.5;
+let smoothColorBlend  = 0.0;  // actual value sent to the shader each frame
+let _targetColorBlend = 0.0;  // 0 = gray, 1 = color
+const COLOR_BLEND_TC  = 2.0;  // EMA time constant in seconds (~6 s to reach 95%)
+let _lastSynthTick    = 0;    // throttle: call setSynthState at most every 200ms
+
+// ── Join burst state ──────────────────────────────────────────────────────────
+// When a spectator joins, a single brightness pulse fires across the field.
+const REST_BRIGHTNESS  = 0.1;   // fixed brightness scale — former audio "silence floor" (audio now drives color, not brightness)
+const BURST_BRIGHTNESS = 0.4;   // peak brightness boost added to params.brightness
+const BURST_DECAY      = 0.88;  // per frame — fully dissipated in ~0.5 s at 60 fps
+const BURST_THRESHOLD  = 0.001;
+let burstBrightness = 0;
+
+const PULSE_INCREMENT  = 0.015; // brightness added per tap event
+const PULSE_MAX        = 0.5;   // cap so a full crowd at full speed doesn't blow out
+const PULSE_DECAY      = 0.96;  // per frame — dissipates in ~1.5 s at 60 fps
+const PULSE_THRESHOLD  = 0.001;
+let pulseEnergy = 0;
+
 {
     // In dev, Vite runs on a different port from Express, so connect directly to Express.
     // In production, use VITE_SOCKET_URL (the Caddy-fronted public origin) so Socket.IO
@@ -2640,32 +2668,6 @@ canvas.addEventListener('mousemove', e => {
     mouseCanvasY = (e.clientY - rect.top)  * (canvas.height / rect.height);
 });
 canvas.addEventListener('mouseleave', () => { mouseCanvasX = -1; mouseCanvasY = -1; });
-
-// ── Collective swarm state (written by 'collective-state' socket events) ───────
-// Smoothed each frame via exponential moving average to avoid jarring jumps.
-let collectiveTemp      = 0.5; // target temperature [0=cold … 1=warm] (from touch Y)
-let collectiveCoherence = 0.5; // target coherence [0=chaos … 1=order] (from touch X)
-
-let smoothTemp        = 0.5;
-let smoothCoherence   = 0.5;
-let smoothColorBlend  = 0.0;  // actual value sent to the shader each frame
-let _targetColorBlend = 0.0;  // 0 = gray, 1 = color
-const COLOR_BLEND_TC  = 2.0;  // EMA time constant in seconds (~6 s to reach 95%)
-let _lastSynthTick    = 0;    // throttle: call setSynthState at most every 200ms
-
-// ── Join burst state ──────────────────────────────────────────────────────────
-// When a spectator joins, a single brightness pulse fires across the field.
-const REST_BRIGHTNESS  = 0.1;   // fixed brightness scale — former audio "silence floor" (audio now drives color, not brightness)
-const BURST_BRIGHTNESS = 0.4;   // peak brightness boost added to params.brightness
-const BURST_DECAY      = 0.88;  // per frame — fully dissipated in ~0.5 s at 60 fps
-const BURST_THRESHOLD  = 0.001;
-let burstBrightness = 0;
-
-const PULSE_INCREMENT  = 0.015; // brightness added per tap event
-const PULSE_MAX        = 0.5;   // cap so a full crowd at full speed doesn't blow out
-const PULSE_DECAY      = 0.96;  // per frame — dissipates in ~1.5 s at 60 fps
-const PULSE_THRESHOLD  = 0.001;
-let pulseEnergy = 0;
 
 // ── Uniform writers ───────────────────────────────────────────────────────────
 function writeSoloUB(dt, time) {
