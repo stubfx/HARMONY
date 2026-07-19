@@ -41,6 +41,7 @@ if (!ADMIN_PASS)  console.warn('[server] ADMIN_PASSWORD not set — /admin will 
 
 const ORIGINS = [
     'https://thesis.lucamolluso.com',
+    'https://admin.lucamolluso.com',
     'https://localhost',
     'https://192.168.1.12',
     ...(process.env.EXTRA_ORIGINS ?? '').split(',').filter(Boolean),
