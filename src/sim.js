@@ -21,7 +21,7 @@ import champLinesWGSL   from './shaders/champLines.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
 import bloomWGSL        from './shaders/bloom.wgsl?raw';
 import glareWGSL        from './shaders/glare.wgsl?raw';
-import { startSynth, setSynthState, setSynthDroneOnly, setSynthBusVolume, setSynthEnergy, addArpInfluence, blinker, BLINKER_TYPES, playRiser, triggerImpact, resolveRiser, speakBinary, setShapePersonality, clearShapePersonality } from './synth.js';
+import { startSynth, setSynthState, setSynthDroneOnly, setSynthBusVolume, setSynthEnergy, addArpInfluence, blinker, BLINKER_TYPES, playRiser, triggerImpact, resolveRiser, speakBinary, binaryCueDurationMs, isSpeaking, setShapePersonality, clearShapePersonality } from './synth.js';
 import * as ambience from './ambience.js';
 import { StoryEngine } from './storyEngine.js';
 import { STORY }       from './story.js';
@@ -691,7 +691,7 @@ const simFacade = {
 
     // The simulation "speaks" its phase number as a short binary tone sequence,
     // replacing recorded narration in the later phases.
-    speakPhase(n) { speakBinary(n); },
+    speakPhase(n) { console.log('[audio] speakBinary n=%d dur=%dms', n, binaryCueDurationMs(n)); speakBinary(n); },
 
     startBlinkersLoop() {
         ambience.startBlinkersLoop(() => {
@@ -1743,6 +1743,7 @@ function _evalHarmony() {
 
 async function _enterHarmony(key, sum) {
     if (_harmonyActive && _currentHarmonyKey === key) return;
+    console.log('[harmony] found key=%d sum=%d speaking=%s', key, sum, isSpeaking());
     _harmonyActive     = true;
     _currentHarmonyKey = key;
     _harmonyImageShown = false;
@@ -1779,6 +1780,7 @@ async function _enterHarmony(key, sum) {
     // Reset any external riser timer (e.g. PHASE 9) to avoid simultaneous risers.
     const riserDur = 3500 + Math.random() * 1500; // 3.5–5 s, same range as PHASE 9
     if (_harmonyRiserResetFn) _harmonyRiserResetFn();
+    console.log('[harmony] riser start %.0fms speaking=%s', riserDur, isSpeaking());
     playRiser(riserDur);
     await new Promise(r => setTimeout(r, riserDur));
 
@@ -1787,6 +1789,7 @@ async function _enterHarmony(key, sum) {
 
     await loadAvoidMap(new Blob([cached.bytes], { type: cached.mime }));
     _harmonyImageShown = true;
+    console.log('[harmony] resolveRiser speaking=%s', isSpeaking());
     resolveRiser();                        // beat + bus restore at the reveal moment
     setShapePersonality('h' + (sum % 5)); // personality keyed on the raw note sum
     _startHarmonyHold();
@@ -2193,8 +2196,8 @@ function applySimParams(data) {
             audio, audioFormat, audiobg, audiobgFormat, audiobgLoop, mode, colorMode,
             adminBlip, adminRiser, adminImpact, ...rest } = data;
 
-    if (audio    !== undefined) playAudio(audio    || null, audioFormat)                              .catch(e => console.warn('[audio]',    e));
-    if (audiobg  !== undefined) playAudioBg(audiobg || null, audiobgFormat, audiobgLoop !== false)    .catch(e => console.warn('[audiobg]',  e));
+    if (audio    !== undefined) { console.log('[audio] playAudio speaking=%s', isSpeaking()); playAudio(audio || null, audioFormat).catch(e => console.warn('[audio]', e)); }
+    if (audiobg  !== undefined) { console.log('[audio] playAudioBg speaking=%s', isSpeaking()); playAudioBg(audiobg || null, audiobgFormat, audiobgLoop !== false).catch(e => console.warn('[audiobg]', e)); }
 
     // Story step — a new step ID resets all completion state then applies the step's UI mode.
     if (step !== undefined) {
@@ -2243,8 +2246,8 @@ function applySimParams(data) {
         }
         if (activeSlots.length) uploadSpectatorSlots();
     }
-    if (adminRiser  === true) playRiser(4000);
-    if (adminImpact === true) triggerImpact();
+    if (adminRiser  === true) { console.log('[audio] adminRiser'); playRiser(4000); }
+    if (adminImpact === true) { console.log('[audio] adminImpact'); triggerImpact(); }
     if (preshow === true)  storyEngine.start();
     if (preshow === false) simFacade.reseed();
     if (restart)              seedAgents();

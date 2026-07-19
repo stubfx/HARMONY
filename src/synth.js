@@ -497,9 +497,15 @@ const RISER_VARIANTS = [
     ], noise: 'pink', noiseLevel: 0.015, duckDb: -5 },
 ];
 
+// Tracks the end timestamp (Date.now()) of the current speakBinary cue.
+// playRiser and triggerImpact check this to stay silent during speech.
+let _speakingUntil = 0;
+export function isSpeaking() { return Date.now() < _speakingUntil; }
+
 // A build voice: staggered sine harmonics rising in pitch + optional noise undertow.
 // Pass a variant object to specify character; omit to pick randomly.
 export async function playRiser(durationMs = 4000, variant) {
+    if (isSpeaking()) { console.log('[audio] playRiser suppressed — shape speaking'); return; }
     await Tone.start();
     const v   = variant ?? RISER_VARIANTS[Math.floor(Math.random() * RISER_VARIANTS.length)];
     const dur = durationMs / 1000;
@@ -566,6 +572,7 @@ export function resolveRiser() {
 // The impact at the end of the riser: a deep sub boom + a bright transient, then
 // setSynthEnergy(1) to lock in the energetic body and restore the ducked bed.
 export async function triggerImpact() {
+    if (isSpeaking()) { console.log('[audio] triggerImpact suppressed — shape speaking'); return; }
     await Tone.start();
     const t = Tone.now();
 
@@ -613,6 +620,7 @@ export async function speakBinary(n, { bitMs = SPEAK_BIT_MS } = {}) {
     await Tone.start();
     await _ensurePingReverb();
     const bits  = Math.max(0, n | 0).toString(2);
+    _speakingUntil = Date.now() + bits.length * bitMs + 900;
     const synth = new Tone.Synth({
         oscillator: { type: 'sine' },
         envelope:   { attack: 0.09, decay: 0.1, sustain: 0.85, release: 0.5 },
