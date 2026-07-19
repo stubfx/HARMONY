@@ -2237,6 +2237,8 @@ let pulseEnergy = 0;
             const chirpSlot = activeSlots.find(s => s.spectatorId === event.spectatorId);
             if (chirpSlot) {
                 triggerReleaseBurst(chirpSlot);
+                chirpSlot.blip      = 1;  // teleport agents to a random position on each chirp
+                chirpSlot.burstSeed = (Math.random() * 0x7fffffff) >>> 0;
                 chirpSlot.formulaIdx = index;
                 if (color) { const [r, g, b] = hexToF(color); chirpSlot.colorR = r; chirpSlot.colorG = g; chirpSlot.colorB = b; }
                 uploadSpectatorSlots();
