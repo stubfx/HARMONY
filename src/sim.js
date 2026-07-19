@@ -2521,12 +2521,12 @@ function _syncAudioBanner() {
 const _validSavedPhase = Number.isFinite(_savedPhase) && _savedPhase >= 1 && _savedPhase <= 9;
 
 if (_validSavedPhase) {
-    // Auto-resume: skip the overlay, replay state up to the saved phase instantly.
+    // Auto-resume: overlay already hidden by HTML default; replay state instantly.
     // Audio will unlock on the next user interaction (first Tone.start() call).
-    _audioBanner?.classList.add('unlocked');
     const targetIdx = _savedPhase - 1; // convert to 0-indexed
     for (let i = 0; i <= targetIdx; i++) storyEngine.goto(i);
 } else {
+    _audioBanner?.classList.remove('unlocked'); // reveal the HARMONY banner
     document.addEventListener('pointerdown', async () => {
         await unlockAudio();
         if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
