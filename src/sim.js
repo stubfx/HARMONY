@@ -1200,6 +1200,7 @@ function seedGoL() {
 let _inQROverlayUpdate = false;
 let _qrOwnedAvoidMap   = false; // true when the current avoid map was set by updateQROverlay
 let _textOwnedAvoidMap = false; // true when the current avoid map was rendered from the text input
+let _currentAvoidMapSrc = null; // URL of the currently-loaded avoid map (null for Blob/dynamic), used to dedup reloads
 function updateQROverlay() {
     const visible = params.qrOverlay && simState.qrStatus === 'SHOW' && !!qrBitmap;
     qrOverlayEl.style.opacity = visible ? '1' : '0';
@@ -1680,10 +1681,10 @@ const _FORMULA_MIN_INTERVAL = 5000;   // movement formulas change at most once e
 // ── Harmony state ─────────────────────────────────────────────────────────────
 // The cache key is the note sum bucketed into a small fixed set (see
 // _HARMONY_IMAGE_KEYS): the same combination bucket maps to the same image within
-// a session, and the number of images ever fetched/stored is capped. An unbounded
-// key (raw sum) fills IndexedDB at show scale — the silent per-write quota failure
-// then makes every read miss and re-fetch, a /simAss-image storm. Images are
-// stored in IndexedDB (binary) and fetched on demand; no speculative prefetch.
+// a session, and the number of images ever fetched is capped. An unbounded key
+// (raw sum) would fetch a fresh image on every qualifying sum at show scale — a
+// /simAss-image storm. Images are held in an in-memory Map (binary bytes) and
+// fetched on demand, tagged so each bucket maps to one server image; no prefetch.
 const _HARMONY_IMAGE_KEYS = 6;      // number of distinct harmony image buckets per session
 let _harmonyActive        = false;
 let _harmonyImagesEnabled = false;  // when false, harmony images are suppressed (enabled per-phase)
@@ -1702,92 +1703,9 @@ const _HARMONY_COOLDOWN_MAX = 20000;
 let _preConnectionFormulas = null;  // { dir, wind } saved when the first spectator connects
 let _chladniSum = 0;                // current harmony sum driving Chladni mode params
 
-// ── IndexedDB helpers ─────────────────────────────────────────────────────────
-const _HARMONY_DB_NAME   = 'thesis-sim-harmony';
-const _HARMONY_DB_IMAGES = 'images';
-const _HARMONY_DB_CONFIGS = 'configs';
-let _harmonyDb = null;
-
-function _openHarmonyDb() {
-    if (_harmonyDb) return Promise.resolve(_harmonyDb);
-    return new Promise((resolve, reject) => {
-        const req = indexedDB.open(_HARMONY_DB_NAME, 2);
-        req.onupgradeneeded = (e) => {
-            const db = e.target.result;
-            if (!db.objectStoreNames.contains(_HARMONY_DB_IMAGES))
-                db.createObjectStore(_HARMONY_DB_IMAGES,  { keyPath: 'sum' });
-            if (!db.objectStoreNames.contains(_HARMONY_DB_CONFIGS))
-                db.createObjectStore(_HARMONY_DB_CONFIGS, { keyPath: 'sum' });
-        };
-        req.onsuccess = (e) => { _harmonyDb = e.target.result; resolve(_harmonyDb); };
-        req.onerror   = (e) => reject(e.target.error);
-    });
-}
-
-async function _harmonyDbRead(sum) {
-    try {
-        const db = await _openHarmonyDb();
-        return new Promise((resolve) => {
-            const req = db.transaction(_HARMONY_DB_IMAGES, 'readonly').objectStore(_HARMONY_DB_IMAGES).get(sum);
-            req.onsuccess = (e) => {
-                const r = e.target.result;
-                resolve(r ? { bytes: r.bytes, mime: r.mime ?? 'image/webp' } : null);
-            };
-            req.onerror   = () => resolve(null);
-        });
-    } catch { return null; }
-}
-
-async function _harmonyDbWrite(sum, bytes, mime) {
-    try {
-        const db = await _openHarmonyDb();
-        return new Promise((resolve, reject) => {
-            const req = db.transaction(_HARMONY_DB_IMAGES, 'readwrite').objectStore(_HARMONY_DB_IMAGES).put({ sum, bytes, mime, savedAt: Date.now() });
-            req.onsuccess = () => resolve();
-            req.onerror   = (e) => reject(e.target.error);
-        });
-    } catch (e) {
-        console.warn('[harmony] IndexedDB write failed (sum=' + sum + '):', e.message);
-    }
-}
-
-async function _harmonyConfigRead(sum) {
-    try {
-        const db = await _openHarmonyDb();
-        return new Promise((resolve) => {
-            const req = db.transaction(_HARMONY_DB_CONFIGS, 'readonly').objectStore(_HARMONY_DB_CONFIGS).get(sum);
-            req.onsuccess = (e) => resolve(e.target.result?.config ?? null);
-            req.onerror   = () => resolve(null);
-        });
-    } catch { return null; }
-}
-
-async function _harmonyConfigWrite(sum, config) {
-    try {
-        const db = await _openHarmonyDb();
-        return new Promise((resolve, reject) => {
-            const req = db.transaction(_HARMONY_DB_CONFIGS, 'readwrite').objectStore(_HARMONY_DB_CONFIGS).put({ sum, config, savedAt: Date.now() });
-            req.onsuccess = () => resolve();
-            req.onerror   = (e) => reject(e.target.error);
-        });
-    } catch (e) {
-        console.warn('[harmony] IndexedDB config write failed (sum=' + sum + '):', e.message);
-    }
-}
-
-async function _clearHarmonyImageCache() {
-    try {
-        const db = await _openHarmonyDb();
-        await new Promise((resolve, reject) => {
-            const req = db.transaction(_HARMONY_DB_IMAGES, 'readwrite').objectStore(_HARMONY_DB_IMAGES).clear();
-            req.onsuccess = () => resolve();
-            req.onerror   = (e) => reject(e.target.error);
-        });
-        console.log('[harmony] image cache cleared');
-    } catch (e) {
-        console.warn('[harmony] image cache clear failed:', e.message);
-    }
-}
+// In-memory harmony image cache. Bounded by _HARMONY_IMAGE_KEYS (≤ 6 entries),
+// starts empty each load — no explicit clear needed.
+const _harmonyImageCache = new Map(); // bucket key -> { bytes, mime }
 
 // Pin the currently shown harmony image for a random 3–10 s. While held,
 // _evalHarmony() is a no-op, so rapid note changes can't swap or clear the
@@ -1831,7 +1749,7 @@ async function _enterHarmony(key, sum) {
 
     // Fetch/cache the image. Happens concurrently with the upcoming riser so the
     // reveal lands as soon as the riser finishes, even if the fetch takes a moment.
-    let cached = await _harmonyDbRead(key);
+    let cached = _harmonyImageCache.get(key);
     if (!cached) {
         if (_harmonyFetching.has(key)) {
             // Another call is already fetching this bucket. Reset state and bail —
@@ -1842,8 +1760,8 @@ async function _enterHarmony(key, sum) {
         }
         _harmonyFetching.add(key);
         try {
-            cached = await _fetchIdleImageBytes();
-            await _harmonyDbWrite(key, cached.bytes, cached.mime);
+            cached = await _fetchIdleImageBytes(key);
+            _harmonyImageCache.set(key, cached);
         } catch (e) {
             console.warn('[harmony] enter key', key, 'failed:', e.message);
             _harmonyActive     = false;
@@ -1889,8 +1807,11 @@ function _exitHarmony() {
     if (_harmonyImagesEnabled) {
         if (_harmonyFallback) {
             // Load the fallback static image (e.g. aant_logo) instead of going blank.
-            loadAvoidMap(`${_apiBase}/simAss-static/${_harmonyFallback}`);
-            setShapePersonality(_harmonyFallback.replace(/\.[^.]+$/, ''));
+            const fbUrl = `${_apiBase}/simAss-static/${_harmonyFallback}`;
+            if (_currentAvoidMapSrc !== fbUrl) { // already showing it → skip the reload
+                loadAvoidMap(fbUrl);
+                setShapePersonality(_harmonyFallback.replace(/\.[^.]+$/, ''));
+            }
         } else {
             clearAvoidMap();
             clearShapePersonality();
@@ -1905,9 +1826,9 @@ function _exitHarmony() {
 async function _loadCurrentHarmonyImage() {
     const key = _currentHarmonyKey;
     if (key < 0) return;
-    let cached = await _harmonyDbRead(key);
+    let cached = _harmonyImageCache.get(key);
     if (!cached) {
-        try { cached = await _fetchIdleImageBytes(); }
+        try { cached = await _fetchIdleImageBytes(key); _harmonyImageCache.set(key, cached); }
         catch (e) { console.warn('[harmony] image reload failed:', e.message); return; }
     }
     if (_harmonyActive && _harmonyImagesEnabled && _currentHarmonyKey === key) {
@@ -1999,7 +1920,6 @@ let socket;
 // Base URL for server API calls — VITE_USER_URL in production, own origin as fallback.
 const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
 ambience.init(_apiBase);
-_clearHarmonyImageCache();
 loadAvoidMap(`${_apiBase}/simAss-static/full_square.png`);
 {
     // In dev, Vite runs on a different port from Express, so connect directly to Express.
@@ -2514,6 +2434,7 @@ function _updateAvoidMapOverlay() {
 // ── Avoidance map upload ──────────────────────────────────────────────────────
 async function loadAvoidMap(source) {
     if (_avoidMapSuppressed) return;
+    _currentAvoidMapSrc = typeof source === 'string' ? source : null;
     _qrOwnedAvoidMap   = false; // user-loaded map; neither QR nor text should clear it
     _textOwnedAvoidMap = false;
     const blob = typeof source === 'string'
@@ -2567,6 +2488,7 @@ async function loadAvoidMap(source) {
 }
 
 function clearAvoidMap() {
+    _currentAvoidMapSrc = null;
     clearAvoidGif();
     if (avoidMapTex) { avoidMapTex.destroy(); avoidMapTex = null; }
     avoidMapTexView    = null;
@@ -3387,14 +3309,16 @@ function frame(ts) {
     fpsFrames++;
 }
 
-// ── simAss image fetch — shared by harmony prefetch ──────────────────────────
-async function _fetchIdleImageBytes() {
-    const res = await fetch(`${_apiBase}/simAss-image`, { cache: 'no-store' });
+// ── simAss image fetch — shared by harmony image loading ─────────────────────
+// The bucket key is sent as ?id= so each bucket deterministically maps to one
+// server image (and the same bucket keeps showing the same image).
+async function _fetchIdleImageBytes(key) {
+    const res = await fetch(`${_apiBase}/simAss-image?id=${key}`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const mime = res.headers.get('content-type')?.split(';')[0].trim() ?? 'image/webp';
     return { bytes: new Uint8Array(await res.arrayBuffer()), mime };
 }
 
-// Harmony images are fetched on demand and cached in localStorage by note sum.
+// Harmony images are fetched on demand and held in the in-memory _harmonyImageCache by bucket key.
 
 requestAnimationFrame(frame);

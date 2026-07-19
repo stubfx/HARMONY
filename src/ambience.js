@@ -18,7 +18,6 @@ let _tremolo    = null;
 let _reverb     = null;
 let _vol        = null;
 let _fadeGain   = null;
-let _noiseGain  = null;
 let _busVol     = null;
 
 async function _buildChain() {
@@ -35,15 +34,7 @@ async function _buildChain() {
     _player.chain(_filter, _dist, _tremolo, _reverb, _vol, _fadeGain);
     _fadeGain.connect(_busVol);
 
-    const noiseBP  = new Tone.Filter({ frequency: 2000, type: 'bandpass', Q: 1.0 });
-    _noiseGain     = new Tone.Gain(0);
-    const noise    = new Tone.Noise('white');
-    noise.connect(noiseBP);
-    noiseBP.connect(_noiseGain);
-    _noiseGain.connect(_fadeGain);
-
     _busVol.toDestination();
-    noise.start();
 
     await _reverb.ready;
     _chainReady = true;

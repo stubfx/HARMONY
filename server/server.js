@@ -388,15 +388,18 @@ async function _simAssFiles(dir) {
 }
 
 
-app.get('/simAss-image', async (_req, res) => {
+app.get('/simAss-image', async (req, res) => {
     const dir   = path.join(_SIM_ASS_DIR, 'images');
-    const files = await _simAssFiles(dir);
+    const files = (await _simAssFiles(dir)).sort();
     console.log(`[simAss-image] request — ${files.length} file(s) available: [${files.join(', ')}]`);
     if (files.length === 0) {
         console.log('[simAss-image] no files in simAss/images — nothing to serve');
         return res.status(404).json({ error: 'no images available' });
     }
-    const chosen = files[Math.floor(Math.random() * files.length)];
+    const id     = Number.parseInt(req.query.id, 10);
+    const chosen = Number.isInteger(id)
+        ? files[((id % files.length) + files.length) % files.length]
+        : files[Math.floor(Math.random() * files.length)];
     const file   = path.join(dir, chosen);
     const mime   = _IMAGE_MIME[path.extname(file).toLowerCase()] ?? 'image/webp';
     console.log(`[simAss-image] serving ${chosen}`);
