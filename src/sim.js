@@ -1817,15 +1817,17 @@ function _evalHarmony() {
 
 // Draw the bitmap into a 4×2 grid, threshold each of the 8 pixel luminances
 // against their mean → 8-bit integer (0–255). Deterministic per image content.
-function _perceptualHash(bitmap) {
-    const oc  = new OffscreenCanvas(4, 2);
-    const ctx = oc.getContext('2d');
-    ctx.drawImage(bitmap, 0, 0, 4, 2);
-    const { data } = ctx.getImageData(0, 0, 4, 2);
-    const lum = Array.from({ length: 8 }, (_, i) =>
-        0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2]);
-    const mean = lum.reduce((a, b) => a + b, 0) / 8;
-    return lum.reduce((hash, l, i) => hash | ((l >= mean ? 1 : 0) << (7 - i)), 0);
+// FNV-1a over up to 512 bytes of raw compressed image data → 8-bit result (0–255).
+// Raw file bytes differ strongly between images even when they look visually similar,
+// giving each image a distinct melodic fingerprint via speakBinary.
+function _imageHash8(bytes) {
+    let h = 2166136261; // FNV-1a offset basis (32-bit)
+    const len = Math.min(bytes.length, 512);
+    for (let i = 0; i < len; i++) {
+        h ^= bytes[i];
+        h = Math.imul(h, 16777619) >>> 0; // FNV prime, unsigned 32-bit
+    }
+    return h & 0xFF; // 8 bits → 0–255 → ~1.6 s cue at 200 ms/bit
 }
 
 async function _enterHarmony(key, sum) {
@@ -1883,7 +1885,7 @@ async function _enterHarmony(key, sum) {
     }
     await loadAvoidMap({ ...decoded, _preDecoded: true });
     _harmonyImageShown = true;
-    speakBinary(_perceptualHash(decoded.frames[0]));
+    speakBinary(_imageHash8(cached.bytes));
     // 50% chance of a visual+audio punch at the reveal moment
     if (Math.random() < 0.5) {
         triggerImpact();
