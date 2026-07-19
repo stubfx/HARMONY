@@ -75,8 +75,9 @@ let _pad = null;  // lifted to module scope for chord re-voicing in setShapePers
 let _lastPadRevoiceT = 0;  // last time the pad chord was re-voiced — throttles rapid image loads
 let _padVol, _padFilter, _padLFO, _droneVol, _arpVol, _arpSeq;
 let _kickVol, _kickLoop, _bassVol, _bassLoop;   // post-drop rhythm section
-let _colorFilter = null;  // master low-pass whose cutoff tracks crowd color temperature
-let _colorOsc    = null;  // reverb-soaked sine gliding C2 (cold) → A2 (warm)
+let _colorFilter  = null;  // master low-pass whose cutoff tracks crowd color temperature
+let _colorOsc     = null;  // reverb-soaked sine gliding C2 (cold) → C4 (warm)
+let _colorOscVol  = null;  // volume node for the color osc — swells with temperature
 let _synthBus = null;  // top-level synth bus volume
 
 // Shape personality state — null means "use defaults / let collective state drive"
@@ -111,11 +112,11 @@ export async function startSynth() {
     // pitch with temperature: C2 (65 Hz) when the crowd is cold, A2 (110 Hz) warm.
     // Barely audible, more felt than heard — gives each color temperature a "voice".
     const colorRev = new Tone.Reverb({ decay: 12, wet: 0.95 });
-    _colorOsc = new Tone.Oscillator({ type: 'sine', frequency: 65 });
-    const colorOscVol = new Tone.Volume(-32);
+    _colorOsc    = new Tone.Oscillator({ type: 'sine', frequency: 65 });
+    _colorOscVol = new Tone.Volume(-40);
     _colorOsc.connect(colorRev);
-    colorRev.connect(colorOscVol);
-    colorOscVol.connect(master);
+    colorRev.connect(_colorOscVol);
+    _colorOscVol.connect(master);
     await colorRev.ready;
     _colorOsc.start();
 
@@ -274,9 +275,11 @@ function _applyState() {
 
     // Color modulation — driven even in droneOnly mode so the room always breathes
     // with color. Filter: 1.2 kHz (cold/dark) → 12 kHz (warm/bright), gentle -12 rolloff.
-    // Color oscillator: C2 (65 Hz) cold → A2 (110 Hz) warm — one consonant 5th glide.
+    // Color oscillator: C2 (65 Hz) cold → C4 (262 Hz) warm — two octaves, clearly audible.
+    // Volume swells with temperature so silence = cold crowd, presence = warm crowd.
     if (_colorFilter) _colorFilter.frequency.rampTo(1200 + tmp * 10800, 3);
-    if (_colorOsc)    _colorOsc.frequency.rampTo(65 * Math.pow(110 / 65, tmp), 4);
+    if (_colorOsc)    _colorOsc.frequency.rampTo(65 * Math.pow(262 / 65, tmp), 1.5);
+    if (_colorOscVol) smoothTo(_colorOscVol.volume, -40 + tmp * 18); // −40 dB cold → −22 dB warm
 
     if (_droneOnly) return; // PHASE 1: solo drone, gli altri layer restano silenziosi
 
