@@ -371,7 +371,7 @@ for (let attempt = 0; attempt < 10 && !adapter; attempt++) {
     }
     adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
 }
-if (!adapter) { showError('No WebGPU adapter found after retries. Please reload.'); throw new Error(); }
+if (!adapter) { location.reload(); throw new Error(); }
 hideError();
 const device = await adapter.requestDevice({
     requiredLimits: {
