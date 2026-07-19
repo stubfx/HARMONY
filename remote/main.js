@@ -147,21 +147,21 @@ function _ensureReverb(ctx) {
 // ── Chirp — local speakBinary played on the phone's own AudioContext ──────────
 // Exactly mirrors the sim's speakBinary: sine gliding between two frequencies,
 // 200ms per bit. note index → value (index+1) → binary string → melodic glide.
-const CHIRP_ONE_HZ  = 1245;  // same as sim's SPEAK_ONE_FREQ
-const CHIRP_ZERO_HZ = 623;   // same as sim's SPEAK_ZERO_FREQ
-const CHIRP_BIT_MS  = 200;
-const CHIRP_COOLDOWN_MS = 800; // minimum gap between chirps per device
+const CHIRP_BIT_MS      = 200;
+const CHIRP_COOLDOWN_MS = 800;
 
 let _chirpCooldownUntil = 0;
 
-function _localChirp(noteIdx) {
+// oneHz / zeroHz are per-zone so each circle has its own distinctive pitch.
+// Default to the original 1245/623 Hz pair for backwards-compat callers.
+function _localChirp(noteIdx, oneHz = 1245, zeroHz = 623) {
     const ctx  = _ensureAudioCtx();
     _ensureReverb(ctx);
-    const value = noteIdx + 1;          // 1–9, giving 1–4 bits
+    const value = noteIdx + 1;
     const bits  = value.toString(2);
     const dur   = (bits.length * CHIRP_BIT_MS) / 1000;
     const glide = (CHIRP_BIT_MS / 1000) * 0.55;
-    const freqAt = i => bits[i] === '1' ? CHIRP_ONE_HZ : CHIRP_ZERO_HZ;
+    const freqAt = i => bits[i] === '1' ? oneHz : zeroHz;
 
     const osc  = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -359,24 +359,55 @@ function _initNoteCanvas() {
         _scheduleBlip();
     }
 
-    function _cf(x, y) {
+    // ── Sound circles — scattered colored discs, each with its own note + pitch ──
+    // X positions evenly spread left (low) → right (high), Y random for organic feel.
+    // oneHz / zeroHz scale with KEYS freq: ×5 / ×2.5 keeps the octave glide character
+    // but shifts each circle into its own pitch register.
+    const CIRCLE_KEYS = [0, 1, 3, 5, 6, 7, 8];
+    const _circles = CIRCLE_KEYS.map((noteIdx, i) => {
+        const freq = KEYS[noteIdx].freq;
+        return {
+            nx:      0.10 + (i / (CIRCLE_KEYS.length - 1)) * 0.80,
+            ny:      0.18 + Math.random() * 0.64,
+            r:       52 + Math.random() * 18,   // pixel radius (52–70 px)
+            noteIdx,
+            color:   KEYS[noteIdx].color,
+            freq,
+            oneHz:   freq * 5,    // e.g. D3 → 734 Hz, A4 → 2200 Hz
+            zeroHz:  freq * 2.5,  //      D3 → 367 Hz, A4 → 1100 Hz
+        };
+    });
+
+    function _circleHit(x, y) {
         const w = noteCanvasEl.width, h = noteCanvasEl.height;
-        const dx = (x / w - 0.5) * 2, dy = (y / h - 0.5) * 2;
-        return Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / Math.SQRT2);
+        // Check in reverse so top-drawn (last) circles are hit first
+        for (let i = _circles.length - 1; i >= 0; i--) {
+            const c = _circles[i];
+            const dx = x - c.nx * w, dy = y - c.ny * h;
+            if (dx * dx + dy * dy <= c.r * c.r) return c;
+        }
+        return null;
     }
 
-    function _noteIdx(x) {
-        return Math.min(KEYS.length - 1, Math.floor(Math.max(0, x / noteCanvasEl.width) * KEYS.length));
-    }
-
-    function _applyColor(y) {
-        const hue = Math.round((Math.max(0, Math.min(1, y / noteCanvasEl.height)) * 270) / 10) * 10;
-        if (hue === _lastSentHue) return;
-        _lastSentHue = hue;
-        const hex = hslToHex(hue, 80, 50);
-        pushedColor = hex;
-        updateAura();
-        sendEvent('color-pick', { color: hex });
+    function _drawCircles(ctx2d, ts) {
+        const w = noteCanvasEl.width, h = noteCanvasEl.height;
+        for (const c of _circles) {
+            const cx   = c.nx * w, cy = c.ny * h;
+            const breathe = 0.85 + 0.15 * Math.sin(ts * 0.0015 + c.nx * 8); // slow pulse
+            ctx2d.save();
+            // Filled disc
+            ctx2d.globalAlpha = 0.28 * breathe;
+            ctx2d.fillStyle   = c.color;
+            ctx2d.beginPath();
+            ctx2d.arc(cx, cy, c.r, 0, Math.PI * 2);
+            ctx2d.fill();
+            // Crisp ring
+            ctx2d.globalAlpha = 0.65 * breathe;
+            ctx2d.strokeStyle = c.color;
+            ctx2d.lineWidth   = 2;
+            ctx2d.stroke();
+            ctx2d.restore();
+        }
     }
 
     // ── Tap-to-chirp ─────────────────────────────────────────────────────────
@@ -384,21 +415,24 @@ function _initNoteCanvas() {
         e.preventDefault();
         if (_blipHit(e.offsetX, e.offsetY, performance.now())) { _popBlip(performance.now()); return; }
 
+        const circle = _circleHit(e.offsetX, e.offsetY);
+        if (!circle) return; // tap empty space = nothing
+
         const now = performance.now();
-        if (now < _chirpCooldownUntil) return; // bird is still singing
+        if (now < _chirpCooldownUntil) return;
         _chirpCooldownUntil = now + CHIRP_COOLDOWN_MS;
 
         if (_audioCtx && _audioCtx.state !== 'running') _audioCtx.resume();
 
-        const noteIdx = _noteIdx(e.offsetX);
-        _applyColor(e.offsetY);
-        _localChirp(noteIdx);
+        pushedColor = circle.color;
+        updateAura();
+        _localChirp(circle.noteIdx, circle.oneHz, circle.zeroHz);
         _spawnChirpRing(e.offsetX, e.offsetY);
         _flashAura();
 
         if (_currentStep >= 1) {
-            const key = KEYS[noteIdx];
-            sendEvent('chirp', { index: noteIdx, freq: key.freq, color: pushedColor });
+            sendEvent('color-pick', { color: circle.color });
+            sendEvent('chirp', { index: circle.noteIdx, freq: circle.freq, color: circle.color });
         }
     });
 
@@ -532,6 +566,7 @@ function _initNoteCanvas() {
         const _w = noteCanvasEl.width, _h = noteCanvasEl.height;
         ctx2d.clearRect(0, 0, _w, _h);
 
+        _drawCircles(ctx2d, ts);
         _tickChirpRings(ctx2d, dt);
 
         // ── Firefly — drifting blip target ─────────────────────────────────
@@ -601,15 +636,26 @@ function _initNoteCanvas() {
             const delay = CHIRP_MIN + Math.random() * (CHIRP_MAX - CHIRP_MIN);
             if (w === 0 || h === 0 || _currentStep < 1) { setTimeout(_botChirp, delay); return; }
             const t = Date.now() / 1000;
-            const x = _botCmdNote !== null
-                ? (_botCmdNote + 0.5) / KEYS.length * w
-                : (Math.sin(t * Math.PI * 2 * fx + px) + 1) / 2 * w;
-            const y = _botCmdHue !== null
-                ? Math.max(0, Math.min(1, _botCmdHue / 270)) * h
-                : (Math.sin(t * Math.PI * 2 * fy + py) + 1) / 2 * h;
-            const noteIdx = _noteIdx(x);
-            _applyColor(y);
-            sendEvent('chirp', { index: noteIdx, freq: KEYS[noteIdx].freq, color: pushedColor });
+            // Pick a circle: if dashboard locked a note, use that circle index;
+            // otherwise wander with Lissajous and pick the circle whose center
+            // is nearest to the wandering position.
+            let circle;
+            if (_botCmdNote !== null) {
+                circle = _circles[Math.min(_botCmdNote, _circles.length - 1)];
+            } else {
+                const bx = (Math.sin(t * Math.PI * 2 * fx + px) + 1) / 2 * w;
+                const by = (Math.sin(t * Math.PI * 2 * fy + py) + 1) / 2 * h;
+                // Pick nearest circle center
+                let bestD = Infinity;
+                circle = _circles[0];
+                for (const c of _circles) {
+                    const dx = bx - c.nx * w, dy = by - c.ny * h;
+                    const d  = dx * dx + dy * dy;
+                    if (d < bestD) { bestD = d; circle = c; }
+                }
+            }
+            pushedColor = circle.color;
+            sendEvent('chirp', { index: circle.noteIdx, freq: circle.freq, color: circle.color });
             setTimeout(_botChirp, delay);
         }
         setTimeout(_botChirp, Math.random() * 3000); // stagger bot start
