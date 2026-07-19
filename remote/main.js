@@ -99,14 +99,9 @@ const KEYS = [
 ];
 
 // ── Audio ─────────────────────────────────────────────────────────────────────
-let _audioCtx     = null;
-let _reverbNode   = null;
-let _reverbSend   = null;
-let _contOsc      = null;
-let _contGainNode = null;
-let _contOscReady = false;
-let _activeNoteIdx = -1;
-let _emitSound     = false;   // whether the note pad produces sound; set externally (story step), audio stays step-agnostic
+let _audioCtx   = null;
+let _reverbNode = null;
+let _reverbSend = null;
 
 function _ensureAudioCtx() {
     if (!_audioCtx) {
@@ -149,25 +144,65 @@ function _ensureReverb(ctx) {
     _reverbSend.connect(ctx.destination);
 }
 
-function _startContOsc() {
-    if (_contOscReady) return;
-    const ctx = _ensureAudioCtx();
+// ── Chirp — local speakBinary played on the phone's own AudioContext ──────────
+// Exactly mirrors the sim's speakBinary: sine gliding between two frequencies,
+// 200ms per bit. note index → value (index+1) → binary string → melodic glide.
+const CHIRP_ONE_HZ  = 1245;  // same as sim's SPEAK_ONE_FREQ
+const CHIRP_ZERO_HZ = 623;   // same as sim's SPEAK_ZERO_FREQ
+const CHIRP_BIT_MS  = 200;
+const CHIRP_COOLDOWN_MS = 800; // minimum gap between chirps per device
+
+let _chirpCooldownUntil = 0;
+
+function _localChirp(noteIdx) {
+    const ctx  = _ensureAudioCtx();
     _ensureReverb(ctx);
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 2200;
-    filter.Q.value = 0.5;
-    _contGainNode = ctx.createGain();
-    _contGainNode.gain.value = 0;
-    _contOsc = ctx.createOscillator();
-    _contOsc.type = 'triangle';
-    _contOsc.frequency.value = KEYS[4].freq;
-    _contOsc.connect(filter);
-    filter.connect(_contGainNode);
-    _contGainNode.connect(ctx.destination);
-    _contGainNode.connect(_reverbNode);
-    _contOsc.start();
-    _contOscReady = true;
+    const value = noteIdx + 1;          // 1–9, giving 1–4 bits
+    const bits  = value.toString(2);
+    const dur   = (bits.length * CHIRP_BIT_MS) / 1000;
+    const glide = (CHIRP_BIT_MS / 1000) * 0.55;
+    const freqAt = i => bits[i] === '1' ? CHIRP_ONE_HZ : CHIRP_ZERO_HZ;
+
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    if (_reverbNode) gain.connect(_reverbNode);
+
+    const t0 = ctx.currentTime + 0.02;
+    osc.frequency.setValueAtTime(freqAt(0), t0);
+    for (let i = 1; i < bits.length; i++) {
+        osc.frequency.exponentialRampToValueAtTime(freqAt(i), t0 + (i * CHIRP_BIT_MS) / 1000 + glide);
+    }
+    gain.gain.setValueAtTime(0.22, t0);
+    gain.gain.linearRampToValueAtTime(0.001, t0 + dur);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.1);
+}
+
+// ── Chirp rings — expanding circle at tap point ───────────────────────────────
+const _chirpRings = [];
+
+function _spawnChirpRing(x, y) {
+    _chirpRings.push({ x, y, t: 0, color: _currentStep >= 2 ? pushedColor : '#ffffff' });
+}
+
+function _tickChirpRings(ctx2d, dt) {
+    for (let i = _chirpRings.length - 1; i >= 0; i--) {
+        const r = _chirpRings[i];
+        r.t += dt;
+        const k = r.t / 0.45;
+        if (k >= 1) { _chirpRings.splice(i, 1); continue; }
+        ctx2d.save();
+        ctx2d.strokeStyle = r.color;
+        ctx2d.lineWidth   = 2;
+        ctx2d.globalAlpha = (1 - k) * 0.85;
+        ctx2d.beginPath();
+        ctx2d.arc(r.x, r.y, 12 + k * 55, 0, Math.PI * 2);
+        ctx2d.stroke();
+        ctx2d.restore();
+    }
 }
 
 // Older iOS (< 16.4) has no navigator.audioSession. Playing a silent looping
@@ -191,35 +226,6 @@ function _silentAudioKick() {
     _silentKickEl.play().catch(() => {});
 }
 
-let _noteDebounceMs    = 0;
-let _noteDebounceTimer = null;
-let _sinePulse         = 0;
-let _poolShake         = 0; // set to 1 on each note change, decays in _tickPool
-
-function _setContNote(noteIdx) {
-    if (!_emitSound || !_contOscReady) return;
-    const t = _audioCtx.currentTime;
-    if (noteIdx !== _activeNoteIdx) {
-        _contOsc.frequency.setTargetAtTime(KEYS[noteIdx].freq, t, 0.04);
-        _activeNoteIdx = noteIdx;
-        _sinePulse = 1;
-        _poolShake = 1;
-        clearTimeout(_noteDebounceTimer);
-        _noteDebounceTimer = setTimeout(() => {
-            sendEvent('note', { index: noteIdx, freq: KEYS[noteIdx].freq, color: KEYS[noteIdx].color });
-        }, _noteDebounceMs);
-    }
-    _contGainNode.gain.setTargetAtTime(0.25, t, 0.05);
-}
-
-function _silenceContNote() {
-    if (!_emitSound || !_contOscReady) return;
-    clearTimeout(_noteDebounceTimer);
-    _noteDebounceTimer = null;
-    _contGainNode.gain.setTargetAtTime(0, _audioCtx.currentTime, 0.12);
-    _activeNoteIdx = -1;
-    sendEvent('note-off', {});
-}
 
 // ── Smoke ─────────────────────────────────────────────────────────────────────
 const _smoke     = [];
@@ -279,7 +285,6 @@ function _initNoteCanvas() {
     new ResizeObserver(resize).observe(noteCanvasEl);
 
     const ctx2d = noteCanvasEl.getContext('2d');
-    let _touching = false, _touchX = 0, _touchY = 0;
     let _lastSentHue = -1;
 
     // ── Blip target ─────────────────────────────────────────────────────────
@@ -350,36 +355,34 @@ function _initNoteCanvas() {
         sendEvent('color-pick', { color: hex });
     }
 
+    // ── Tap-to-chirp ─────────────────────────────────────────────────────────
     noteCanvasEl.addEventListener('pointerdown', (e) => {
         e.preventDefault();
-        if (_blipHit(e.offsetX, e.offsetY)) { _popBlip(); return; } // tap the target, not a note
-        noteCanvasEl.setPointerCapture(e.pointerId);
-        _touching = true;
-        _touchX = e.offsetX; _touchY = e.offsetY;
-        // Safari may re-suspend or interrupt the AudioContext after interruptions
-        // (calls, Siri). Resume here on user gesture without risking autoplay block.
+        if (_blipHit(e.offsetX, e.offsetY)) { _popBlip(); return; }
+
+        const now = performance.now();
+        if (now < _chirpCooldownUntil) return; // bird is still singing
+        _chirpCooldownUntil = now + CHIRP_COOLDOWN_MS;
+
         if (_audioCtx && _audioCtx.state !== 'running') _audioCtx.resume();
-        _setContNote(_noteIdx(_touchX));
-        _applyColor(_touchY);
+
+        const noteIdx = _noteIdx(e.offsetX);
+        _applyColor(e.offsetY);
+        _localChirp(noteIdx);
+        _spawnChirpRing(e.offsetX, e.offsetY);
+        _flashAura();
+
+        if (_currentStep >= 1) {
+            const key = KEYS[noteIdx];
+            sendEvent('chirp', { index: noteIdx, freq: key.freq, color: pushedColor });
+        }
     });
 
-    noteCanvasEl.addEventListener('pointermove', (e) => {
-        if (!_touching) return;
-        _touchX = e.offsetX; _touchY = e.offsetY;
-        _setContNote(_noteIdx(_touchX));
-        _applyColor(_touchY);
-    });
-
-    noteCanvasEl.addEventListener('pointerup',     () => { _touching = false; _silenceContNote(); });
-    noteCanvasEl.addEventListener('pointercancel', () => { _touching = false; _silenceContNote(); });
-
-    let _lastSpawn  = 0;
     let _lastChaosT = 0;
 
-    // ── Sine wave state ───────────────────────────────────────────────────────
+    // ── Sine wave state (kept for potential future use) ────────────────────
     let _sineAmp   = 0;
     let _sinePhase = 0;
-    // _sinePulse is module-level (set by _setContNote on note change)
 
     function _drawSine(w, h, dt) {
         return; // sine wave replaced by pixel pool interaction
@@ -502,13 +505,10 @@ function _initNoteCanvas() {
         _adaptPoolMax(dt);
         _lastChaosT = ts;
 
-        ctx2d.clearRect(0, 0, noteCanvasEl.width, noteCanvasEl.height);
+        const _w = noteCanvasEl.width, _h = noteCanvasEl.height;
+        ctx2d.clearRect(0, 0, _w, _h);
 
-        if (_touching && ts - _lastSpawn > 25) {
-            _spawnSmoke(_touchX, _touchY, _cf(_touchX, _touchY));
-            _lastSpawn = ts;
-        }
-        _tickSmoke(ctx2d, noteCanvasEl.width, noteCanvasEl.height);
+        _tickChirpRings(ctx2d, dt);
 
         // ── Blip target + tap-burst ─────────────────────────────────────────
         if (_blip) {
@@ -560,46 +560,30 @@ function _initNoteCanvas() {
     // path a real pointermove takes so smoke, aura and server events match.
     if (isBot) {
         const i  = parseInt(urlParams.get('i') ?? '0', 10) || 0;
-        const fx = 0.11 + (i % 5) * 0.017;          // horizontal wander frequency (Hz)
-        const fy = 0.07 + (i % 3) * 0.023;          // vertical wander frequency (Hz)
-        const px = (i * 1.3) % (Math.PI * 2);       // phase offsets so tiles differ
+        const fx = 0.11 + (i % 5) * 0.017;
+        const fy = 0.07 + (i % 3) * 0.023;
+        const px = (i * 1.3) % (Math.PI * 2);
         const py = (i * 2.1) % (Math.PI * 2);
-        const LIFT_PERIOD = 4000 + (i % 5) * 600;   // "lift the finger" cadence (ms)
-        const LIFT_DUR    = 500;
-        const liftOffset  = (i * 700) % LIFT_PERIOD;
+        const CHIRP_MIN = 2000 + (i % 4) * 500;
+        const CHIRP_MAX = 5000 + (i % 3) * 1000;
 
-        (function botLoop(ts) {
-            requestAnimationFrame(botLoop);
+        function _botChirp() {
             const w = noteCanvasEl.width, h = noteCanvasEl.height;
-            if (w === 0 || h === 0) return;
-            // Break off the wander to chase a blip target, then resume next frame.
-            if (_blip) {
-                _touching = true;
-                _touchX += (_blip.x - _touchX) * 0.15;
-                _touchY += (_blip.y - _touchY) * 0.15;
-                _setContNote(_noteIdx(_touchX));
-                _applyColor(_touchY);
-                if (_blipHit(_touchX, _touchY)) _popBlip();
-                return;
-            }
-            // When the dashboard has synced this bot, hold a steady finger (no lift)
-            // so the note/colour stays locked; otherwise phrase with periodic lifts.
-            const synced = _botCmdNote !== null || _botCmdHue !== null;
-            if (!synced && ((ts + liftOffset) % LIFT_PERIOD) < LIFT_DUR) {
-                if (_touching) { _touching = false; _silenceContNote(); }
-                return;
-            }
-            const t = ts / 1000;
-            _touching = true;
-            _touchX = _botCmdNote !== null
+            const delay = CHIRP_MIN + Math.random() * (CHIRP_MAX - CHIRP_MIN);
+            if (w === 0 || h === 0 || _currentStep < 1) { setTimeout(_botChirp, delay); return; }
+            const t = Date.now() / 1000;
+            const x = _botCmdNote !== null
                 ? (_botCmdNote + 0.5) / KEYS.length * w
                 : (Math.sin(t * Math.PI * 2 * fx + px) + 1) / 2 * w;
-            _touchY = _botCmdHue !== null
+            const y = _botCmdHue !== null
                 ? Math.max(0, Math.min(1, _botCmdHue / 270)) * h
                 : (Math.sin(t * Math.PI * 2 * fy + py) + 1) / 2 * h;
-            _setContNote(_noteIdx(_touchX));
-            _applyColor(_touchY);
-        })(0);
+            const noteIdx = _noteIdx(x);
+            _applyColor(y);
+            sendEvent('chirp', { index: noteIdx, freq: KEYS[noteIdx].freq, color: pushedColor });
+            setTimeout(_botChirp, delay);
+        }
+        setTimeout(_botChirp, Math.random() * 3000); // stagger bot start
     }
 
     // Start the blip cycle — shared by real phones and bots.
@@ -611,9 +595,6 @@ function _initNoteCanvas() {
 const _stepDebug = document.querySelector('#step-debug');
 socket.on('story-step', ({ step } = {}) => {
     _currentStep = typeof step === 'number' ? step : -1;
-    _emitSound   = _currentStep > 0;   // note pad is audible from step 1 onward
-    // Debug display only: show the 1-based phase number to match the host GUI.
-    // The wire value and all gating above stay 0-based (the STORY array index).
     if (_stepDebug) _stepDebug.textContent = _currentStep >= 0 ? _currentStep + 1 : '';
     updateAura();
 });
@@ -623,26 +604,18 @@ socket.on('story-step', ({ step } = {}) => {
 // AudioContext requires a user gesture, so the oscillator is deferred.
 const _tapHint = document.querySelector('#tap-hint');
 _initNoteCanvas();
-// Bots have no human to tap: start the oscillator now so notes emit. The
-// AudioContext is created but stays suspended (no user gesture), so the tiles
-// drive events while staying silent.
 if (isBot) {
     _tapHint?.classList.add('hidden');
-    try { _startContOsc(); } catch { /* suspended context is expected without a gesture */ }
-    // Parent (simremotes dashboard) → bot commands: lock this tile's finger to a
-    // fixed note (X) and/or colour hue (Y), or release back to autonomous wandering.
     window.addEventListener('message', (e) => {
         if (e.origin !== window.location.origin) return;
         const d = e.data;
         if (!d || d.type !== 'bot-cmd') return;
-        if ('note' in d) _botCmdNote = d.note;   // 0–8, or null to release
-        if ('hue'  in d) _botCmdHue  = d.hue;     // 0–270, or null to release
+        if ('note' in d) _botCmdNote = d.note;
+        if ('hue'  in d) _botCmdHue  = d.hue;
     });
-    // Tell the dashboard we're ready so it can push the current sync state.
-    try { window.parent?.postMessage({ type: 'bot-ready' }, window.location.origin); } catch { /* not framed */ }
+    try { window.parent?.postMessage({ type: 'bot-ready' }, window.location.origin); } catch {}
 }
 document.addEventListener('pointerdown', () => {
     _silentAudioKick();
-    _startContOsc();
     _tapHint?.classList.add('hidden');
 }, { once: true });

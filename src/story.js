@@ -132,12 +132,23 @@ export const STORY = [
                 this._enableTimer = setTimeout(() => {
                     log('cue terminato — note abilitate.');
                     this._notesEnabled = true;
+                    // Fallback: if no chirp/note arrives within 30s, advance anyway.
+                    // Ensures the show is never blocked by a silent crowd.
+                    this._fallbackTimer = setTimeout(() => {
+                        if (!this._noteTimerStarted) {
+                            this._noteTimerStarted = true;
+                            log('30s senza note — avanzamento automatico a PHASE 3.');
+                            sim.setParam('windEnabled', true);
+                            setTimeout(() => sim.next(), 20_000);
+                        }
+                    }, 30_000);
                 }, PHASE_CUE_HOLD_MS);
             }, 10_000);
         },
         onNote(sim, noteIndex) {
             if (!this._notesEnabled || this._noteTimerStarted) return;
             this._noteTimerStarted = true;
+            clearTimeout(this._fallbackTimer);
             sim.setParam('windEnabled', true);
             log('prima nota ricevuta (index ' + noteIndex + '). wind abilitato. timer 20s avviato → PHASE 3.');
             setTimeout(() => {
@@ -149,6 +160,7 @@ export const STORY = [
             log('uscita PHASE 2.');
             clearTimeout(this._cueTimer);
             clearTimeout(this._enableTimer);
+            clearTimeout(this._fallbackTimer);
             sim.thawParams();
         },
     },

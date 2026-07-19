@@ -1746,6 +1746,7 @@ const activeSlots = [];
 
 // Note-driven formula selection: sum of active note indices → modulo on formula arrays.
 const _activeNotesBySpectator = new Map(); // spectatorId → noteIndex (0–8)
+const _burstExpiry = new Map();            // spectatorId → timeoutId for auto-expiry (chirp/burst)
 let _noteFormulaTimer  = null;
 let _pendingFormulas   = null;        // latest { dir, wind } requested while throttled
 let _lastFormulaApplyT = 0;           // timestamp of the last applied formula change
@@ -2175,6 +2176,8 @@ let pulseEnergy = 0;
                 uploadSpectatorSlots();
             }
             _activeNotesBySpectator.delete(spectatorId);
+            clearTimeout(_burstExpiry.get(spectatorId));
+            _burstExpiry.delete(spectatorId);
         }
     });
 
@@ -2229,8 +2232,30 @@ let pulseEnergy = 0;
                 storyEngine.onNote(event.data.index);
             }
         }
+        if (event.type === 'chirp' && typeof event.data?.index === 'number') {
+            const { index, freq, color } = event.data;
+            const chirpSlot = activeSlots.find(s => s.spectatorId === event.spectatorId);
+            if (chirpSlot) {
+                triggerReleaseBurst(chirpSlot);
+                chirpSlot.formulaIdx = index;
+                if (color) { const [r, g, b] = hexToF(color); chirpSlot.colorR = r; chirpSlot.colorG = g; chirpSlot.colorB = b; }
+                uploadSpectatorSlots();
+            }
+            if (freq) addArpInfluence(freq);
+            clearTimeout(_burstExpiry.get(event.spectatorId));
+            _activeNotesBySpectator.set(event.spectatorId, index);
+            _recalcNoteFormulas();
+            storyEngine.onNote(index);
+            _burstExpiry.set(event.spectatorId, setTimeout(() => {
+                _activeNotesBySpectator.delete(event.spectatorId);
+                _burstExpiry.delete(event.spectatorId);
+                _recalcNoteFormulas();
+            }, 4000));
+        }
         if (event.type === 'note-off') {
             _activeNotesBySpectator.delete(event.spectatorId);
+            clearTimeout(_burstExpiry.get(event.spectatorId));
+            _burstExpiry.delete(event.spectatorId);
         }
         if (event.type === 'blip') {
             // A random chime (like the sim's own ambient blips) plus a one-shot
