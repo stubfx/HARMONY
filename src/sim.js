@@ -1442,6 +1442,56 @@ async function decodeAnimatedImage(blob) {
     finally { decoder?.close(); }
 }
 
+const AVOID_MAP_MAX_PX = 1024;
+
+async function _capBitmap(bmp) {
+    const longest = Math.max(bmp.width, bmp.height);
+    if (longest <= AVOID_MAP_MAX_PX) return bmp;
+    const scale = AVOID_MAP_MAX_PX / longest;
+    const resized = await createImageBitmap(bmp, {
+        resizeWidth:   Math.round(bmp.width  * scale),
+        resizeHeight:  Math.round(bmp.height * scale),
+        resizeQuality: 'medium',
+    });
+    bmp.close();
+    return resized;
+}
+
+// Decode blob → { frames: ImageBitmap[], durations: number[]|null }.
+// Handles SVG, animated GIF, and static images. Applies _capBitmap to
+// every frame so the result is always upload-ready at a bounded size.
+async function _predecodeBitmap(blob) {
+    const isSvg = blob.type === 'image/svg+xml' || blob.name?.toLowerCase().endsWith('.svg');
+    if (isSvg) {
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+        URL.revokeObjectURL(url);
+        const cw = canvas.width, ch = canvas.height;
+        const offscreen = new OffscreenCanvas(cw, ch);
+        const ctx2 = offscreen.getContext('2d');
+        ctx2.fillStyle = '#000000';
+        ctx2.fillRect(0, 0, cw, ch);
+        const imgW = img.naturalWidth  || cw;
+        const imgH = img.naturalHeight || ch;
+        const scale = Math.min(cw / imgW, ch / imgH);
+        const dw = imgW * scale, dh = imgH * scale;
+        ctx2.filter = 'invert(1)';
+        ctx2.drawImage(img, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
+        ctx2.filter = 'none';
+        const bmp = await createImageBitmap(offscreen);
+        return { frames: [await _capBitmap(bmp)], durations: null };
+    }
+    const anim = await decodeAnimatedImage(blob);
+    if (anim) {
+        const frames = [];
+        for (const f of anim.frames) frames.push(await _capBitmap(f));
+        return { frames, durations: anim.durations };
+    }
+    const bmp = await createImageBitmap(blob, { colorSpaceConversion: 'none' });
+    return { frames: [await _capBitmap(bmp)], durations: null };
+}
+
 function clearAvoidGif() {
     if (avoidGifFrames) avoidGifFrames.forEach(b => b.close());
     avoidGifFrames = null; avoidGifDurations = null; avoidGifFrameIdx = 0; avoidGifNextFrameAt = 0;
@@ -1791,15 +1841,21 @@ async function _enterHarmony(key, sum) {
     if (_harmonyRiserResetFn) _harmonyRiserResetFn();
     console.log('[harmony] riser start %.0fms', riserDur);
     playRiser(riserDur);
-    await new Promise(r => setTimeout(r, riserDur));
+    const blob = new Blob([cached.bytes], { type: cached.mime });
+    // decode concurrently with the riser — hides the latency inside the audio window
+    const [decoded] = await Promise.all([
+        _predecodeBitmap(blob),
+        new Promise(r => setTimeout(r, riserDur)),
+    ]);
 
-    // Guard again — user may have changed notes during the riser
-    if (!_harmonyImagesEnabled || _currentHarmonyKey !== key) return;
-
-    await loadAvoidMap(new Blob([cached.bytes], { type: cached.mime }));
-    _harmonyImageShown = true;
+    if (!_harmonyImagesEnabled || _currentHarmonyKey !== key) {
+        decoded.frames.forEach(f => f.close());
+        return;
+    }
     console.log('[harmony] resolveRiser');
     resolveRiser();                        // beat + bus restore at the reveal moment
+    await loadAvoidMap({ ...decoded, _preDecoded: true });
+    _harmonyImageShown = true;
     setShapePersonality('h' + (sum % 5)); // personality keyed on the raw note sum
     _startHarmonyHold();
 }
@@ -2455,45 +2511,33 @@ function _updateAvoidMapOverlay() {
 }
 
 // ── Avoidance map upload ──────────────────────────────────────────────────────
+// source: string URL | Blob/File | { frames, durations, _preDecoded: true }
 async function loadAvoidMap(source) {
     if (_avoidMapSuppressed) return;
     _currentAvoidMapSrc = typeof source === 'string' ? source : null;
-    _qrOwnedAvoidMap   = false; // user-loaded map; neither QR nor text should clear it
+    _qrOwnedAvoidMap   = false;
     _textOwnedAvoidMap = false;
-    const blob = typeof source === 'string'
-        ? await fetch(source).then(r => r.blob())
-        : source; // File is a Blob
-    clearAvoidGif();
-    const isSvg = blob.type === 'image/svg+xml' || (typeof source === 'object' && source?.name?.toLowerCase().endsWith('.svg'));
-    let bmp;
-    if (isSvg) {
-        const url = URL.createObjectURL(blob);
-        const img = new Image();
-        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
-        URL.revokeObjectURL(url);
-        const cw = canvas.width, ch = canvas.height;
-        const offscreen = new OffscreenCanvas(cw, ch);
-        const ctx2 = offscreen.getContext('2d');
-        ctx2.fillStyle = '#000000';
-        ctx2.fillRect(0, 0, cw, ch);
-        const imgW = img.naturalWidth  || cw;
-        const imgH = img.naturalHeight || ch;
-        const scale = Math.min(cw / imgW, ch / imgH);
-        const dw = imgW * scale, dh = imgH * scale;
-        ctx2.filter = 'invert(1)';
-        ctx2.drawImage(img, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
-        ctx2.filter = 'none';
-        bmp = await createImageBitmap(offscreen);
+
+    let decoded;
+    if (source?._preDecoded) {
+        decoded = source;
     } else {
-        const anim = await decodeAnimatedImage(blob);
-        if (anim) {
-            avoidGifFrames = anim.frames; avoidGifDurations = anim.durations;
-            avoidGifFrameIdx = 0; avoidGifNextFrameAt = performance.now() + avoidGifDurations[0];
-            bmp = avoidGifFrames[0];
-        } else {
-            bmp = await createImageBitmap(blob, { colorSpaceConversion: 'none' });
-        }
+        const blob = typeof source === 'string'
+            ? await fetch(source).then(r => r.blob())
+            : source;
+        decoded = await _predecodeBitmap(blob);
     }
+
+    clearAvoidGif();
+    const { frames, durations } = decoded;
+    const bmp = frames[0];
+    if (durations && frames.length > 1) {
+        avoidGifFrames      = frames;
+        avoidGifDurations   = durations;
+        avoidGifFrameIdx    = 0;
+        avoidGifNextFrameAt = performance.now() + durations[0];
+    }
+
     if (avoidMapTex) avoidMapTex.destroy();
     avoidMapTex = device.createTexture({
         size:   [bmp.width, bmp.height],
