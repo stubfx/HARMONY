@@ -183,6 +183,7 @@ const _forcedSession = _urlParams.get('s') || null;
     const v = _urlParams.get('autoscale');
     if (v === 'true' || v === '1') params.autoScale = true;
 }
+const _savedPhase = parseInt(_urlParams.get('phase') ?? '', 10); // 1–9 or NaN
 
 const DEFAULT_DIR  = 'atan2(y-cy,x-cx) + sin(length(vec2(x-cx,y-cy))*0.012 - t*1.5)*PI';
 const DEFAULT_WIND = 'sin(x * 0.004 - y * 0.003 + t * 0.4) * TWO_PI';
@@ -735,6 +736,10 @@ const simFacade = {
     },
 };
 const storyEngine = new StoryEngine(STORY, simFacade);
+storyEngine.onGoto = (i) => {
+    _urlParams.set('phase', i + 1); // store 1-indexed for readability
+    history.replaceState(null, '', '?' + _urlParams.toString());
+};
 
 // ── Static pipelines & resources ──────────────────────────────────────────────
 const screenSmp = device.createSampler({
@@ -2488,12 +2493,22 @@ function _syncAudioBanner() {
     _audioBanner?.classList.toggle('unlocked', isAudioReady());
 }
 
-document.addEventListener('pointerdown', async () => {
-    await unlockAudio();
-    if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
-    _syncAudioBanner();
-    storyEngine.start();
-}, { once: true });
+const _validSavedPhase = Number.isFinite(_savedPhase) && _savedPhase >= 1 && _savedPhase <= 9;
+
+if (_validSavedPhase) {
+    // Auto-resume: skip the overlay, replay state up to the saved phase instantly.
+    // Audio will unlock on the next user interaction (first Tone.start() call).
+    _audioBanner?.classList.add('unlocked');
+    const targetIdx = _savedPhase - 1; // convert to 0-indexed
+    for (let i = 0; i <= targetIdx; i++) storyEngine.goto(i);
+} else {
+    document.addEventListener('pointerdown', async () => {
+        await unlockAudio();
+        if (socket?.connected) socket.emit('audio-state', { locked: isAudioLocked() });
+        _syncAudioBanner();
+        storyEngine.start();
+    }, { once: true });
+}
 
 // ── Avoidance map overlay ─────────────────────────────────────────────────────
 function _updateAvoidMapOverlay() {
