@@ -144,32 +144,41 @@ function _ensureReverb(ctx) {
     _reverbSend.connect(ctx.destination);
 }
 
-// ── Chirp — single-pitch bip at the zone's own frequency ─────────────────────
-// Each colored zone has one note. Tapping it plays a short sine bip at that
-// exact pitch — no binary glide, just the zone's distinctive voice.
-const CHIRP_COOLDOWN_MS = 800;
+// ── Chirp — local speakBinary played on the phone's own AudioContext ──────────
+// Exactly mirrors the sim's speakBinary: sine gliding between two frequencies,
+// 200ms per bit. note index → value (index+1) → binary string → melodic glide.
+const CHIRP_ONE_HZ  = 1245;  // same as sim's SPEAK_ONE_FREQ
+const CHIRP_ZERO_HZ = 623;   // same as sim's SPEAK_ZERO_FREQ
+const CHIRP_BIT_MS  = 200;
+const CHIRP_COOLDOWN_MS = 800; // minimum gap between chirps per device
 
 let _chirpCooldownUntil = 0;
 
-function _localBip(freq) {
+function _localChirp(noteIdx) {
     const ctx  = _ensureAudioCtx();
     _ensureReverb(ctx);
+    const value = noteIdx + 1;          // 1–9, giving 1–4 bits
+    const bits  = value.toString(2);
+    const dur   = (bits.length * CHIRP_BIT_MS) / 1000;
+    const glide = (CHIRP_BIT_MS / 1000) * 0.55;
+    const freqAt = i => bits[i] === '1' ? CHIRP_ONE_HZ : CHIRP_ZERO_HZ;
+
     const osc  = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';
-    osc.frequency.value = freq;
     osc.connect(gain);
     gain.connect(ctx.destination);
     if (_reverbNode) gain.connect(_reverbNode);
-    const t = ctx.currentTime + 0.01;
-    gain.gain.setValueAtTime(0.28, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
-    osc.start(t);
-    osc.stop(t + 0.45);
-}
 
-function hexToRGB(hex) {
-    return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
+    const t0 = ctx.currentTime + 0.02;
+    osc.frequency.setValueAtTime(freqAt(0), t0);
+    for (let i = 1; i < bits.length; i++) {
+        osc.frequency.exponentialRampToValueAtTime(freqAt(i), t0 + (i * CHIRP_BIT_MS) / 1000 + glide);
+    }
+    gain.gain.setValueAtTime(0.22, t0);
+    gain.gain.linearRampToValueAtTime(0.001, t0 + dur);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.1);
 }
 
 // ── Chirp rings — expanding circle at tap point ───────────────────────────────
@@ -350,60 +359,24 @@ function _initNoteCanvas() {
         _scheduleBlip();
     }
 
-    // ── Sound zones — scattered colored light blobs, each with its own note ─────
-    // X positions are evenly spread left→right (preserving X=note relationship).
-    // Y positions are random so the layout looks organic, not like a grid.
-    // Each phone generates its own unique territory; collectively a living forest.
-    const ZONE_NOTE_INDICES = [0, 1, 3, 5, 6, 7, 8]; // 7 notes spread across KEYS
-    const _zones = ZONE_NOTE_INDICES.map((noteIdx, i) => {
-        const [rr, gg, bb] = hexToRGB(KEYS[noteIdx].color);
-        return {
-            nx:      0.08 + (i / (ZONE_NOTE_INDICES.length - 1)) * 0.84, // 8%–92% width
-            ny:      0.15 + Math.random() * 0.70,                         // 15%–85% height
-            nr:      0.32 + Math.random() * 0.14,                         // radius fraction of min(w,h)
-            noteIdx,
-            freq:    KEYS[noteIdx].freq,
-            color:   KEYS[noteIdx].color,
-            rgb:     [rr, gg, bb],
-        };
-    });
-
-    function _nearestZone(x, y) {
+    function _cf(x, y) {
         const w = noteCanvasEl.width, h = noteCanvasEl.height;
-        let best = _zones[0], bestD = Infinity;
-        for (const z of _zones) {
-            const dx = x - z.nx * w, dy = y - z.ny * h;
-            const d  = dx * dx + dy * dy;
-            if (d < bestD) { bestD = d; best = z; }
-        }
-        return best;
+        const dx = (x / w - 0.5) * 2, dy = (y / h - 0.5) * 2;
+        return Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / Math.SQRT2);
     }
 
-    function _drawZones(ctx2d) {
-        const w = noteCanvasEl.width, h = noteCanvasEl.height;
-        const m = Math.min(w, h);
-        ctx2d.save();
-        for (const z of _zones) {
-            const cx = z.nx * w, cy = z.ny * h, r = z.nr * m;
-            const [rr, gg, bb] = z.rgb;
-            const grd = ctx2d.createRadialGradient(cx, cy, 0, cx, cy, r);
-            grd.addColorStop(0,   `rgba(${rr},${gg},${bb},0.22)`);
-            grd.addColorStop(0.45,`rgba(${rr},${gg},${bb},0.10)`);
-            grd.addColorStop(1,   `rgba(${rr},${gg},${bb},0)`);
-            ctx2d.fillStyle = grd;
-            ctx2d.beginPath();
-            ctx2d.arc(cx, cy, r, 0, Math.PI * 2);
-            ctx2d.fill();
-        }
-        ctx2d.restore();
+    function _noteIdx(x) {
+        return Math.min(KEYS.length - 1, Math.floor(Math.max(0, x / noteCanvasEl.width) * KEYS.length));
     }
 
-    function _pickZone(x, y) {
-        const zone = _nearestZone(x, y);
-        pushedColor = zone.color;
+    function _applyColor(y) {
+        const hue = Math.round((Math.max(0, Math.min(1, y / noteCanvasEl.height)) * 270) / 10) * 10;
+        if (hue === _lastSentHue) return;
+        _lastSentHue = hue;
+        const hex = hslToHex(hue, 80, 50);
+        pushedColor = hex;
         updateAura();
-        sendEvent('color-pick', { color: zone.color });
-        return zone;
+        sendEvent('color-pick', { color: hex });
     }
 
     // ── Tap-to-chirp ─────────────────────────────────────────────────────────
@@ -412,18 +385,20 @@ function _initNoteCanvas() {
         if (_blipHit(e.offsetX, e.offsetY, performance.now())) { _popBlip(performance.now()); return; }
 
         const now = performance.now();
-        if (now < _chirpCooldownUntil) return;
+        if (now < _chirpCooldownUntil) return; // bird is still singing
         _chirpCooldownUntil = now + CHIRP_COOLDOWN_MS;
 
         if (_audioCtx && _audioCtx.state !== 'running') _audioCtx.resume();
 
-        const zone = _pickZone(e.offsetX, e.offsetY);
-        _localBip(zone.freq);
+        const noteIdx = _noteIdx(e.offsetX);
+        _applyColor(e.offsetY);
+        _localChirp(noteIdx);
         _spawnChirpRing(e.offsetX, e.offsetY);
         _flashAura();
 
         if (_currentStep >= 1) {
-            sendEvent('chirp', { index: zone.noteIdx, freq: zone.freq, color: zone.color });
+            const key = KEYS[noteIdx];
+            sendEvent('chirp', { index: noteIdx, freq: key.freq, color: pushedColor });
         }
     });
 
@@ -557,7 +532,6 @@ function _initNoteCanvas() {
         const _w = noteCanvasEl.width, _h = noteCanvasEl.height;
         ctx2d.clearRect(0, 0, _w, _h);
 
-        _drawZones(ctx2d);
         _tickChirpRings(ctx2d, dt);
 
         // ── Firefly — drifting blip target ─────────────────────────────────
@@ -628,12 +602,14 @@ function _initNoteCanvas() {
             if (w === 0 || h === 0 || _currentStep < 1) { setTimeout(_botChirp, delay); return; }
             const t = Date.now() / 1000;
             const x = _botCmdNote !== null
-                ? (_zones[Math.min(_botCmdNote, _zones.length - 1)].nx * w)
+                ? (_botCmdNote + 0.5) / KEYS.length * w
                 : (Math.sin(t * Math.PI * 2 * fx + px) + 1) / 2 * w;
-            const y = (Math.sin(t * Math.PI * 2 * fy + py) + 1) / 2 * h;
-            const zone = _nearestZone(x, y);
-            pushedColor = zone.color;
-            sendEvent('chirp', { index: zone.noteIdx, freq: zone.freq, color: zone.color });
+            const y = _botCmdHue !== null
+                ? Math.max(0, Math.min(1, _botCmdHue / 270)) * h
+                : (Math.sin(t * Math.PI * 2 * fy + py) + 1) / 2 * h;
+            const noteIdx = _noteIdx(x);
+            _applyColor(y);
+            sendEvent('chirp', { index: noteIdx, freq: KEYS[noteIdx].freq, color: pushedColor });
             setTimeout(_botChirp, delay);
         }
         setTimeout(_botChirp, Math.random() * 3000); // stagger bot start
