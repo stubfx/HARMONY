@@ -2554,6 +2554,23 @@ function _updateAvoidMapOverlay() {
     _avoidMapOverlayEl.style.opacity = '1';
 }
 
+// ── Static image cache ────────────────────────────────────────────────────────
+// Keyed by URL string. Animated GIFs are evicted after first decode so their
+// frames are never re-used after clearAvoidGif() closes them.
+// ImageBitmap is safe to reuse: copyExternalImageToTexture does not consume it.
+const _decodedImageCache = new Map(); // URL → Promise<{frames, durations}>
+
+function _cachedDecode(url) {
+    if (!_decodedImageCache.has(url)) {
+        const p = fetch(url).then(r => r.blob()).then(b => _predecodeBitmap(b)).then(decoded => {
+            if (decoded.durations !== null) _decodedImageCache.delete(url); // don't cache animated GIFs
+            return decoded;
+        });
+        _decodedImageCache.set(url, p);
+    }
+    return _decodedImageCache.get(url);
+}
+
 // ── Avoidance map upload ──────────────────────────────────────────────────────
 // source: string URL | Blob/File | { frames, durations, _preDecoded: true }
 async function loadAvoidMap(source) {
@@ -2565,11 +2582,10 @@ async function loadAvoidMap(source) {
     let decoded;
     if (source?._preDecoded) {
         decoded = source;
+    } else if (typeof source === 'string') {
+        decoded = await _cachedDecode(source);
     } else {
-        const blob = typeof source === 'string'
-            ? await fetch(source).then(r => r.blob())
-            : source;
-        decoded = await _predecodeBitmap(blob);
+        decoded = await _predecodeBitmap(source);
     }
 
     clearAvoidGif();
