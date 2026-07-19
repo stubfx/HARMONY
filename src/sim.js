@@ -736,11 +736,6 @@ const simFacade = {
     },
 };
 const storyEngine = new StoryEngine(STORY, simFacade);
-storyEngine.onGoto = (i) => {
-    _urlParams.set('phase', i + 1); // store 1-indexed for readability
-    history.replaceState(null, '', '?' + _urlParams.toString());
-};
-
 // ── Static pipelines & resources ──────────────────────────────────────────────
 const screenSmp = device.createSampler({
     magFilter: 'linear', minFilter: 'linear',
@@ -2397,6 +2392,8 @@ function applySimParams(data) {
 autoScaleCtrl.updateDisplay();
 
 storyEngine.onGoto = (i) => {
+    _urlParams.set('phase', i + 1);
+    history.replaceState(null, '', '?' + _urlParams.toString());
     storyPhaseCtrl.updateDisplay();
     socket?.emit('story-step', { step: i });
     emitSimState();
