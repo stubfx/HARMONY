@@ -1814,6 +1814,19 @@ function _evalHarmony() {
     }
 }
 
+// Draw the bitmap into a 4×2 grid, threshold each of the 8 pixel luminances
+// against their mean → 8-bit integer (0–255). Deterministic per image content.
+function _perceptualHash(bitmap) {
+    const oc  = new OffscreenCanvas(4, 2);
+    const ctx = oc.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0, 4, 2);
+    const { data } = ctx.getImageData(0, 0, 4, 2);
+    const lum = Array.from({ length: 8 }, (_, i) =>
+        0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2]);
+    const mean = lum.reduce((a, b) => a + b, 0) / 8;
+    return lum.reduce((hash, l, i) => hash | ((l >= mean ? 1 : 0) << (7 - i)), 0);
+}
+
 async function _enterHarmony(key, sum) {
     if (_harmonyActive && _currentHarmonyKey === key) return;
     console.log('[harmony] found key=%d sum=%d speaking=%s', key, sum, isSpeaking());
@@ -1869,6 +1882,7 @@ async function _enterHarmony(key, sum) {
     }
     await loadAvoidMap({ ...decoded, _preDecoded: true });
     _harmonyImageShown = true;
+    speakBinary(_perceptualHash(decoded.frames[0]));
     // 50% chance of a visual+audio punch at the reveal moment
     if (Math.random() < 0.5) {
         triggerImpact();
