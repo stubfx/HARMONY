@@ -290,9 +290,12 @@ function _initNoteCanvas() {
     // ── Blip target ─────────────────────────────────────────────────────────
     // A small circle that pops up at a random interval; tapping it fires a blip
     // on the big screen. Only appears during interactive phases (step >= 1).
-    const BLIP_MIN_MS = 30000, BLIP_MAX_MS = 60000, BLIP_LIFETIME_MS = 8000;
-    let _blip = null;       // { x, y, r, born } | null — the live target
-    let _blipPop = null;    // { x, y, r, t } | null — the tap-burst animation
+    // ── Firefly — drifting blip target ──────────────────────────────────────────
+    // Replaces the static pulsing ring. The firefly wanders in a slow Lissajous
+    // figure around its spawn point. Tap near it to catch it and fire a blip.
+    const BLIP_MIN_MS = 30000, BLIP_MAX_MS = 60000, BLIP_LIFETIME_MS = 10000;
+    let _blip    = null; // { cx, cy, r, born, ax, ay, fx, fy, px, py } | null
+    let _blipPop = null; // { x, y, r, t } — burst at the captured live position
     let _blipTimer = null;
 
     function _scheduleBlip() {
@@ -301,18 +304,38 @@ function _initNoteCanvas() {
     }
 
     function _spawnBlip() {
-        if (_currentStep < 1) { _scheduleBlip(); return; } // never on the intro screen
+        if (_currentStep < 1) { _scheduleBlip(); return; }
         const w = noteCanvasEl.width, h = noteCanvasEl.height;
-        const r = Math.max(26, Math.min(w, h) * 0.09);
-        const margin = 2 * r; // keep dot + pop ring on-canvas
-        const x = margin + Math.random() * Math.max(1, w - 2 * margin);
-        const y = margin + Math.random() * Math.max(1, h - 2 * margin);
-        _blip = { x, y, r, born: performance.now() };
+        const r      = 35;
+        const margin = 70;
+        const cx = margin + Math.random() * Math.max(1, w - 2 * margin);
+        const cy = margin + Math.random() * Math.max(1, h - 2 * margin);
+        _blip = {
+            cx, cy, r,
+            born: performance.now(),
+            ax: 28 + Math.random() * 22,        // drift amplitude x (px)
+            ay: 20 + Math.random() * 18,        // drift amplitude y (px)
+            fx: 0.18 + Math.random() * 0.14,    // drift freq x (Hz) — slow wander
+            fy: 0.11 + Math.random() * 0.10,    // drift freq y (Hz) — slightly different
+            px: Math.random() * Math.PI * 2,    // phase offsets so each firefly is unique
+            py: Math.random() * Math.PI * 2,
+        };
     }
 
-    function _blipHit(px, py) {
+    // Returns the firefly's live canvas position at timestamp ts.
+    function _blipPos(ts) {
+        if (!_blip) return null;
+        const t = (ts - _blip.born) / 1000;
+        return {
+            x: _blip.cx + Math.sin(t * Math.PI * 2 * _blip.fx + _blip.px) * _blip.ax,
+            y: _blip.cy + Math.sin(t * Math.PI * 2 * _blip.fy + _blip.py) * _blip.ay,
+        };
+    }
+
+    function _blipHit(px, py, ts) {
         if (!_blip) return false;
-        const dx = px - _blip.x, dy = py - _blip.y;
+        const pos = _blipPos(ts);
+        const dx = px - pos.x, dy = py - pos.y;
         return dx * dx + dy * dy <= _blip.r * _blip.r;
     }
 
@@ -326,9 +349,10 @@ function _initNoteCanvas() {
         }, 80);
     }
 
-    function _popBlip() {
+    function _popBlip(ts) {
         if (!_blip) return;
-        _blipPop = { x: _blip.x, y: _blip.y, r: _blip.r, t: 0 };
+        const pos = _blipPos(ts ?? performance.now()); // capture live position
+        _blipPop = { x: pos.x, y: pos.y, r: _blip.r, t: 0 };
         _flashAura();
         sendEvent('blip', { color: pushedColor });
         _blip = null;
@@ -358,7 +382,7 @@ function _initNoteCanvas() {
     // ── Tap-to-chirp ─────────────────────────────────────────────────────────
     noteCanvasEl.addEventListener('pointerdown', (e) => {
         e.preventDefault();
-        if (_blipHit(e.offsetX, e.offsetY)) { _popBlip(); return; }
+        if (_blipHit(e.offsetX, e.offsetY, performance.now())) { _popBlip(performance.now()); return; }
 
         const now = performance.now();
         if (now < _chirpCooldownUntil) return; // bird is still singing
@@ -510,45 +534,50 @@ function _initNoteCanvas() {
 
         _tickChirpRings(ctx2d, dt);
 
-        // ── Blip target + tap-burst ─────────────────────────────────────────
+        // ── Firefly — drifting blip target ─────────────────────────────────
         if (_blip) {
             if (ts - _blip.born > BLIP_LIFETIME_MS) {
-                _blip = null;               // ignored — auto-expire and reschedule
+                _blip = null;
                 _scheduleBlip();
             } else {
-                // Neutral white, never the pushed color: the canvas is screen-blended,
-                // so a colored dot over a same-hue aura washes out. White always lifts.
-                const pulse = 0.5 + 0.5 * Math.sin(ts * 0.005);            // 0..1, gentle
-                const r     = _blip.r * (1 + 0.08 * Math.sin(ts * 0.006)); // subtle breathe
+                const pos   = _blipPos(ts);
+                const pulse = 0.5 + 0.5 * Math.sin(ts * 0.0034);  // slow breathe
+                const age   = (ts - _blip.born) / BLIP_LIFETIME_MS;
+                const fade  = age < 0.15 ? age / 0.15             // fade in
+                            : age > 0.80 ? 1 - (age - 0.80) / 0.20 // fade out
+                            : 1;
                 ctx2d.save();
-                ctx2d.fillStyle   = '#ffffff';
-                ctx2d.strokeStyle = '#ffffff';
-                // Faint core
-                ctx2d.globalAlpha = 0.10 + 0.05 * pulse;
+                // Outer glow — warm yellow-white radial gradient
+                const grd = ctx2d.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 28);
+                grd.addColorStop(0,   `rgba(255,252,180,${(0.25 + 0.15 * pulse) * fade})`);
+                grd.addColorStop(0.4, `rgba(255,240,100,${(0.12 + 0.08 * pulse) * fade})`);
+                grd.addColorStop(1,   'rgba(255,220,60,0)');
+                ctx2d.fillStyle = grd;
                 ctx2d.beginPath();
-                ctx2d.arc(_blip.x, _blip.y, r * 0.5, 0, Math.PI * 2);
+                ctx2d.arc(pos.x, pos.y, 28, 0, Math.PI * 2);
                 ctx2d.fill();
-                // Thin, delicate ring
-                ctx2d.globalAlpha = 0.30 + 0.15 * pulse;
-                ctx2d.lineWidth   = 1.5;
+                // Bright core
+                ctx2d.globalAlpha = (0.7 + 0.3 * pulse) * fade;
+                ctx2d.fillStyle   = '#fffff0';
                 ctx2d.beginPath();
-                ctx2d.arc(_blip.x, _blip.y, r, 0, Math.PI * 2);
-                ctx2d.stroke();
+                ctx2d.arc(pos.x, pos.y, 3.5 + pulse * 1.5, 0, Math.PI * 2);
+                ctx2d.fill();
                 ctx2d.restore();
             }
         }
         if (_blipPop) {
             _blipPop.t += dt;
-            const k = _blipPop.t / 0.4; // ~0.4 s pop
+            const k = _blipPop.t / 0.55;
             if (k >= 1) {
                 _blipPop = null;
             } else {
                 ctx2d.save();
-                ctx2d.globalAlpha = (1 - k) * 0.6;   // softer than before
-                ctx2d.strokeStyle = '#ffffff';       // match the delicate white target
-                ctx2d.lineWidth   = 1 + 3 * (1 - k);
+                // Burst in the user's chirp color
+                ctx2d.globalAlpha = (1 - k) * 0.75;
+                ctx2d.strokeStyle = _currentStep >= 2 ? pushedColor : '#fffff0';
+                ctx2d.lineWidth   = 2 - k;
                 ctx2d.beginPath();
-                ctx2d.arc(_blipPop.x, _blipPop.y, _blipPop.r * (1 + 1.5 * k), 0, Math.PI * 2); // r → 2.5r
+                ctx2d.arc(_blipPop.x, _blipPop.y, _blipPop.r * (0.5 + k * 2.5), 0, Math.PI * 2);
                 ctx2d.stroke();
                 ctx2d.restore();
             }
