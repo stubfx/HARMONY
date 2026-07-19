@@ -277,67 +277,7 @@ function _initNoteCanvas() {
     if (_noteCanvasInit || !noteCanvasEl) return;
     _noteCanvasInit = true;
 
-    function resize() {
-        noteCanvasEl.width  = noteCanvasEl.offsetWidth;
-        noteCanvasEl.height = noteCanvasEl.offsetHeight;
-    }
-    resize();
-    new ResizeObserver(resize).observe(noteCanvasEl);
-
     const ctx2d = noteCanvasEl.getContext('2d');
-    let _lastSentHue = -1;
-
-    // ── Blip target ─────────────────────────────────────────────────────────
-    // A small circle that pops up at a random interval; tapping it fires a blip
-    // on the big screen. Only appears during interactive phases (step >= 1).
-    // ── Firefly — drifting blip target ──────────────────────────────────────────
-    // Replaces the static pulsing ring. The firefly wanders in a slow Lissajous
-    // figure around its spawn point. Tap near it to catch it and fire a blip.
-    const BLIP_MIN_MS = 30000, BLIP_MAX_MS = 60000, BLIP_LIFETIME_MS = 10000;
-    let _blip    = null; // { cx, cy, r, born, ax, ay, fx, fy, px, py } | null
-    let _blipPop = null; // { x, y, r, t } — burst at the captured live position
-    let _blipTimer = null;
-
-    function _scheduleBlip() {
-        clearTimeout(_blipTimer);
-        _blipTimer = setTimeout(_spawnBlip, BLIP_MIN_MS + Math.random() * (BLIP_MAX_MS - BLIP_MIN_MS));
-    }
-
-    function _spawnBlip() {
-        if (_currentStep < 1) { _scheduleBlip(); return; }
-        const w = noteCanvasEl.width, h = noteCanvasEl.height;
-        const r      = 35;
-        const margin = 70;
-        const cx = margin + Math.random() * Math.max(1, w - 2 * margin);
-        const cy = margin + Math.random() * Math.max(1, h - 2 * margin);
-        _blip = {
-            cx, cy, r,
-            born: performance.now(),
-            ax: 28 + Math.random() * 22,        // drift amplitude x (px)
-            ay: 20 + Math.random() * 18,        // drift amplitude y (px)
-            fx: 0.18 + Math.random() * 0.14,    // drift freq x (Hz) — slow wander
-            fy: 0.11 + Math.random() * 0.10,    // drift freq y (Hz) — slightly different
-            px: Math.random() * Math.PI * 2,    // phase offsets so each firefly is unique
-            py: Math.random() * Math.PI * 2,
-        };
-    }
-
-    // Returns the firefly's live canvas position at timestamp ts.
-    function _blipPos(ts) {
-        if (!_blip) return null;
-        const t = (ts - _blip.born) / 1000;
-        return {
-            x: _blip.cx + Math.sin(t * Math.PI * 2 * _blip.fx + _blip.px) * _blip.ax,
-            y: _blip.cy + Math.sin(t * Math.PI * 2 * _blip.fy + _blip.py) * _blip.ay,
-        };
-    }
-
-    function _blipHit(px, py, ts) {
-        if (!_blip) return false;
-        const pos = _blipPos(ts);
-        const dx = px - pos.x, dy = py - pos.y;
-        return dx * dx + dy * dy <= _blip.r * _blip.r;
-    }
 
     function _flashAura() {
         if (!auraEl) return;
@@ -349,91 +289,114 @@ function _initNoteCanvas() {
         }, 80);
     }
 
-    function _popBlip(ts) {
-        if (!_blip) return;
-        const pos = _blipPos(ts ?? performance.now()); // capture live position
-        _blipPop = { x: pos.x, y: pos.y, r: _blip.r, t: 0 };
-        _flashAura();
-        sendEvent('blip', { color: pushedColor });
-        _blip = null;
-        _scheduleBlip();
-    }
+    // ── Bubbles — small colored discs, max 3 on screen ───────────────────────
+    // Each bubble has its own note + pitch pair (freq×5 / freq×2.5 keeps the
+    // octave-glide character while shifting each bubble into a distinct register).
+    // Tapping a bubble: plays its chirp, replaces it with a new random one.
+    // Hidden when _currentStep < 2 (no color phase yet).
+    const MAX_BUBBLES   = 3;
+    const BUBBLE_R      = 26;   // radius in px — small
+    const BUBBLE_GAP    = 90;   // min center-to-center distance between bubbles
+    const BUBBLE_MARGIN = 40;   // edge margin in px
+    const ALL_NOTE_IDX  = [0, 1, 2, 3, 4, 5, 6, 7, 8];
 
-    // ── Sound circles — scattered colored discs, each with its own note + pitch ──
-    // X positions evenly spread left (low) → right (high), Y random for organic feel.
-    // oneHz / zeroHz scale with KEYS freq: ×5 / ×2.5 keeps the octave glide character
-    // but shifts each circle into its own pitch register.
-    const CIRCLE_KEYS = [0, 1, 3, 5, 6, 7, 8];
-    const _circles = CIRCLE_KEYS.map((noteIdx, i) => {
-        const freq = KEYS[noteIdx].freq;
-        return {
-            nx:      0.10 + (i / (CIRCLE_KEYS.length - 1)) * 0.80,
-            ny:      0.18 + Math.random() * 0.64,
-            r:       52 + Math.random() * 18,   // pixel radius (52–70 px)
-            noteIdx,
-            color:   KEYS[noteIdx].color,
-            freq,
-            oneHz:   freq * 5,    // e.g. D3 → 734 Hz, A4 → 2200 Hz
-            zeroHz:  freq * 2.5,  //      D3 → 367 Hz, A4 → 1100 Hz
-        };
-    });
+    let _bubbles = []; // active bubble objects
 
-    function _circleHit(x, y) {
-        const w = noteCanvasEl.width, h = noteCanvasEl.height;
-        // Check in reverse so top-drawn (last) circles are hit first
-        for (let i = _circles.length - 1; i >= 0; i--) {
-            const c = _circles[i];
-            const dx = x - c.nx * w, dy = y - c.ny * h;
-            if (dx * dx + dy * dy <= c.r * c.r) return c;
+    function _makeBubble(existing) {
+        const w = noteCanvasEl.width  || 375;
+        const h = noteCanvasEl.height || 667;
+        const noteIdx = ALL_NOTE_IDX[Math.floor(Math.random() * ALL_NOTE_IDX.length)];
+        const freq    = KEYS[noteIdx].freq;
+        for (let attempt = 0; attempt < 40; attempt++) {
+            const x = BUBBLE_MARGIN + Math.random() * (w - 2 * BUBBLE_MARGIN);
+            const y = BUBBLE_MARGIN + Math.random() * (h - 2 * BUBBLE_MARGIN);
+            const ok = existing.every(b => {
+                const dx = x - b.x, dy = y - b.y;
+                return dx * dx + dy * dy >= BUBBLE_GAP * BUBBLE_GAP;
+            });
+            if (ok) return { x, y, r: BUBBLE_R, noteIdx, color: KEYS[noteIdx].color, freq, oneHz: freq * 5, zeroHz: freq * 2.5 };
         }
-        return null;
+        // Fallback: ignore collision constraint after 40 attempts
+        return {
+            x: BUBBLE_MARGIN + Math.random() * (w - 2 * BUBBLE_MARGIN),
+            y: BUBBLE_MARGIN + Math.random() * (h - 2 * BUBBLE_MARGIN),
+            r: BUBBLE_R, noteIdx, color: KEYS[noteIdx].color, freq, oneHz: freq * 5, zeroHz: freq * 2.5,
+        };
     }
 
-    function _drawCircles(ctx2d, ts) {
-        const w = noteCanvasEl.width, h = noteCanvasEl.height;
-        for (const c of _circles) {
-            const cx   = c.nx * w, cy = c.ny * h;
-            const breathe = 0.85 + 0.15 * Math.sin(ts * 0.0015 + c.nx * 8); // slow pulse
+    function _initBubbles() {
+        _bubbles = [];
+        for (let i = 0; i < MAX_BUBBLES; i++) _bubbles.push(_makeBubble(_bubbles));
+    }
+
+    function _bubbleAt(x, y) {
+        for (let i = _bubbles.length - 1; i >= 0; i--) {
+            const b = _bubbles[i];
+            const dx = x - b.x, dy = y - b.y;
+            if (dx * dx + dy * dy <= b.r * b.r) return i;
+        }
+        return -1;
+    }
+
+    function _replaceBubble(idx) {
+        _bubbles.splice(idx, 1);
+        _bubbles.push(_makeBubble(_bubbles));
+    }
+
+    function _drawBubbles(ctx2d, ts) {
+        if (_currentStep < 2) return;
+        for (const b of _bubbles) {
+            const breathe = 0.82 + 0.18 * Math.sin(ts * 0.0014 + b.x * 0.05);
             ctx2d.save();
-            // Filled disc
-            ctx2d.globalAlpha = 0.28 * breathe;
-            ctx2d.fillStyle   = c.color;
+            ctx2d.globalAlpha = 0.30 * breathe;
+            ctx2d.fillStyle   = b.color;
             ctx2d.beginPath();
-            ctx2d.arc(cx, cy, c.r, 0, Math.PI * 2);
+            ctx2d.arc(b.x, b.y, b.r, 0, Math.PI * 2);
             ctx2d.fill();
-            // Crisp ring
-            ctx2d.globalAlpha = 0.65 * breathe;
-            ctx2d.strokeStyle = c.color;
-            ctx2d.lineWidth   = 2;
+            ctx2d.globalAlpha = 0.72 * breathe;
+            ctx2d.strokeStyle = b.color;
+            ctx2d.lineWidth   = 1.5;
             ctx2d.stroke();
             ctx2d.restore();
         }
     }
 
+    // Initialise once canvas has a real size
+    function resize() {
+        noteCanvasEl.width  = noteCanvasEl.offsetWidth;
+        noteCanvasEl.height = noteCanvasEl.offsetHeight;
+        if (_bubbles.length === 0 && noteCanvasEl.width > 0) _initBubbles();
+    }
+    resize();
+    new ResizeObserver(resize).observe(noteCanvasEl);
+
     // ── Tap-to-chirp ─────────────────────────────────────────────────────────
     noteCanvasEl.addEventListener('pointerdown', (e) => {
         e.preventDefault();
-        if (_blipHit(e.offsetX, e.offsetY, performance.now())) { _popBlip(performance.now()); return; }
+        if (_currentStep < 2) return; // bubbles not visible yet
 
-        const circle = _circleHit(e.offsetX, e.offsetY);
-        if (!circle) return; // tap empty space = nothing
+        const idx = _bubbleAt(e.offsetX, e.offsetY);
+        if (idx === -1) return; // missed all bubbles
 
         const now = performance.now();
         if (now < _chirpCooldownUntil) return;
         _chirpCooldownUntil = now + CHIRP_COOLDOWN_MS;
 
+        const bubble = _bubbles[idx];
         if (_audioCtx && _audioCtx.state !== 'running') _audioCtx.resume();
 
-        pushedColor = circle.color;
+        pushedColor = bubble.color;
         updateAura();
-        _localChirp(circle.noteIdx, circle.oneHz, circle.zeroHz);
+        _localChirp(bubble.noteIdx, bubble.oneHz, bubble.zeroHz);
         _spawnChirpRing(e.offsetX, e.offsetY);
         _flashAura();
 
         if (_currentStep >= 1) {
-            sendEvent('color-pick', { color: circle.color });
-            sendEvent('chirp', { index: circle.noteIdx, freq: circle.freq, color: circle.color });
+            sendEvent('color-pick', { color: bubble.color });
+            sendEvent('chirp', { index: bubble.noteIdx, freq: bubble.freq, color: bubble.color });
         }
+
+        _replaceBubble(idx); // this bubble gone, new one spawns
     });
 
     let _lastChaosT = 0;
@@ -566,57 +529,8 @@ function _initNoteCanvas() {
         const _w = noteCanvasEl.width, _h = noteCanvasEl.height;
         ctx2d.clearRect(0, 0, _w, _h);
 
-        _drawCircles(ctx2d, ts);
+        _drawBubbles(ctx2d, ts);
         _tickChirpRings(ctx2d, dt);
-
-        // ── Firefly — drifting blip target ─────────────────────────────────
-        if (_blip) {
-            if (ts - _blip.born > BLIP_LIFETIME_MS) {
-                _blip = null;
-                _scheduleBlip();
-            } else {
-                const pos   = _blipPos(ts);
-                const pulse = 0.5 + 0.5 * Math.sin(ts * 0.0034);  // slow breathe
-                const age   = (ts - _blip.born) / BLIP_LIFETIME_MS;
-                const fade  = age < 0.15 ? age / 0.15             // fade in
-                            : age > 0.80 ? 1 - (age - 0.80) / 0.20 // fade out
-                            : 1;
-                ctx2d.save();
-                // Outer glow — warm yellow-white radial gradient
-                const grd = ctx2d.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 28);
-                grd.addColorStop(0,   `rgba(255,252,180,${(0.25 + 0.15 * pulse) * fade})`);
-                grd.addColorStop(0.4, `rgba(255,240,100,${(0.12 + 0.08 * pulse) * fade})`);
-                grd.addColorStop(1,   'rgba(255,220,60,0)');
-                ctx2d.fillStyle = grd;
-                ctx2d.beginPath();
-                ctx2d.arc(pos.x, pos.y, 28, 0, Math.PI * 2);
-                ctx2d.fill();
-                // Bright core
-                ctx2d.globalAlpha = (0.7 + 0.3 * pulse) * fade;
-                ctx2d.fillStyle   = '#fffff0';
-                ctx2d.beginPath();
-                ctx2d.arc(pos.x, pos.y, 3.5 + pulse * 1.5, 0, Math.PI * 2);
-                ctx2d.fill();
-                ctx2d.restore();
-            }
-        }
-        if (_blipPop) {
-            _blipPop.t += dt;
-            const k = _blipPop.t / 0.55;
-            if (k >= 1) {
-                _blipPop = null;
-            } else {
-                ctx2d.save();
-                // Burst in the user's chirp color
-                ctx2d.globalAlpha = (1 - k) * 0.75;
-                ctx2d.strokeStyle = _currentStep >= 2 ? pushedColor : '#fffff0';
-                ctx2d.lineWidth   = 2 - k;
-                ctx2d.beginPath();
-                ctx2d.arc(_blipPop.x, _blipPop.y, _blipPop.r * (0.5 + k * 2.5), 0, Math.PI * 2);
-                ctx2d.stroke();
-                ctx2d.restore();
-            }
-        }
     })(0);
 
     // ── Bot autopilot ─────────────────────────────────────────────────────────
@@ -632,37 +546,24 @@ function _initNoteCanvas() {
         const CHIRP_MAX = 5000 + (i % 3) * 1000;
 
         function _botChirp() {
-            const w = noteCanvasEl.width, h = noteCanvasEl.height;
             const delay = CHIRP_MIN + Math.random() * (CHIRP_MAX - CHIRP_MIN);
-            if (w === 0 || h === 0 || _currentStep < 1) { setTimeout(_botChirp, delay); return; }
-            const t = Date.now() / 1000;
-            // Pick a circle: if dashboard locked a note, use that circle index;
-            // otherwise wander with Lissajous and pick the circle whose center
-            // is nearest to the wandering position.
-            let circle;
+            if (_bubbles.length === 0 || _currentStep < 1) { setTimeout(_botChirp, delay); return; }
+            // Pick a bubble: prefer the one whose noteIdx is closest to the
+            // commanded note, otherwise pick randomly.
+            let bubble;
             if (_botCmdNote !== null) {
-                circle = _circles[Math.min(_botCmdNote, _circles.length - 1)];
+                bubble = _bubbles.reduce((best, b) =>
+                    Math.abs(b.noteIdx - _botCmdNote) < Math.abs(best.noteIdx - _botCmdNote) ? b : best
+                );
             } else {
-                const bx = (Math.sin(t * Math.PI * 2 * fx + px) + 1) / 2 * w;
-                const by = (Math.sin(t * Math.PI * 2 * fy + py) + 1) / 2 * h;
-                // Pick nearest circle center
-                let bestD = Infinity;
-                circle = _circles[0];
-                for (const c of _circles) {
-                    const dx = bx - c.nx * w, dy = by - c.ny * h;
-                    const d  = dx * dx + dy * dy;
-                    if (d < bestD) { bestD = d; circle = c; }
-                }
+                bubble = _bubbles[Math.floor(Math.random() * _bubbles.length)];
             }
-            pushedColor = circle.color;
-            sendEvent('chirp', { index: circle.noteIdx, freq: circle.freq, color: circle.color });
+            pushedColor = bubble.color;
+            sendEvent('chirp', { index: bubble.noteIdx, freq: bubble.freq, color: bubble.color });
             setTimeout(_botChirp, delay);
         }
-        setTimeout(_botChirp, Math.random() * 3000); // stagger bot start
+        setTimeout(_botChirp, Math.random() * 3000);
     }
-
-    // Start the blip cycle — shared by real phones and bots.
-    _scheduleBlip();
 }
 
 // ── Story step socket handler ─────────────────────────────────────────────────
