@@ -678,6 +678,14 @@ const simFacade = {
     // Generative "drop" — the PHASE 3 red reveal build-up and impact.
     // playRiser starts the build; triggerImpact resolves it and adds a visual punch.
     // resolveRiser() is the lighter resolution for PHASE 9 and harmony risers.
+    //
+    // WARNING — playRiser calls `await rev.ready` (Tone.Reverb IR generation) which
+    // can block the compositor for tens of milliseconds on the audio thread. This was
+    // the root cause of a visible frame freeze that was incorrectly attributed to the
+    // harmony image decode/upload. Image decode is now done via _predecodeBitmap
+    // (see _enterHarmony) but the riser before harmony images was removed entirely
+    // because the Reverb IR spike was the actual culprit. Do NOT reinstate a playRiser
+    // call immediately before a loadAvoidMap call — the IR stall lands at reveal time.
     playRiser(durationMs, variant) { playRiser(durationMs, variant); },
     resolveRiser() { resolveRiser(); },
     triggerImpact() {
@@ -1846,6 +1854,12 @@ async function _enterHarmony(key, sum) {
     }
     await loadAvoidMap({ ...decoded, _preDecoded: true });
     _harmonyImageShown = true;
+    // 50% chance of a visual+audio punch at the reveal moment
+    if (Math.random() < 0.5) {
+        triggerImpact();
+        burstBrightness = BURST_BRIGHTNESS;
+        ambience.burstBlinkers(6, 90);
+    }
     setShapePersonality('h' + (sum % 5)); // personality keyed on the raw note sum
     _startHarmonyHold();
 }

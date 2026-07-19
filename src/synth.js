@@ -505,6 +505,15 @@ export function speakingRemainingMs() { return Math.max(0, _speakingUntil - Date
 
 // A build voice: staggered sine harmonics rising in pitch + optional noise undertow.
 // Pass a variant object to specify character; omit to pick randomly.
+//
+// CAUTION — `await rev.ready` below generates the Reverb impulse response on the
+// audio thread. With decay:8 this produces a large IR buffer whose allocation can
+// block the compositor for 20–80 ms depending on sample rate. This is a hard Tone.js
+// constraint (no way to pre-warm a Reverb node before calling playRiser). Consequence:
+// never call playRiser immediately before a visually time-sensitive operation (e.g.
+// loading a new avoidmap / GPU texture upload) — the IR stall will land at the worst
+// possible moment and cause a visible freeze. The harmony flow removed its pre-image
+// riser for exactly this reason; triggerImpact() fires instead (no Reverb, no stall).
 export async function playRiser(durationMs = 4000, variant) {
     await Tone.start();
     const v   = variant ?? RISER_VARIANTS[Math.floor(Math.random() * RISER_VARIANTS.length)];
