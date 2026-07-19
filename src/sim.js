@@ -1837,23 +1837,13 @@ async function _enterHarmony(key, sum) {
         if (!_harmonyImagesEnabled || _currentHarmonyKey !== key) return;
     }
 
-    const riserDur = 3500 + Math.random() * 1500; // 3.5–5 s, same range as PHASE 9
-    if (_harmonyRiserResetFn) _harmonyRiserResetFn();
-    console.log('[harmony] riser start %.0fms', riserDur);
-    playRiser(riserDur);
     const blob = new Blob([cached.bytes], { type: cached.mime });
-    // decode concurrently with the riser — hides the latency inside the audio window
-    const [decoded] = await Promise.all([
-        _predecodeBitmap(blob),
-        new Promise(r => setTimeout(r, riserDur)),
-    ]);
+    const decoded = await _predecodeBitmap(blob);
 
     if (!_harmonyImagesEnabled || _currentHarmonyKey !== key) {
         decoded.frames.forEach(f => f.close());
         return;
     }
-    console.log('[harmony] resolveRiser');
-    resolveRiser();                        // beat + bus restore at the reveal moment
     await loadAvoidMap({ ...decoded, _preDecoded: true });
     _harmonyImageShown = true;
     setShapePersonality('h' + (sum % 5)); // personality keyed on the raw note sum
