@@ -2190,7 +2190,8 @@ function applySimParams(data) {
     const { dir, wind, restart, clearTrace, showQR, traceText, clearText, status, avoidMap,
             step, stepStatus, optionA, optionB, preshow,
             gotoPhase, storyNext, storyPrev, storyStart, capture,
-            audio, audioFormat, audiobg, audiobgFormat, audiobgLoop, mode, colorMode, ...rest } = data;
+            audio, audioFormat, audiobg, audiobgFormat, audiobgLoop, mode, colorMode,
+            adminBlip, adminRiser, adminImpact, ...rest } = data;
 
     if (audio    !== undefined) playAudio(audio    || null, audioFormat)                              .catch(e => console.warn('[audio]',    e));
     if (audiobg  !== undefined) playAudioBg(audiobg || null, audiobgFormat, audiobgLoop !== false)    .catch(e => console.warn('[audiobg]',  e));
@@ -2234,6 +2235,16 @@ function applySimParams(data) {
     if (storyPrev  === true) storyEngine.goto(storyEngine.index - 1);
     if (storyStart === true) storyEngine.start();
     if (capture    === true) _captureRequested = true;
+    if (adminBlip === true) {
+        blinker(BLINKER_TYPES[Math.floor(Math.random() * BLINKER_TYPES.length)]);
+        for (const slot of activeSlots) {
+            slot.blip      = 1;
+            slot.burstSeed = (Math.random() * 0x7fffffff) >>> 0;
+        }
+        if (activeSlots.length) uploadSpectatorSlots();
+    }
+    if (adminRiser  === true) playRiser(4000);
+    if (adminImpact === true) triggerImpact();
     if (preshow === true)  storyEngine.start();
     if (preshow === false) simFacade.reseed();
     if (restart)              seedAgents();
