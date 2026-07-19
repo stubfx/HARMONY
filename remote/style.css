@@ -26,13 +26,7 @@ body::after {
 }
 
 #aura {
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    transition: background 0.8s ease;
-    background: #000000;
-    opacity: 0.55;
+    display: none; /* particles carry the color; aura overlay removed */
 }
 
 #tap-hint {

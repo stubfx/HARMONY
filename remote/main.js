@@ -79,10 +79,7 @@ function hslToHex(h, s, l) {
     return `#${f(0)}${f(8)}${f(4)}`;
 }
 
-function updateAura() {
-    if (!auraEl) return;
-    auraEl.style.background = _currentStep >= 2 ? pushedColor : '#000000';
-}
+function updateAura() { /* aura hidden — particles carry the color */ }
 updateAura();
 
 // ── Keyboard — A minor pentatonic D3–A4 ──────────────────────────────────────
@@ -344,17 +341,18 @@ function _initNoteCanvas() {
     }
 
     function _drawBubbles(ctx2d, ts) {
-        if (_currentStep < 2) return;
+        const hasColor = _currentStep >= 2;
         for (const b of _bubbles) {
+            const col     = hasColor ? b.color : '#ffffff';
             const breathe = 0.82 + 0.18 * Math.sin(ts * 0.0014 + b.x * 0.05);
             ctx2d.save();
             ctx2d.globalAlpha = 0.30 * breathe;
-            ctx2d.fillStyle   = b.color;
+            ctx2d.fillStyle   = col;
             ctx2d.beginPath();
             ctx2d.arc(b.x, b.y, b.r, 0, Math.PI * 2);
             ctx2d.fill();
             ctx2d.globalAlpha = 0.72 * breathe;
-            ctx2d.strokeStyle = b.color;
+            ctx2d.strokeStyle = col;
             ctx2d.lineWidth   = 1.5;
             ctx2d.stroke();
             ctx2d.restore();
@@ -373,8 +371,6 @@ function _initNoteCanvas() {
     // ── Tap-to-chirp ─────────────────────────────────────────────────────────
     noteCanvasEl.addEventListener('pointerdown', (e) => {
         e.preventDefault();
-        if (_currentStep < 2) return; // bubbles not visible yet
-
         const idx = _bubbleAt(e.offsetX, e.offsetY);
         if (idx === -1) return; // missed all bubbles
 
@@ -389,7 +385,6 @@ function _initNoteCanvas() {
         updateAura();
         _localChirp(bubble.noteIdx, bubble.oneHz, bubble.zeroHz);
         _spawnChirpRing(e.offsetX, e.offsetY);
-        _flashAura();
 
         if (_currentStep >= 1) {
             sendEvent('color-pick', { color: bubble.color });
@@ -401,9 +396,52 @@ function _initNoteCanvas() {
 
     let _lastChaosT = 0;
 
-    // ── Sine wave state (kept for potential future use) ────────────────────
-    let _sineAmp   = 0;
-    let _sinePhase = 0;
+    // ── Rising particles — slow upward drift, snowflake wobble ───────────────
+    // White pre-color-phase; pushedColor once phase 2 starts.
+    const _pts = [];
+    const _PT_MAX  = 55;
+    const _PT_INT  = 220; // ms between spawns
+    let   _ptLast  = 0;
+
+    function _spawnPt() {
+        const w = noteCanvasEl.width || 375;
+        _pts.push({
+            x:    Math.random() * w,
+            y:    (noteCanvasEl.height || 667) + 6,
+            vx:   (Math.random() - 0.5) * 0.3,
+            vy:   -(0.35 + Math.random() * 0.45),   // slow upward
+            size: 1 + Math.random() * 1.8,
+            life: 0,
+            dur:  9 + Math.random() * 7,             // 9–16 s lifetime
+            phase: Math.random() * Math.PI * 2,      // sine wobble phase offset
+        });
+    }
+
+    function _tickParticles(ctx2d, dt, ts) {
+        if (_pts.length < _PT_MAX && ts - _ptLast > _PT_INT) {
+            _spawnPt(); _ptLast = ts;
+        }
+        const col = _currentStep >= 2 ? pushedColor : '#ffffff';
+        for (let i = _pts.length - 1; i >= 0; i--) {
+            const p = _pts[i];
+            p.life += dt / p.dur;
+            if (p.life >= 1 || p.y < -8) { _pts.splice(i, 1); continue; }
+            // Snowflake horizontal wobble
+            p.x += p.vx + Math.sin(p.life * 5.5 + p.phase) * 0.28 * dt * 60;
+            p.y += p.vy;
+            // Fade in (first 10%) and out (last 20%)
+            const fade = p.life < 0.10 ? p.life / 0.10
+                       : p.life > 0.80 ? (1 - p.life) / 0.20
+                       : 1;
+            ctx2d.save();
+            ctx2d.globalAlpha = fade * 0.55;
+            ctx2d.fillStyle   = col;
+            ctx2d.beginPath();
+            ctx2d.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx2d.fill();
+            ctx2d.restore();
+        }
+    }
 
     function _drawSine(w, h, dt) {
         return; // sine wave replaced by pixel pool interaction
@@ -529,6 +567,7 @@ function _initNoteCanvas() {
         const _w = noteCanvasEl.width, _h = noteCanvasEl.height;
         ctx2d.clearRect(0, 0, _w, _h);
 
+        _tickParticles(ctx2d, dt, ts);
         _drawBubbles(ctx2d, ts);
         _tickChirpRings(ctx2d, dt);
     })(0);
