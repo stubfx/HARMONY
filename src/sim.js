@@ -359,8 +359,20 @@ function updateMonitor(fps) {
 
 // ── WebGPU init ───────────────────────────────────────────────────────────────
 if (!navigator.gpu) { showError('WebGPU not supported in this browser.'); throw new Error(); }
-const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
-if (!adapter)       { showError('No WebGPU adapter found.'); throw new Error(); }
+
+// requestAdapter() can return null right after a GPU device loss while the driver
+// is recovering (Windows TDR, power-management reset, etc.). Retry with backoff
+// rather than hard-failing — the adapter always comes back within a few seconds.
+let adapter = null;
+for (let attempt = 0; attempt < 10 && !adapter; attempt++) {
+    if (attempt > 0) {
+        showError(`GPU adapter unavailable — reconnecting… (attempt ${attempt}/9)`);
+        await new Promise(r => setTimeout(r, 3000));
+    }
+    adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+}
+if (!adapter) { showError('No WebGPU adapter found after retries. Please reload.'); throw new Error(); }
+hideError();
 const device = await adapter.requestDevice({
     requiredLimits: {
         maxStorageBufferBindingSize:      adapter.limits.maxStorageBufferBindingSize,
@@ -387,7 +399,10 @@ let deviceLost = false;
 device.lost.then(({ reason, message }) => {
     deviceLost = true;
     console.error('[WebGPU] device lost:', reason, message);
-    setTimeout(() => location.reload(), 3000);
+    // Wait 10 s before reloading — Windows TDR / driver recovery typically takes
+    // 5–10 s; reloading too early means requestAdapter() returns null again.
+    showError('GPU lost — reconnecting…');
+    setTimeout(() => location.reload(), 10_000);
 });
 
 // Proactive reload every hour to prevent Vulkan semaphore FD exhaustion
