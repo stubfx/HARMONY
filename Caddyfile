@@ -22,6 +22,9 @@ thesis.lucamolluso.com {
     handle /simremotes/* {
         try_files {path} /simremotes/index.html
     }
+    handle /admin/* {
+        try_files {path} /admin/index.html
+    }
     handle {
         try_files {path} /index.html
     }
