@@ -285,8 +285,9 @@ function _applyState() {
     smoothTo(_padVol.volume, Tone.gainToDb(padGain));
     smoothTo(_padFilter.frequency, PAD_FILTER_BASE + e * PAD_FILTER_ENERGY);
 
-    // LFO frequency ← coherence (bypassed while a shape personality overrides it)
-    if (_shapeLfoHz === null) _padLFO.frequency.value = 0.05 + coh * 0.75;
+    // LFO frequency ← coherence² so a disengaged crowd (coh≈0.5) barely pulses
+    // (0.02 + 0.25² * 1.2 ≈ 0.095 Hz) while a locked-in crowd (coh→1) sweeps fast (1.22 Hz).
+    if (_shapeLfoHz === null) _padLFO.frequency.value = 0.02 + coh * coh * 1.2;
 
     // LFO amplitude ← wind magnitude: physical tilt deepens the sweep
     const windMag = Math.min(1, Math.sqrt(_lastBiasX * _lastBiasX + _lastBiasY * _lastBiasY) / Math.SQRT2);
