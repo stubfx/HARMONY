@@ -21,7 +21,7 @@ import champLinesWGSL   from './shaders/champLines.wgsl?raw';
 import golStepWGSL      from './shaders/gol-step.wgsl?raw';
 import bloomWGSL        from './shaders/bloom.wgsl?raw';
 import glareWGSL        from './shaders/glare.wgsl?raw';
-import { startSynth, setSynthState, setSynthDroneOnly, setSynthBusVolume, setSynthEnergy, addArpInfluence, blinker, BLINKER_TYPES, playRiser, triggerImpact, resolveRiser, speakBinary, binaryCueDurationMs, isSpeaking, setShapePersonality, clearShapePersonality } from './synth.js';
+import { startSynth, setSynthState, setSynthDroneOnly, setSynthBusVolume, setSynthEnergy, addArpInfluence, blinker, BLINKER_TYPES, playRiser, triggerImpact, resolveRiser, speakBinary, binaryCueDurationMs, isSpeaking, speakingRemainingMs, setShapePersonality, clearShapePersonality } from './synth.js';
 import * as ambience from './ambience.js';
 import { StoryEngine } from './storyEngine.js';
 import { STORY }       from './story.js';
@@ -1778,9 +1778,18 @@ async function _enterHarmony(key, sum) {
 
     // Play a riser to announce the combination, then reveal the image at the peak.
     // Reset any external riser timer (e.g. PHASE 9) to avoid simultaneous risers.
+    // Let any ongoing binary speech cue finish before the riser starts — the two
+    // fight over AudioContext scheduled values and cause silence if they overlap.
+    const speechMs = speakingRemainingMs();
+    if (speechMs > 0) {
+        console.log('[harmony] waiting %dms for shape speech to finish', speechMs);
+        await new Promise(r => setTimeout(r, speechMs + 100));
+        if (!_harmonyImagesEnabled || _currentHarmonyKey !== key) return;
+    }
+
     const riserDur = 3500 + Math.random() * 1500; // 3.5–5 s, same range as PHASE 9
     if (_harmonyRiserResetFn) _harmonyRiserResetFn();
-    console.log('[harmony] riser start %.0fms speaking=%s', riserDur, isSpeaking());
+    console.log('[harmony] riser start %.0fms', riserDur);
     playRiser(riserDur);
     await new Promise(r => setTimeout(r, riserDur));
 
@@ -1789,7 +1798,7 @@ async function _enterHarmony(key, sum) {
 
     await loadAvoidMap(new Blob([cached.bytes], { type: cached.mime }));
     _harmonyImageShown = true;
-    console.log('[harmony] resolveRiser speaking=%s', isSpeaking());
+    console.log('[harmony] resolveRiser');
     resolveRiser();                        // beat + bus restore at the reveal moment
     setShapePersonality('h' + (sum % 5)); // personality keyed on the raw note sum
     _startHarmonyHold();

@@ -501,11 +501,11 @@ const RISER_VARIANTS = [
 // playRiser and triggerImpact check this to stay silent during speech.
 let _speakingUntil = 0;
 export function isSpeaking() { return Date.now() < _speakingUntil; }
+export function speakingRemainingMs() { return Math.max(0, _speakingUntil - Date.now()); }
 
 // A build voice: staggered sine harmonics rising in pitch + optional noise undertow.
 // Pass a variant object to specify character; omit to pick randomly.
 export async function playRiser(durationMs = 4000, variant) {
-    if (isSpeaking()) { console.log('[audio] playRiser suppressed — shape speaking'); return; }
     await Tone.start();
     const v   = variant ?? RISER_VARIANTS[Math.floor(Math.random() * RISER_VARIANTS.length)];
     const dur = durationMs / 1000;
