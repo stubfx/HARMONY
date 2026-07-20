@@ -100,17 +100,38 @@ let _audioCtx   = null;
 let _reverbNode = null;
 let _reverbSend = null;
 
+// audioSession.type MUST be set before new AudioContext() — setting it after
+// the context is already created has no effect on iOS audio routing.
+const _isIOSSafari = /iPhone|iPad|iPod/.test(navigator.userAgent)
+    && /Safari/.test(navigator.userAgent)
+    && !/Chrome|CriOS|FxiOS/.test(navigator.userAgent);
+const _hasAudioSession = 'audioSession' in navigator;
+if (_hasAudioSession) navigator.audioSession.type = 'playback';
+
+const _audioHintEl = document.querySelector('#audio-hint');
+
+function _showAudioHint() {
+    _audioHintEl?.classList.remove('hidden');
+}
+function _hideAudioHint() {
+    _audioHintEl?.classList.add('hidden');
+}
+
 function _ensureAudioCtx() {
     if (!_audioCtx) {
         _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        // iOS 16.4+: declare a playback session so Web Audio is routed through the
-        // media channel — it then ignores the hardware silent switch and follows the
-        // media volume instead of the (often muted) ringer volume.
-        if ('audioSession' in navigator) navigator.audioSession.type = 'playback';
+        // On older iOS where audioSession is absent, the mute switch always
+        // silences Web Audio regardless of the silent-kick workaround.
+        if (_isIOSSafari && !_hasAudioSession) _showAudioHint();
+        // Also watch for suspended/interrupted state changes (e.g. phone call, Siri)
+        _audioCtx.addEventListener('statechange', () => {
+            if (_audioCtx.state === 'running') _hideAudioHint();
+            else if (_isIOSSafari) _showAudioHint();
+        });
     }
-    // iOS may leave the context 'suspended' or in the non-standard 'interrupted'
-    // state (after a call, Siri, or focus loss). Resume on anything but 'running'.
-    if (_audioCtx.state !== 'running') _audioCtx.resume();
+    if (_audioCtx.state !== 'running') {
+        _audioCtx.resume().then(() => _hideAudioHint());
+    }
     return _audioCtx;
 }
 
