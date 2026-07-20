@@ -2076,10 +2076,11 @@ let pulseEnergy = 0;
     socket.on('session-id', async (sessionId) => {
         sessionRoom = sessionId;
         // Pin this session ID in the page URL so reloads reconnect to the same room.
-        const currentUrl = new URL(location.href);
-        if (currentUrl.searchParams.get('s') !== sessionId) {
-            currentUrl.searchParams.set('s', sessionId);
-            history.replaceState(null, '', currentUrl);
+        // Also sync into _urlParams so phase transitions don't clobber ?s= when
+        // storyEngine.onGoto calls history.replaceState with _urlParams.toString().
+        _urlParams.set('s', sessionId);
+        if (new URL(location.href).searchParams.get('s') !== sessionId) {
+            history.replaceState(null, '', '?' + _urlParams.toString());
         }
         // Use VITE_USER_URL as-is (Caddy handles the /remote redirect internally).
         // Falls back to the page's own origin in dev when no env var is set.
