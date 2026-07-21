@@ -633,6 +633,7 @@ const simFacade = {
     },
 
     next: () => storyEngine.next(),
+    getUserCount() { return simState.userCount; },
 
     setParam(key, val) { params[key] = val; },
     setStatus(s) { setStatus(s); },

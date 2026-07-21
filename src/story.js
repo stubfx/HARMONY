@@ -131,6 +131,17 @@ export const STORY = [
             sim.suppressImages();
             sim.dormantSeed();
             sim.speakPhase(this.id);
+            // If spectators are already connected when P1 enters (e.g. show restart),
+            // onSpectatorJoined(userCount=1) will never fire — start the timer now.
+            if (sim.getUserCount() > 0) {
+                sim.startBlinkersLoop();
+                log('utenti già connessi al restart — hold 40s avviato immediatamente.');
+                this._timer = setTimeout(() => {
+                    log('hold 40s scaduto — accensione completa + avanzamento a PHASE 2.');
+                    sim.activateChunk(1);
+                    sim.next();
+                }, 40_000);
+            }
         },
         onSpectatorJoined(sim, userCount) {
             log('utente connesso — totale: ' + userCount);
