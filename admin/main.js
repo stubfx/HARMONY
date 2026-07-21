@@ -320,30 +320,10 @@ function buildFormulas() {
 async function buildAvoidPicker() {
     controlsEl.appendChild(mkLabel('Avoid map'));
 
-    let files = [];
-    try {
-        const res = await fetch(`${_authBase}/simAss-static-list`);
-        if (res.ok) ({ files } = await res.json());
-    } catch { /* leave files empty */ }
-
-    if (files.length === 0) {
-        const note = document.createElement('p');
-        note.className   = 'section-label';
-        note.textContent = 'no static images found';
-        note.style.opacity = '0.5';
-        controlsEl.appendChild(note);
-    } else {
-        const grid = document.createElement('div');
-        grid.className = 'preset-grid';
-        files.forEach(filename => {
-            const btn = document.createElement('button');
-            btn.className   = 'btn-preset';
-            btn.textContent = filename.replace(/\.[^.]+$/, '');
-            btn.addEventListener('click', () => _loadAdminAvoidMap(filename));
-            grid.appendChild(btn);
-        });
-        controlsEl.appendChild(grid);
-    }
+    // Append all containers synchronously so DOM order is fixed before the fetch.
+    const grid = document.createElement('div');
+    grid.className = 'preset-grid';
+    controlsEl.appendChild(grid);
 
     const statusRow = document.createElement('div');
     statusRow.className = 'btn-row';
@@ -362,11 +342,34 @@ async function buildAvoidPicker() {
     statusRow.appendChild(removeBtn);
 
     controlsEl.appendChild(statusRow);
+
+    // Fetch file list and populate grid after layout is settled.
+    let files = [];
+    try {
+        const res = await fetch(`${_authBase}/simAss-static-list`);
+        if (res.ok) ({ files } = await res.json());
+    } catch { /* leave files empty */ }
+
+    if (files.length === 0) {
+        const note = document.createElement('p');
+        note.className   = 'section-label';
+        note.textContent = 'no static images found';
+        note.style.opacity = '0.5';
+        grid.appendChild(note);
+    } else {
+        files.forEach(filename => {
+            const btn = document.createElement('button');
+            btn.className   = 'btn-preset';
+            btn.textContent = filename.replace(/\.[^.]+$/, '');
+            btn.addEventListener('click', () => _loadAdminAvoidMap(filename));
+            grid.appendChild(btn);
+        });
+    }
 }
 
 function _loadAdminAvoidMap(filename) {
     if (_adminAvoidHold) { clearTimeout(_adminAvoidHold.timer); _adminAvoidHold = null; }
-    send({ avoidMap: filename });
+    send({ avoidMap: `${_authBase}/simAss-static/${filename}` });
     const HOLD_MS = 30_000;
     _adminAvoidHold = {
         image: filename, startMs: Date.now(),

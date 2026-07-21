@@ -2580,7 +2580,7 @@ function _cachedDecode(url) {
     return _decodedImageCache.get(url);
 }
 
-const _validSavedPhase = Number.isFinite(_savedPhase) && _savedPhase >= 1 && _savedPhase <= 9;
+const _validSavedPhase = Number.isFinite(_savedPhase) && _savedPhase >= 1 && _savedPhase <= storyEngine.length;
 
 if (_validSavedPhase) {
     // Auto-resume: overlay already hidden by HTML default; replay state instantly.
