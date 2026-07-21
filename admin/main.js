@@ -49,6 +49,8 @@ let adminToken = sessionStorage.getItem('admin-token');
 // Latest sim-state snapshot — the single source of truth for every highlight.
 let _state = null;
 
+let _adminAvoidHold = null; // { image: string, timer: number, startMs: number } | null
+
 // ── Auth ──────────────────────────────────────────────────────────────────────
 authForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -149,6 +151,7 @@ const PHASES = [
     { code: 'P7', label: 'TEXT' },
     { code: 'P8', label: 'CLOSING' },
     { code: 'P9', label: 'AMBIENT FINALE' },
+    { code: 'SHOWCASE', label: 'SHOWCASE' },
 ];
 
 // Chip color classes per state field. Value → semantic class.
@@ -182,11 +185,13 @@ function showAdmin() {
 function buildUI() {
     controlsEl.innerHTML = '';
 
-    buildPhaseNavigator();   // B
-    buildEffects();          // C
-    buildGlobalVisual();     // D
-    buildEmergency();        // E
-    buildAdvanced();         // F
+    buildPhaseNavigator();
+    buildEffects();
+    buildFormulas();
+    buildAvoidPicker();
+    buildGlobalVisual();
+    buildEmergency();
+    buildAdvanced();
 }
 
 // ── B. Phase navigator ─────────────────────────────────────────────────────────
@@ -290,29 +295,9 @@ function buildEmergency() {
     controlsEl.appendChild(row2);
 }
 
-// ── G. Advanced (collapsed) ──────────────────────────────────────────────────
-function buildAdvanced() {
-    const details = document.createElement('details');
-    details.className = 'advanced';
-    const summary = document.createElement('summary');
-    summary.textContent = 'advanced tuning';
-    details.appendChild(summary);
-
-    const inner = document.createElement('div');
-    inner.className = 'advanced-inner';
-
-    // Live tuning sliders
-    const sliders = document.createElement('div');
-    sliders.className = 'ctrl-block';
-    sliders.appendChild(mkSlider('Brightness', 'brightness', 0.06, 0.005, 1.5, 0.005));
-    sliders.appendChild(mkSlider('Speed',      'stepLen',    2.0,  0.1,   8,   0.1));
-    sliders.appendChild(mkSlider('Trail decay','trailDecay', 0.02, 0.001, 0.2, 0.001));
-    sliders.appendChild(mkSlider('Point size', 'pointSize',  3.5,  0.5,   12,  0.1));
-    sliders.appendChild(mkSlider('Audio duck', 'duckLevel',  0.15, 0,     1,   0.01));
-    inner.appendChild(sliders);
-
-    // Formula presets
-    inner.appendChild(mkLabel('Formula presets'));
+// ── E2. Formula presets ──────────────────────────────────────────────────────
+function buildFormulas() {
+    controlsEl.appendChild(mkLabel('Formula presets'));
     const grid = document.createElement('div');
     grid.className = 'preset-grid';
     let activePresetBtn = null;
@@ -328,20 +313,113 @@ function buildAdvanced() {
         });
         grid.appendChild(btn);
     });
-    inner.appendChild(grid);
+    controlsEl.appendChild(grid);
+}
 
-    // Trace text
-    inner.appendChild(mkLabel('Trace text'));
-    const textRow = document.createElement('div');
-    textRow.className = 'text-row';
-    const textIn = mkTextInput('trace text…');
-    const textBtn = document.createElement('button');
-    textBtn.className   = 'btn-small';
-    textBtn.textContent = 'set';
-    textBtn.addEventListener('click', () => send({ traceText: textIn.input.value }));
-    textRow.appendChild(textIn.wrap);
-    textRow.appendChild(textBtn);
-    inner.appendChild(textRow);
+// ── E3. Avoid-map picker ─────────────────────────────────────────────────────
+async function buildAvoidPicker() {
+    controlsEl.appendChild(mkLabel('Avoid map'));
+
+    let files = [];
+    try {
+        const res = await fetch(`${_authBase}/simAss-static-list`);
+        if (res.ok) ({ files } = await res.json());
+    } catch { /* leave files empty */ }
+
+    if (files.length === 0) {
+        const note = document.createElement('p');
+        note.className   = 'section-label';
+        note.textContent = 'no static images found';
+        note.style.opacity = '0.5';
+        controlsEl.appendChild(note);
+    } else {
+        const grid = document.createElement('div');
+        grid.className = 'preset-grid';
+        files.forEach(filename => {
+            const btn = document.createElement('button');
+            btn.className   = 'btn-preset';
+            btn.textContent = filename.replace(/\.[^.]+$/, '');
+            btn.addEventListener('click', () => _loadAdminAvoidMap(filename));
+            grid.appendChild(btn);
+        });
+        controlsEl.appendChild(grid);
+    }
+
+    const statusRow = document.createElement('div');
+    statusRow.className = 'btn-row';
+
+    const statusEl = document.createElement('span');
+    statusEl.id        = 'avoid-hold-status';
+    statusEl.className = 'ctrl-label';
+    statusRow.appendChild(statusEl);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.id        = 'avoid-hold-remove';
+    removeBtn.className = 'btn-big btn-clear';
+    removeBtn.textContent = '✕ remove';
+    removeBtn.style.display = 'none';
+    removeBtn.addEventListener('click', _removeAdminAvoidMap);
+    statusRow.appendChild(removeBtn);
+
+    controlsEl.appendChild(statusRow);
+}
+
+function _loadAdminAvoidMap(filename) {
+    if (_adminAvoidHold) { clearTimeout(_adminAvoidHold.timer); _adminAvoidHold = null; }
+    send({ avoidMap: filename });
+    const HOLD_MS = 30_000;
+    _adminAvoidHold = {
+        image: filename, startMs: Date.now(),
+        timer: setTimeout(() => {
+            send({ avoidMap: null });
+            _adminAvoidHold = null;
+            _updateAvoidHoldUI();
+        }, HOLD_MS),
+    };
+    _updateAvoidHoldUI();
+}
+
+function _removeAdminAvoidMap() {
+    if (!_adminAvoidHold) return;
+    clearTimeout(_adminAvoidHold.timer);
+    _adminAvoidHold = null;
+    send({ avoidMap: null });
+    _updateAvoidHoldUI();
+}
+
+function _updateAvoidHoldUI() {
+    const statusEl  = document.getElementById('avoid-hold-status');
+    const removeBtn = document.getElementById('avoid-hold-remove');
+    if (!statusEl || !removeBtn) return;
+    if (_adminAvoidHold) {
+        const remaining = Math.max(0, Math.ceil((30_000 - (Date.now() - _adminAvoidHold.startMs)) / 1000));
+        statusEl.textContent    = `${_adminAvoidHold.image} — clears in ${remaining}s`;
+        removeBtn.style.display = '';
+    } else {
+        statusEl.textContent    = '';
+        removeBtn.style.display = 'none';
+    }
+}
+
+// ── G. Advanced (collapsed) ──────────────────────────────────────────────────
+function buildAdvanced() {
+    const details = document.createElement('details');
+    details.className = 'advanced';
+    const summary = document.createElement('summary');
+    summary.textContent = 'tuning';
+    details.appendChild(summary);
+
+    const inner = document.createElement('div');
+    inner.className = 'advanced-inner';
+
+    const sliders = document.createElement('div');
+    sliders.className = 'ctrl-block';
+    sliders.appendChild(mkSlider('Brightness', 'brightness', 0.06, 0.005, 1.5, 0.005));
+    sliders.appendChild(mkSlider('Speed',      'stepLen',    2.0,  0.1,   8,   0.1));
+    sliders.appendChild(mkSlider('Trail decay','trailDecay', 0.02, 0.001, 0.2, 0.001));
+    sliders.appendChild(mkSlider('Point size', 'pointSize',  3.5,  0.5,   12,  0.1));
+    sliders.appendChild(mkSlider('Audio duck', 'duckLevel',  0.15, 0,     1,   0.01));
+    inner.appendChild(sliders);
 
     details.appendChild(inner);
     controlsEl.appendChild(details);
@@ -501,8 +579,11 @@ function mkSlider(label, key, def, min, max, step) {
     return wrap;
 }
 
-// Keep the vote countdown ticking between sim-state snapshots.
-setInterval(() => { if (_state?.stepStatus === 'VOTE') renderVote(_state); }, 1000);
+// Keep the vote countdown and avoid-hold status ticking between sim-state snapshots.
+setInterval(() => {
+    if (_state?.stepStatus === 'VOTE') renderVote(_state);
+    _updateAvoidHoldUI();
+}, 1000);
 
 // Bootstrap — all let/const declarations above must be initialized before this runs.
 let _uiBuilt = false;

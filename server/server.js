@@ -467,6 +467,19 @@ app.get('/simAss-static/:filename', async (req, res) => {
     }
 });
 
+// ── Static asset list — returns sorted list of image filenames in simAss/static/ ─
+app.get('/simAss-static-list', async (req, res) => {
+    const dir = path.join(_SIM_ASS_DIR, 'static');
+    const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp']);
+    try {
+        const all = await readdir(dir);
+        const files = all.filter(f => IMAGE_EXT.has(path.extname(f).toLowerCase())).sort();
+        res.json({ files });
+    } catch {
+        res.json({ files: [] });
+    }
+});
+
 // ── Narrator audio — serves a specific file by name from simAss/narrator/ ────
 app.get('/simAss-narrator/:filename', async (req, res) => {
     const filename = path.basename(req.params.filename); // prevent path traversal
