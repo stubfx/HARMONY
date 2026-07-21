@@ -126,6 +126,18 @@ function _hideAudioHint() {
 function _ensureAudioCtx() {
     if (!_audioCtx) {
         _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        // Synchronous silent-buffer unlock: forces the context awake within this
+        // user gesture so the FIRST real note plays instantly. resume() alone is
+        // async — on slow devices it resolves after the next tap, so the first
+        // chirp is dropped. Playing a 1-sample source synchronously wakes the
+        // clock immediately, before _localChirp schedules its oscillator.
+        try {
+            const b = _audioCtx.createBuffer(1, 1, 22050);
+            const s = _audioCtx.createBufferSource();
+            s.buffer = b;
+            s.connect(_audioCtx.destination);
+            s.start(0);
+        } catch { /* unlock best-effort */ }
         // On older iOS where audioSession is absent, the mute switch always
         // silences Web Audio regardless of the silent-kick workaround.
         if (_isIOSSafari && !_hasAudioSession) _showAudioHint();
@@ -187,30 +199,22 @@ function _localChirp(noteIdx, oneHz = 1245, zeroHz = 623) {
     const glide = (CHIRP_BIT_MS / 1000) * 0.55;
     const freqAt = i => bits[i] === '1' ? oneHz : zeroHz;
 
-    // Build + schedule only once the clock is running. On the very first tap the
-    // context is freshly created and suspended, so ctx.currentTime is frozen at 0
-    // and a synchronously-scheduled note gets dropped. Defer to resume() there.
-    const emit = () => {
-        const osc  = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        if (_reverbNode) gain.connect(_reverbNode);
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    if (_reverbNode) gain.connect(_reverbNode);
 
-        const t0 = ctx.currentTime + 0.02;
-        osc.frequency.setValueAtTime(freqAt(0), t0);
-        for (let i = 1; i < bits.length; i++) {
-            osc.frequency.exponentialRampToValueAtTime(freqAt(i), t0 + (i * CHIRP_BIT_MS) / 1000 + glide);
-        }
-        gain.gain.setValueAtTime(0.22, t0);
-        gain.gain.linearRampToValueAtTime(0.001, t0 + dur);
-        osc.start(t0);
-        osc.stop(t0 + dur + 0.1);
-    };
-
-    if (ctx.state === 'running') emit();
-    else ctx.resume().then(emit).catch(() => {});
+    const t0 = ctx.currentTime + 0.02;
+    osc.frequency.setValueAtTime(freqAt(0), t0);
+    for (let i = 1; i < bits.length; i++) {
+        osc.frequency.exponentialRampToValueAtTime(freqAt(i), t0 + (i * CHIRP_BIT_MS) / 1000 + glide);
+    }
+    gain.gain.setValueAtTime(0.22, t0);
+    gain.gain.linearRampToValueAtTime(0.001, t0 + dur);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.1);
 }
 
 // ── Chirp rings — expanding circle at tap point ───────────────────────────────
@@ -731,11 +735,15 @@ if (isBot) {
     });
     try { window.parent?.postMessage({ type: 'bot-ready' }, window.location.origin); } catch {}
 }
+// Capture phase so this runs before the canvas tap handler: the context is
+// created and unlocked at the very start of the gesture, so _localChirp's
+// synchronous scheduling on the same first tap already sees a running clock.
 document.addEventListener('pointerdown', () => {
+    _ensureAudioCtx();
     _silentAudioKick();
     _lastTapMs   = Date.now();
     _hintVisible = false;
-});
+}, true);
 
 if (!isBot) {
     _showHint(); // initial show, pointed at a random bubble
