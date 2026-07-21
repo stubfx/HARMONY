@@ -2008,7 +2008,6 @@ let socket;
 // Base URL for server API calls — VITE_USER_URL in production, own origin as fallback.
 const _apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
 ambience.init(_apiBase);
-loadAvoidMap(`${_apiBase}/simAss-static/full_square.png`);
 
 // ── Collective swarm state (written by 'collective-state' socket events) ───────
 // Smoothed each frame via exponential moving average to avoid jarring jumps.
