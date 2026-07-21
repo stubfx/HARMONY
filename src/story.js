@@ -11,7 +11,7 @@ const _P3_P7 = {
 
 const PHASE_SNAPSHOTS = [
     // P1
-    { colorMode:'GRAYSCALE', champLinesAlpha:0, limitAtCenter:false, limitAtCenterRadius:100,
+    { colorMode:'GRAYSCALE', champLinesAlpha:0, limitAtCenter:true, limitAtCenterRadius:100,
       dotRespawnChance:0, windEnabled:false, harmonyImages:false, harmonyFallback:null,
       avoidMap:null, fullSynth:false, formulas:null, music:false, blinkersLoop:false },
     // P2
@@ -126,6 +126,8 @@ export const STORY = [
             sim.setColorMode('GRAYSCALE');
             sim.freezeParams({ spectatorSpawnChance: 0, randomTeleportChance: 0, dotRespawnChance: 0, spawnFadeRate: 0 });
             sim.setParam('champLinesAlpha', 0);
+            sim.setParam('limitAtCenter', true);
+            sim.setParam('limitAtCenterRadius', 100);
             sim.suppressImages();
             sim.dormantSeed();
             sim.speakPhase(this.id);
