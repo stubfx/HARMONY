@@ -66,6 +66,7 @@ function sendEvent(type, data) {
 let _currentStep = -1;
 
 let _lastTapMs = Date.now(); // tracks last tap for 20 s inactivity re-show
+let _pickHintTarget = () => null; // set by _initNoteCanvas once bubbles exist
 
 // ── Aura ──────────────────────────────────────────────────────────────────────
 let pushedColor = '#2495FF';
@@ -386,7 +387,10 @@ function _initNoteCanvas() {
     function resize() {
         noteCanvasEl.width  = noteCanvasEl.offsetWidth;
         noteCanvasEl.height = noteCanvasEl.offsetHeight;
-        if (_bubbles.length === 0 && noteCanvasEl.width > 0) _initBubbles();
+        if (_bubbles.length === 0 && noteCanvasEl.width > 0) {
+            _initBubbles();
+            _pickHintTarget = () => _bubbles[Math.floor(Math.random() * _bubbles.length)] ?? null;
+        }
     }
     resize();
     new ResizeObserver(resize).observe(noteCanvasEl);
@@ -642,6 +646,20 @@ socket.on('story-step', ({ step } = {}) => {
 // Canvas loop starts immediately so the pixel pool is visible before first touch.
 // AudioContext requires a user gesture, so the oscillator is deferred.
 const _tapHint = document.querySelector('#tap-hint');
+
+function _showHint() {
+    const b = _pickHintTarget();
+    if (b && _tapHint) {
+        // Position hint above the bubble: text on top, hand on bottom pointing down.
+        // transform: translate(-50%, -100%) puts element's bottom-center at (left, top).
+        // Offset -36 so the finger tip dips to ~bubble edge during animation.
+        _tapHint.style.left      = b.x + 'px';
+        _tapHint.style.top       = (b.y - 36) + 'px';
+        _tapHint.style.transform = 'translate(-50%, -100%)';
+    }
+    _tapHint?.classList.remove('hidden');
+}
+
 _initNoteCanvas();
 if (isBot) {
     _tapHint?.classList.add('hidden');
@@ -661,9 +679,8 @@ document.addEventListener('pointerdown', () => {
 });
 
 if (!isBot) {
+    _showHint(); // initial show, pointed at a random bubble
     setInterval(() => {
-        if (Date.now() - _lastTapMs > 20_000) {
-            _tapHint?.classList.remove('hidden');
-        }
+        if (Date.now() - _lastTapMs > 20_000) _showHint();
     }, 2000);
 }
