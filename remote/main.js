@@ -187,22 +187,30 @@ function _localChirp(noteIdx, oneHz = 1245, zeroHz = 623) {
     const glide = (CHIRP_BIT_MS / 1000) * 0.55;
     const freqAt = i => bits[i] === '1' ? oneHz : zeroHz;
 
-    const osc  = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    if (_reverbNode) gain.connect(_reverbNode);
+    // Build + schedule only once the clock is running. On the very first tap the
+    // context is freshly created and suspended, so ctx.currentTime is frozen at 0
+    // and a synchronously-scheduled note gets dropped. Defer to resume() there.
+    const emit = () => {
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        if (_reverbNode) gain.connect(_reverbNode);
 
-    const t0 = ctx.currentTime + 0.02;
-    osc.frequency.setValueAtTime(freqAt(0), t0);
-    for (let i = 1; i < bits.length; i++) {
-        osc.frequency.exponentialRampToValueAtTime(freqAt(i), t0 + (i * CHIRP_BIT_MS) / 1000 + glide);
-    }
-    gain.gain.setValueAtTime(0.22, t0);
-    gain.gain.linearRampToValueAtTime(0.001, t0 + dur);
-    osc.start(t0);
-    osc.stop(t0 + dur + 0.1);
+        const t0 = ctx.currentTime + 0.02;
+        osc.frequency.setValueAtTime(freqAt(0), t0);
+        for (let i = 1; i < bits.length; i++) {
+            osc.frequency.exponentialRampToValueAtTime(freqAt(i), t0 + (i * CHIRP_BIT_MS) / 1000 + glide);
+        }
+        gain.gain.setValueAtTime(0.22, t0);
+        gain.gain.linearRampToValueAtTime(0.001, t0 + dur);
+        osc.start(t0);
+        osc.stop(t0 + dur + 0.1);
+    };
+
+    if (ctx.state === 'running') emit();
+    else ctx.resume().then(emit).catch(() => {});
 }
 
 // ── Chirp rings — expanding circle at tap point ───────────────────────────────
