@@ -679,27 +679,28 @@ function _drawHint(ctx2d, dt) {
         ctx2d.restore();
     }
 
-    // Hand: 42 × 50 px bounding box, y coords flipped so fingertip points DOWN.
-    // Flipped: palm at top (oy+6), fingertip at bottom (oy+48).
+    // Hand below bubble, fingertip pointing UP toward it.
+    // oy is the top of the 42×50 bounding box; fingertip is at oy+2.
+    // Dip subtracts so the hand nudges upward toward the bubble each cycle.
     const ox = x - 21;
-    const oy = y - 86 + dip;
+    const oy = y + 28 - dip;  // palm hangs below bubble, tip rises toward it
 
     ctx2d.save();
     ctx2d.fillStyle   = '#ffffff';
     ctx2d.shadowColor = 'rgba(255,255,255,0.35)';
     ctx2d.shadowBlur  = 12;
 
-    ctx2d.globalAlpha = 0.70; _rrect(ctx2d, ox+8,  oy+6,  30, 18, 9);   // palm
+    ctx2d.globalAlpha = 0.70; _rrect(ctx2d, ox+8,  oy+26, 30, 18, 9);   // palm
     ctx2d.globalAlpha = 0.70;                                              // thumb
     ctx2d.save();
-    ctx2d.translate(ox+5, oy+14); ctx2d.rotate(-20 * Math.PI / 180);
+    ctx2d.translate(ox+5, oy+36); ctx2d.rotate(-20 * Math.PI / 180);
     ctx2d.beginPath(); ctx2d.ellipse(0, 0, 5, 8, 0, 0, Math.PI * 2); ctx2d.fill();
     ctx2d.restore();
-    ctx2d.globalAlpha = 0.78; _rrect(ctx2d, ox+10, oy+16, 10, 32, 5);   // index finger
-    ctx2d.globalAlpha = 0.50; _rrect(ctx2d, ox+20, oy+16,  9, 20, 4.5); // middle finger
+    ctx2d.globalAlpha = 0.78; _rrect(ctx2d, ox+10, oy+2,  10, 32, 5);   // index finger
+    ctx2d.globalAlpha = 0.50; _rrect(ctx2d, ox+20, oy+14,  9, 20, 4.5); // middle finger
     ctx2d.globalAlpha = 0.39; _rrect(ctx2d, ox+29, oy+16,  8, 18, 4);   // ring finger
     ctx2d.shadowBlur  = 0;
-    ctx2d.globalAlpha = 0.30; _rrect(ctx2d, ox+12, oy+18,  3, 11, 1.5); // sheen
+    ctx2d.globalAlpha = 0.30; _rrect(ctx2d, ox+12, oy+4,   3, 11, 1.5); // sheen
 
     ctx2d.restore();
 }
