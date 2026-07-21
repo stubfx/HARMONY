@@ -687,6 +687,7 @@ const simFacade = {
 
     // Unlock noise/pad/arp — call when the story is ready for the full synth.
     enableFullSynth() { setSynthDroneOnly(false); },
+    // Start synth. One-time guard — safe to call from phase snapshots.
     startBackgroundMusic() {
         if (_musicStarted) return;
         _musicStarted = true;

@@ -81,18 +81,35 @@ export function applyPhaseSnapshot(sim, idx) {
 //   onNote(sim, noteIndex)    — called each time any spectator plays a note
 //
 // sim primitives:
-//   sim.dormantSeed()              — seed all agents invisible (weight=0)
-//   sim.activateChunk(fraction)    — light up next N% of agents from center
-//   sim.freezeParams(overrides)    — save + override named params
-//   sim.thawParams()               — restore params saved by freezeParams
-//   sim.reseed({ mode })           — full reseed; mode: RESEED.FADE_FROM_EDGES → perimeter spawn at weight=0
-//   sim.next()                     — advance to the next step
-//   sim.setParam(key, val)         — override a single param
-//   sim.suppressImages()           — block loadAvoidMap (images from admin)
-//   sim.restoreImages()            — re-enable loadAvoidMap
-//   sim.enableHarmonyImages()      — allow harmony to show its avoidmap image (off by default)
-//   sim.disableHarmonyImages()     — hide harmony image; blocks future ones until re-enabled
-//   sim.setTraceText(text)         — set the trace text input and re-render the avoidmap
+//   sim.dormantSeed()                    — seed all agents invisible (weight=0)
+//   sim.activateChunk(fraction)          — light up next N% of agents from center
+//   sim.freezeParams(overrides)          — save + override named params
+//   sim.thawParams()                     — restore params saved by freezeParams
+//   sim.reseed({ mode })                 — full reseed; mode: RESEED.FADE_FROM_EDGES → perimeter spawn at weight=0
+//   sim.next()                           — advance to the next step
+//   sim.setParam(key, val)               — override a single param
+//   sim.setColorMode(mode)               — 'GRAYSCALE' | 'NORMAL' | 'GRAYSCALE_INVERTED'
+//   sim.setFormulas(dir, wind)           — set WGSL direction + wind formula strings
+//   sim.enableFullSynth()                — unlock noise/pad/arp layers
+//   sim.setSynthEnergy(e, rampSec)       — set synth energy (0=calm, 1=post-drop)
+//   sim.startBackgroundMusic()           — start ambience + synth (one-time, no-op if already started)
+//   sim.startBlinkersLoop()              — start ambient blinker loop (one-time, no-op if already started)
+//   sim.stopBlinkersLoop()               — stop blinker loop
+//   sim.speakPhase(n)                    — play binary tone cue for phase n
+//   sim.playRiser(durationMs)            — start riser build-up
+//   sim.resolveRiser()                   — light riser resolution (P9/harmony)
+//   sim.triggerImpact()                  — heavy drop resolution + brightness burst
+//   sim.suppressImages()                 — block loadAvoidMap (images from admin)
+//   sim.restoreImages()                  — re-enable loadAvoidMap
+//   sim.loadStaticAvoidMap(filename)     — load a static asset as avoidmap
+//   sim.clearAvoidMap()                  — clear current avoidmap
+//   sim.enableHarmonyImages()            — allow harmony to show its avoidmap image (off by default)
+//   sim.disableHarmonyImages()           — hide harmony image; blocks future ones until re-enabled
+//   sim.setHarmonyFallback(filename)     — avoidmap to restore after each harmony image exits
+//   sim.clearHarmonyFallback()           — remove the fallback
+//   sim.setHarmonyRiserResetCallback(fn) — called by harmony on riser fire; pass null to clear
+//   sim.setTraceText(text)               — set the trace text input and re-render the avoidmap
+//   sim.getUserCount()                   — current connected spectator count
 
 const log = (msg) => console.log(`[story] ${msg}`);
 

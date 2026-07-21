@@ -1,6 +1,6 @@
 // ambience.js — ambient blinkers engine
-// Audio track playback removed; server endpoint kept but not fetched.
-// Call init(apiBase) once at startup, then start()/stop() as before.
+// Audio track playback has been removed; this module now only manages the blinker loop.
+// start()/stop() are kept as stubs (called by simFacade) but do nothing meaningful.
 
 import { blinker, BLINKER_TYPES } from './synth.js';
 
@@ -8,10 +8,8 @@ let _started = false;
 
 export function init(_apiBase) {}
 
-// No-op — audio track no longer fetched on the client.
 export function start() { _started = true; }
-
-export function stop() { _started = false; }
+export function stop()  { _started = false; }
 
 // ── Blinkers loop ─────────────────────────────────────────────────────────────
 // Plays a random blinker every 0.2–8 s. Fully async, cancellable.
