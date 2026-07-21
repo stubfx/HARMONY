@@ -67,6 +67,9 @@ let _currentStep = -1;
 
 let _lastTapMs = Date.now(); // tracks last tap for 20 s inactivity re-show
 let _pickHintTarget = () => null; // set by _initNoteCanvas once bubbles exist
+let _hintVisible = false;
+let _hintTarget  = null;  // { x, y } bubble centre in canvas CSS pixels
+let _hintT       = 0;     // animation clock, resets on each show
 
 // ── Aura ──────────────────────────────────────────────────────────────────────
 let pushedColor = '#2495FF';
@@ -596,6 +599,7 @@ function _initNoteCanvas() {
 
         _tickParticles(ctx2d, dt, ts);
         _drawBubbles(ctx2d, ts);
+        _drawHint(ctx2d, dt);
         _tickChirpRings(ctx2d, dt);
     })(0);
 
@@ -645,24 +649,69 @@ socket.on('story-step', ({ step } = {}) => {
 // ── Init ──────────────────────────────────────────────────────────────────────
 // Canvas loop starts immediately so the pixel pool is visible before first touch.
 // AudioContext requires a user gesture, so the oscillator is deferred.
-const _tapHint = document.querySelector('#tap-hint');
+function _rrect(ctx, x, y, w, h, r) {
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill();
+}
+
+function _drawHint(ctx2d, dt) {
+    if (!_hintVisible || !_hintTarget) return;
+    _hintT += dt;
+
+    const { x, y } = _hintTarget;
+    const cycle = (_hintT % 2) / 2; // 0..1 over 2 s
+
+    // Dip envelope: 0→14 px (0–35 %), 14→0 (35–55 %), rest (55–100 %)
+    let dip = 0;
+    if      (cycle < 0.35) dip = (cycle / 0.35) * 14;
+    else if (cycle < 0.55) dip = (1 - (cycle - 0.35) / 0.20) * 14;
+
+    // Ring expands from bubble centre, synced to dip bottom
+    if (cycle >= 0.30) {
+        const rp     = Math.min(1, (cycle - 0.30) / 0.70);
+        const appear = cycle < 0.50 ? (cycle - 0.30) / 0.20 : 1;
+        ctx2d.save();
+        ctx2d.globalAlpha = Math.min(appear, 1 - rp) * 0.7;
+        ctx2d.strokeStyle = '#ffffff';
+        ctx2d.lineWidth   = 1.5;
+        ctx2d.beginPath();
+        ctx2d.arc(x, y, 10 + rp * 32, 0, Math.PI * 2);
+        ctx2d.stroke();
+        ctx2d.restore();
+    }
+
+    // Hand: SVG bounding box 42 × 50 px centred on bubble x, bottom 36 px above centre
+    const ox = x - 21;
+    const oy = y - 86 + dip;
+
+    ctx2d.save();
+    ctx2d.fillStyle   = '#ffffff';
+    ctx2d.shadowColor = 'rgba(255,255,255,0.35)';
+    ctx2d.shadowBlur  = 12;
+
+    ctx2d.globalAlpha = 0.70; _rrect(ctx2d, ox+8,  oy+26, 30, 18, 9);   // palm
+    ctx2d.globalAlpha = 0.70;                                              // thumb
+    ctx2d.save();
+    ctx2d.translate(ox+5, oy+36); ctx2d.rotate(-20 * Math.PI / 180);
+    ctx2d.beginPath(); ctx2d.ellipse(0, 0, 5, 8, 0, 0, Math.PI * 2); ctx2d.fill();
+    ctx2d.restore();
+    ctx2d.globalAlpha = 0.78; _rrect(ctx2d, ox+10, oy+2,  10, 32, 5);   // index finger
+    ctx2d.globalAlpha = 0.50; _rrect(ctx2d, ox+20, oy+14,  9, 20, 4.5); // middle finger
+    ctx2d.globalAlpha = 0.39; _rrect(ctx2d, ox+29, oy+16,  8, 18, 4);   // ring finger
+    ctx2d.shadowBlur  = 0;
+    ctx2d.globalAlpha = 0.30; _rrect(ctx2d, ox+12, oy+4,   3, 11, 1.5); // sheen
+
+    ctx2d.restore();
+}
 
 function _showHint() {
     const b = _pickHintTarget();
-    if (b && _tapHint) {
-        // Position hint above the bubble: text on top, hand on bottom pointing down.
-        // transform: translate(-50%, -100%) puts element's bottom-center at (left, top).
-        // Offset -36 so the finger tip dips to ~bubble edge during animation.
-        _tapHint.style.left      = b.x + 'px';
-        _tapHint.style.top       = (b.y - 36) + 'px';
-        _tapHint.style.transform = 'translate(-50%, -100%)';
-    }
-    _tapHint?.classList.remove('hidden');
+    if (b) _hintTarget = { x: b.x, y: b.y };
+    _hintT       = 0;
+    _hintVisible = true;
 }
 
 _initNoteCanvas();
 if (isBot) {
-    _tapHint?.classList.add('hidden');
     window.addEventListener('message', (e) => {
         if (e.origin !== window.location.origin) return;
         const d = e.data;
@@ -674,8 +723,8 @@ if (isBot) {
 }
 document.addEventListener('pointerdown', () => {
     _silentAudioKick();
-    _lastTapMs = Date.now();
-    _tapHint?.classList.add('hidden');
+    _lastTapMs   = Date.now();
+    _hintVisible = false;
 });
 
 if (!isBot) {

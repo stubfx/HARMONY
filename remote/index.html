@@ -13,27 +13,6 @@
     <body>
         <script type="module" src="./main.js"></script>
         <div id="aura"></div>
-        <div id="tap-hint" class="hidden">
-            <span id="tap-sub">touch to begin</span>
-            <div id="hint-hand">
-                <svg id="hint-svg" width="42" height="50" viewBox="0 0 42 50" fill="none"
-                     xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <!-- thumb -->
-                    <ellipse cx="5" cy="36" rx="5" ry="8" transform="rotate(-20 5 36)"/>
-                    <!-- index finger (left of center, extended) -->
-                    <rect x="10" y="2"  width="10" height="32" rx="5"/>
-                    <!-- middle finger (folded) -->
-                    <rect x="20" y="14" width="9"  height="20" rx="4.5" opacity=".65"/>
-                    <!-- ring finger (more folded) -->
-                    <rect x="29" y="16" width="8"  height="18" rx="4"   opacity=".5"/>
-                    <!-- palm -->
-                    <rect x="8"  y="26" width="30" height="18" rx="9"/>
-                    <!-- glass sheen on index finger -->
-                    <rect x="12" y="4"  width="3"  height="11" rx="1.5" fill="white" opacity=".3"/>
-                </svg>
-                <div id="hint-ring"></div>
-            </div>
-        </div>
         <div id="audio-hint" class="hidden">enable audio</div>
         <!-- step-debug: intentional debug element — shows current story phase number. keep it. -->
     <div id="step-debug"></div>
