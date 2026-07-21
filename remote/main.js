@@ -682,7 +682,7 @@ function _drawHint(ctx2d, dt) {
     // Hand below bubble, fingertip pointing UP toward it.
     // oy is the top of the 42×50 bounding box; fingertip is at oy+2.
     // Dip subtracts so the hand nudges upward toward the bubble each cycle.
-    const ox = x - 21;
+    const ox = x - 15; // centre index finger (box x=10..20) on bubble
     const oy = y + 28 - dip;  // palm hangs below bubble, tip rises toward it
 
     ctx2d.save();
