@@ -24,7 +24,7 @@ import glareWGSL        from './shaders/glare.wgsl?raw';
 import { startSynth, setSynthState, setSynthDroneOnly, setSynthBusVolume, setSynthEnergy, addArpInfluence, blinker, BLINKER_TYPES, playRiser, triggerImpact, resolveRiser, speakBinary, binaryCueDurationMs, isSpeaking, speakingRemainingMs, setShapePersonality, clearShapePersonality } from './synth.js';
 import * as ambience from './ambience.js';
 import { StoryEngine } from './storyEngine.js';
-import { STORY }       from './story.js';
+import { STORY, applyPhaseSnapshot } from './story.js';
 import { RESEED }      from './constants.js';
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -552,6 +552,9 @@ function _rawTeleport(x, y, fraction = 0.1) {
 // ── Story facade & engine ────────────────────────────────────────────────────
 // sim.js exposes low-level primitives. Story steps (story.js) compose them.
 
+let _musicStarted        = false;
+let _blinkersLoopStarted = false;
+
 const simFacade = {
     // Seed all agents dormant (weight=0), storing original weights for later restore.
     dormantSeed() {
@@ -683,10 +686,9 @@ const simFacade = {
 
     // Unlock noise/pad/arp — call when the story is ready for the full synth.
     enableFullSynth() { setSynthDroneOnly(false); },
-
-    // Start the ambience music and the synth together.
-    // Safe to call multiple times — no-op if already started.
     startBackgroundMusic() {
+        if (_musicStarted) return;
+        _musicStarted = true;
         ambience.start();
         startSynth().then(() => setSynthState(smoothCoherence, 0, 0, smoothTemp));
     },
@@ -718,37 +720,17 @@ const simFacade = {
     speakPhase(n) { console.log('[audio] speakBinary n=%d dur=%dms', n, binaryCueDurationMs(n)); speakBinary(n); },
 
     startBlinkersLoop() {
+        if (_blinkersLoopStarted) return;
+        _blinkersLoopStarted = true;
         ambience.startBlinkersLoop(() => {
             const x = Math.random() * canvas.width;
             const y = Math.random() * canvas.height;
             _rawTeleport(x, y, 0.1);
         });
     },
-    stopBlinkersLoop()  { ambience.stopBlinkersLoop();  },
+    stopBlinkersLoop() { _blinkersLoopStarted = false; ambience.stopBlinkersLoop(); },
     burstBlinkers(count, intervalMs) { ambience.burstBlinkers(count, intervalMs); },
 
-    // Play a narrator audio file from simAss/narrator/.
-    // Pass { autoNext: true } to advance to the next step when playback ends.
-    // Returns the Audio element so the caller can pause it on exit if needed.
-    playNarratorAudio(filename, { autoNext = false } = {}) {
-        const DUCK_DB = -10; // duck the generative bed (synth + ambience) under narration
-        const audio = new Audio(`${_apiBase}/simAss-narrator/${filename}`);
-        const restoreBed = () => { setSynthBusVolume(0); ambience.setVolume(0); };
-        const onEnd = () => { restoreBed(); if (autoNext) storyEngine.next(); };
-        audio.addEventListener('play', () => {
-            setSynthBusVolume(DUCK_DB);
-            ambience.setVolume(DUCK_DB);
-        }, { once: true });
-        audio.addEventListener('ended', onEnd, { once: true });
-        audio.addEventListener('error', (e) => {
-            console.warn(`[narrator] failed to load "${filename}" — skipping.`, e);
-            // Treat a missing/broken file as an instant end: dispatch 'ended' so both the
-            // bed restore above and any caller 'ended' logic (e.g. PHASE 3's build→drop) run.
-            audio.dispatchEvent(new Event('ended'));
-        }, { once: true });
-        audio.play().catch(e => console.warn('[narrator] play() rejected:', e));
-        return audio;
-    },
 };
 const storyEngine = new StoryEngine(STORY, simFacade);
 // ── Static pipelines & resources ──────────────────────────────────────────────
@@ -2168,6 +2150,8 @@ let pulseEnergy = 0;
             collectiveCoherence = 0.5;
             collectiveTemp      = 0.5;
             setSynthState(0.5, 0, 0, 0.5);
+            _musicStarted = false;
+            _blinkersLoopStarted = false;
             ambience.stop(); // last user left — fade out music
         }
         if (spectatorId) {
@@ -2390,7 +2374,10 @@ function applySimParams(data) {
     }
     // Story navigation — operator override. Mirrors the engine calls the GUI uses;
     // onGoto emits story-step + sim-state, so the admin gets immediate confirmation.
-    if (typeof gotoPhase === 'number') storyEngine.goto(gotoPhase);
+    if (typeof gotoPhase === 'number') {
+        storyEngine.goto(gotoPhase);
+        applyPhaseSnapshot(simFacade, gotoPhase);
+    }
     if (storyNext  === true) storyEngine.next();
     if (storyPrev  === true) storyEngine.goto(storyEngine.index - 1);
     if (storyStart === true) storyEngine.start();

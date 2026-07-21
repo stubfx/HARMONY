@@ -1,11 +1,66 @@
 import { PHASE } from './constants.js';
 
+const _P1_DIR  = 'atan2(cy - y, cx - x) + sin(t * 1.4 + length(vec2(x-cx,y-cy)) * 0.012) * PI * 0.38';
+const _P1_WIND = 'atan2(cy - y, cx - x) + PI * 0.46 + sin(t * 0.65 + length(vec2(x-cx,y-cy)) * 0.007) * 0.6';
+
+const _P3_P7 = {
+    colorMode:'NORMAL', champLinesAlpha:0.02, limitAtCenter:false, limitAtCenterRadius:100,
+    dotRespawnChance:0.002, windEnabled:true, harmonyImages:true, harmonyFallback:null,
+    avoidMap:null, fullSynth:true, formulas:[_P1_DIR,_P1_WIND], music:true, blinkersLoop:true,
+};
+
+const PHASE_SNAPSHOTS = [
+    // P1
+    { colorMode:'GRAYSCALE', champLinesAlpha:0, limitAtCenter:true, limitAtCenterRadius:100,
+      dotRespawnChance:0, windEnabled:false, harmonyImages:false, harmonyFallback:null,
+      avoidMap:null, fullSynth:false, formulas:null, music:false, blinkersLoop:false },
+    // P2
+    { colorMode:'GRAYSCALE', champLinesAlpha:0, limitAtCenter:false, limitAtCenterRadius:100,
+      dotRespawnChance:0, windEnabled:false, harmonyImages:false, harmonyFallback:null,
+      avoidMap:'circle.png', fullSynth:true, formulas:[_P1_DIR,_P1_WIND], music:true, blinkersLoop:true },
+    // P3
+    _P3_P7,
+    // P4
+    _P3_P7,
+    // P5
+    _P3_P7,
+    // P6
+    _P3_P7,
+    // P7
+    _P3_P7,
+    // P8
+    { colorMode:'NORMAL', champLinesAlpha:0.02, limitAtCenter:false, limitAtCenterRadius:100,
+      dotRespawnChance:0.002, windEnabled:true, harmonyImages:true, harmonyFallback:'aant_logo.png',
+      avoidMap:'aant_logo.png', fullSynth:true, formulas:[_P1_DIR,_P1_WIND], music:true, blinkersLoop:true },
+    // P9
+    { colorMode:'NORMAL', champLinesAlpha:0.02, limitAtCenter:false, limitAtCenterRadius:100,
+      dotRespawnChance:0.002, windEnabled:true, harmonyImages:true, harmonyFallback:'aant_logo.png',
+      avoidMap:'aant_logo.png', fullSynth:true, formulas:[_P1_DIR,_P1_WIND], music:true, blinkersLoop:true },
+];
+
+export function applyPhaseSnapshot(sim, idx) {
+    const s = PHASE_SNAPSHOTS[idx];
+    if (!s) return;
+    sim.setColorMode(s.colorMode);
+    sim.setParam('champLinesAlpha', s.champLinesAlpha);
+    sim.setParam('limitAtCenter', s.limitAtCenter);
+    if (s.limitAtCenterRadius !== undefined) sim.setParam('limitAtCenterRadius', s.limitAtCenterRadius);
+    sim.setParam('dotRespawnChance', s.dotRespawnChance);
+    sim.setParam('windEnabled', s.windEnabled);
+    if (s.harmonyImages) sim.enableHarmonyImages(); else sim.disableHarmonyImages();
+    if (s.harmonyFallback) sim.setHarmonyFallback(s.harmonyFallback); else sim.clearHarmonyFallback();
+    if (s.avoidMap) sim.loadStaticAvoidMap(s.avoidMap); else sim.clearAvoidMap();
+    if (s.fullSynth) sim.enableFullSynth();
+    if (s.formulas) sim.setFormulas(s.formulas[0], s.formulas[1]);
+    if (s.music) sim.startBackgroundMusic();
+    if (s.blinkersLoop) sim.startBlinkersLoop();
+}
+
 // ─── Phase audio ─────────────────────────────────────────────────────────────
 // No phase uses recorded narration any more. Every phase announces itself by
 // having the simulation "speak" its own phase number as a short binary tone
 // sequence (sim.speakPhase(this.id)) at the point its narration used to start.
 // PHASE 6 stays silent (director's note: "no commentary needed").
-// (sim.playNarratorAudio is still available as a primitive but is now unused.)
 
 // ─── Note on hardcoded parameters ────────────────────────────────────────────
 // All timers, thresholds and filenames are intentionally hardcoded in this file.
@@ -33,7 +88,6 @@ import { PHASE } from './constants.js';
 //   sim.restoreImages()            — re-enable loadAvoidMap
 //   sim.enableHarmonyImages()      — allow harmony to show its avoidmap image (off by default)
 //   sim.disableHarmonyImages()     — hide harmony image; blocks future ones until re-enabled
-//   sim.playNarratorAudio(file)    — play simAss/narrator/<file>; auto-next on ended
 //   sim.setTraceText(text)         — set the trace text input and re-render the avoidmap
 
 const log = (msg) => console.log(`[story] ${msg}`);
@@ -98,10 +152,7 @@ export const STORY = [
             clearTimeout(this._timer);
             sim.restoreImages();
             sim.thawParams();
-            sim.setFormulas(
-                'atan2(cy - y, cx - x) + sin(t * 1.4 + length(vec2(x-cx,y-cy)) * 0.012) * PI * 0.38',
-                'atan2(cy - y, cx - x) + PI * 0.46 + sin(t * 0.65 + length(vec2(x-cx,y-cy)) * 0.007) * 0.6',
-            );
+            sim.setFormulas(_P1_DIR, _P1_WIND);
         },
     },
 
