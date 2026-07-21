@@ -36,6 +36,10 @@ const PHASE_SNAPSHOTS = [
     { colorMode:'NORMAL', champLinesAlpha:0.02, limitAtCenter:false, limitAtCenterRadius:100,
       dotRespawnChance:0.002, windEnabled:true, harmonyImages:true, harmonyFallback:'aant_logo.png',
       avoidMap:'aant_logo.png', fullSynth:true, formulas:[_P1_DIR,_P1_WIND], music:true, blinkersLoop:true },
+    // SHOWCASE
+    { colorMode:'NORMAL', champLinesAlpha:0.02, limitAtCenter:false, limitAtCenterRadius:100,
+      dotRespawnChance:0.002, windEnabled:true, harmonyImages:true, harmonyFallback:'aant_logo.png',
+      avoidMap:'aant_logo.png', fullSynth:true, formulas:[_P1_DIR,_P1_WIND], music:true, blinkersLoop:true },
 ];
 
 export function applyPhaseSnapshot(sim, idx) {
@@ -412,6 +416,59 @@ export const STORY = [
         },
         exit(sim) {
             log('uscita PHASE 9 (restart).');
+            clearTimeout(this._riserTimer);
+            clearTimeout(this._restoreTimer);
+            sim.setStatus('NORMAL');
+            sim.setHarmonyRiserResetCallback(null);
+            sim.clearHarmonyFallback();
+        },
+    },
+
+    // ── SHOWCASE — ambient exhibition loop ────────────────────────────────────
+    // Self-contained clone of PHASE 9: sets up all state in enter() so it can
+    // be jumped to directly from the admin at any time without relying on P8.
+    // No next() — runs indefinitely until the operator navigates away.
+    {
+        id: PHASE.SHOWCASE,
+        label: 'SHOWCASE',
+        enter(sim) {
+            log('SHOWCASE — modalità esposizione. impostazione stato completo. riser ogni ~40s.');
+            sim.setColorMode('NORMAL');
+            sim.setParam('champLinesAlpha', 0.02);
+            sim.setParam('limitAtCenter', false);
+            sim.setParam('dotRespawnChance', 0.002);
+            sim.setParam('windEnabled', true);
+            sim.enableFullSynth();
+            sim.setFormulas(_P1_DIR, _P1_WIND);
+            sim.enableHarmonyImages();
+            sim.setHarmonyFallback('aant_logo.png');
+            sim.loadStaticAvoidMap('aant_logo.png');
+            sim.startBackgroundMusic();
+            sim.startBlinkersLoop();
+            sim.setHarmonyRiserResetCallback(() => this._rescheduleRiser(sim));
+            this._scheduleRiser(sim);
+        },
+        _scheduleRiser(sim) {
+            const ms = 36_000 + Math.random() * 8_000;
+            this._riserTimer = setTimeout(() => {
+                const dur = 3500 + Math.random() * 1500;
+                log(`SHOWCASE — freeroam + riser (${(dur / 1000).toFixed(1)}s).`);
+                sim.setStatus('FREEROAM');
+                sim.playRiser(dur);
+                this._restoreTimer = setTimeout(() => {
+                    sim.setStatus('NORMAL');
+                    sim.resolveRiser();
+                    log('SHOWCASE — riser terminato, ritorno a NORMAL.');
+                }, dur);
+                this._scheduleRiser(sim);
+            }, ms);
+        },
+        _rescheduleRiser(sim) {
+            clearTimeout(this._riserTimer);
+            this._scheduleRiser(sim);
+        },
+        exit(sim) {
+            log('uscita SHOWCASE.');
             clearTimeout(this._riserTimer);
             clearTimeout(this._restoreTimer);
             sim.setStatus('NORMAL');

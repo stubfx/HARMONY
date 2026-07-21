@@ -12,6 +12,7 @@ export const PHASE = Object.freeze({
     P7: 7,
     P8: 8,
     P9: 9,
+    SHOWCASE: 'SHOWCASE',
 });
 
 // Reseed modes passed to sim.reseed() / seedAgents().
