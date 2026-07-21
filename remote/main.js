@@ -65,6 +65,8 @@ function sendEvent(type, data) {
 // ── Story step ────────────────────────────────────────────────────────────────
 let _currentStep = -1;
 
+let _lastTapMs = Date.now(); // tracks last tap for 20 s inactivity re-show
+
 // ── Aura ──────────────────────────────────────────────────────────────────────
 let pushedColor = '#2495FF';
 
@@ -654,5 +656,14 @@ if (isBot) {
 }
 document.addEventListener('pointerdown', () => {
     _silentAudioKick();
+    _lastTapMs = Date.now();
     _tapHint?.classList.add('hidden');
-}, { once: true });
+});
+
+if (!isBot) {
+    setInterval(() => {
+        if (Date.now() - _lastTapMs > 20_000) {
+            _tapHint?.classList.remove('hidden');
+        }
+    }, 2000);
+}
