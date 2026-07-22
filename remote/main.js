@@ -653,6 +653,30 @@ function _rrect(ctx, x, y, w, h, r) {
     ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill();
 }
 
+// Draws the pointing hand into a 42×50 box whose top-left is (ox, oy).
+// Fingertip points up; shared by the on-canvas hint and the join overlay so
+// both show the exact same hand.
+function _drawHand(ctx, ox, oy) {
+    ctx.save();
+    ctx.fillStyle   = '#ffffff';
+    ctx.shadowColor = 'rgba(255,255,255,0.35)';
+    ctx.shadowBlur  = 12;
+
+    ctx.globalAlpha = 0.70; _rrect(ctx, ox+8,  oy+26, 30, 18, 9);   // palm
+    ctx.globalAlpha = 0.70;                                         // thumb
+    ctx.save();
+    ctx.translate(ox+5, oy+36); ctx.rotate(-20 * Math.PI / 180);
+    ctx.beginPath(); ctx.ellipse(0, 0, 5, 8, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.globalAlpha = 0.78; _rrect(ctx, ox+10, oy+2,  10, 32, 5);   // index finger
+    ctx.globalAlpha = 0.50; _rrect(ctx, ox+20, oy+14,  9, 20, 4.5); // middle finger
+    ctx.globalAlpha = 0.39; _rrect(ctx, ox+29, oy+16,  8, 18, 4);   // ring finger
+    ctx.shadowBlur  = 0;
+    ctx.globalAlpha = 0.30; _rrect(ctx, ox+12, oy+4,   3, 11, 1.5); // sheen
+
+    ctx.restore();
+}
+
 function _drawHint(ctx2d, dt) {
     if (!_hintVisible || !_hintTarget) return;
     _hintT += dt;
@@ -685,24 +709,7 @@ function _drawHint(ctx2d, dt) {
     const ox = x - 15; // centre index finger (box x=10..20) on bubble
     const oy = y + 28 - dip;  // palm hangs below bubble, tip rises toward it
 
-    ctx2d.save();
-    ctx2d.fillStyle   = '#ffffff';
-    ctx2d.shadowColor = 'rgba(255,255,255,0.35)';
-    ctx2d.shadowBlur  = 12;
-
-    ctx2d.globalAlpha = 0.70; _rrect(ctx2d, ox+8,  oy+26, 30, 18, 9);   // palm
-    ctx2d.globalAlpha = 0.70;                                              // thumb
-    ctx2d.save();
-    ctx2d.translate(ox+5, oy+36); ctx2d.rotate(-20 * Math.PI / 180);
-    ctx2d.beginPath(); ctx2d.ellipse(0, 0, 5, 8, 0, 0, Math.PI * 2); ctx2d.fill();
-    ctx2d.restore();
-    ctx2d.globalAlpha = 0.78; _rrect(ctx2d, ox+10, oy+2,  10, 32, 5);   // index finger
-    ctx2d.globalAlpha = 0.50; _rrect(ctx2d, ox+20, oy+14,  9, 20, 4.5); // middle finger
-    ctx2d.globalAlpha = 0.39; _rrect(ctx2d, ox+29, oy+16,  8, 18, 4);   // ring finger
-    ctx2d.shadowBlur  = 0;
-    ctx2d.globalAlpha = 0.30; _rrect(ctx2d, ox+12, oy+4,   3, 11, 1.5); // sheen
-
-    ctx2d.restore();
+    _drawHand(ctx2d, ox, oy);
 }
 
 function _showHint() {
@@ -710,6 +717,51 @@ function _showHint() {
     if (b) _hintTarget = { x: b.x, y: b.y };
     _hintT       = 0;
     _hintVisible = true;
+}
+
+// One-time entry gate. Covers the bubbles until the first tap, which unlocks
+// (but does NOT play) audio — decoupling the unlock gesture from the first
+// chirp so the first note lands against an already-running clock.
+function _initJoinGate() {
+    const overlay = document.getElementById('join-overlay');
+    const canvas  = document.getElementById('join-hand');
+    if (!overlay || !canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const cw  = canvas.clientWidth  || 90;
+    const ch  = canvas.clientHeight || 120;
+    canvas.width  = cw * dpr;
+    canvas.height = ch * dpr;
+    ctx.scale(dpr, dpr);
+
+    const ox = (cw - 42) / 2; // centre the 42-wide hand box
+    let _start = 0;
+    let _raf   = 0;
+
+    (function loop(ts) {
+        _raf = requestAnimationFrame(loop);
+        if (!_start) _start = ts;
+        const cycle = ((((ts - _start) / 1000) % 2)) / 2; // 0..1 over 2 s
+        // Same tap-dip envelope as _drawHint: 0→14 px (0–35 %), back (35–55 %)
+        let dip = 0;
+        if      (cycle < 0.35) dip = (cycle / 0.35) * 14;
+        else if (cycle < 0.55) dip = (1 - (cycle - 0.35) / 0.20) * 14;
+        ctx.clearRect(0, 0, cw, ch);
+        _drawHand(ctx, ox, (ch - 46) / 2 - dip);
+    })(0);
+
+    overlay.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();   // keep the document handler from clearing the post-join hint
+        _ensureAudioCtx();     // create + resume inside the gesture
+        _silentAudioKick();
+        _lastTapMs = Date.now();
+        overlay.classList.add('dismissed');
+        cancelAnimationFrame(_raf);
+        _showHint();           // point a hand at the first real bubble
+        setTimeout(() => overlay.remove(), 600);
+    }, { once: true });
 }
 
 _initNoteCanvas();
@@ -730,8 +782,10 @@ document.addEventListener('pointerdown', () => {
 });
 
 if (!isBot) {
-    _showHint(); // initial show, pointed at a random bubble
-    setInterval(() => {
+    _initJoinGate();                 // was: _showHint()
+    setInterval(() => {              // keep the 20 s inactivity re-show
         if (Date.now() - _lastTapMs > 20_000) _showHint();
     }, 2000);
+} else {
+    document.getElementById('join-overlay')?.remove();  // bots skip the gate
 }
