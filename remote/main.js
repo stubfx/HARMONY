@@ -169,10 +169,16 @@ function _ensureReverb(ctx) {
 }
 
 // ── Chirp — local speakBinary played on the phone's own AudioContext ──────────
-// Exactly mirrors the sim's speakBinary: sine gliding between two frequencies,
-// 200ms per bit. note index → value (index+1) → binary string → melodic glide.
+// A sine glides between two frequencies, 200ms per bit. Each note keeps its own
+// pitch pair (oneHz/zeroHz); the bit string sets the rhythm/melodic contour.
 const CHIRP_BIT_MS      = 200;
 const CHIRP_COOLDOWN_MS = 800;
+
+// Per-note chirp patterns — capped at 2 bits so no chirp exceeds 400ms. The old
+// encoding used (noteIdx+1) in binary, which pushed higher notes to 3–4 bits
+// (600–800ms). These short patterns mix single tones with up/down glides so the
+// nine notes stay distinct even though every chirp is now short.
+const CHIRP_PATTERNS = ['1', '10', '01', '11', '1', '10', '01', '10', '01'];
 
 let _chirpCooldownUntil = 0;
 
@@ -181,8 +187,7 @@ let _chirpCooldownUntil = 0;
 function _localChirp(noteIdx, oneHz = 1245, zeroHz = 623) {
     const ctx  = _ensureAudioCtx();
     _ensureReverb(ctx);
-    const value = noteIdx + 1;
-    const bits  = value.toString(2);
+    const bits  = CHIRP_PATTERNS[noteIdx] ?? '1';
     const dur   = (bits.length * CHIRP_BIT_MS) / 1000;
     const glide = (CHIRP_BIT_MS / 1000) * 0.55;
     const freqAt = i => bits[i] === '1' ? oneHz : zeroHz;
