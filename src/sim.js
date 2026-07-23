@@ -2926,14 +2926,8 @@ function writeRenderUB() {
 }
 
 
-function writeFadeUB(dt) {
-    // The fade pass multiplies the trail buffer by (1 - alpha) each frame, so
-    // trailDecay is a per-frame decay defined at 60 fps. Raise the keep factor
-    // to the power of dt*60 so the decay-per-second — and thus trail length and
-    // contrast — stays constant when the frame rate drops.
-    _fadeF[0] = params.trailEnabled
-        ? 1.0 - Math.pow(1.0 - params.trailDecay, dt * 60.0)
-        : 1.0;
+function writeFadeUB() {
+    _fadeF[0] = params.trailEnabled ? params.trailDecay : 1.0;
     device.queue.writeBuffer(fadeUB, 0, _fadeAB);
 }
 
@@ -3258,7 +3252,7 @@ function frame(ts) {
 
     writeSoloUB(dt, now);
     writeRenderUB();
-    writeFadeUB(dt);
+    writeFadeUB();
     writeBlitUB();
     writeContamUB();
 
