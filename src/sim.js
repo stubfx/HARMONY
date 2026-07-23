@@ -100,7 +100,7 @@ const params = {
     avoidForceStr:        1.0,  // multiplier on avoidance-map deflection forces
     avoidMapScale:        1.0,  // avoidance map coverage as fraction of canvas (1.0 = full)
     avoidMapInvert:  false, // true = read the map as 1 - r, so light areas become non-avoid and dark areas become the avoid signal
-    avoidMapSampleColor: true,  // true = particles take their base color from the avoid map sample at their position
+    avoidMapSampleColor: false, // off because current avoid-maps are binary (pure white on black), so sampling only produced dim anti-aliased-edge agents; true = particles take their base color from the avoid map sample at their position
     avoidMapFixedColor:  true,  // true (paired with sampleColor) = use the sampled pixel exactly
     avoidMapBlackCutoff: 0.05,  // luminance floor for the color sample: pixels below this are skipped (particle keeps base color)
     showAvoidMapImage: false, // debug: overlay avoidmap image on canvas
