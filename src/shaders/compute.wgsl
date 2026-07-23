@@ -177,6 +177,13 @@ struct ContamParams {
 const PI:     f32 = 3.14159265358979;
 const TWO_PI: f32 = 6.28318530717959;
 
+// Avoidance sub-stepping: split a frame's movement into chunks no larger than
+// SUBSTEP_TARGET_PX so the stiff avoid-map edge force is integrated stably even
+// when dt is large (low FPS, where dt*60 reaches 3). 5 px ≈ one 60-fps step, so
+// the keep-out margin around white regions stays the same width at any frame rate.
+const MAX_SUBSTEPS:      i32 = 4;
+const SUBSTEP_TARGET_PX: f32 = 5.0;
+
 fn chladniDirAngle(x: f32, y: f32, cx: f32, cy: f32, m: f32, n: f32, sym: f32) -> f32 {
     let xn = x / (2.0 * cx);
     let yn = y / (2.0 * cy);
@@ -268,8 +275,12 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     var wind = vec2<f32>(cos(windAngle), sin(windAngle)) * params.windStr
              + vec2<f32>(params.windBiasX, params.windBiasY);
 
+    // ── Soft steering (once per frame) ─────────────────────────────────────────
+    // Formula heading, wind, Game-of-Life and contamination are smooth, non-stiff
+    // fields, so they are integrated once per frame using the full dt. The stiff
+    // avoidance-map force is sub-stepped below, so its expensive trig inputs
+    // (desired/wind, already computed above) are hoisted out of the loop.
     {
-        // ── Free agent: formula steering + wind ───────────────────────────────
         if (params.followFormula != 0u) {
             vel = mix(vel, desired * (params.stepLen * weight), params.turnRate);
         }
@@ -308,18 +319,35 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                 }
             }
         }
+    }
 
-        // ── Avoidance map ──────────────────────────────────────────────────────
-        // Grayscale mask (white = repel, black = pass). Gradient-based deflection:
-        // agents push toward lower values and are deflected at edges, scaled by
-        // avoidForceStr.
+    // ── Avoidance map + integration (sub-stepped) ──────────────────────────────
+    // The avoid-map force is stiff at white-region edges. With a large per-frame
+    // step (low FPS, dt*60 up to 3) an agent overshoots the fixed look-ahead and
+    // gradient band, tunnels into white, and is ejected — carving a visible empty
+    // margin that traces the white perimeter. Splitting movement into sub-steps
+    // no larger than SUBSTEP_TARGET_PX keeps the edge tracking stable so that
+    // margin stays the same width at any frame rate. Only the cheap avoid-map
+    // sampling and the Euler update repeat; the trig above runs once.
+    var np = pos;
+    let stepPx = length(vel) * params.dt * 60.0;
+    var nSub: i32 = 1;
+    if (params.hasAvoidMap != 0u) {
+        nSub = clamp(i32(ceil(stepPx / SUBSTEP_TARGET_PX)), 1, MAX_SUBSTEPS);
+    }
+    let subDt = params.dt / f32(nSub);
+
+    for (var s: i32 = 0; s < nSub; s = s + 1) {
         if (params.hasAvoidMap != 0u) {
+            // Grayscale mask (white = repel, black = pass). Gradient-based
+            // deflection: agents push toward lower values and are deflected at
+            // edges, scaled by avoidForceStr.
             let EPS    = 4.0;
-            let mapStr = avoidMapStrAt(pos);
-            let gx     = avoidMapStrAt(vec2<f32>(pos.x + EPS, pos.y))
-                       - avoidMapStrAt(vec2<f32>(pos.x - EPS, pos.y));
-            let gy     = avoidMapStrAt(vec2<f32>(pos.x, pos.y + EPS))
-                       - avoidMapStrAt(vec2<f32>(pos.x, pos.y - EPS));
+            let mapStr = avoidMapStrAt(np);
+            let gx     = avoidMapStrAt(vec2<f32>(np.x + EPS, np.y))
+                       - avoidMapStrAt(vec2<f32>(np.x - EPS, np.y));
+            let gy     = avoidMapStrAt(vec2<f32>(np.x, np.y + EPS))
+                       - avoidMapStrAt(vec2<f32>(np.x, np.y - EPS));
             let grad    = vec2<f32>(gx, gy);
             let gradLen = length(grad);
 
@@ -327,13 +355,13 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                 // Inside a white zone — push toward lower values (toward black)
                 if (gradLen > 0.001) {
                     vel += -normalize(grad) * params.maxSpeed * mapStr
-                         * params.dt * 60.0 * params.avoidForceStr;
+                         * subDt * 60.0 * params.avoidForceStr;
                 } else {
                     // Flat fill — push outward from map centre
-                    let away = pos - vec2<f32>(params.canvasW * 0.5, params.canvasH * 0.5);
+                    let away = np - vec2<f32>(params.canvasW * 0.5, params.canvasH * 0.5);
                     if (length(away) > 0.001) {
                         vel += normalize(away) * params.maxSpeed * mapStr
-                             * params.dt * 60.0 * params.avoidForceStr;
+                             * subDt * 60.0 * params.avoidForceStr;
                     }
                 }
             } else if (gradLen > 0.001) {
@@ -343,7 +371,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                     let gradDir     = normalize(grad);
                     let inwardSpeed = dot(gradDir, vel);
                     if (inwardSpeed > 0.0) {
-                        let futurePos = pos + normalize(vel) * (params.stepLen * 4.0);
+                        let futurePos = np + normalize(vel) * (params.stepLen * 4.0);
                         let lookStr   = avoidMapStrAt(futurePos);
                         if (lookStr > 0.05) {
                             let strength = smoothstep(0.05, 1.0, lookStr);
@@ -353,23 +381,23 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                 }
             }
         }
-    }
 
-    let spd = length(vel);
-    if (spd > params.maxSpeed) { vel = vel * (params.maxSpeed / spd); }
-    if (spd < params.minSpeed && spd > 0.00001) { vel = vel * (params.minSpeed / spd); }
+        let spd = length(vel);
+        if (spd > params.maxSpeed) { vel = vel * (params.maxSpeed / spd); }
+        if (spd < params.minSpeed && spd > 0.00001) { vel = vel * (params.minSpeed / spd); }
 
-    var np = pos + vel * params.dt * 60.0;
-    if (params.bounceEdges != 0u) {
-        if (np.x < 0.0)              { np.x =  -np.x;                      vel.x =  abs(vel.x); }
-        else if (np.x > params.canvasW) { np.x = 2.0 * params.canvasW - np.x; vel.x = -abs(vel.x); }
-        if (np.y < 0.0)              { np.y =  -np.y;                      vel.y =  abs(vel.y); }
-        else if (np.y > params.canvasH) { np.y = 2.0 * params.canvasH - np.y; vel.y = -abs(vel.y); }
-        np.x = clamp(np.x, 0.0, params.canvasW);
-        np.y = clamp(np.y, 0.0, params.canvasH);
-    } else {
-        np.x = ((np.x % params.canvasW) + params.canvasW) % params.canvasW;
-        np.y = ((np.y % params.canvasH) + params.canvasH) % params.canvasH;
+        np = np + vel * subDt * 60.0;
+        if (params.bounceEdges != 0u) {
+            if (np.x < 0.0)              { np.x =  -np.x;                      vel.x =  abs(vel.x); }
+            else if (np.x > params.canvasW) { np.x = 2.0 * params.canvasW - np.x; vel.x = -abs(vel.x); }
+            if (np.y < 0.0)              { np.y =  -np.y;                      vel.y =  abs(vel.y); }
+            else if (np.y > params.canvasH) { np.y = 2.0 * params.canvasH - np.y; vel.y = -abs(vel.y); }
+            np.x = clamp(np.x, 0.0, params.canvasW);
+            np.y = clamp(np.y, 0.0, params.canvasH);
+        } else {
+            np.x = ((np.x % params.canvasW) + params.canvasW) % params.canvasW;
+            np.y = ((np.y % params.canvasH) + params.canvasH) % params.canvasH;
+        }
     }
 
     // DOT mode centre-respawn — two-frame process to avoid edge-flash artefacts:
