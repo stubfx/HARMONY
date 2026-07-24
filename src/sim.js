@@ -766,6 +766,31 @@ let avoidMapTex     = null;
 let avoidMapTexView = null;
 let hasAvoidMap     = false;
 
+// Size-keyed pool of avoid-map textures. Avoid maps churn during a show (harmony
+// enter/exit, QR overlay, trace text); each load used to destroy() + createTexture()
+// + rebuild bind groups synchronously on the main thread, spiking the frame rate.
+// Reusing a texture of the same size makes a repeat load a bare pixel upload — no
+// GPU (re)allocation, no bind-group churn. Bounded by the number of distinct sizes
+// (harmony buckets ≤6 at ≤1024 px, QR/text use one or two canvas sizes).
+const _avoidMapTexPool = new Map(); // "wxh" -> GPUTexture
+function ensureAvoidMapTexture(w, h) {
+    const key = `${w}x${h}`;
+    let tex = _avoidMapTexPool.get(key);
+    if (!tex) {
+        tex = device.createTexture({
+            size:   [w, h],
+            format: 'rgba8unorm',
+            usage:  GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+        _avoidMapTexPool.set(key, tex);
+    }
+    return tex;
+}
+
+// Gated behind ?perflog=1: warns when a loadAvoidMap call exceeds this budget so the
+// synchronous upload/alloc/rebuild cost can be measured on the native-GPU hardware.
+const _perfLogAvoidMap = _urlParams.has('perflog');
+
 // Fade: black quad, alpha blend
 const fadeMod = device.createShaderModule({ code: fadeWGSL });
 const fadePipe = device.createRenderPipeline({
@@ -1246,22 +1271,21 @@ function updateQROverlay() {
     const actx   = avoidCanvas.getContext('2d');
     actx.drawImage(qrBitmap, cx - size / 2, cy - size / 2, size, size);
 
-    if (avoidMapTex) avoidMapTex.destroy();
-    avoidMapTex = device.createTexture({
-        size:   [canvas.width, canvas.height],
-        format: 'rgba8unorm',
-        usage:  GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-    });
+    const tex     = ensureAvoidMapTexture(canvas.width, canvas.height);
+    const changed = tex !== avoidMapTex;
+    avoidMapTex   = tex;
     device.queue.copyExternalImageToTexture(
         { source: avoidCanvas },
         { texture: avoidMapTex },
         [canvas.width, canvas.height],
     );
-    avoidMapTexView  = avoidMapTex.createView();
     hasAvoidMap      = true;
     _qrOwnedAvoidMap = true;
-    rebuildSimBG();
-    rebuildRenderBG();
+    if (changed) {
+        avoidMapTexView = avoidMapTex.createView();
+        rebuildSimBG();
+        rebuildRenderBG();
+    }
 }
 
 // ── Google Fonts loader ─────────────────────────────────────────────────────
@@ -1342,7 +1366,7 @@ function renderTextAvoidMap() {
         if (_textOwnedAvoidMap) {
             _textOwnedAvoidMap = false;
             clearAvoidGif();
-            if (avoidMapTex) { avoidMapTex.destroy(); avoidMapTex = null; }
+            avoidMapTex     = null; // pooled texture survives for reuse
             avoidMapTexView = null;
             hasAvoidMap     = false;
             rebuildSimBG();
@@ -1408,19 +1432,18 @@ function renderTextAvoidMap() {
 
     // Upload to avoidMapTex
     clearAvoidGif();
-    if (avoidMapTex) avoidMapTex.destroy();
-    avoidMapTex = device.createTexture({
-        size:   [w, h],
-        format: 'rgba8unorm',
-        usage:  GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-    });
+    const tex     = ensureAvoidMapTexture(w, h);
+    const changed = tex !== avoidMapTex;
+    avoidMapTex   = tex;
     device.queue.copyExternalImageToTexture({ source: _textAvoidCanvas }, { texture: avoidMapTex }, [w, h]);
-    avoidMapTexView    = avoidMapTex.createView();
     hasAvoidMap        = true;
     _qrOwnedAvoidMap   = false;
     _textOwnedAvoidMap = true;
-    rebuildSimBG();
-    rebuildRenderBG();
+    if (changed) {
+        avoidMapTexView = avoidMapTex.createView();
+        rebuildSimBG();
+        rebuildRenderBG();
+    }
 }
 
 // ── Auto-clear timer ──────────────────────────────────────────────────────────
@@ -2643,18 +2666,22 @@ async function loadAvoidMap(source) {
         avoidGifNextFrameAt = performance.now() + durations[0];
     }
 
-    if (avoidMapTex) avoidMapTex.destroy();
-    avoidMapTex = device.createTexture({
-        size:   [bmp.width, bmp.height],
-        format: 'rgba8unorm',
-        usage:  GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-    });
+    const _t0     = _perfLogAvoidMap ? performance.now() : 0;
+    const tex     = ensureAvoidMapTexture(bmp.width, bmp.height);
+    const changed = tex !== avoidMapTex;
+    avoidMapTex   = tex;
     device.queue.copyExternalImageToTexture({ source: bmp }, { texture: avoidMapTex }, [bmp.width, bmp.height]);
-    avoidMapTexView = avoidMapTex.createView();
     hasAvoidMap     = true;
     _avoidMapBitmap = bmp;
-    rebuildSimBG();
-    rebuildRenderBG();
+    if (changed) {
+        avoidMapTexView = avoidMapTex.createView();
+        rebuildSimBG();
+        rebuildRenderBG();
+    }
+    if (_perfLogAvoidMap) {
+        const ms = performance.now() - _t0;
+        if (ms > 3) console.warn(`[perflog] loadAvoidMap ${bmp.width}x${bmp.height} ${changed ? 'alloc+rebuild' : 'upload-only'} took ${ms.toFixed(2)} ms`);
+    }
     _updateAvoidMapOverlay();
     if (!_inQROverlayUpdate && params.qrOverlay && simState.qrStatus === 'SHOW' && qrBitmap) updateQROverlay();
 }
@@ -2662,7 +2689,7 @@ async function loadAvoidMap(source) {
 function clearAvoidMap() {
     _currentAvoidMapSrc = null;
     clearAvoidGif();
-    if (avoidMapTex) { avoidMapTex.destroy(); avoidMapTex = null; }
+    avoidMapTex        = null; // pooled texture survives for reuse
     avoidMapTexView    = null;
     hasAvoidMap        = false;
     _avoidMapBitmap    = null;
