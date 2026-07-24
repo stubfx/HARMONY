@@ -150,6 +150,29 @@ document.addEventListener('visibilitychange', () => {
     }
 });
 
+// ── Wake-from-sleep → hard reload ─────────────────────────────────────────────
+// When the phone sleeps (screen lock) or the tab is backgrounded, the JS event
+// loop freezes: the socket drops, audio suspends and the animation clock stalls.
+// Piecemeal recovery is fragile, so we detect the freeze and reload for a clean
+// slate. A heartbeat measures its own scheduling gap — while frozen it stops
+// ticking, so on wake the gap far exceeds the interval. visibilitychange gives an
+// instant check on unlock; the heartbeat is the fallback if that event doesn't
+// fire. Bots run in dashboard iframes and must never reload.
+if (!isBot) {
+    const WAKE_GAP_MS = 10_000;
+    let _lastBeat = Date.now();
+    function _checkWake() {
+        const now = Date.now();
+        const gap = now - _lastBeat;
+        _lastBeat = now;
+        if (gap > WAKE_GAP_MS) location.reload();
+    }
+    setInterval(_checkWake, 2000);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') _checkWake();
+    });
+}
+
 function _ensureReverb(ctx) {
     if (_reverbNode) return;
     const sr  = ctx.sampleRate;
