@@ -39,6 +39,8 @@ export function initGUI({
         uiEl.style.display           = show ? 'flex' : 'none';
         monitorEl.style.display      = show ? 'flex' : 'none';
         gui.domElement.style.display = show ? ''     : 'none';
+        // Hide the cursor when the HUD is hidden — clean projector/display view.
+        document.body.style.cursor   = show ? ''     : 'none';
     }
 
     function toggleGUI() {
