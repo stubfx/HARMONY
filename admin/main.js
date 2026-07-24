@@ -221,12 +221,6 @@ function buildPhaseNavigator() {
         grid.appendChild(btn);
     });
     controlsEl.appendChild(grid);
-
-    // STORY ⇄ SHOWCASE toggle
-    controlsEl.appendChild(mkStateBtnGroup('mode', 'mode', [
-        { label: 'STORY',    value: 'STORY',    params: { mode: 'STORY', storyStart: true } },
-        { label: 'SHOWCASE', value: 'SHOWCASE', params: { mode: 'SHOWCASE' } },
-    ]));
 }
 
 // ── C. Effects ───────────────────────────────────────────────────────────────
