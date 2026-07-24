@@ -13,6 +13,9 @@ export const PHASE = Object.freeze({
     P8: 8,
     P9: 9,
     SHOWCASE: 'SHOWCASE',
+    // Closing finale — a terminal shutdown stage the director triggers from the
+    // admin. Numbered 104 to stand apart from the linear P1–P9 flow.
+    CLOSING: 104,
 });
 
 // Reseed modes passed to sim.reseed() / seedAgents().

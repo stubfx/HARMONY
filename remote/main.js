@@ -72,6 +72,20 @@ function sendEvent(type, data) {
 // ── Story step ────────────────────────────────────────────────────────────────
 let _currentStep = -1;
 
+// Closing finale — STORY array index of the CLOSING stage (src/story.js). When the
+// show reaches it, the phone is taken over by the thank-you message and every
+// input and sound is locked out until the tab reloads.
+const CLOSING_STEP      = 10;
+let   _showClosed       = false;
+const _closingOverlayEl = document.querySelector('#closing-overlay');
+
+function _enterClosing() {
+    if (_showClosed) return;
+    _showClosed = true;
+    _closingOverlayEl?.classList.remove('hidden');
+    _audioCtx?.suspend?.(); // kill sound; the visibilitychange resume is guarded below
+}
+
 let _lastTapMs = Date.now(); // tracks last tap for 20 s inactivity re-show
 let _pickHintTarget = () => null; // set by _initNoteCanvas once bubbles exist
 let _hintVisible = false;
@@ -163,6 +177,7 @@ function _reloadForBrokenAudio() {
 // background or an interruption arrives (call, Siri). Restore it on return
 // without requiring a fresh user gesture.
 document.addEventListener('visibilitychange', () => {
+    if (_showClosed) return; // keep audio suspended once the show has closed
     if (document.visibilityState === 'visible' && _audioCtx && _audioCtx.state !== 'running') {
         _audioCtx.resume();
     }
@@ -447,6 +462,7 @@ function _initNoteCanvas() {
     // ── Tap-to-chirp ─────────────────────────────────────────────────────────
     noteCanvasEl.addEventListener('pointerdown', (e) => {
         e.preventDefault();
+        if (_showClosed) return; // inputs locked at the closing finale
         const idx = _bubbleAt(e.offsetX, e.offsetY);
         if (idx === -1) return; // missed all bubbles
 
@@ -694,6 +710,7 @@ const _stepDebug = document.querySelector('#step-debug');
 socket.on('story-step', ({ step } = {}) => {
     _currentStep = typeof step === 'number' ? step : -1;
     if (_stepDebug) _stepDebug.textContent = _currentStep >= 0 ? _currentStep + 1 : '';
+    if (_currentStep === CLOSING_STEP) _enterClosing();
     updateAura();
 });
 
@@ -827,6 +844,7 @@ if (isBot) {
     try { window.parent?.postMessage({ type: 'bot-ready' }, window.location.origin); } catch {}
 }
 document.addEventListener('pointerdown', () => {
+    if (_showClosed) return; // inputs/sounds locked at the closing finale
     _silentAudioKick();
     _lastTapMs   = Date.now();
     _hintVisible = false;

@@ -555,6 +555,11 @@ function _rawTeleport(x, y, fraction = 0.1) {
 let _musicStarted        = false;
 let _blinkersLoopStarted = false;
 
+// Brightness fade-to-black state (closing finale). fadeToBlack ramps params.brightness
+// to 0; restoreBrightness puts back the pre-fade value on phase exit / restart.
+let _brightnessFadeIval  = null;
+let _brightnessBeforeFade = null;
+
 const simFacade = {
     // Seed all agents dormant (weight=0), storing original weights for later restore.
     dormantSeed() {
@@ -732,6 +737,31 @@ const simFacade = {
     },
     stopBlinkersLoop() { _blinkersLoopStarted = false; ambience.stopBlinkersLoop(); },
     burstBlinkers(count, intervalMs) { ambience.burstBlinkers(count, intervalMs); },
+
+    // Smoothly fade every particle to black by ramping global brightness (their
+    // additive alpha) to 0 over durationMs. The pre-fade value is remembered so
+    // restoreBrightness() can undo it when the show restarts.
+    fadeToBlack(durationMs = 1500) {
+        clearInterval(_brightnessFadeIval);
+        if (_brightnessBeforeFade === null) _brightnessBeforeFade = params.brightness;
+        const start = params.brightness;
+        const t0    = performance.now();
+        _brightnessFadeIval = setInterval(() => {
+            const k = Math.min(1, (performance.now() - t0) / durationMs);
+            params.brightness = start * (1 - k);
+            brightnessCtrl?.updateDisplay();
+            if (k >= 1) { clearInterval(_brightnessFadeIval); _brightnessFadeIval = null; }
+        }, 32);
+    },
+    restoreBrightness() {
+        clearInterval(_brightnessFadeIval);
+        _brightnessFadeIval = null;
+        if (_brightnessBeforeFade !== null) {
+            params.brightness = _brightnessBeforeFade;
+            _brightnessBeforeFade = null;
+            brightnessCtrl?.updateDisplay();
+        }
+    },
 
 };
 const storyEngine = new StoryEngine(STORY, simFacade);

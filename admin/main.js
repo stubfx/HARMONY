@@ -152,6 +152,7 @@ const PHASES = [
     { code: 'P8', label: 'CLOSING' },
     { code: 'P9', label: 'AMBIENT FINALE' },
     { code: 'SHOWCASE', label: 'SHOWCASE' },
+    { code: 'P104', label: 'CLOSING' },
 ];
 
 // Chip color classes per state field. Value → semantic class.

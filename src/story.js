@@ -40,6 +40,11 @@ const PHASE_SNAPSHOTS = [
     { colorMode:'NORMAL', champLinesAlpha:0.02, limitAtCenter:false, limitAtCenterRadius:100,
       dotRespawnChance:0.002, windEnabled:true, harmonyImages:true, harmonyFallback:'aant_logo.png',
       avoidMap:'aant_logo.png', fullSynth:true, formulas:[_P1_DIR,_P1_WIND], music:true, blinkersLoop:true },
+    // CLOSING (stage 104) — grayscale, no images, wind off, dots pulled to a tight
+    // centre. The stage's enter() adds FREEROAM and the timed fade-to-black.
+    { colorMode:'GRAYSCALE', champLinesAlpha:0, limitAtCenter:true, limitAtCenterRadius:20,
+      dotRespawnChance:0, windEnabled:false, harmonyImages:false, harmonyFallback:null,
+      avoidMap:null, fullSynth:false, formulas:null, music:false, blinkersLoop:false },
 ];
 
 export function applyPhaseSnapshot(sim, idx) {
@@ -502,6 +507,46 @@ export const STORY = [
             sim.setStatus('NORMAL');
             sim.setHarmonyRiserResetCallback(null);
             sim.clearHarmonyFallback();
+        },
+    },
+
+    // ── STAGE 104 — CLOSING FINALE ────────────────────────────────────────────
+    // Terminal shutdown stage the director triggers from the admin (like PHASE 9,
+    // there is no next()). On enter: grayscale, FREEROAM, wind off, and the dots
+    // are gathered to the centre (limitAtCenter). After 2 s every particle fades
+    // to black. The remotes independently show "Grazie per la partecipazione" and
+    // lock their inputs/sounds when they see this step. limitAtCenter only pulls
+    // ~1% of outside agents per frame (compute.wgsl), so the gather is gradual and
+    // continues through the fade — reading as the field collecting then dissolving.
+    {
+        id: PHASE.CLOSING,
+        label: 'CLOSING',
+        enter(sim) {
+            log('STAGE 104 — chiusura. grayscale + freeroam, wind off, punti al centro. fade dopo 2s.');
+            sim.setColorMode('GRAYSCALE');
+            sim.setStatus('FREEROAM');
+            sim.disableHarmonyImages();
+            sim.clearHarmonyFallback();
+            sim.clearAvoidMap();
+            sim.freezeParams({
+                champLinesAlpha:     0,
+                windEnabled:         false,
+                dotRespawnChance:    0,
+                limitAtCenter:       true,
+                limitAtCenterRadius: 20,
+                freeroamLock:        false, // hold FREEROAM; don't auto-revert to NORMAL
+            });
+            this._fadeTimer = setTimeout(() => {
+                log('STAGE 104 — fade di tutti i punti a nero.');
+                sim.fadeToBlack(1500);
+            }, 2000);
+        },
+        exit(sim) {
+            log('uscita STAGE 104 (restart).');
+            clearTimeout(this._fadeTimer);
+            sim.restoreBrightness();
+            sim.setStatus('NORMAL');
+            sim.thawParams();
         },
     },
 ];

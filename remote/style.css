@@ -79,6 +79,35 @@ html, body {
     padding-left: 0.35em;
 }
 
+/* Closing finale — takes over the whole phone with a thank-you message.
+   Same Bellefair treatment as the intro, full black, above every other layer. */
+#closing-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    background: #000;
+    touch-action: none;
+    opacity: 1;
+    transition: opacity 1.2s ease;
+}
+#closing-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+#closing-text {
+    font-family: 'Bellefair', Georgia, serif;
+    font-size: 1.4rem;
+    letter-spacing: 0.2em;
+    line-height: 1.6;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.9);
+}
+
 #harmony-panel {
     position: fixed;
     inset: 0;
