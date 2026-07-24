@@ -37,7 +37,14 @@ socket.on('joined', () => {
 });
 
 socket.on('connect_error', () => console.warn('[remote] connection failed, retrying…'));
-socket.on('disconnect',    () => console.warn('[remote] disconnected'));
+// A dropped socket leaves the remote stale — taps never reach the show. Reload for
+// a clean reconnect instead of relying on socket.io's backoff. disconnect only
+// fires after a successful connect, so a server that's still down yields
+// connect_error (not disconnect) on reload — no reload loop. Bots never reload.
+socket.on('disconnect', () => {
+    console.warn('[remote] disconnected');
+    if (!isBot) location.reload();
+});
 
 socket.on('host-reconnected', () => {
     socket.emit('join-session', { room, spectatorId });
@@ -131,7 +138,7 @@ function _ensureAudioCtx() {
         if (_isIOSSafari && !_hasAudioSession) _showAudioHint();
         // Also watch for suspended/interrupted state changes (e.g. phone call, Siri)
         _audioCtx.addEventListener('statechange', () => {
-            if (_audioCtx.state === 'running') _hideAudioHint();
+            if (_audioCtx.state === 'running') { _hideAudioHint(); sessionStorage.removeItem('audio-reload'); }
             else if (_isIOSSafari) _showAudioHint();
         });
     }
@@ -139,6 +146,17 @@ function _ensureAudioCtx() {
         _audioCtx.resume().then(() => _hideAudioHint());
     }
     return _audioCtx;
+}
+
+// On a real press we expect audio to already be unlocked (the join gate does it on
+// first tap). If the context refuses to resume, the audio permission/state is
+// broken — reload once for a fresh unlock gesture. The sessionStorage guard
+// (cleared once audio runs) prevents a reload loop on a device where audio never
+// starts. Bots never reload.
+function _reloadForBrokenAudio() {
+    if (isBot || sessionStorage.getItem('audio-reload')) return;
+    sessionStorage.setItem('audio-reload', '1');
+    location.reload();
 }
 
 // Safari iOS suspends/interrupts the AudioContext when the page goes to the
@@ -437,7 +455,12 @@ function _initNoteCanvas() {
         _chirpCooldownUntil = now + CHIRP_COOLDOWN_MS;
 
         const bubble = _bubbles[idx];
-        if (_audioCtx && _audioCtx.state !== 'running') _audioCtx.resume();
+        if (_audioCtx && _audioCtx.state !== 'running') {
+            _audioCtx.resume().then(
+                () => { if (_audioCtx.state !== 'running') _reloadForBrokenAudio(); },
+                () => _reloadForBrokenAudio(),
+            );
+        }
 
         pushedColor = bubble.color;
         updateAura();
