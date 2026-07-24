@@ -2357,6 +2357,10 @@ function _startVoteTimer(status) {
 // verbatim, so every operator-visible field lives here in one place.
 function _simStatePayload() {
     return {
+        // The sim page's own origin — the only host that serves /simremotes/ and
+        // /remote/. The admin (a different subdomain) uses this to open simremotes
+        // on the simulation's URL rather than its own.
+        simUrl:     window.location.origin,
         phaseIndex: storyEngine.index,
         phaseId:    storyEngine.stepId,
         phaseLabel: storyEngine.current?.label ?? null,

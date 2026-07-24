@@ -302,11 +302,12 @@ function buildTools() {
     const simremotesBtn = document.createElement('button');
     simremotesBtn.className   = 'btn-big';
     simremotesBtn.textContent = '⧉  simremotes';
-    // simremotes spawns /remote/ bot iframes that must run on the public site, so
-    // the link targets VITE_USER_URL (thesis.lucamolluso.com in prod), falling back
-    // to the current origin in dev. Opens a synthetic crowd against this session.
+    // simremotes spawns /remote/ bot iframes that must run on the simulation host
+    // (the only domain serving /simremotes/ and /remote/), not the admin subdomain.
+    // The sim broadcasts its own origin as simUrl; fall back to this origin in dev.
+    // Opens a synthetic crowd against this session.
     simremotesBtn.addEventListener('click', () => {
-        const base = (import.meta.env.VITE_USER_URL ?? '').replace(/\/$/, '') || location.origin;
+        const base = (_state?.simUrl ?? '').replace(/\/$/, '') || location.origin;
         window.open(`${base}/simremotes/?s=${encodeURIComponent(room)}`, '_blank', 'noopener');
     });
     row.appendChild(simremotesBtn);
