@@ -288,12 +288,6 @@ function buildEmergency() {
     const row2 = document.createElement('div');
     row2.className = 'btn-row';
     row2.appendChild(mkGuardBtn('✕  clear trace', 'btn-clear', 'Clear the trace?', { clearTrace: true, caption: '' }));
-
-    const shotBtn = document.createElement('button');
-    shotBtn.className   = 'btn-big btn-shot';
-    shotBtn.textContent = '⎙  screenshot';
-    shotBtn.addEventListener('click', () => send({ capture: true }));
-    row2.appendChild(shotBtn);
     controlsEl.appendChild(row2);
 }
 
@@ -308,10 +302,12 @@ function buildTools() {
     const simremotesBtn = document.createElement('button');
     simremotesBtn.className   = 'btn-big';
     simremotesBtn.textContent = '⧉  simremotes';
-    // Origin-relative so it works in dev (vite) and prod alike; opens a synthetic
-    // crowd against this session. Bot count is the simremotes default.
+    // simremotes spawns /remote/ bot iframes that must run on the public site, so
+    // the link targets VITE_USER_URL (thesis.lucamolluso.com in prod), falling back
+    // to the current origin in dev. Opens a synthetic crowd against this session.
     simremotesBtn.addEventListener('click', () => {
-        window.open(`/simremotes/?s=${encodeURIComponent(room)}`, '_blank', 'noopener');
+        const base = (import.meta.env.VITE_USER_URL ?? '').replace(/\/$/, '') || location.origin;
+        window.open(`${base}/simremotes/?s=${encodeURIComponent(room)}`, '_blank', 'noopener');
     });
     row.appendChild(simremotesBtn);
 

@@ -40,11 +40,10 @@ const PHASE_SNAPSHOTS = [
     { colorMode:'NORMAL', champLinesAlpha:0.02, limitAtCenter:false, limitAtCenterRadius:100,
       dotRespawnChance:0.002, windEnabled:true, harmonyImages:true, harmonyFallback:'aant_logo.png',
       avoidMap:'aant_logo.png', fullSynth:true, formulas:[_P1_DIR,_P1_WIND], music:true, blinkersLoop:true },
-    // CLOSING (stage 104) — grayscale, no images, wind off, dots pulled to a tight
-    // centre. The stage's enter() adds FREEROAM and the timed fade-to-black.
-    { colorMode:'GRAYSCALE', champLinesAlpha:0, limitAtCenter:true, limitAtCenterRadius:20,
+    // CLOSING (stage 104) — grayscale, no images, wind off, soft inward pull.
+    { colorMode:'GRAYSCALE', champLinesAlpha:0, limitAtCenter:false, limitAtCenterRadius:100,
       dotRespawnChance:0, windEnabled:false, harmonyImages:false, harmonyFallback:null,
-      avoidMap:null, fullSynth:false, formulas:null, music:false, blinkersLoop:false },
+      avoidMap:null, fullSynth:false, formulas:[_P1_DIR,_P1_WIND], music:false, blinkersLoop:false },
 ];
 
 export function applyPhaseSnapshot(sim, idx) {
@@ -512,30 +511,33 @@ export const STORY = [
 
     // ── STAGE 104 — CLOSING FINALE ────────────────────────────────────────────
     // Terminal shutdown stage the director triggers from the admin (like PHASE 9,
-    // there is no next()). On enter: grayscale, FREEROAM, wind off, and the dots
-    // are gathered to the centre (limitAtCenter). After 2 s every particle fades
-    // to black. The remotes independently show "Grazie per la partecipazione" and
-    // lock their inputs/sounds when they see this step. limitAtCenter only pulls
-    // ~1% of outside agents per frame (compute.wgsl), so the gather is gradual and
-    // continues through the fade — reading as the field collecting then dissolving.
+    // there is no next()). Marked adminOnly so the linear story flow / "next →"
+    // transport can never fall into it — only an explicit admin goto (P104) enters.
+    // On enter: grayscale, NORMAL status with the inward swirl formula, wind off.
+    // The global inward formula steers the bulk of the field toward the centre
+    // while keeping it moving (the swirl term prevents collapse to a point), so it
+    // reads as a loose milling cluster rather than a single frozen dot. After 2 s
+    // every particle fades to black. The remotes independently show "Grazie per la
+    // partecipazione" and lock their inputs/sounds when they see this step.
     {
         id: PHASE.CLOSING,
         label: 'CLOSING',
+        adminOnly: true,
         enter(sim) {
-            log('STAGE 104 — chiusura. grayscale + freeroam, wind off, punti al centro. fade dopo 2s.');
+            log('STAGE 104 — chiusura. grayscale, pull morbido verso il centro (in movimento), wind off. fade dopo 2s.');
             sim.setColorMode('GRAYSCALE');
-            sim.setStatus('FREEROAM');
+            sim.setStatus('NORMAL');
             sim.disableHarmonyImages();
             sim.clearHarmonyFallback();
             sim.clearAvoidMap();
             sim.freezeParams({
-                champLinesAlpha:     0,
-                windEnabled:         false,
-                dotRespawnChance:    0,
-                limitAtCenter:       true,
-                limitAtCenterRadius: 20,
-                freeroamLock:        false, // hold FREEROAM; don't auto-revert to NORMAL
+                champLinesAlpha:  0,
+                windEnabled:      false,
+                dotRespawnChance: 0,
+                followFormula:    true,
+                autoDir:          false,   // hold the inward formula; don't auto-cycle
             });
+            sim.setFormulas(_P1_DIR, _P1_WIND); // inward swirl → flows toward centre, keeps moving
             this._fadeTimer = setTimeout(() => {
                 log('STAGE 104 — fade di tutti i punti a nero.');
                 sim.fadeToBlack(1500);
@@ -545,7 +547,6 @@ export const STORY = [
             log('uscita STAGE 104 (restart).');
             clearTimeout(this._fadeTimer);
             sim.restoreBrightness();
-            sim.setStatus('NORMAL');
             sim.thawParams();
         },
     },

@@ -18,7 +18,13 @@ export class StoryEngine {
     set onGoto(fn) { this._onGoto = fn; }
 
     start()    { this._goto(0); }
-    next()     { this._goto(this._index + 1); }
+    // Linear advance. Skips adminOnly stages (e.g. CLOSING) so the story flow and
+    // the "next →" transport can never fall into them — only goto() may enter.
+    next()     {
+        let i = this._index + 1;
+        while (this._steps[i]?.adminOnly) i++;
+        this._goto(i);
+    }
     goto(i)    { this._goto(i); }
 
     _goto(i) {
