@@ -191,6 +191,7 @@ function buildUI() {
     buildAvoidPicker();
     buildGlobalVisual();
     buildEmergency();
+    buildTools();
     buildAdvanced();
 }
 
@@ -293,6 +294,27 @@ function buildEmergency() {
     shotBtn.addEventListener('click', () => send({ capture: true }));
     row2.appendChild(shotBtn);
     controlsEl.appendChild(row2);
+}
+
+// ── F2. Tools ────────────────────────────────────────────────────────────────
+function buildTools() {
+    if (!room) return; // simremotes needs the session token to join the same room
+    controlsEl.appendChild(mkLabel('Tools'));
+
+    const row = document.createElement('div');
+    row.className = 'btn-row';
+
+    const simremotesBtn = document.createElement('button');
+    simremotesBtn.className   = 'btn-big';
+    simremotesBtn.textContent = '⧉  simremotes';
+    // Origin-relative so it works in dev (vite) and prod alike; opens a synthetic
+    // crowd against this session. Bot count is the simremotes default.
+    simremotesBtn.addEventListener('click', () => {
+        window.open(`/simremotes/?s=${encodeURIComponent(room)}`, '_blank', 'noopener');
+    });
+    row.appendChild(simremotesBtn);
+
+    controlsEl.appendChild(row);
 }
 
 // ── E2. Formula presets ──────────────────────────────────────────────────────

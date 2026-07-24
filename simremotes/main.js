@@ -4,7 +4,7 @@ import './style.css';
 // iframes, so the sim can be exercised solo. Takes one ?s=<token> like the remote.
 const params = new URLSearchParams(location.search);
 const token  = params.get('s');
-const n      = Math.max(1, parseInt(params.get('n') ?? '15', 10) || 15);
+const n      = Math.max(1, parseInt(params.get('n') ?? '6', 10) || 6);
 
 const grid = document.getElementById('grid');
 
