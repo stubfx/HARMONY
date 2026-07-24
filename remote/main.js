@@ -705,11 +705,8 @@ function _initNoteCanvas() {
 }
 
 // ── Story step socket handler ─────────────────────────────────────────────────
-// _stepDebug is intentional — keep it. Small phase number at top for director use.
-const _stepDebug = document.querySelector('#step-debug');
 socket.on('story-step', ({ step } = {}) => {
     _currentStep = typeof step === 'number' ? step : -1;
-    if (_stepDebug) _stepDebug.textContent = _currentStep >= 0 ? _currentStep + 1 : '';
     if (_currentStep === CLOSING_STEP) _enterClosing();
     updateAura();
 });

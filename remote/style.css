@@ -35,18 +35,6 @@ html, body {
 }
 #audio-hint.hidden { opacity: 0; }
 
-#step-debug {
-    position: fixed;
-    top: 0.6rem;
-    left: 50%;
-    transform: translateX(-50%);
-    font-family: ui-monospace, monospace;
-    font-size: 0.6rem;
-    letter-spacing: 0.2em;
-    color: rgba(255, 255, 255, 0.25);
-    pointer-events: none;
-    z-index: 30;
-}
 
 #join-overlay {
     position: fixed;
